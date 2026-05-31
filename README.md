@@ -209,15 +209,37 @@ The premium glassmorphic user interface is divided into dedicated workspaces:
 *   **Alert Tracker Panel**: View active alerts, trigger timestamps, and indicators.
 
 ### 2. Single Stock Workspace
-*   **Core Metrics Table**: Comparative grid mapping analyst actions, ROE/ROCE percentages, debt levels, DCF safety margins, RSI, and moving average trends.
-*   **Historical P/E Bands Card**: Plots current trailing P/E multiples directly against 5-year statistical medians, maximums, and minimums with color-coded premium indicators.
-*   **Interactive DCF Sandbox**: Allows investors to custom-model growth rates, margins, and cost of capital, recalculating valuation models in real-time.
-*   **Catalyst Headlines Feed**: Renders publisher, title, and links for news and technical articles.
+*   **Bloomberg-Style Sub-Tabs Navigation**: Divides the 21+ comprehensive analytics cards into 6 logical sub-tabs, completely replacing vertical scrolling with structured, active-scaling workspaces:
+    1.  `📋 Executive Summary`: Business profiles, CIO prospectus checklist, growth catalysts, and risk indicators.
+    2.  `📊 Valuation & DCF`: DCF sandbox, cost of capital sliders, sensitivity matrices, consensus targets, and historical PE bands.
+    3.  `📉 Technical Timing`: SMA price chart curves, RSI momentum listings, Fibonacci retracements, capturing ratios, and drawdowns.
+    4.  `🩺 Ratios & Earnings`: Altman Z-Score, Piotroski F-Score logs, and dynamic compounding return calculators.
+    5.  `👥 Peers & Ownership`: Competitive side-by-side matrices, rival pricing trendlines, and promoter/FII shareholdings.
+    6.  `🔬 Agent Strategy Audit`: Multi-agent operational Diagnostics audit matrix displaying gate-by-gate pass/fail results.
+*   **Collapsible Configure PDF Sections Panel**: A glassmorphic accordion panel (**`⚙️ CONFIGURE PDF REPORT SECTIONS`**) equipped with a granular **11-checkbox matrix**. Saves valuable screen space by remaining collapsed by default, sliding open smoothly with rotating arrow chevrons (`▼` to `▲`).
+*   **Q&A Co-Pilot Prospectus Drawer**: Features a dynamic side-drawer triggered by the conviction badge pill. Supports interactive conversational chatbot prospectus queries, soft-red circular hover-closing triggers, click-outside-to-close listeners, and a **Print Prospectus** exporter button (`#print-prospectus-btn`) compiling Llama-3 synthesis into custom A4 PDF page briefs.
+*   **Dynamic Chart.js Auto-Scaler**: Bypasses browser thread suspensions on hidden elements by automatically firing window resize triggers and `.resize()` / `.update()` routines when switching sub-tabs, securing crisp, correctly scaled pricing and Fibonacci curves.
 
 ### 3. AI Stock Screener
 *   **Quantitative Strategy Selector**: Choose between Top-Down, Bottom-Up, or Hybrid screenings.
-*   **Segment Selector**: Scan the entire universe or target specific segments (Large, Mid, or Small Caps).
+*   **Segment Selector & Style Overlays**: Scan Nifty baskets or isolate targets against investment overlays (Value, Growth, Contra). Supports custom A4 print formatting and dynamic CSV ledger downloads.
 *   **Global Investor Profile Configurator**: Adjusts quality gate criteria and blended scoring algorithms dynamically in the background based on Horizon and Risk boundaries.
+
+### 4. Index Universe Registry
+*   **Index Constituent Monitor**: Complete database oversight over large, mid, and small cap NSE listings.
+*   **Sync Engine**: Supports manual constituent updates from the live exchange, displaying progress bars and caching status (`WARMED 🟢` or `COLD ⚪`).
+
+### 5. Peer Benchmarking Arena
+*   **Tactical Battleground Matrix**: Direct, side-by-side comparison grids plotting valuation, returns, and momentum indicators.
+*   **Sector Battleground Exporter**: Features a `#print-battleground-btn` button compiling peer statistics and custom Llama-3 competitive advantage theses into formal A4 report popup sheets.
+
+### 6. Watchlist Registry Workspace
+*   **SQLite Watchlist Managers**: Supports customized watchlists (Add, Delete, Rename) synced directly to SQLite.
+*   **AI Batch Scorecard Exporter**: Computes batch constituents lists, generating a Groq Llama-3 portfolio summary report (**`Generate AI Watchlist Summary`**) and launches a unified popup printer (`#print-watchlist-report-btn`) mapping the constituent table and AI risk logs.
+
+### 7. Portfolio Optimization Doctor
+*   **Holdings Allocation Ledger**: Formats and audits current holdings (tickers, cost, committed capital, unrealized net P&L).
+*   **Optimization Prescription Exporter**: Evaluates asset concentrations, computing health scores and diagnostics. Features a **Print Diagnostics Exporter** (`#print-portfolio-report-btn`) launching A4 print sheets decorated with soft green/red asset allocation meters.
 
 ---
 
@@ -239,10 +261,15 @@ When working with this codebase inside your agentic IDE, you can invoke the foll
 ### 1. Standalone vs. Consolidated Mismatch
 If a stock's current P/E appears abnormally high (e.g., JSW Energy showing standalone P/E 115x) while its historical bands indicate a consolidated median (42x), the backend automatically overrides the displayed P/E using the latest calculated entry from the yfinance historical P/E list. This guarantees that current and historical metrics remain perfectly consistent on a consolidated basis.
 
-### 2. Purging Stale Database Cache
+### 2. Self-Healing Valuation Anomalies (The GVT&D P/E Fix)
+Due to occasional delayed data updates on external Indian stock portals, **Screener.in** may publish corrupted P/E multiples (for instance, showing an outdated P/E of **706** for `GVT&D.NS` / GE Vernova T&D India Ltd). 
+The backend resolves this automatically:
+- During database mapping, it calculates a **Derived P/E** ($\text{Price} / \text{Trailing\_EPS}$ from yfinance real-time values).
+- If it detects a discrepancy $> 50$ or an outlier ($PE > 300$ while derived P/E $< 150$), it flags the data as corrupted and **self-heals the profile** using the correct trailing P/E multiple (rebuilding the valuation bands to a correct, clean multiple of **106.38**).
+
+### 3. Purging Stale Database Cache
 To force-refresh an equity's profile or clear database write lock anomalies, execute this simple SQLite purge command from the root directory:
 ```bash
 python -c "import sqlite3; conn = sqlite3.connect('backend/data/watchlist_database.db'); c = conn.cursor(); c.execute('DELETE FROM cached_profiles WHERE symbol = \'YOUR_TICKER.NS\''); conn.commit()"
 ```
 Upon the next query or background warming loop, the system will rebuild and cache the profile using the latest real-time scraping structures.
-
