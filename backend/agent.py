@@ -980,6 +980,14 @@ def run_conversational_chat(chat_history: list, user_message: str, profile: dict
     if not profile or "company_name" not in profile:
         context_prompt = "No single active company context loaded. Batch watchlist analysis mode."
     else:
+        # Cleanly format latest news items
+        news_list = profile.get("news", [])
+        news_formatted = ""
+        if news_list:
+            news_formatted = "\n".join([f"  * [{item['date']}] {item['title']} (Source: {item['publisher']})" for item in news_list[:4]])
+        else:
+            news_formatted = "  * No recent news catalysts."
+
         context_prompt = f"""
         Loaded Company Profile:
         - Name: {profile['company_name']} ({profile['ticker']})
@@ -1002,6 +1010,9 @@ def run_conversational_chat(chat_history: list, user_message: str, profile: dict
         - Rating: {profile['analysis']['recommendation']} (Valuation: {profile['analysis']['valuation_score']}/10, Growth: {profile['analysis']['growth_score']}/10)
         - Suggested Target Buy Price: {profile['analysis']['suggested_buy_price_range']}
         - Suggested Target Sell Price: {profile['analysis']['suggested_sell_price_range']}
+        
+        Recent Catalyst News:
+        {news_formatted}
         """
     
     formatted_messages = []
