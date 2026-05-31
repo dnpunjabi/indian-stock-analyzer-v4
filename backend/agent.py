@@ -44,17 +44,19 @@ def get_db():
     finally:
         conn.close()
 
-# Helper to run Groq API calls securely with fallback
-def call_groq_llm(system_prompt: str, user_prompt: str, max_tokens: int = 2500) -> str:
+def call_groq_llm(system_prompt: str, user_prompt: str = None, max_tokens: int = 2500, messages: list = None) -> str:
     if not groq_client:
         return "ERROR_401: Groq client is not initialized. Please verify your GROQ_API_KEY."
     
+    if messages is None:
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
     try:
         chat_completion = groq_client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
+            messages=messages,
             model="llama-3.3-70b-versatile",
             max_tokens=max_tokens,
             temperature=0.2
@@ -69,10 +71,7 @@ def call_groq_llm(system_prompt: str, user_prompt: str, max_tokens: int = 2500) 
             
         try:
             chat_completion = groq_client.chat.completions.create(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+                messages=messages,
                 model="llama3-70b-8192",
                 max_tokens=max_tokens,
                 temperature=0.2
@@ -1014,7 +1013,7 @@ def run_conversational_chat(chat_history: list, user_message: str, profile: dict
         
     formatted_messages.append({"role": "user", "content": user_message})
     
-    res = call_groq_llm(system_prompt, user_message, max_tokens=600)
+    res = call_groq_llm(system_prompt, user_message, max_tokens=600, messages=formatted_messages)
     
     # If invalid API key triggers fallback
     if "ERROR_401" in res or not groq_client:
