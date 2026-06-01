@@ -1,0 +1,16 @@
+[Unit]
+Description=Apex Agentic Stock Analyzer FastAPI Backend Service
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/indian-stock-analyzer
+ExecStart=/home/ubuntu/indian-stock-analyzer/venv/bin/uvicorn backend.agent:app --host 127.0.0.1 --port 8000 --workers 2
+Restart=always
+RestartSec=5
+Environment=PORT=8000
+Environment=DATABASE_DIR=/home/ubuntu/indian-stock-analyzer/backend/data
+EnvironmentFile=/home/ubuntu/indian-stock-analyzer/.env
+
+[Install]
+WantedBy=multi-user.target
