@@ -1006,26 +1006,23 @@ function renderStockDashboard(p) {
     if (bsContent) bsContent.style.maxHeight = '0px';
     if (bsArrow) bsArrow.style.transform = 'rotate(0deg)';
     
-    const delta = p.technicals ? p.technicals.dist_high_52w_pct : null;
+    const changePct = p.technicals ? p.technicals.price_change_pct : null;
+    const isBullish = p.technicals && p.technicals.trend_50_vs_200 === "Bullish";
     let changeText = 'N/A';
-    let isBullish = false;
+    let isPositive = false;
     
-    if (p.technicals && p.technicals.trend_50_vs_200) {
-        isBullish = p.technicals.trend_50_vs_200 === "Bullish";
-        if (delta !== null && delta !== undefined) {
-            changeText = isBullish 
-                ? `+${(delta * 0.1).toFixed(2)}% (Bullish trend)` 
-                : `-${(delta * 0.1).toFixed(2)}% (Consolidating)`;
-        } else {
-            changeText = isBullish ? 'Trend: Bullish' : 'Trend: Consolidating';
-        }
+    if (changePct !== null && changePct !== undefined) {
+        isPositive = changePct >= 0;
+        const sign = isPositive ? '+' : '';
+        const trendLabel = isBullish ? 'Bullish trend' : 'Consolidating';
+        changeText = `${sign}${changePct.toFixed(2)}% (${trendLabel})`;
     } else {
-        changeText = 'N/A (No Trend Data)';
+        changeText = 'N/A (No Price Change Data)';
     }
     
     const changeEl = document.getElementById('meta-change');
     changeEl.innerText = changeText;
-    changeEl.className = isBullish ? "meta-change green-text" : "meta-change red-text";
+    changeEl.className = isPositive ? "meta-change green-text" : "meta-change red-text";
     
     const scoring = p.score_metrics || {};
     const finalScore = scoring.final_score || 50;

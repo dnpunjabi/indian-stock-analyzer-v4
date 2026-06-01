@@ -503,6 +503,7 @@ def calculate_technical_indicators(ticker_symbol: str, stock_obj=None) -> dict:
     """Calculates SMA-50/200, 14-day RSI, 52-week boundaries, Fibonacci levels, and breakout signals."""
     result = {
         "current_price": 0.0,
+        "price_change_pct": 0.0,
         "sma_50": 0.0,
         "sma_200": 0.0,
         "rsi": 50.0,
@@ -570,6 +571,11 @@ def calculate_technical_indicators(ticker_symbol: str, stock_obj=None) -> dict:
         result["low_52w"] = low_52w
         result["dist_high_52w_pct"] = float(((high_52w - current_price) / high_52w) * 100)
         result["dist_low_52w_pct"] = float(((current_price - low_52w) / low_52w) * 100)
+        
+        price_change_pct = 0.0
+        if len(df) >= 2:
+            price_change_pct = float(((df['Close'].iloc[-1] - df['Close'].iloc[-2]) / df['Close'].iloc[-2]) * 100.0)
+        result["price_change_pct"] = price_change_pct
         
         # Calculate Advanced Fibonacci Levels (0%, 23.6%, 38.2%, 50%, 61.8%, 78.6%, 100%)
         diff = high_52w - low_52w
