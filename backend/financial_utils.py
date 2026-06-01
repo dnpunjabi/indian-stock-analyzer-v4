@@ -1465,44 +1465,59 @@ def get_complete_financial_profile(ticker_query: str, bypass_db_cache: bool = Fa
             conn = sqlite3.connect(DATABASE_PATH)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (ticker,))
+            cursor.execute("SELECT profile_json, updated_at FROM cached_profiles WHERE symbol = ?", (ticker,))
             row = cursor.fetchone()
             conn.close()
             
             if row and row["profile_json"]:
-                profile = json.loads(row["profile_json"])
-                
-                # Dynamic self-healing: deduplicate target duplicates dynamically!
-                if "peers" in profile and profile.get("ticker"):
+                # Check if cache has expired (TTL = 4 Hours)
+                is_stale = False
+                if row["updated_at"]:
                     try:
-                        ticker_query = profile["ticker"]
-                        res = resolve_company_ticker(ticker_query)
-                        base_symbol = res["base_symbol"]
-                        company_name = res["name"]
-                        
-                        fundamentals = profile.get("fundamentals", {})
-                        pe_ratio = fundamentals.get("pe_ratio")
-                        market_cap = fundamentals.get("market_cap")
-                        roce = fundamentals.get("roce_pct")
-                        roe = fundamentals.get("roe_pct")
-                        
-                        profile["peers"] = clean_and_deduplicate_peers(
-                            profile["peers"], 
-                            base_symbol, 
-                            company_name,
-                            pe_ratio,
-                            market_cap,
-                            roce,
-                            roe
-                        )
-                    except Exception as clean_err:
-                        print(f"Error self-healing cached peers: {clean_err}")
-                
-                # Save to 5-minute memory cache
-                with _cache_lock:
-                    _profile_cache[cache_key] = profile
-                    _profile_cache[ticker] = profile
-                return profile
+                        from datetime import datetime
+                        last_update = datetime.strptime(row["updated_at"], "%Y-%m-%d %H:%M:%S")
+                        age = datetime.now() - last_update
+                        if age.total_seconds() > 14400:  # 4 hours in seconds
+                            is_stale = True
+                    except Exception:
+                        is_stale = True
+                else:
+                    is_stale = True
+
+                if not is_stale:
+                    profile = json.loads(row["profile_json"])
+                    
+                    # Dynamic self-healing: deduplicate target duplicates dynamically!
+                    if "peers" in profile and profile.get("ticker"):
+                        try:
+                            ticker_query = profile["ticker"]
+                            res = resolve_company_ticker(ticker_query)
+                            base_symbol = res["base_symbol"]
+                            company_name = res["name"]
+                            
+                            fundamentals = profile.get("fundamentals", {})
+                            pe_ratio = fundamentals.get("pe_ratio")
+                            market_cap = fundamentals.get("market_cap")
+                            roce = fundamentals.get("roce_pct")
+                            roe = fundamentals.get("roe_pct")
+                            
+                            profile["peers"] = clean_and_deduplicate_peers(
+                                profile["peers"], 
+                                base_symbol, 
+                                company_name,
+                                pe_ratio,
+                                market_cap,
+                                roce,
+                                roe
+                            )
+                        except Exception as clean_err:
+                            print(f"Error self-healing cached peers: {clean_err}")
+                    
+                    # Save to 5-minute memory cache
+                    with _cache_lock:
+                        _profile_cache[cache_key] = profile
+                        _profile_cache[ticker] = profile
+                    return profile
         except Exception as e:
             print(f"Error querying SQLite database cache in financial_utils: {e}")
 
