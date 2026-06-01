@@ -2456,11 +2456,7 @@ function setupComparisonArena() {
                 }
             });
 
-            const printWindow = window.open('', '_blank', 'width=850,height=900');
-            if (!printWindow) {
-                showToast("Popup blocked! Please allow popups for this site to print the report.", "error");
-                return;
-            }
+
 
             const today = new Date().toLocaleDateString('en-IN', {
                 day: '2-digit',
@@ -2763,8 +2759,7 @@ function setupComparisonArena() {
 </html>
             `;
 
-            printWindow.document.write(printContent);
-            printWindow.document.close();
+            executeSystemPrint(printContent, 'width=850,height=900');
         });
     }
 }
@@ -4696,12 +4691,12 @@ function showToast(message, type = 'info') {
 }
 
 // Universal Printing Engine (Desktop & Mobile compatibility)
-function executeSystemPrint(printContent) {
+function executeSystemPrint(printContent, customFeatures = 'width=850,height=900') {
     const isMobile = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (!isMobile) {
         // Desktop Workflow: Spawn a custom pop-up window
-        const printWindow = window.open('', '_blank', 'width=850,height=900');
+        const printWindow = window.open('', '_blank', customFeatures);
         if (!printWindow) {
             showToast("Popup blocked! Please allow popups for this site to print.", "error");
             return;
@@ -4709,37 +4704,58 @@ function executeSystemPrint(printContent) {
         printWindow.document.write(printContent);
         printWindow.document.close();
     } else {
-        // Mobile Workflow: Inline fullscreen print container with automated cleanup on afterprint
-        showToast("Generating mobile print prospectus...", "success");
+        // Mobile Workflow: Fullscreen isolated iframe to prevent style bleed
+        showToast("Generating mobile print report...", "success");
         
         let mobileContent = printContent;
         // Strip out autostart print scripts to prevent the parent tab from attempting window.close()
         mobileContent = mobileContent.replace(/<script>[\s\S]*?<\/script>/gi, '');
         
-        // 1. Create and populate wrapper element
-        const wrapper = document.createElement('div');
-        wrapper.id = 'mobile-print-wrapper';
-        wrapper.innerHTML = mobileContent;
-        document.body.appendChild(wrapper);
+        // 1. Create and style iframe overlay to guarantee absolute isolation
+        const iframe = document.createElement('iframe');
+        iframe.id = 'mobile-print-iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.left = '0';
+        iframe.style.top = '0';
+        iframe.style.width = '100vw';
+        iframe.style.height = '100vh';
+        iframe.style.border = 'none';
+        iframe.style.zIndex = '999999';
+        iframe.style.background = '#ffffff';
         
-        // 2. Add print mode class to body
-        document.body.classList.add('is-printing-mobile');
+        document.body.appendChild(iframe);
         
-        // 3. Trigger native printing on the parent window (supported on Android/iOS)
+        // 2. Write the content to the iframe document
+        const iframeDoc = iframe.contentWindow.document || iframe.contentDocument;
+        iframeDoc.open();
+        iframeDoc.write(mobileContent);
+        iframeDoc.close();
+        
+        // 3. Trigger native printing on the iframe window
         setTimeout(() => {
-            window.print();
-        }, 400);
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                console.error("Iframe print failed, falling back to main print:", e);
+                window.print();
+            }
+        }, 500);
         
         // 4. Register cleanup on print dialog close
         const cleanup = () => {
-            document.body.classList.remove('is-printing-mobile');
-            const el = document.getElementById('mobile-print-wrapper');
+            const el = document.getElementById('mobile-print-iframe');
             if (el) el.remove();
         };
         
         window.addEventListener('afterprint', cleanup, { once: true });
+        try {
+            iframe.contentWindow.addEventListener('afterprint', cleanup, { once: true });
+        } catch (e) {
+            console.error("Error binding afterprint to iframe:", e);
+        }
         // Fail-safe cleanup backup
-        setTimeout(cleanup, 12000);
+        setTimeout(cleanup, 15000);
     }
 }
 
@@ -5050,7 +5066,7 @@ function setupCSVExports() {
                 showToast("No screener results to print.", "warning");
                 return;
             }
-            const win = window.open("", "_blank");
+
             const universeSelect = document.getElementById('screener-universe-select');
             const universeLabel = universeSelect ? universeSelect.options[universeSelect.selectedIndex].text : 'Selected Segment';
             const styleSelect = document.getElementById('screener-style-select');
@@ -5137,8 +5153,7 @@ function setupCSVExports() {
             </body>
             </html>
             `;
-            win.document.write(html);
-            win.document.close();
+            executeSystemPrint(html, 'width=1100,height=850');
         });
     }
     
@@ -6489,11 +6504,7 @@ function setupPortfolioDoctor() {
                 ledgerRows.push({ symbol, name, sector, qty, price });
             });
 
-            const printWindow = window.open('', '_blank', 'width=850,height=900');
-            if (!printWindow) {
-                showToast("Popup blocked! Please allow popups for this site to print the report.", "error");
-                return;
-            }
+
 
             const today = new Date().toLocaleDateString('en-IN', {
                 day: '2-digit',
@@ -6878,8 +6889,7 @@ function setupPortfolioDoctor() {
 </html>
             `;
 
-            printWindow.document.write(printContent);
-            printWindow.document.close();
+            executeSystemPrint(printContent, 'width=850,height=900');
         });
     }
 }
@@ -7409,19 +7419,14 @@ Keep the response professional, mathematically grounded, and extremely concise. 
                 `;
             }
             
-            // Spawn print popup window
-            const printWindow = window.open('', '_blank', 'width=1100,height=850');
-            if (!printWindow) {
-                showToast("Popup blocker prevented launching the print window. Please allow popups for this site.", "warning");
-                return;
-            }
+
             
             const currentLocalDate = new Date().toLocaleDateString('en-IN', {
                 year: 'numeric', month: 'long', day: 'numeric',
                 hour: '2-digit', minute: '2-digit', second: '2-digit'
             });
             
-            printWindow.document.write(`
+            const watchlistReportContent = `
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -7567,8 +7572,8 @@ Keep the response professional, mathematically grounded, and extremely concise. 
                     </script>
                 </body>
                 </html>
-            `);
-            printWindow.document.close();
+            `;
+            executeSystemPrint(watchlistReportContent, 'width=1100,height=850');
         });
     }
 }
