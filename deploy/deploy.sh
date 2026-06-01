@@ -39,11 +39,11 @@ cd /home/ubuntu/indian-stock-analyzer
 # 4. Setup Python Virtual Environment & dependencies
 echo "🐍 Initializing Python Virtual Environment..."
 python3 -m venv venv
-source venv/bin/bin/activate || source venv/bin/activate
+source venv/bin/activate
 
 echo "⚡ Installing Python requirements..."
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 
 # 5. Write Environment Configurations (.env)
 echo "🔒 Writing application environment credentials..."
