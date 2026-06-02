@@ -3257,8 +3257,14 @@ body.is-printing-mobile #mobile-print-wrapper {
     }
     body.is-printing-mobile #mobile-print-wrapper {
         display: block !important;
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        overflow: visible !important;
         background: #ffffff !important;
         color: #111827 !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
 }
 
