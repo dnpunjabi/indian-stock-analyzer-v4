@@ -1127,12 +1127,21 @@
 
                         <!-- Drawdown Analysis Card -->
                         <div class="card col-span-4 card-hidden" id="drawdown-card" data-subtab="technical">
-                            <h3>DRAWDOWN & RISK PROFILE</h3>
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border: none; padding: 0; width: 100%;">
+                                <h3 style="margin:0;">DRAWDOWN & RISK PROFILE</h3>
+                                <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Peak-to-Trough Corrections</span>
+                            </div>
                             <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Quantifying peak-to-trough corrections, recovery durations, and historical risk flags.</p>
-                            <div class="chart-container" style="height: 120px; position: relative;">
+                            
+                            <!-- New dynamic floating HUD legend for Drawdown indicators -->
+                            <div id="drawdown-chart-hud" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; margin-bottom: 12px; min-height: 20px; padding: 6px 12px; border-radius: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-glass); align-items: center; width: 100%;">
+                                <span class="text-muted">Hover over the chart to inspect drawdown percentages...</span>
+                            </div>
+
+                            <div id="drawdown-chart-container" style="height: 200px; position: relative; width: 100%;">
                                 <canvas id="drawdown-chart"></canvas>
                             </div>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass); width: 100%;">
                                 <div style="background: rgba(255,75,75,0.05); border-left: 3px solid var(--neon-red); padding: 8px; border-radius: 4px;">
                                     <span style="font-size: 8px; color: var(--text-secondary); display:block; text-transform:uppercase;">Max Drawdown</span>
                                     <strong id="drawdown-max-pct" style="font-size: 12px; color: var(--text-primary);">--%</strong>
@@ -1143,7 +1152,7 @@
                                 </div>
                             </div>
                             
-                            <div id="drawdown-summary-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass);">
+                            <div id="drawdown-summary-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass); width: 100%;">
                                 <span style="font-size: 10px; color: var(--text-secondary); font-weight: 600; display: block; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px;">AI Risk Chartist Interpretation</span>
                                 <p id="drawdown-summary-text" style="font-size: 11px; color: var(--text-muted); line-height: 1.45; margin: 0;">Analyzing drawdown patterns and volatility recovery cycles...</p>
                             </div>

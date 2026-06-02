@@ -6755,74 +6755,207 @@ function renderEarningsQuality(p) {
 let activeDrawdownChartInstance = null;
 
 async function loadDrawdownChart(ticker, period) {
-    const canvas = document.getElementById('drawdown-chart');
-    const container = canvas?.parentElement;
+    const container = document.getElementById('drawdown-chart-container');
     if (!container) return;
-    
+
+    // Clean up previous Lightweight Drawdown Chart instance
+    if (window.activeDrawdownLightweightChart) {
+        try {
+            window.activeDrawdownLightweightChart.remove();
+        } catch (e) {
+            console.warn("Error removing drawdown chart:", e);
+        }
+        window.activeDrawdownLightweightChart = null;
+    }
+
+    // Clean up legacy Chart.js instances if any exist
+    if (activeDrawdownChartInstance) {
+        activeDrawdownChartInstance.destroy();
+        activeDrawdownChartInstance = null;
+    }
+
     try {
         const response = await fetch(`/api/drawdown?symbol=${encodeURIComponent(ticker)}&period=${period}`);
         if (!response.ok) throw new Error();
         const data = await response.json();
-        
+
+        const maxDd = Math.abs(data.max_drawdown_pct);
+        const recDays = data.worst_drawdown_duration_days;
+
         document.getElementById('drawdown-max-pct').innerText = `${data.max_drawdown_pct.toFixed(1)}%`;
         document.getElementById('drawdown-recovery-days').innerText = `${data.worst_drawdown_duration_days} days`;
-        
+
+        // Render dynamic summary with Analyst Verdict and Layman Translation
         const summaryTextEl = document.getElementById('drawdown-summary-text');
         if (summaryTextEl) {
-            const maxDd = Math.abs(data.max_drawdown_pct);
-            const recDays = data.worst_drawdown_duration_days;
-            
+            let analystText = "";
             let laymanDescription = "";
+
             if (maxDd < 10) {
-                laymanDescription = `This stock is highly stable. In its worst drop over this period, it lost only ${maxDd.toFixed(1)}% of its value from peak to bottom. It takes around ${recDays} days to fully bounce back from a correction, indicating low volatility and extremely safe market holds.`;
+                analystText = `Asset demonstrates high fundamental stability. Maximum peak-to-trough drop is limited to ${maxDd.toFixed(1)}%, with a rapid worst-case recovery speed of ${recDays} days. High capital preservation profile.`;
+                laymanDescription = `This stock is highly stable and steady, like driving a car over a tiny pothole on a beautifully paved highway. In its worst drop, it barely lost value and bounced back in just ${recDays} days. It is an extremely safe place to park your money.`;
             } else if (maxDd < 20) {
-                laymanDescription = `The stock demonstrates moderate volatility. Its largest correction hit a dip of ${maxDd.toFixed(1)}%, which is normal for bluechip index equities. It typically recovers its value within ${recDays} days, showing a resilient rebound capability during market corrections.`;
+                analystText = `Moderate pricing drawdowns observed (Max Drop: ${maxDd.toFixed(1)}%). Symmetrical cyclical recovery cycle of ${recDays} days aligns with standard bluechip index volatility. Sizable capital defense.`;
+                laymanDescription = `The stock has normal, moderate price swings—like riding a mild roller coaster with short, gentle drops. Its worst dip was a reasonable ${maxDd.toFixed(1)}% drop, and it crawled back to its previous peak within ${recDays} days. Very standard for high-quality bluechip companies.`;
             } else if (maxDd < 35) {
-                laymanDescription = `This stock has significant price swings. It experienced a peak-to-trough drop of ${maxDd.toFixed(1)}%, which means investors must tolerate sizable temporary paper losses. It requires about ${recDays} days to crawl back to its previous peak, indicating a higher-beta growth profile.`;
+                analystText = `High cyclical beta swings (Max Drop: ${maxDd.toFixed(1)}%) with extended value-recovery timelines spanning ${recDays} days. Sizable risk premium requires a long-term capital focus.`;
+                laymanDescription = `This stock experiences significant price swings—like riding a fast roller coaster with sudden, steep drops. It suffered a sizable ${maxDd.toFixed(1)}% drop from its high and took a lengthy ${recDays} days to climb back. Investors should expect temporary paper losses and must be patient.`;
             } else {
-                laymanDescription = `This is a high-risk, volatile asset. The stock suffered a major crash of ${maxDd.toFixed(1)}% from its high, taking ${recDays} days to fully recover. Only allocate capital here if you have a high risk tolerance and a multi-year horizon to withstand deep cyclical dips.`;
+                analystText = `Extreme risk profiling with severe price drops (Max Drop: ${maxDd.toFixed(1)}%) and major cyclical capital recovery delays lasting ${recDays} days. Vulnerable to macro-shocks.`;
+                laymanDescription = `This is a highly volatile, high-risk asset—like standing on the edge of a steep mountain cliff. The stock suffered a major crash of ${maxDd.toFixed(1)}% from its high and took an extremely long time (${recDays} days) to fully recover. Only invest here if you are comfortable with deep dips and have a multi-year horizon.`;
             }
-            summaryTextEl.innerText = laymanDescription;
+
+            summaryTextEl.innerHTML = `
+                <div style="margin-bottom: 8px;">
+                    <strong>Analyst Verdict:</strong> ${analystText}
+                </div>
+                <div style="font-size:11px; color:var(--text-muted); line-height: 1.45; border-left: 2.5px solid var(--color-crimson); padding-left: 8px; margin-top: 6px; background: rgba(239, 68, 68, 0.03); padding-top: 5px; padding-bottom: 5px; border-radius: 0 4px 4px 0; width: 100%;">
+                    💡 <strong>Layman Translation:</strong> ${laymanDescription}
+                </div>
+            `;
         }
-        
-        const restoredCanvas = getOrCreateCanvas('drawdown-chart', container);
-        if (!restoredCanvas) return;
-        
-        if (activeDrawdownChartInstance) activeDrawdownChartInstance.destroy();
-        
-        const ctx = restoredCanvas.getContext('2d');
-        
-        activeDrawdownChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.chart_data.dates,
-                datasets: [{
-                    label: 'Drawdown %',
-                    data: data.chart_data.drawdowns,
-                    borderColor: '#ef4444',
-                    borderWidth: 1.5,
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    fill: true,
-                    tension: 0.1,
-                    pointRadius: 0
-                }]
+
+        // Check if TradingView Lightweight Charts is available
+        if (typeof LightweightCharts === 'undefined') {
+            console.warn("TradingView Lightweight Charts offline, falling back to Chart.js for drawdown chart.");
+            drawChartJSDrawdownChart(data);
+            return;
+        }
+
+        container.innerHTML = ''; // Clear container for TradingView Canvas
+        const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+        const hudEl = document.getElementById('drawdown-chart-hud');
+
+        // Create Lightweight Chart
+        const chart = LightweightCharts.createChart(container, {
+            width: container.clientWidth,
+            height: 200,
+            layout: {
+                background: { type: 'solid', color: 'transparent' },
+                textColor: isDarkTheme ? '#94a3b8' : '#334155',
+                fontFamily: 'Inter, sans-serif',
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { display: false },
-                    y: {
-                        grid: { color: 'rgba(255,255,255,0.05)' },
-                        ticks: { color: '#9ca3af', font: { size: 9 } }
-                    }
+            grid: {
+                vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+                horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            },
+            rightPriceScale: {
+                borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                scaleMargins: { top: 0.1, bottom: 0.15 }
+            },
+            timeScale: {
+                borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                timeVisible: false,
+                fixLeftEdge: true,
+                fixRightEdge: true
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            }
+        });
+        window.activeDrawdownLightweightChart = chart;
+
+        // Plot Drawdown Area series (flips translucent crimson red downward)
+        const drawdownSeries = chart.addAreaSeries({
+            topColor: 'rgba(239, 68, 68, 0.0)',
+            bottomColor: 'rgba(239, 68, 68, 0.25)',
+            lineColor: '#ef4444',
+            lineWidth: 2,
+            priceFormat: {
+                type: 'custom',
+                formatter: v => `${v.toFixed(1)}%`
+            }
+        });
+
+        const formattedDates = data.chart_data.dates.map(d => d.split('T')[0]);
+        const drawdownsData = formattedDates.map((d, idx) => ({
+            time: d,
+            value: Number(data.chart_data.drawdowns[idx])
+        })).filter(item => item.value !== null && !isNaN(item.value));
+
+        drawdownSeries.setData(drawdownsData);
+        chart.timeScale().fitContent();
+
+        // Crosshair move listener to update HUD
+        const updateHUD = (timeStr) => {
+            if (!hudEl) return;
+            const idx = formattedDates.indexOf(timeStr);
+            const val = idx !== -1 ? Number(data.chart_data.drawdowns[idx]) : -data.max_drawdown_pct;
+
+            hudEl.innerHTML = `
+                <span style="color:var(--text-primary); font-weight:600; margin-right:15px;">📅 ${timeStr || 'Latest'}</span>
+                <span style="color:#ef4444; font-weight:600; margin-right:15px;">📉 Peak-to-Trough Drawdown: ${val.toFixed(1)}%</span>
+                <span style="color:#94a3b8; font-weight:500;">🛡️ Peak Volatility Drop Floor: ${data.max_drawdown_pct.toFixed(1)}%</span>
+            `;
+        };
+
+        // Initialize with latest data points
+        if (formattedDates.length > 0) {
+            updateHUD(formattedDates[formattedDates.length - 1]);
+        }
+
+        chart.subscribeCrosshairMove(param => {
+            if (param.time) {
+                const timeStr = typeof param.time === 'string'
+                    ? param.time
+                    : `${param.time.year}-${String(param.time.month).padStart(2,'0')}-${String(param.time.day).padStart(2,'0')}`;
+                updateHUD(timeStr);
+            } else {
+                if (formattedDates.length > 0) {
+                    updateHUD(formattedDates[formattedDates.length - 1]);
                 }
             }
         });
+
+        // Resize Observer
+        const resizeObserver = new ResizeObserver(entries => {
+            for (let entry of entries) {
+                chart.resize(entry.contentRect.width, 200);
+            }
+        });
+        resizeObserver.observe(container);
+
     } catch (e) {
         console.error("Failed to load drawdown chart:", e);
     }
+}
+
+function drawChartJSDrawdownChart(data) {
+    const restoredCanvas = getOrCreateCanvas('drawdown-chart', document.getElementById('drawdown-chart-container'));
+    if (!restoredCanvas) return;
+    
+    if (activeDrawdownChartInstance) activeDrawdownChartInstance.destroy();
+    
+    const ctx = restoredCanvas.getContext('2d');
+    
+    activeDrawdownChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.chart_data.dates,
+            datasets: [{
+                label: 'Drawdown %',
+                data: data.chart_data.drawdowns,
+                borderColor: '#ef4444',
+                borderWidth: 1.5,
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                fill: true,
+                tension: 0.1,
+                pointRadius: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#9ca3af', font: { size: 9 } }
+                }
+            }
+        }
+    });
 }
 
 // 6. Return Calculator Controller
