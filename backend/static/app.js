@@ -2160,6 +2160,7 @@ async function fetchAndRenderChart() {
         } else {
             drawStockChartCanvas(chartData);
             drawVolatilityMomentumMiniCharts(chartData);
+            drawFibonacciChart(activeStockProfile);
         }
     } catch (e) {
         console.error("Failed to load dynamic chart: ", e);
@@ -4268,14 +4269,188 @@ let miniCharts = {
 };
 
 function drawFibonacciChart(p) {
+    const container = document.getElementById('fibonacci-chart-container');
+    if (!container) return;
+
+    // 1. Clean up previous Lightweight Fibonacci Chart instance
+    if (window.activeFibLightweightChart) {
+        try {
+            window.activeFibLightweightChart.remove();
+        } catch (e) {
+            console.warn("Error removing Fibonacci chart:", e);
+        }
+        window.activeFibLightweightChart = null;
+    }
+    
+    // Clean up legacy Chart.js instances if any exist
+    if (activeFibChartInstance) {
+        activeFibChartInstance.destroy();
+        activeFibChartInstance = null;
+    }
+
+    // 2. Check if TradingView Lightweight Charts is available
+    if (typeof LightweightCharts === 'undefined') {
+        console.warn("TradingView Lightweight Charts offline, falling back to Chart.js for Fibonacci retracements.");
+        drawChartJSFibonacciChart(p);
+        return;
+    }
+
+    container.innerHTML = ''; // Clear container for TradingView Canvas
+    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+    const hudEl = document.getElementById('fibonacci-chart-hud');
+
+    const fib = p.technicals ? p.technicals.fib_levels : null;
+    const curPrice = p.fundamentals.current_price;
+    const low_52w = p.technicals ? p.technicals.low_52w : null;
+    const high_52w = p.technicals ? p.technicals.high_52w : null;
+
+    if (!fib || curPrice === null || curPrice === undefined || low_52w === null || high_52w === null || isNaN(low_52w) || isNaN(high_52w)) {
+        container.innerHTML = `<div class="chart-fallback" style="display:flex; align-items:center; justify-content:center; height:100%; font-size:11px; color:var(--text-muted); text-align:center; padding:10px; border: 1px dashed var(--border-glass); border-radius:6px; background:rgba(0,0,0,0.15);">Fibonacci retracement level indicators are currently unavailable for this asset.</div>`;
+        return;
+    }
+
+    // 3. Create Lightweight Chart
+    const chart = LightweightCharts.createChart(container, {
+        width: container.clientWidth,
+        height: 250,
+        layout: {
+            background: { type: 'solid', color: 'transparent' },
+            textColor: isDarkTheme ? '#94a3b8' : '#334155',
+            fontFamily: 'Inter, sans-serif',
+        },
+        grid: {
+            vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+        },
+        rightPriceScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            scaleMargins: { top: 0.1, bottom: 0.1 }
+        },
+        timeScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            timeVisible: false,
+            fixLeftEdge: true,
+            fixRightEdge: true
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        }
+    });
+    window.activeFibLightweightChart = chart;
+
+    // 4. Plot close price Area series
+    const priceSeries = chart.addAreaSeries({
+        topColor: 'rgba(0, 229, 255, 0.22)',
+        bottomColor: 'rgba(0, 229, 255, 0.0)',
+        lineColor: '#00e5ff',
+        lineWidth: 2,
+        priceFormat: { type: 'custom', formatter: v => `₹${v.toFixed(1)}` }
+    });
+
+    let dates = [];
+    let prices = [];
+
+    // Pull from active cached chart data if available
+    if (window.activeChartData && window.activeChartData.prices && window.activeChartData.labels) {
+        dates = window.activeChartData.labels.map(d => d.split('T')[0]);
+        prices = window.activeChartData.prices.map(v => Number(v));
+    } else {
+        // Safe immediate timeline mock
+        dates = [new Date().toISOString().split('T')[0]];
+        prices = [curPrice];
+    }
+
+    const priceData = dates.map((d, idx) => ({
+        time: d,
+        value: prices[idx]
+    })).filter(item => item.value !== null && !isNaN(item.value));
+
+    priceSeries.setData(priceData);
+
+    // 5. Overlay 7 Horizontal Fibonacci levels
+    const levels = [
+        { val: fib.fib_0, ratio: '0.0%', label: '0.0% (High Ceiling)', color: 'rgba(239, 68, 68, 0.8)' },
+        { val: fib.fib_236, ratio: '23.6%', label: '23.6% Retracement', color: 'rgba(245, 158, 11, 0.7)' },
+        { val: fib.fib_382, ratio: '38.2%', label: '38.2% Retracement', color: 'rgba(234, 179, 8, 0.7)' },
+        { val: fib.fib_500, ratio: '50.0%', label: '50.0% Retracement Pivot', color: 'rgba(99, 102, 241, 0.7)' },
+        { val: fib.fib_618, ratio: '61.8%', label: '61.8% Golden Support', color: 'rgba(16, 185, 129, 0.85)' },
+        { val: fib.fib_786, ratio: '78.6%', label: '78.6% Retracement Floor', color: 'rgba(148, 163, 184, 0.7)' },
+        { val: fib.fib_100, ratio: '100.0%', label: '100% (Low Floor)', color: 'rgba(239, 68, 68, 0.8)' }
+    ];
+
+    levels.forEach(lvl => {
+        priceSeries.createPriceLine({
+            price: Number(lvl.val),
+            color: lvl.color,
+            lineWidth: 1.2,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: lvl.label
+        });
+    });
+
+    chart.timeScale().fitContent();
+
+    // 6. Dynamic Crosshair Proximity Tracker
+    const updateHUD = (timeStr) => {
+        if (!hudEl) return;
+        const idx = dates.indexOf(timeStr);
+        const price = idx !== -1 ? prices[idx] : curPrice;
+
+        // Find nearest Fibonacci level
+        let nearestLvl = levels[0];
+        let minDist = Math.abs(price - Number(levels[0].val));
+
+        levels.forEach(lvl => {
+            const dist = Math.abs(price - Number(lvl.val));
+            if (dist < minDist) {
+                minDist = dist;
+                nearestLvl = lvl;
+            }
+        });
+
+        const devPercent = Number(nearestLvl.val) > 0 ? ((minDist / Number(nearestLvl.val)) * 100).toFixed(1) : '0.0';
+        const direction = price >= Number(nearestLvl.val) ? 'above' : 'below';
+
+        hudEl.innerHTML = `
+            <span style="color:var(--text-primary); font-weight:600; margin-right:15px;">📅 ${timeStr || 'Latest'}</span>
+            <span style="color:#00e5ff; font-weight:600; margin-right:15px;">● Price: ₹${price.toFixed(1)}</span>
+            <span style="color:#10b981; font-weight:600;">🛡️ Nearest Level: ${nearestLvl.ratio} (₹${Number(nearestLvl.val).toFixed(1)}) — ${devPercent}% ${direction}</span>
+        `;
+    };
+
+    // Initialize with latest data points
+    if (dates.length > 0) {
+        updateHUD(dates[dates.length - 1]);
+    }
+
+    // Connect crosshair listeners
+    chart.subscribeCrosshairMove(param => {
+        if (param.time) {
+            const timeStr = typeof param.time === 'string'
+                ? param.time
+                : `${param.time.year}-${String(param.time.month).padStart(2,'0')}-${String(param.time.day).padStart(2,'0')}`;
+            updateHUD(timeStr);
+        } else {
+            if (dates.length > 0) {
+                updateHUD(dates[dates.length - 1]);
+            }
+        }
+    });
+
+    // Resize Observer
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            chart.resize(entry.contentRect.width, 250);
+        }
+    });
+    resizeObserver.observe(container);
+}
+
+function drawChartJSFibonacciChart(p) {
     const canvas = document.getElementById('fibonacci-chart');
     const container = canvas?.parentElement;
     if (!container) return;
-
-    if (typeof Chart === 'undefined') {
-        container.innerHTML = `<div class="chart-fallback" style="display:flex; align-items:center; justify-content:center; height:100%; font-size:11px; color:var(--text-muted); text-align:center; padding:10px; border: 1px dashed var(--border-glass); border-radius:6px; background:rgba(0,0,0,0.1);">Chart.js CDN is currently offline. Unable to render Fibonacci chart.</div>`;
-        return;
-    }
 
     const restoredCanvas = getOrCreateCanvas('fibonacci-chart', container);
     if (!restoredCanvas) return;

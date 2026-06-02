@@ -602,11 +602,18 @@
 
                         <!-- Fibonacci Retracement Levels Card (Recommendation 1) -->
                         <div class="card card-hidden" id="tech-fib-card" data-subtab="technical">
-                            <h3>FIBONACCI RETRACEMENTS</h3>
-                            <div class="chart-container" style="height: 180px; margin-top: 10px;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border: none; padding: 0; width: 100%;">
+                                <h3 style="margin:0;">FIBONACCI RETRACEMENTS</h3>
+                                <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Interactive Retracement Scale</span>
+                            </div>
+                            <!-- New dynamic floating HUD legend for Fibonacci values -->
+                            <div id="fibonacci-chart-hud" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; margin-bottom: 12px; min-height: 20px; padding: 6px 12px; border-radius: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-glass); align-items: center; width: 100%;">
+                                <span class="text-muted">Hover over the chart to inspect Fibonacci levels...</span>
+                            </div>
+                            <div id="fibonacci-chart-container" style="height: 250px; position: relative; width: 100%;">
                                 <canvas id="fibonacci-chart"></canvas>
                             </div>
-                            <div class="fib-summary-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass);">
+                            <div class="fib-summary-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass); width: 100%;">
                                 <span style="font-size: 10px; color: var(--text-secondary); font-weight:600; display:block; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">Fibonacci Momentum Analysis</span>
                                 <p id="fib-summary-text" style="font-size: 11px; color: var(--text-muted); line-height:1.45; margin:0;">Computing retracement zones...</p>
                             </div>
