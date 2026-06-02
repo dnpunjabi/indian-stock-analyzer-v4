@@ -947,11 +947,17 @@
                                         <option value="3mo">3 Months</option>
                                         <option value="6mo">6 Months</option>
                                         <option value="1y" selected>1 Year</option>
+                                        <option value="2y">2 Years</option>
+                                        <option value="3y">3 Years</option>
                                         <option value="5y">5 Years</option>
                                     </select>
                                 </div>
                             </div>
-                            <div style="height: 320px; position: relative;">
+                            <!-- New dynamic floating HUD legend for peer returns -->
+                            <div id="peer-chart-legend" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; margin-bottom: 12px; min-height: 20px; padding: 6px 12px; border-radius: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-glass); align-items: center;">
+                                <span class="text-muted">Hover over the chart to inspect performance...</span>
+                            </div>
+                            <div style="height: 320px; position: relative;" id="peer-comparison-container">
                                 <canvas id="peer-comparison-chart"></canvas>
                             </div>
                         </div>

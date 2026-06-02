@@ -574,8 +574,8 @@ async def get_compare_chart(
     """
     if not symbols:
         raise HTTPException(status_code=400, detail="Symbols parameter is required.")
-    if period not in ["3mo", "6mo", "1y", "5y"]:
-        raise HTTPException(status_code=400, detail="Supported periods are 3mo, 6mo, 1y, or 5y.")
+    if period not in ["3mo", "6mo", "1y", "2y", "3y", "5y"]:
+        raise HTTPException(status_code=400, detail="Supported periods are 3mo, 6mo, 1y, 2y, 3y, or 5y.")
         
     try:
         from backend.financial_utils import resolve_company_ticker

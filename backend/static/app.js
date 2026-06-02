@@ -1602,8 +1602,7 @@ async function updatePeerComparisonChart() {
             }
         });
         
-        const canvas = document.getElementById('peer-comparison-chart');
-        const container = canvas?.parentElement;
+        const container = document.getElementById('peer-comparison-container');
         if (!container) return;
         
         // Show loading status inside the container visually
@@ -1631,31 +1630,55 @@ async function updatePeerComparisonChart() {
 }
 
 function drawPeerComparisonChart(dates, series, benchmarkSymbol) {
-    const canvas = document.getElementById('peer-comparison-chart');
-    const container = canvas?.parentElement;
+    const container = document.getElementById('peer-comparison-container');
     if (!container) return;
-    
-    // Destroy previous Chart instance to resolve mouse hover overlaps
-    if (activePeerChartInstance) {
-        activePeerChartInstance.destroy();
+
+    // Check if TradingView Lightweight Charts is available
+    if (typeof LightweightCharts === 'undefined') {
+        console.warn("TradingView Lightweight Charts offline, falling back to Chart.js for peer comparison.");
+        drawChartJSPeerComparisonChart(dates, series, benchmarkSymbol);
+        return;
+    }
+
+    // Clean up previous Lightweight Peer Chart instance
+    if (window.activeLightweightPeerChart) {
+        window.activeLightweightPeerChart.remove();
+        window.activeLightweightPeerChart = null;
     }
     
-    // Re-create canvas to ensure clean DOM rendering
-    const restoredCanvas = getOrCreateCanvas('peer-comparison-chart', container);
-    if (!restoredCanvas) return;
-    
-    const ctx = restoredCanvas.getContext('2d');
-    
-    // Theme-aware color configuration for light/dark modes
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-    const isLightTheme = currentTheme === 'light';
+    // Clean up legacy Chart.js peer chart if exists
+    if (activePeerChartInstance) {
+        activePeerChartInstance.destroy();
+        activePeerChartInstance = null;
+    }
 
-    const legendColor = isLightTheme ? '#1f2937' : '#94a3b8';
-    const tickColor = isLightTheme ? '#4b5563' : '#64748b';
-    const gridColor = isLightTheme ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)';
-    const benchmarkColor = isLightTheme ? 'rgba(31, 41, 55, 0.7)' : 'rgba(255, 255, 255, 0.45)';
+    container.innerHTML = ''; // Clear container for TradingView Canvas
+    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+    const legendEl = document.getElementById('peer-chart-legend');
 
-    // Palette: Cyan/Bright Blue for target, Grey/dashed for benchmark, Orchid/Gold/Orange for peers
+    // 1. Create Chart
+    const chart = LightweightCharts.createChart(container, {
+        width: container.clientWidth,
+        height: 320, // Match the index.html height of 320px!
+        layout: {
+            background: { type: 'solid', color: 'transparent' },
+            textColor: isDarkTheme ? '#94a3b8' : '#334155',
+            fontFamily: 'Inter, sans-serif',
+        },
+        grid: {
+            vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+        },
+        rightPriceScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+        },
+        timeScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            timeVisible: false,
+        },
+    });
+    window.activeLightweightPeerChart = chart;
+
     const peerColors = [
         '#10b981', // Emerald Green
         '#f59e0b', // Amber/Gold
@@ -1664,7 +1687,132 @@ function drawPeerComparisonChart(dates, series, benchmarkSymbol) {
         '#14b8a6', // Teal
         '#38bdf8'  // Light Blue
     ];
+    let peerColorIdx = 0;
+    const seriesLines = {};
+    const seriesColors = {};
+    const formattedDates = dates.map(d => d.split('T')[0]);
+
+    // 2. Add each series
+    Object.keys(series).forEach(key => {
+        const isBenchmark = key === benchmarkSymbol;
+        const isTarget = key === activeStockProfile.ticker;
+
+        let strokeColor = '';
+        let strokeWidth = 1.5;
+        let lineStyle = LightweightCharts.LineStyle.Solid;
+
+        if (isTarget) {
+            strokeColor = '#00e5ff'; // Bright target cyan
+            strokeWidth = 2.5;
+        } else if (isBenchmark) {
+            strokeColor = isDarkTheme ? 'rgba(255,255,255,0.45)' : 'rgba(31, 41, 55, 0.7)';
+            strokeWidth = 2;
+            lineStyle = LightweightCharts.LineStyle.Dashed;
+        } else {
+            strokeColor = peerColors[peerColorIdx % peerColors.length];
+            peerColorIdx++;
+        }
+
+        seriesColors[key] = strokeColor;
+
+        const lineSeries = chart.addLineSeries({
+            color: strokeColor,
+            lineWidth: strokeWidth,
+            lineStyle: lineStyle,
+            priceFormat: {
+                type: 'custom',
+                formatter: v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`
+            }
+        });
+
+        const lineData = formattedDates.map((d, idx) => ({
+            time: d,
+            value: series[key][idx] - 100.0 // Re-base starting point to 0.0%
+        })).filter(item => item.value !== null && !isNaN(item.value));
+
+        lineSeries.setData(lineData);
+        seriesLines[key] = lineSeries;
+    });
+
+    chart.timeScale().fitContent();
+
+    // 3. Implement Floating Crosshair HUD legend
+    const updateHUD = (timeStr) => {
+        if (!legendEl) return;
+        const idx = formattedDates.indexOf(timeStr);
+        if (idx === -1) return;
+
+        let html = '';
+        Object.keys(series).forEach(key => {
+            const isBenchmark = key === benchmarkSymbol;
+            const isTarget = key === activeStockProfile.ticker;
+            let displayLabel = key.replace('.NS', '').replace('.BO', '');
+
+            if (isBenchmark) {
+                displayLabel = benchmarkSymbol === '^NSEI' ? 'Nifty 50' : 'Sensex';
+            } else if (isTarget) {
+                displayLabel = `${displayLabel} (Target)`;
+            }
+
+            const val = series[key][idx] - 100.0;
+            const color = seriesColors[key];
+
+            html += `<span style="color:${color}; font-weight:600; margin-right:12px;">
+                ● ${displayLabel}: ${val >= 0 ? '+' : ''}${val.toFixed(2)}%
+            </span>`;
+        });
+        legendEl.innerHTML = html;
+    };
+
+    // Default HUD value (latest session)
+    if (formattedDates.length > 0) {
+        updateHUD(formattedDates[formattedDates.length - 1]);
+    }
+
+    // Subscribe to mouse movement crosshair updates
+    chart.subscribeCrosshairMove(param => {
+        if (!legendEl) return;
+        if (param.time) {
+            const timeStr = typeof param.time === 'string' 
+                ? param.time 
+                : `${param.time.year}-${String(param.time.month).padStart(2,'0')}-${String(param.time.day).padStart(2,'0')}`;
+            updateHUD(timeStr);
+        } else {
+            // Restore latest session details when cursor leaves canvas
+            if (formattedDates.length > 0) {
+                updateHUD(formattedDates[formattedDates.length - 1]);
+            }
+        }
+    });
+
+    // Resize observer alignment
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            chart.resize(entry.contentRect.width, 320);
+        }
+    });
+    resizeObserver.observe(container);
+}
+
+// Fallback legacy Chart.js drawer
+function drawChartJSPeerComparisonChart(dates, series, benchmarkSymbol) {
+    const container = document.getElementById('peer-comparison-container');
+    if (!container) return;
     
+    const restoredCanvas = getOrCreateCanvas('peer-comparison-chart', container);
+    if (!restoredCanvas) return;
+    
+    const ctx = restoredCanvas.getContext('2d');
+    
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const isLightTheme = currentTheme === 'light';
+
+    const legendColor = isLightTheme ? '#1f2937' : '#94a3b8';
+    const tickColor = isLightTheme ? '#4b5563' : '#64748b';
+    const gridColor = isLightTheme ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.03)';
+    const benchmarkColor = isLightTheme ? 'rgba(31, 41, 55, 0.7)' : 'rgba(255, 255, 255, 0.45)';
+
+    const peerColors = ['#10b981', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#38bdf8'];
     const datasets = [];
     let peerColorIdx = 0;
     
@@ -1684,12 +1832,12 @@ function drawPeerComparisonChart(dates, series, benchmarkSymbol) {
         let borderDash = [];
         
         if (isTarget) {
-            strokeColor = '#00e5ff'; // Pinned bright Cyan/Blue target line
+            strokeColor = '#00e5ff';
             strokeWidth = 2.5;
         } else if (isBenchmark) {
-            strokeColor = benchmarkColor; // Pinned theme-aware benchmark line
+            strokeColor = benchmarkColor;
             strokeWidth = 2;
-            borderDash = [5, 5]; // Dashed curve
+            borderDash = [5, 5];
         } else {
             strokeColor = peerColors[peerColorIdx % peerColors.length];
             peerColorIdx++;
