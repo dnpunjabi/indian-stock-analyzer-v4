@@ -2358,6 +2358,51 @@ input[type="range"]::-webkit-slider-thumb:hover {
     .volatility-charts-grid {
         grid-template-columns: 1fr !important;
     }
+
+    /* Sidebar Mobile Logo & Arrow Alignments */
+    #sidebar-collapse-btn {
+        display: none !important;
+    }
+    #logo-icon-toggle {
+        font-size: 18px !important;
+        line-height: 1 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        margin-bottom: 2px !important;
+    }
+    .sidebar .logo-area {
+        gap: 8px !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        margin-bottom: 25px !important;
+    }
+
+    /* Peer Benchmarking Inputs Vertical Stacking */
+    .compare-input-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 10px !important;
+    }
+    .compare-input-row input {
+        width: 100% !important;
+    }
+
+    /* Portfolio Grid Stacking & Overflow Prevention */
+    .portfolio-inputs-grid {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+    }
+    .portfolio-inputs-grid > div {
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    /* Alert Center Grid Overflow Prevention */
+    .alerts-grid > .card {
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
 }
 
 @media (max-width: 480px) {
