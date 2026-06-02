@@ -2080,7 +2080,8 @@ function drawStockChartCanvas(data) {
 
     // 2. Add Price Series
     let priceSeries;
-    const formattedDates = data.dates.map(d => d.split('T')[0]);
+    const rawDates = data.dates || data.labels || [];
+    const formattedDates = rawDates.map(d => d.split('T')[0]);
     
     if (chartStyle === 'candlestick') {
         priceSeries = chart.addCandlestickSeries({
