@@ -841,6 +841,8 @@ async def get_chart_data(ticker: str, period: str = "1y", interval: str = "1d"):
             "3mo": 90,
             "6mo": 180,
             "1y": 365,
+            "2y": 365 * 2,
+            "3y": 365 * 3,
             "5y": 365 * 5
         }
         days = period_days.get(period, 365)

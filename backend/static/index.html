@@ -889,6 +889,8 @@
                                         <option value="3mo">3 Months</option>
                                         <option value="6mo">6 Months</option>
                                         <option value="1y" selected>1 Year</option>
+                                        <option value="2y">2 Years</option>
+                                        <option value="3y">3 Years</option>
                                         <option value="5y">5 Years</option>
                                     </select>
                                     <select id="chart-interval" style="padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); cursor:pointer;">
@@ -898,7 +900,7 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="chart-container">
+                            <div class="chart-container" style="height: 380px;">
                                 <canvas id="stock-chart"></canvas>
                             </div>
                         </div>
@@ -1674,6 +1676,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=1.0.6"></script>
+    <script src="app.js?v=1.0.7"></script>
 </body>
 </html>
