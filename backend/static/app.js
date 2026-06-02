@@ -4379,23 +4379,249 @@ function drawFibonacciChart(p) {
 }
 
 function drawVolatilityMomentumMiniCharts(data) {
+    // 1. Clean up previous Lightweight Volatility Chart instances
+    if (window.activeVolatilityLightweightCharts) {
+        Object.keys(window.activeVolatilityLightweightCharts).forEach(key => {
+            if (window.activeVolatilityLightweightCharts[key]) {
+                try {
+                    window.activeVolatilityLightweightCharts[key].remove();
+                } catch (e) {
+                    console.warn("Error removing volatility chart:", e);
+                }
+                window.activeVolatilityLightweightCharts[key] = null;
+            }
+        });
+    }
+    window.activeVolatilityLightweightCharts = { bb: null, atr: null, macd: null, vpt: null };
+
+    // 2. Check if TradingView Lightweight Charts is available
+    if (typeof LightweightCharts === 'undefined') {
+        console.warn("TradingView Lightweight Charts offline, falling back to Chart.js for volatility mini-charts.");
+        drawChartJSVolatilityMiniCharts(data);
+        return;
+    }
+
+    // Clean up legacy Chart.js instances if any exist
+    Object.keys(miniCharts).forEach(key => {
+        if (miniCharts[key]) {
+            miniCharts[key].destroy();
+            miniCharts[key] = null;
+        }
+    });
+
+    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+    const hudEl = document.getElementById('volatility-chart-hud');
+
+    // Containers
+    const containers = {
+        bb: document.getElementById('volatility-bb-container'),
+        atr: document.getElementById('volatility-atr-container'),
+        macd: document.getElementById('volatility-macd-container'),
+        vpt: document.getElementById('volatility-vpt-container')
+    };
+
+    if (!containers.bb || !containers.atr || !containers.macd || !containers.vpt) return;
+
+    // Clear contents
+    Object.keys(containers).forEach(key => {
+        containers[key].innerHTML = '';
+    });
+
+    // Formatting Helpers
+    const formattedDates = data.labels.map(d => d.split('T')[0]);
+    const getSeriesData = (arr) => {
+        return formattedDates.map((d, idx) => ({
+            time: d,
+            value: Number(arr[idx])
+        })).filter(item => item.value !== null && !isNaN(item.value));
+    };
+
+    // Shared Chart Constructor Options
+    const getChartOptions = (container) => ({
+        width: container.clientWidth,
+        height: 120,
+        layout: {
+            background: { type: 'solid', color: 'transparent' },
+            textColor: isDarkTheme ? '#94a3b8' : '#334155',
+            fontFamily: 'Inter, sans-serif',
+        },
+        grid: {
+            vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+        },
+        rightPriceScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            scaleMargins: { top: 0.15, bottom: 0.15 }
+        },
+        timeScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            timeVisible: false,
+            fixLeftEdge: true,
+            fixRightEdge: true
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        }
+    });
+
+    // Create Charts
+    const bbChart = LightweightCharts.createChart(containers.bb, getChartOptions(containers.bb));
+    const atrChart = LightweightCharts.createChart(containers.atr, getChartOptions(containers.atr));
+    const macdChart = LightweightCharts.createChart(containers.macd, getChartOptions(containers.macd));
+    const vptChart = LightweightCharts.createChart(containers.vpt, getChartOptions(containers.vpt));
+
+    window.activeVolatilityLightweightCharts.bb = bbChart;
+    window.activeVolatilityLightweightCharts.atr = atrChart;
+    window.activeVolatilityLightweightCharts.macd = macdChart;
+    window.activeVolatilityLightweightCharts.vpt = vptChart;
+
+    const charts = [bbChart, atrChart, macdChart, vptChart];
+
+    // 1. Bollinger Bands price lines
+    const bbPriceSeries = bbChart.addLineSeries({
+        color: '#00e5ff',
+        lineWidth: 2,
+        priceFormat: { type: 'custom', formatter: v => `₹${v.toFixed(1)}` }
+    });
+    const bbUpperSeries = bbChart.addLineSeries({
+        color: 'rgba(239, 68, 68, 0.5)',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        priceFormat: { type: 'custom', formatter: v => `₹${v.toFixed(1)}` }
+    });
+    const bbLowerSeries = bbChart.addLineSeries({
+        color: 'rgba(239, 68, 68, 0.5)',
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        priceFormat: { type: 'custom', formatter: v => `₹${v.toFixed(1)}` }
+    });
+
+    bbPriceSeries.setData(getSeriesData(data.prices));
+    bbUpperSeries.setData(getSeriesData(data.bb_upper));
+    bbLowerSeries.setData(getSeriesData(data.bb_lower));
+
+    // 2. ATR Area Series
+    const atrSeries = atrChart.addAreaSeries({
+        topColor: 'rgba(99, 102, 241, 0.25)',
+        bottomColor: 'rgba(99, 102, 241, 0.0)',
+        lineColor: '#6366f1',
+        lineWidth: 2,
+        priceFormat: { type: 'custom', formatter: v => `₹${v.toFixed(2)}` }
+    });
+    atrSeries.setData(getSeriesData(data.atr));
+
+    // 3. MACD Hist Columns
+    const macdSeries = macdChart.addHistogramSeries({
+        priceFormat: { type: 'volume' }
+    });
+    const macdData = formattedDates.map((d, idx) => {
+        const val = Number(data.macd_hist[idx]);
+        return {
+            time: d,
+            value: val,
+            color: val >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)'
+        };
+    }).filter(item => item.value !== null && !isNaN(item.value));
+    macdSeries.setData(macdData);
+
+    // 4. VPT Area Series
+    const vptSeries = vptChart.addAreaSeries({
+        topColor: 'rgba(168, 85, 247, 0.25)',
+        bottomColor: 'rgba(168, 85, 247, 0.0)',
+        lineColor: '#a855f7',
+        lineWidth: 2,
+        priceFormat: { type: 'volume' }
+    });
+    vptSeries.setData(getSeriesData(data.vpt));
+
+    // Fit content
+    charts.forEach(c => c.timeScale().fitContent());
+
+    // Synchronize horizontal panned and zoomed visible scales!
+    charts.forEach(srcChart => {
+        srcChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+            charts.forEach(targetChart => {
+                if (targetChart !== srcChart) {
+                    targetChart.timeScale().setVisibleLogicalRange(range);
+                }
+            });
+        });
+    });
+
+    // Dynamic HUD Crosshair Update Router
+    const updateHUD = (timeStr) => {
+        if (!hudEl) return;
+        const idx = formattedDates.indexOf(timeStr);
+        if (idx === -1) return;
+
+        const price = Number(data.prices[idx]);
+        const bbUpper = Number(data.bb_upper[idx]);
+        const bbLower = Number(data.bb_lower[idx]);
+        const atrVal = Number(data.atr[idx]);
+        const macdVal = Number(data.macd_hist[idx]);
+        const vptVal = Number(data.vpt[idx]);
+
+        const bbSqueeze = bbLower > 0 ? (((bbUpper - bbLower) / bbLower) * 100).toFixed(1) : '0.0';
+
+        hudEl.innerHTML = `
+            <span style="color:var(--text-primary); font-weight:600; margin-right:15px;">📅 ${timeStr}</span>
+            <span style="color:#00e5ff; font-weight:600; margin-right:15px;">● Close: ₹${price.toFixed(1)}</span>
+            <span style="color:#f87171; font-weight:600; margin-right:15px;">● BB Sqz: ${bbSqueeze}% (₹${bbLower.toFixed(1)}-₹${bbUpper.toFixed(1)})</span>
+            <span style="color:#6366f1; font-weight:600; margin-right:15px;">● ATR: ₹${atrVal.toFixed(2)}</span>
+            <span style="color:${macdVal >= 0 ? '#10b981' : '#ef4444'}; font-weight:600; margin-right:15px;">● MACD Hist: ${macdVal >= 0 ? '+' : ''}${macdVal.toFixed(2)}</span>
+            <span style="color:#a855f7; font-weight:600;">● VPT: ${vptVal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+        `;
+
+        // Update indicators text details synchronously
+        document.getElementById('label-vol-bb').innerText = `₹${bbLower.toFixed(1)} - ₹${bbUpper.toFixed(1)} (Sqz: ${bbSqueeze}%)`;
+        document.getElementById('label-vol-atr').innerText = `₹${atrVal.toFixed(2)}`;
+        document.getElementById('label-vol-macd').innerText = `${macdVal.toFixed(2)} (${macdVal >= 0 ? 'Bullish' : 'Bearish'})`;
+        document.getElementById('label-vol-vpt').innerText = vptVal.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    };
+
+    // Initialize with latest data points
+    if (formattedDates.length > 0) {
+        updateHUD(formattedDates[formattedDates.length - 1]);
+    }
+
+    // Connect Crosshair Hover Listeners
+    charts.forEach(chartInstance => {
+        chartInstance.subscribeCrosshairMove(param => {
+            if (param.time) {
+                const timeStr = typeof param.time === 'string'
+                    ? param.time
+                    : `${param.time.year}-${String(param.time.month).padStart(2,'0')}-${String(param.time.day).padStart(2,'0')}`;
+                updateHUD(timeStr);
+            } else {
+                if (formattedDates.length > 0) {
+                    updateHUD(formattedDates[formattedDates.length - 1]);
+                }
+            }
+        });
+    });
+
+    // Resize Observer Alignment
+    charts.forEach((chartInstance, chartIdx) => {
+        const containerId = ['volatility-bb-container', 'volatility-atr-container', 'volatility-macd-container', 'volatility-vpt-container'][chartIdx];
+        const containerEl = document.getElementById(containerId);
+        if (containerEl) {
+            const resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    chartInstance.resize(entry.contentRect.width, 120);
+                }
+            });
+            resizeObserver.observe(containerEl);
+        }
+    });
+}
+
+function drawChartJSVolatilityMiniCharts(data) {
     const targets = {
         bb: 'chart-vol-bb',
         atr: 'chart-vol-atr',
         macd: 'chart-vol-macd',
         vpt: 'chart-vol-vpt'
     };
-
-    if (typeof Chart === 'undefined') {
-        Object.keys(targets).forEach(key => {
-            const canvas = document.getElementById(targets[key]);
-            const container = canvas?.parentElement;
-            if (container) {
-                container.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; height:100%; font-size:8px; color:var(--text-muted); text-align:center;">Offline</div>`;
-            }
-        });
-        return;
-    }
 
     Object.keys(miniCharts).forEach(key => {
         if (miniCharts[key]) {

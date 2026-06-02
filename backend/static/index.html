@@ -995,38 +995,40 @@
 
                         <!-- Advanced Volatility & Momentum Indicators Card (Recommendation 4) -->
                         <div class="card card-hidden" id="tech-volatility-card" data-subtab="technical">
-                            <h3>VOLATILITY & MOMENTUM</h3>
-                            <div class="volatility-charts-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px;">
-                                <div style="text-align: center;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border: none; padding: 0; width: 100%;">
+                                <h3 style="margin:0;">VOLATILITY & MOMENTUM</h3>
+                                <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Date-Synchronized Pan & Zoom</span>
+                            </div>
+                            
+                            <!-- New dynamic floating HUD legend for Volatility indicators -->
+                            <div id="volatility-chart-hud" style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; margin-bottom: 12px; min-height: 20px; padding: 6px 12px; border-radius: 6px; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-glass); align-items: center; width: 100%;">
+                                <span class="text-muted">Hover over any chart to inspect volatility indicators...</span>
+                            </div>
+
+                            <div class="volatility-charts-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px; width: 100%;">
+                                <div style="text-align: center; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 6px; border: 1px solid var(--border-glass);">
                                     <span style="font-size: 9px; color: var(--text-secondary); font-weight:600; display:block; margin-bottom:5px; letter-spacing:0.05em;">BOLLINGER BANDS (20, 2)</span>
-                                    <div style="height: 60px; position: relative;">
-                                        <canvas id="chart-vol-bb"></canvas>
-                                    </div>
-                                    <span style="font-size: 9px; color: var(--text-secondary); font-weight:700; margin-top:3px; display:block;" id="label-vol-bb">Rs. 0 - Rs. 0</span>
+                                    <div id="volatility-bb-container" style="height: 120px; position: relative;"></div>
+                                    <span style="font-size: 9px; color: var(--text-secondary); font-weight:700; margin-top:5px; display:block;" id="label-vol-bb">Rs. 0 - Rs. 0</span>
                                 </div>
-                                <div style="text-align: center;">
+                                <div style="text-align: center; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 6px; border: 1px solid var(--border-glass);">
                                     <span style="font-size: 9px; color: var(--text-secondary); font-weight:600; display:block; margin-bottom:5px; letter-spacing:0.05em;">AVERAGE TRUE RANGE (14D)</span>
-                                    <div style="height: 60px; position: relative;">
-                                        <canvas id="chart-vol-atr"></canvas>
-                                    </div>
-                                    <span style="font-size: 9px; color: var(--text-secondary); font-weight:700; margin-top:3px; display:block;" id="label-vol-atr">Rs. 0.00</span>
+                                    <div id="volatility-atr-container" style="height: 120px; position: relative;"></div>
+                                    <span style="font-size: 9px; color: var(--text-secondary); font-weight:700; margin-top:5px; display:block;" id="label-vol-atr">Rs. 0.00</span>
                                 </div>
-                                <div style="text-align: center;">
+                                <div style="text-align: center; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 6px; border: 1px solid var(--border-glass);">
                                     <span style="font-size: 9px; color: var(--text-secondary); font-weight:600; display:block; margin-bottom:5px; letter-spacing:0.05em;">MACD MOMENTUM (12, 26)</span>
-                                    <div style="height: 60px; position: relative;">
-                                        <canvas id="chart-vol-macd"></canvas>
-                                    </div>
-                                    <span style="font-size: 9px; color: var(--text-secondary); font-weight:700; margin-top:3px; display:block;" id="label-vol-macd">0.00 (Neutral)</span>
+                                    <div id="volatility-macd-container" style="height: 120px; position: relative;"></div>
+                                    <span style="font-size: 9px; color: var(--text-secondary); font-weight:700; margin-top:5px; display:block;" id="label-vol-macd">0.00 (Neutral)</span>
                                 </div>
-                                <div style="text-align: center;">
+                                <div style="text-align: center; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 6px; border: 1px solid var(--border-glass);">
                                     <span style="font-size: 9px; color: var(--text-secondary); font-weight:600; display:block; margin-bottom:5px; letter-spacing:0.05em;">VOLUME PRICE TREND (VPT)</span>
-                                    <div style="height: 60px; position: relative;">
-                                        <canvas id="chart-vol-vpt"></canvas>
-                                    </div>
-                                    <span style="font-size: 9px; color: var(--text-secondary); font-weight:700; margin-top:3px; display:block;" id="label-vol-vpt">0 (Neutral)</span>
+                                    <div id="volatility-vpt-container" style="height: 120px; position: relative;"></div>
+                                    <span style="font-size: 9px; color: var(--text-secondary); font-weight:700; margin-top:5px; display:block;" id="label-vol-vpt">0 (Neutral)</span>
                                 </div>
                             </div>
-                            <div class="vol-summary-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass);">
+                            
+                            <div class="vol-summary-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass); width: 100%;">
                                 <span style="font-size: 10px; color: var(--text-secondary); font-weight:600; display:block; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:5px;">Volatility & Momentum Summary</span>
                                 <p id="vol-summary-text" style="font-size: 11px; color: var(--text-muted); line-height:1.45; margin:0;">Analyzing technical indicators...</p>
                             </div>
