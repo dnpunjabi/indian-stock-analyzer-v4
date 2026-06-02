@@ -553,50 +553,82 @@
 
                         <!-- Technical & Momentum Indicators Card -->
                         <div class="card col-span-2 card-hidden" id="tech-timing-card" data-subtab="technical">
-                            <h3>TECHNICAL & MOMENTUM TIMING</h3>
-                            <div class="tech-metrics-list">
-                                <div class="tech-metric-row">
-                                    <span>Relative Strength Index (RSI-14)</span>
-                                    <strong id="tech-rsi">52.4 (Neutral)</strong>
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border: none; padding: 0; width: 100%;">
+                                <h3 style="margin:0;">TECHNICAL & MOMENTUM TIMING</h3>
+                                <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Oscillators & Trend Tracking</span>
+                            </div>
+                            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Monitoring moving average crossovers, relative strength indexes, and capture thresholds.</p>
+                            
+                            <div class="tech-metrics-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; margin-bottom: 15px;">
+                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 14px;">📊</span>
+                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">RSI-14</span>
+                                    </div>
+                                    <strong id="tech-rsi" style="font-size: 14px; margin-top: 6px; color: var(--text-primary);">52.4 (Neutral)</strong>
                                 </div>
-                                <div class="tech-metric-row">
-                                    <span>SMA Crossover Status (50 vs 200)</span>
-                                    <strong id="tech-sma-trend">Golden Cross (Bullish)</strong>
+                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 14px;">🔄</span>
+                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">SMA Crossover</span>
+                                    </div>
+                                    <strong id="tech-sma-trend" style="font-size: 12px; margin-top: 6px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Golden Cross (Bullish)</strong>
                                 </div>
-                                <div class="tech-metric-row">
-                                    <span>50-Day Moving Average</span>
-                                    <strong id="tech-sma-50">Rs. 3,745.20</strong>
+                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 14px;">📈</span>
+                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">50-Day SMA</span>
+                                    </div>
+                                    <strong id="tech-sma-50" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 3,745.20</strong>
                                 </div>
-                                <div class="tech-metric-row">
-                                    <span>200-Day Moving Average</span>
-                                    <strong id="tech-sma-200">Rs. 3,580.40</strong>
+                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 14px;">📉</span>
+                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">200-Day SMA</span>
+                                    </div>
+                                    <strong id="tech-sma-200" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 3,580.40</strong>
                                 </div>
-                                <div class="tech-metric-row">
-                                    <span>Distance from 52-Week High</span>
-                                    <strong id="tech-dist-high">6.2%</strong>
+                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 14px;">🏔️</span>
+                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">52W High Dist</span>
+                                    </div>
+                                    <strong id="tech-dist-high" style="font-size: 14px; margin-top: 6px; color: var(--text-primary);">6.2%</strong>
                                 </div>
-                                <div class="tech-metric-row">
-                                    <span>Distance from 52-Week Low</span>
-                                    <strong id="tech-dist-low">22.8%</strong>
+                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 14px;">🌋</span>
+                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">52W Low Dist</span>
+                                    </div>
+                                    <strong id="tech-dist-low" style="font-size: 14px; margin-top: 6px; color: var(--text-primary);">22.8%</strong>
                                 </div>
-                                <div class="tech-metric-row">
-                                    <span>Up-Market Capture Ratio (3Y)</span>
-                                    <strong id="tech-up-capture">N/A</strong>
+                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 14px;">🚀</span>
+                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">Up Capture</span>
+                                    </div>
+                                    <strong id="tech-up-capture" style="font-size: 12px; margin-top: 6px; color: var(--text-primary);">N/A</strong>
                                 </div>
-                                <div class="tech-metric-row">
-                                    <span>Down-Market Capture Ratio (3Y)</span>
-                                    <strong id="tech-down-capture">N/A</strong>
+                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 14px;">🛡️</span>
+                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">Down Capture</span>
+                                    </div>
+                                    <strong id="tech-down-capture" style="font-size: 12px; margin-top: 6px; color: var(--text-primary);">N/A</strong>
                                 </div>
                             </div>
                             
-
-
-                            <div class="tech-breakout-block" style="padding-top: 15px; border-top: 1px dashed var(--border-glass);">
+                            <div class="tech-breakout-block" style="padding-top: 15px; border-top: 1px dashed var(--border-glass); margin-bottom: 12px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                     <span style="font-size: 11px; color: var(--text-secondary); font-weight: 500;">Breakout Technical Signal</span>
                                     <div class="breakout-badge" id="tech-breakout-badge">CONSOLIDATING</div>
                                 </div>
                                 <p id="tech-breakout-desc" style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin: 0;">Price currently trading inside standard range bounds.</p>
+                            </div>
+
+                            <div id="tech-timing-layman-block" style="margin-top: 15px; padding: 10px 12px; background: rgba(59, 130, 246, 0.03); border-left: 2.5px solid var(--color-primary); border-radius: 0 6px 6px 0; border-top: 1px dashed rgba(255,255,255,0.05); border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); width: 100%; box-sizing: border-box;">
+                                <span style="font-size: 9px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em; margin-bottom: 4px;">💡 Layman Timing Translation</span>
+                                <p id="tech-timing-layman-text" style="font-size: 11px; color: var(--text-muted); line-height: 1.45; margin: 0;">Analyzing moving average crossovers and oversold triggers...</p>
                             </div>
                         </div>
 
@@ -621,8 +653,8 @@
 
                         <!-- Interactive Market Capture Diagnostics -->
                         <div class="card col-span-2 card-hidden" id="interactive-capture-card" data-subtab="technical">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                                <h3>INTERACTIVE MARKET CAPTURE</h3>
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border: none; padding: 0; width: 100%;">
+                                <h3 style="margin:0;">INTERACTIVE MARKET CAPTURE</h3>
                                 <select id="capture-period" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 4px 8px; font-size: 11px; font-weight: 500; cursor: pointer; outline: none;">
                                     <option value="3m">3 Months</option>
                                     <option value="6m">6 Months</option>
@@ -632,30 +664,53 @@
                                     <option value="5y">5 Years (60M)</option>
                                 </select>
                             </div>
+                            <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Evaluating upside outperformance velocity and downside cushion strength over active time horizons.</p>
                             
                             <div class="capture-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px;">
-                                <div class="capture-box up-box" style="padding: 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px;">
-                                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.05em;">Up-Market Capture</span>
-                                    <strong id="int-up-val" style="font-size: 22px; display: block; margin-top: 5px; color: var(--text-primary);">100.0%</strong>
-                                    <div class="capture-bar-bg" style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; margin-top: 10px; overflow: hidden;">
-                                        <div id="int-up-bar" style="height: 100%; width: 100%; background: var(--neon-green); border-radius: 3px; transition: width 0.4s ease;"></div>
+                                <div class="capture-box up-box" style="padding: 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; margin-bottom: 12px; text-align: center;">Up-Market Capture</span>
+                                    
+                                    <!-- Radial Gauge Dial -->
+                                    <div style="position: relative; width: 80px; height: 80px; margin-bottom: 12px;">
+                                        <svg width="80" height="80" viewBox="0 0 80 80" style="transform: rotate(-90deg);">
+                                            <circle cx="40" cy="40" r="34" stroke="rgba(255, 255, 255, 0.04)" stroke-width="6" fill="transparent" />
+                                            <circle id="int-up-circle" cx="40" cy="40" r="34" stroke="var(--neon-green)" stroke-width="6" fill="transparent" 
+                                                    stroke-dasharray="213.6" stroke-dashoffset="213.6" stroke-linecap="round" style="transition: stroke-dashoffset 0.6s ease, stroke 0.4s ease;" />
+                                        </svg>
+                                        <div style="position: absolute; top: 0; left: 0; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+                                            <strong id="int-up-val" style="font-size: 14px; color: var(--text-primary);">100.0%</strong>
+                                        </div>
                                     </div>
-                                    <span id="int-up-lbl" style="font-size: 9px; color: var(--text-muted); display: block; margin-top: 8px;">Loading up-market performance...</span>
+                                    
+                                    <span id="int-up-lbl" style="font-size: 9px; color: var(--text-muted); display: block; text-align: center; font-weight: 500;">Loading returns...</span>
+                                    <!-- Keep the legacy bar to avoid potential crashes in unmodified references -->
+                                    <div id="int-up-bar" style="display:none; width: 0%;"></div>
                                 </div>
                                 
-                                <div class="capture-box down-box" style="padding: 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px;">
-                                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.05em;">Down-Market Capture</span>
-                                    <strong id="int-down-val" style="font-size: 22px; display: block; margin-top: 5px; color: var(--text-primary);">100.0%</strong>
-                                    <div class="capture-bar-bg" style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; margin-top: 10px; overflow: hidden;">
-                                        <div id="int-down-bar" style="height: 100%; width: 100%; background: var(--neon-green); border-radius: 3px; transition: width 0.4s ease;"></div>
+                                <div class="capture-box down-box" style="padding: 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; margin-bottom: 12px; text-align: center;">Down-Market Capture</span>
+                                    
+                                    <!-- Radial Gauge Dial -->
+                                    <div style="position: relative; width: 80px; height: 80px; margin-bottom: 12px;">
+                                        <svg width="80" height="80" viewBox="0 0 80 80" style="transform: rotate(-90deg);">
+                                            <circle cx="40" cy="40" r="34" stroke="rgba(255, 255, 255, 0.04)" stroke-width="6" fill="transparent" />
+                                            <circle id="int-down-circle" cx="40" cy="40" r="34" stroke="var(--neon-green)" stroke-width="6" fill="transparent" 
+                                                    stroke-dasharray="213.6" stroke-dashoffset="213.6" stroke-linecap="round" style="transition: stroke-dashoffset 0.6s ease, stroke 0.4s ease;" />
+                                        </svg>
+                                        <div style="position: absolute; top: 0; left: 0; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+                                            <strong id="int-down-val" style="font-size: 14px; color: var(--text-primary);">100.0%</strong>
+                                        </div>
                                     </div>
-                                    <span id="int-down-lbl" style="font-size: 9px; color: var(--text-muted); display: block; margin-top: 8px;">Loading down-market performance...</span>
+                                    
+                                    <span id="int-down-lbl" style="font-size: 9px; color: var(--text-muted); display: block; text-align: center; font-weight: 500;">Loading returns...</span>
+                                    <!-- Keep the legacy bar to avoid potential crashes in unmodified references -->
+                                    <div id="int-down-bar" style="display:none; width: 0%;"></div>
                                 </div>
                             </div>
                             
-                            <div style="margin-top: 15px; padding: 10px 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-glass); border-radius: 6px;">
-                                <span style="font-size: 9px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em;">Capture Ratios Profile Summary</span>
-                                <p id="int-capture-summary" style="font-size: 11px; color: var(--text-muted); line-height: 1.45; margin: 5px 0 0 0;">Calculating custom profile thesis...</p>
+                            <div style="margin-top: 15px; padding: 12px; background: rgba(59, 130, 246, 0.03); border-left: 2.5px solid var(--color-primary); border-radius: 0 6px 6px 0; border-top: 1px dashed rgba(255,255,255,0.05); border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); width: 100%; box-sizing: border-box;">
+                                <span style="font-size: 9px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em;">📈 Capture Ratios Profile Summary</span>
+                                <p id="int-capture-summary" style="font-size: 11px; color: var(--text-muted); line-height: 1.45; margin: 0;">Calculating custom profile thesis...</p>
                             </div>
                         </div>
 
@@ -909,6 +964,10 @@
                             </div>
                             <div class="chart-container" style="height: 380px;">
                                 <canvas id="stock-chart"></canvas>
+                            </div>
+                            <div id="price-trend-summary-block" style="margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass); width: 100%;">
+                                <span style="font-size: 10px; color: var(--text-secondary); font-weight: 600; display: block; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px;">AI Historical Price & Trend Interpretation</span>
+                                <p id="price-trend-summary-text" style="font-size: 11px; color: var(--text-muted); line-height: 1.45; margin: 0;">Analyzing price channels, moving averages, and dynamic resistance zones...</p>
                             </div>
                         </div>
 

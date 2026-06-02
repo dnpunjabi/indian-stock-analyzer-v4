@@ -1204,8 +1204,33 @@ function renderStockDashboard(p) {
         thesisEl.innerText = p.analysis.investment_thesis;
     }
     
-    document.getElementById('tech-rsi').innerText = `${safeFixed(p.technicals.rsi, 1)} (${p.technicals.rsi_status})`;
-    document.getElementById('tech-sma-trend').innerText = p.technicals.trend_50_vs_200;
+    const rsiVal = p.technicals.rsi;
+    const rsiStatus = p.technicals.rsi_status || "Neutral";
+    const rsiEl = document.getElementById('tech-rsi');
+    if (rsiEl) {
+        rsiEl.innerText = `${safeFixed(rsiVal, 1)} (${rsiStatus})`;
+        if (rsiStatus.toLowerCase().includes("oversold")) {
+            rsiEl.style.color = "var(--neon-green)";
+        } else if (rsiStatus.toLowerCase().includes("overbought")) {
+            rsiEl.style.color = "var(--neon-red)";
+        } else {
+            rsiEl.style.color = "var(--text-primary)";
+        }
+    }
+
+    const smaTrend = p.technicals.trend_50_vs_200 || "Neutral";
+    const smaTrendEl = document.getElementById('tech-sma-trend');
+    if (smaTrendEl) {
+        smaTrendEl.innerText = smaTrend;
+        if (smaTrend.toLowerCase().includes("bullish") || smaTrend.toLowerCase().includes("golden")) {
+            smaTrendEl.style.color = "var(--neon-green)";
+        } else if (smaTrend.toLowerCase().includes("bearish") || smaTrend.toLowerCase().includes("death")) {
+            smaTrendEl.style.color = "var(--neon-red)";
+        } else {
+            smaTrendEl.style.color = "var(--text-primary)";
+        }
+    }
+
     document.getElementById('tech-sma-50').innerText = safeFormatRupees(p.technicals.sma_50, 2);
     document.getElementById('tech-sma-200').innerText = safeFormatRupees(p.technicals.sma_200, 2);
     document.getElementById('tech-dist-high').innerText = `${safeFixed(p.technicals.dist_high_52w_pct, 1)}%`;
@@ -1220,8 +1245,26 @@ function renderStockDashboard(p) {
         const benchSymbol = p.capture_ratios ? p.capture_ratios.benchmark_symbol : '^NSEI';
         const benchName = benchSymbol === '^NSEI' ? 'Nifty 50' : 'Sensex';
         
-        upCapEl.innerHTML = `${safeFixed(upCap, 1)}% <span style="font-size:9px; color: ${upCap !== null && upCap >= 100 ? 'var(--neon-green)' : 'var(--text-muted)'}; font-weight:normal;">(${upCap !== null && upCap >= 100 ? 'Outperforming' : 'Lagging'} vs ${benchName})</span>`;
-        downCapEl.innerHTML = `${safeFixed(downCap, 1)}% <span style="font-size:9px; color: ${downCap !== null && downCap <= 100 ? 'var(--neon-green)' : 'var(--neon-red)'}; font-weight:normal;">(${downCap !== null && downCap <= 100 ? 'Protected' : 'Volatile'} vs ${benchName})</span>`;
+        upCapEl.innerHTML = `${safeFixed(upCap, 1)}% <span style="font-size:8px; color: ${upCap !== null && upCap >= 100 ? 'var(--neon-green)' : 'var(--text-muted)'}; font-weight:normal; display:block;">(${upCap !== null && upCap >= 100 ? 'Outperforming' : 'Lagging'} vs ${benchName})</span>`;
+        downCapEl.innerHTML = `${safeFixed(downCap, 1)}% <span style="font-size:8px; color: ${downCap !== null && downCap <= 100 ? 'var(--neon-green)' : 'var(--neon-red)'}; font-weight:normal; display:block;">(${downCap !== null && downCap <= 100 ? 'Protected' : 'Volatile'} vs ${benchName})</span>`;
+    }
+
+    // Technical Timing Layman Translation
+    const timingLaymanEl = document.getElementById('tech-timing-layman-text');
+    if (timingLaymanEl) {
+        let timingLaymanDesc = "The stock is currently consolidating within standard parameters. Buyers and sellers are balanced, waiting for a definitive breakout direction.";
+        if (technicalSignal === "BULLISH ENTRY") {
+            timingLaymanDesc = "The Golden Cross is active and the RSI is perfectly balanced. This indicates the stock has strong speed but is not overheated yet. Think of a runner who is fully warmed up and just starting their sprint—this is typically an ideal entry window.";
+        } else if (technicalSignal === "OVERBOUGHT WATCH") {
+            timingLaymanDesc = `The stock is in a strong uptrend, but its RSI is at ${safeFixed(p.technicals.rsi, 1)}, indicating that buyers have driven the price up too fast. Think of a runner gasping for breath at the top of a steep hill. It is best to wait for a temporary price pullback before adding new cash.`;
+        } else if (technicalSignal === "BULLISH TIMING") {
+            timingLaymanDesc = "The stock is cruising in a healthy, broad upward trend. Moving averages are aligned, and the RSI is in a safe territory. Think of a high-speed train that has built up steady cruising speed—the trend remains highly supportive.";
+        } else if (technicalSignal === "ACCUMULATE ON DIP") {
+            timingLaymanDesc = `The stock has experienced short-term selling, pushing the RSI to a depressed level of ${safeFixed(p.technicals.rsi, 1)}. Think of this as a premium retail store offering a massive clearance sale on high-quality merchandise. It represents a lucrative dip-buying window.`;
+        } else if (technicalSignal === "BEARISH WATCH") {
+            timingLaymanDesc = "The stock has entered a downward crossover (Death Cross) or is showing severe technical weakness. Think of a vehicle rolling downhill with fading brakes. It is highly advised to avoid buying and hold current positions defensively.";
+        }
+        timingLaymanEl.innerHTML = timingLaymanDesc;
     }
     
     // Render Volatility & Momentum Indicator Labels
@@ -1445,10 +1488,12 @@ async function updateInteractiveCaptureCard(p, customYears) {
     const upValEl = document.getElementById('int-up-val');
     const upBarEl = document.getElementById('int-up-bar');
     const upLblEl = document.getElementById('int-up-lbl');
+    const upCircleEl = document.getElementById('int-up-circle');
     
     const downValEl = document.getElementById('int-down-val');
     const downBarEl = document.getElementById('int-down-bar');
     const downLblEl = document.getElementById('int-down-lbl');
+    const downCircleEl = document.getElementById('int-down-circle');
     
     const summaryEl = document.getElementById('int-capture-summary');
     
@@ -1458,6 +1503,15 @@ async function updateInteractiveCaptureCard(p, customYears) {
     if (upLblEl) upLblEl.innerText = 'Analyzing returns...';
     if (downLblEl) downLblEl.innerText = 'Analyzing returns...';
     if (summaryEl) summaryEl.innerText = 'Loading custom capture ratio thesis...';
+    
+    if (upCircleEl) {
+        upCircleEl.style.strokeDashoffset = '213.6';
+        upCircleEl.style.stroke = 'var(--text-muted)';
+    }
+    if (downCircleEl) {
+        downCircleEl.style.strokeDashoffset = '213.6';
+        downCircleEl.style.stroke = 'var(--text-muted)';
+    }
     
     if (upBarEl) {
         upBarEl.style.width = '10%';
@@ -1493,30 +1547,52 @@ async function updateInteractiveCaptureCard(p, customYears) {
         if (upValEl) upValEl.innerText = `${upCap.toFixed(1)}%`;
         if (downValEl) downValEl.innerText = `${downCap.toFixed(1)}%`;
         
-        // Map bar widths smoothly (0% - 200% maps to 5% - 100% width)
+        // Circumference of circles is 213.6
+        // Map 0% - 200% smoothly to 100% - 0% stroke-dashoffset (213.6 down to 0)
+        const upCapClamped = Math.min(200.0, Math.max(0.0, upCap));
+        const downCapClamped = Math.min(200.0, Math.max(0.0, downCap));
+        
+        const upOffset = 213.6 - (upCapClamped / 200.0) * 213.6;
+        const downOffset = 213.6 - (downCapClamped / 200.0) * 213.6;
+        
+        let upColor = 'var(--neon-green)';
+        if (upCap >= 100.0) {
+            upColor = 'var(--neon-green)';
+        } else if (upCap >= 80.0) {
+            upColor = '#f59e0b';
+        } else {
+            upColor = 'var(--neon-red)';
+        }
+        
+        let downColor = 'var(--neon-red)';
+        if (downCap <= 80.0) {
+            downColor = 'var(--neon-green)';
+        } else if (downCap <= 100.0) {
+            downColor = 'var(--text-muted)';
+        } else {
+            downColor = 'var(--neon-red)';
+        }
+
+        if (upCircleEl) {
+            upCircleEl.style.strokeDashoffset = upOffset.toString();
+            upCircleEl.style.stroke = upColor;
+        }
+        if (downCircleEl) {
+            downCircleEl.style.strokeDashoffset = downOffset.toString();
+            downCircleEl.style.stroke = downColor;
+        }
+        
+        // Map legacy bar widths smoothly (0% - 200% maps to 5% - 100% width)
         const upWidth = Math.min(100, Math.max(5, (upCap / 200.0) * 100));
         const downWidth = Math.min(100, Math.max(5, (downCap / 200.0) * 100));
         
         if (upBarEl) {
             upBarEl.style.width = `${upWidth}%`;
-            if (upCap >= 100.0) {
-                upBarEl.style.background = 'var(--neon-green)';
-            } else if (upCap >= 80.0) {
-                upBarEl.style.background = '#f59e0b'; // Amber/orange for matching/neutral
-            } else {
-                upBarEl.style.background = 'var(--neon-red)';
-            }
+            upBarEl.style.background = upColor;
         }
-        
         if (downBarEl) {
             downBarEl.style.width = `${downWidth}%`;
-            if (downCap <= 80.0) {
-                downBarEl.style.background = 'var(--neon-green)'; // Superior protection is green!
-            } else if (downCap <= 100.0) {
-                downBarEl.style.background = 'var(--text-muted)'; // Standard co-movement
-            } else {
-                downBarEl.style.background = 'var(--neon-red)'; // Volatile downside is red!
-            }
+            downBarEl.style.background = downColor;
         }
         
         // Labels
@@ -1551,18 +1627,33 @@ async function updateInteractiveCaptureCard(p, customYears) {
         // Personalized Thesis Summary Text
         if (summaryEl) {
             let summaryText = "";
+            let laymanDescription = "";
+            
             if (upCap >= 100.0 && downCap <= 80.0) {
                 summaryText = `<strong>Asymmetric Alpha (Premium Profile):</strong> Over ${horizonText}, ${p.company_name} captured ${upCap.toFixed(1)}% of the index gains while cushioning standard drawdowns to just ${downCap.toFixed(1)}%. This represents a classic asymmetric alpha asset with superior downside defense.`;
+                laymanDescription = `This stock behaves like an **advanced performance sports hybrid**. It features a **high-octane outperformance engine** (upside capture of ${upCap.toFixed(1)}%) that speeds past the Nifty index during market surges, paired with an **impenetrable shock absorption shield** (downside capture of only ${downCap.toFixed(1)}%) that absorbs 80% of road bumps during downward market shocks. It offers the holy grail of high returns with strong safety.`;
             } else if (upCap >= 100.0 && downCap > 100.0) {
                 summaryText = `<strong>High-Beta Momentum:</strong> Over ${horizonText}, ${p.company_name} captured ${upCap.toFixed(1)}% of the index gains but experienced highly magnified drawdowns of ${downCap.toFixed(1)}% during market declines. Suitable for aggressive growth seekers who can tolerate high short-term volatility.`;
+                laymanDescription = `Think of this stock as a **turbocharged racing car without airbags**. It boasts a **massive outperformance engine** (upside capture of ${upCap.toFixed(1)}%) that leaves the index in the dust when going uphill, but has **zero downside shock shields** (downside capture of ${downCap.toFixed(1)}%), meaning you will feel every bump and crash at double the intensity when the market slides. Great for thrill-seekers, but keep your seatbelt fastened!`;
             } else if (upCap < 100.0 && downCap <= 80.0) {
                 summaryText = `<strong>Defensive Stability:</strong> Over ${horizonText}, ${p.company_name} underperformed the index upside at ${upCap.toFixed(1)}% capture, but offered superb capital preservation with a low ${downCap.toFixed(1)}% downside co-movement. Fits conservative, income-oriented portfolios.`;
+                laymanDescription = `This stock acts like a **heavy-armored family SUV**. Its **outperformance engine is modest** (upside capture of ${upCap.toFixed(1)}%), meaning it won't win drag races when the market climbs, but its **downside shock shield is incredibly robust** (downside capture of just ${downCap.toFixed(1)}%), neutralizing most of the market's turbulence and protecting your capital from steep drops. Perfect for a safe, smooth, stress-free journey.`;
             } else if (upCap < 100.0 && downCap > 100.0) {
                 summaryText = `<strong>Unfavorable Asymmetry (Caution):</strong> Over ${horizonText}, ${p.company_name} underperformed on the upside (${upCap.toFixed(1)}% capture) while dropping faster than the index during declines (${downCap.toFixed(1)}% capture). Displays unfavorable asymmetry, presenting high relative risk.`;
+                laymanDescription = `This is a **compromised vehicle with a sputtering engine and weak brakes**. It has a **weak engine** (upside capture of ${upCap.toFixed(1)}%) that lags far behind the index when going uphill, but has **no shock shields at all** (downside capture of ${downCap.toFixed(1)}%), falling faster and harder than the index when the road gets rough. Investors should handle this with extreme caution as the risk-reward math is highly unfavorable.`;
             } else {
                 summaryText = `<strong>Balanced Market Tracker:</strong> Over ${horizonText}, ${p.company_name} moved in close harmony with ${benchName} (Up-Capture: ${upCap.toFixed(1)}%, Down-Capture: ${downCap.toFixed(1)}%). Core risk-return patterns mirror standard domestic stock cycles.`;
+                laymanDescription = `This stock acts like a **standard commuter sedan**. Its **engine and shock shields are perfectly tuned to mimic the average traffic flow**. When the Nifty accelerates, it keeps pace (upside capture: ${upCap.toFixed(1)}%); when the market hits a pothole, it experiences the exact same bump (downside capture: ${downCap.toFixed(1)}%). It offers a balanced, standard ride that mirrors the broader index.`;
             }
-            summaryEl.innerHTML = summaryText;
+            
+            summaryEl.innerHTML = `
+                <div style="margin-bottom: 8px;">
+                    ${summaryText}
+                </div>
+                <div style="font-size:11px; color:var(--text-muted); line-height: 1.45; border-left: 2.5px solid var(--color-primary); padding-left: 8px; margin-top: 8px; background: rgba(59, 130, 246, 0.03); padding-top: 5px; padding-bottom: 5px; border-radius: 0 4px 4px 0; width: 100%; box-sizing: border-box;">
+                    💡 <strong>Layman Translation:</strong> ${laymanDescription}
+                </div>
+            `;
         }
     } catch (err) {
         console.error("Error updating capture card:", err);
@@ -2161,6 +2252,53 @@ async function fetchAndRenderChart() {
             drawStockChartCanvas(chartData);
             drawVolatilityMomentumMiniCharts(chartData);
             drawFibonacciChart(activeStockProfile);
+        }
+
+        // Render dynamic price trend AI summary
+        const trendSummaryEl = document.getElementById('price-trend-summary-text');
+        if (trendSummaryEl && activeStockProfile) {
+            const p = activeStockProfile;
+            const curPrice = p.fundamentals.current_price;
+            const sma50 = p.technicals.sma_50;
+            const sma200 = p.technicals.sma_200;
+            const trendStatus = p.technicals.trend_50_vs_200 || "Neutral";
+            const breakoutDesc = p.technicals.breakout_desc || "Price currently trading inside standard range bounds.";
+            
+            let condition = "Consolidating Range";
+            let technicalAnalystVerdict = breakoutDesc;
+            let laymanExplanation = "The stock is moving sideways within a steady price channel. Buyers and sellers are in balance, waiting for a catalyst to push the price in a clear direction.";
+            
+            if (curPrice !== null && sma50 !== null && sma200 !== null) {
+                if (curPrice >= sma50 && sma50 >= sma200) {
+                    condition = "Bullish Cruising Speed";
+                    technicalAnalystVerdict = `Price (Rs. ${safeFormatNumber(curPrice, 2)}) is comfortably sustained above the 50-Day SMA (Rs. ${safeFormatNumber(sma50, 2)}) and the 200-Day SMA (Rs. ${safeFormatNumber(sma200, 2)}). The structural trend is Bullish with positive moving average slope confirmation.`;
+                    laymanExplanation = "The stock is driving smoothly in the fast lane of a clear highway. It has strong momentum behind it, and its major support cushions (the moving averages) are trailing right beneath it to catch any minor slips.";
+                } else if (curPrice < sma50 && curPrice >= sma200) {
+                    condition = "Mean Reversion Pullback";
+                    technicalAnalystVerdict = `Price (Rs. ${safeFormatNumber(curPrice, 2)}) has pulled back below the 50-Day SMA (Rs. ${safeFormatNumber(sma50, 2)}) but remains structurally anchored above the 200-Day SMA (Rs. ${safeFormatNumber(sma200, 2)}). Crossover remains supportive, but short-term buying momentum has cooled.`;
+                    laymanExplanation = "The stock is taking a temporary pit stop or meeting a brief traffic slowdown. While the long-term trend remains positive, it is wise to wait for the price to stop sliding and bounce off its main safety cushion (the 200-day moving average) before adding more capital.";
+                } else if (curPrice < sma200 && sma50 < sma200) {
+                    condition = "Bearish Downward Slope";
+                    technicalAnalystVerdict = `Price (Rs. ${safeFormatNumber(curPrice, 2)}) is locked in a structural downtrend below both the 50-Day SMA (Rs. ${safeFormatNumber(sma50, 2)}) and the 200-Day SMA (Rs. ${safeFormatNumber(sma200, 2)}). Moving averages are in a Bearish state (Death Cross), indicating ongoing distribution.`;
+                    laymanExplanation = "The stock is rolling down a steep hill with fading brakes. The road is muddy and slippery, and major support walls have cracked. It is highly advised to avoid buying new shares and hold defensively until a solid floor is established.";
+                } else if (curPrice < sma200) {
+                    condition = "Under-Shoring Transition";
+                    technicalAnalystVerdict = `Price (Rs. ${safeFormatNumber(curPrice, 2)}) is trading below the 200-Day SMA (Rs. ${safeFormatNumber(sma200, 2)}) while the 50-Day SMA (Rs. ${safeFormatNumber(sma50, 2)}) is still sloping down. Watch for a potential capitulation dump or structural base building.`;
+                    laymanExplanation = "The stock has slipped underneath its basement floor. It is in a dark and volatile zone. Unless you are an experienced contrarian looking for a deep-discount rebound, it is safest to watch from the sidelines until a supportive trend emerges.";
+                }
+            }
+            
+            trendSummaryEl.innerHTML = `
+                <div style="margin-bottom: 8px;">
+                    <strong>Indicator State:</strong> ${condition} | <strong>Trend Outlook:</strong> <span style="font-weight: 700; color: ${trendStatus === "Bullish" ? "var(--neon-green)" : "var(--neon-red)"};">${trendStatus.toUpperCase()}</span>
+                </div>
+                <div style="font-size:11px; color:var(--text-secondary); margin-bottom: 8px; line-height: 1.45;">
+                    <strong>Analyst Verdict:</strong> ${technicalAnalystVerdict}
+                </div>
+                <div style="font-size:11px; color:var(--text-muted); line-height: 1.45; border-left: 2.5px solid var(--color-primary); padding-left: 8px; margin-top: 6px; background: rgba(59, 130, 246, 0.03); padding-top: 5px; padding-bottom: 5px; border-radius: 0 4px 4px 0; width: 100%; box-sizing: border-box;">
+                    💡 <strong>Layman Translation:</strong> ${laymanExplanation}
+                </div>
+            `;
         }
     } catch (e) {
         console.error("Failed to load dynamic chart: ", e);
