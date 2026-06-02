@@ -90,7 +90,16 @@ POPULAR_INDIAN_STOCKS = {
     "hind.aeronautics.": "HAL",
     "hind.aeronautics": "HAL",
     "hindustan aeronautics": "HAL",
-    "hal": "HAL"
+    "hal": "HAL",
+    "cg power & ind": "CGPOWER",
+    "cg power & ind.": "CGPOWER",
+    "cg power": "CGPOWER",
+    "siemens ener.ind": "ENRIN",
+    "siemens ener.ind.": "ENRIN",
+    "siemens energy": "ENRIN",
+    "siemens energy india": "ENRIN",
+    "siemens": "SIEMENS",
+    "siemens limited": "SIEMENS"
 }
 
 def resolve_company_ticker(query: str) -> dict:
@@ -106,6 +115,10 @@ def resolve_company_ticker(query: str) -> dict:
     # Clean spacing inside abbreviation names (e.g. "A B B" -> "ABB", "B H E L" -> "BHEL")
     if re.match(r'^([a-zA-Z]\s)+[a-zA-Z]$', cleaned):
         cleaned = cleaned.replace(" ", "")
+        
+    # Clean Screener.in specific peer abbreviations
+    cleaned = re.sub(r'\b& ind\.?\b', 'and Industrial', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\bener\.ind\.?\b', 'Energy India', cleaned, flags=re.IGNORECASE)
     
     # 0. Check local SQLite database screener_universe first for high-speed offline resolution
     import sqlite3
