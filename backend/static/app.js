@@ -2023,10 +2023,243 @@ function drawStockChartCanvas(data) {
     const container = canvas?.parentElement;
     if (!container) return;
 
-    if (typeof Chart === 'undefined') {
-        container.innerHTML = `<div class="chart-fallback" style="display:flex; align-items:center; justify-content:center; height:100%; font-size:12px; color:var(--text-muted); text-align:center; padding:15px; border: 1px dashed var(--border-glass); border-radius:6px; background:rgba(0,0,0,0.15);">Chart.js is offline. Unable to render historical price trend.</div>`;
+    // Check if TradingView Lightweight Charts is available
+    if (typeof LightweightCharts === 'undefined') {
+        console.warn("TradingView Lightweight Charts offline, falling back to Chart.js.");
+        drawChartJSStockChart(data); // Call legacy Chart.js drawer
         return;
     }
+
+    // Clean up previous Lightweight Chart instance
+    if (window.activeLightweightChart) {
+        window.activeLightweightChart.remove();
+        window.activeLightweightChart = null;
+    }
+    
+    // Clean up Chart.js canvas if exists
+    if (activeChartInstance) {
+        activeChartInstance.destroy();
+        activeChartInstance = null;
+    }
+    
+    container.innerHTML = ''; // Clear container for TradingView Canvas
+    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+
+    // 1. Initialize TradingView Chart
+    const chart = LightweightCharts.createChart(container, {
+        width: container.clientWidth,
+        height: 380,
+        layout: {
+            background: { type: 'solid', color: 'transparent' },
+            textColor: isDarkTheme ? '#94a3b8' : '#334155',
+            fontFamily: 'Inter, sans-serif',
+        },
+        grid: {
+            vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+        },
+        timeScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            timeVisible: false,
+        },
+    });
+    window.activeLightweightChart = chart;
+
+    const showSma50 = document.getElementById('toggle-sma50')?.checked ?? true;
+    const showSma200 = document.getElementById('toggle-sma200')?.checked ?? true;
+    const showBB = document.getElementById('toggle-bb')?.checked ?? false;
+    const showTrendline = document.getElementById('toggle-trendline')?.checked ?? true;
+    const showAiLines = document.getElementById('toggle-ai-lines')?.checked ?? true;
+    const chartStyle = document.getElementById('chart-style')?.value || 'line';
+
+    // 2. Add Price Series
+    let priceSeries;
+    const formattedDates = data.dates.map(d => d.split('T')[0]);
+    
+    if (chartStyle === 'candlestick') {
+        priceSeries = chart.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+        });
+        const candleData = data.prices.map((close, i) => ({
+            time: formattedDates[i],
+            open: data.open[i] || close,
+            high: data.high[i] || close,
+            low: data.low[i] || close,
+            close: close
+        }));
+        priceSeries.setData(candleData);
+    } else {
+        priceSeries = chart.addAreaSeries({
+            lineColor: '#3b82f6',
+            topColor: 'rgba(59, 130, 246, 0.2)',
+            bottomColor: 'rgba(59, 130, 246, 0.0)',
+            lineWidth: 2,
+            priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
+        });
+        const areaData = data.prices.map((close, i) => ({
+            time: formattedDates[i],
+            value: close
+        }));
+        priceSeries.setData(areaData);
+    }
+
+    // 3. Add Volumetric Bar Overlay
+    if (data.volumes && data.volumes.length > 0) {
+        const volumeSeries = chart.addHistogramSeries({
+            color: 'rgba(59, 130, 246, 0.15)',
+            priceFormat: { type: 'volume' },
+            priceScaleId: '', // overlay on same price pane
+        });
+        
+        volumeSeries.priceScale().configure({
+            scaleMargins: { top: 0.8, bottom: 0 }, // place in the bottom 20%
+        });
+
+        const volumeData = data.volumes.map((vol, i) => {
+            const isUp = data.prices[i] >= (data.open[i] || data.prices[i]);
+            return {
+                time: formattedDates[i],
+                value: vol,
+                color: isUp ? 'rgba(16, 185, 129, 0.18)' : 'rgba(239, 68, 68, 0.18)'
+            };
+        });
+        volumeSeries.setData(volumeData);
+    }
+
+    // 4. Add SMA Indicators
+    if (showSma50 && data.sma50) {
+        const sma50Series = chart.addLineSeries({
+            color: '#10b981',
+            lineWidth: 1.5,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            title: 'SMA 50',
+        });
+        const sma50Data = data.sma50.map((v, i) => ({ time: formattedDates[i], value: v })).filter(x => x.value !== null);
+        sma50Series.setData(sma50Data);
+    }
+
+    if (showSma200 && data.sma200) {
+        const sma200Series = chart.addLineSeries({
+            color: '#ef4444',
+            lineWidth: 1.5,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            title: 'SMA 200',
+        });
+        const sma200Data = data.sma200.map((v, i) => ({ time: formattedDates[i], value: v })).filter(x => x.value !== null);
+        sma200Series.setData(sma200Data);
+    }
+
+    // 5. Add Bollinger Bands
+    if (showBB && data.bb_upper && data.bb_lower) {
+        const bbUpperSeries = chart.addLineSeries({
+            color: 'rgba(245, 158, 11, 0.4)',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: 'BB Upper',
+        });
+        const bbUpperData = data.bb_upper.map((v, i) => ({ time: formattedDates[i], value: v })).filter(x => x.value !== null);
+        bbUpperSeries.setData(bbUpperData);
+
+        const bbLowerSeries = chart.addLineSeries({
+            color: 'rgba(245, 158, 11, 0.4)',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: 'BB Lower',
+        });
+        const bbLowerData = data.bb_lower.map((v, i) => ({ time: formattedDates[i], value: v })).filter(x => x.value !== null);
+        bbLowerSeries.setData(bbLowerData);
+    }
+
+    // 6. Add Support/Resistance Trendlines
+    if (showAiLines) {
+        if (data.ai_support) {
+            const supportSeries = chart.addLineSeries({
+                color: 'rgba(16, 185, 129, 0.6)',
+                lineWidth: 1.5,
+                lineStyle: LightweightCharts.LineStyle.Dotted,
+                title: 'AI Support',
+            });
+            const supportData = data.ai_support.map((v, i) => ({ time: formattedDates[i], value: v })).filter(x => x.value !== null);
+            supportSeries.setData(supportData);
+        }
+        if (data.ai_resistance) {
+            const resistanceSeries = chart.addLineSeries({
+                color: 'rgba(239, 68, 68, 0.6)',
+                lineWidth: 1.5,
+                lineStyle: LightweightCharts.LineStyle.Dotted,
+                title: 'AI Resistance',
+            });
+            const resistanceData = data.ai_resistance.map((v, i) => ({ time: formattedDates[i], value: v })).filter(x => x.value !== null);
+            resistanceSeries.setData(resistanceData);
+        }
+    }
+
+    // 7. Add Regression Trendline
+    if (showTrendline) {
+        const trendPrices = calculateRegressionTrendline(data.prices);
+        const trendSeries = chart.addLineSeries({
+            color: '#c084fc',
+            lineWidth: 1.5,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: 'Linear Trendline',
+        });
+        const trendData = trendPrices.map((v, i) => ({ time: formattedDates[i], value: v }));
+        trendSeries.setData(trendData);
+    }
+
+    // 8. Place Crossover Buy/Sell Triangle Markers on Price Chart
+    const markers = [];
+    for (let i = 1; i < data.prices.length; i++) {
+        // Bullish Breakout crossover: Price crosses above SMA 50
+        if (data.prices[i] > data.sma50[i] && data.prices[i-1] <= data.sma50[i-1]) {
+            markers.push({
+                time: formattedDates[i],
+                position: 'belowBar',
+                color: '#10b981',
+                shape: 'arrowUp',
+                text: 'BUY',
+            });
+        }
+        // Bearish Breakdown crossover: Price crosses below SMA 200
+        if (data.prices[i] < data.sma200[i] && data.prices[i-1] >= data.sma200[i-1]) {
+            markers.push({
+                time: formattedDates[i],
+                position: 'aboveBar',
+                color: '#ef4444',
+                shape: 'arrowDown',
+                text: 'SELL',
+            });
+        }
+    }
+    priceSeries.setMarkers(markers);
+
+    // Auto-fit contents on render
+    chart.timeScale().fitContent();
+
+    // Trigger Resize Handler
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            chart.resize(entry.contentRect.width, 380);
+        }
+    });
+    resizeObserver.observe(container);
+}
+
+// Legacy Chart.js drawer to ensure robust offline fallback
+function drawChartJSStockChart(data) {
+    const canvas = document.getElementById('stock-chart');
+    const container = canvas?.parentElement;
+    if (!container) return;
 
     const restoredCanvas = getOrCreateCanvas('stock-chart', container);
     if (!restoredCanvas) return;
