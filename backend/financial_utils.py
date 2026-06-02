@@ -103,6 +103,10 @@ def resolve_company_ticker(query: str) -> dict:
     cleaned = re.sub(r'\s*\(\s*(Target|Peer)\s*\)\s*', '', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\s+(ltd|limited|corp|co|corporation)\.?\s*$', '', cleaned, flags=re.IGNORECASE).strip()
     
+    # Clean spacing inside abbreviation names (e.g. "A B B" -> "ABB", "B H E L" -> "BHEL")
+    if re.match(r'^([a-zA-Z]\s)+[a-zA-Z]$', cleaned):
+        cleaned = cleaned.replace(" ", "")
+    
     # 0. Check local SQLite database screener_universe first for high-speed offline resolution
     import sqlite3
     import os
@@ -414,6 +418,9 @@ def fetch_screener_data(symbol: str) -> dict:
                 if a_tag and len(cells) > 2:
                     company_name = a_tag.text.strip()
                     company_name = re.sub(r'^\d+\.\s*', '', company_name) # remove number
+                    # Clean spacing inside abbreviation names (e.g. "A B B" -> "ABB", "B H E L" -> "BHEL")
+                    if re.match(r'^([a-zA-Z]\s)+[a-zA-Z]$', company_name):
+                        company_name = company_name.replace(" ", "")
                     
                     # Create cell data dictionary
                     cell_vals = [c.text.strip() for c in cells]
