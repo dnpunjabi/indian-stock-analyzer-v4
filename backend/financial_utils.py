@@ -1962,7 +1962,6 @@ def _build_financial_profile(ticker_query: str) -> dict:
                         if peer.get("Profit Qtr YoY %") == "N/A" or not peer.get("Profit Qtr YoY %"):
                             peer["Profit Qtr YoY %"] = f"{fund.get('eps_growth_3y_pct', 0.0):.1f}"
                     else:
-                        import yfinance as yf
                         p_stock = yf.Ticker(peer_ticker)
                         p_info = p_stock.info
                         if p_info:
