@@ -1383,13 +1383,26 @@ function renderStockDashboard(p) {
     const peStatus = document.getElementById('pe-status');
     const peRatio = p.fundamentals.pe_ratio;
     const medianPe = p.pe_bands ? p.pe_bands.median_pe : null;
+    const peLaymanTextEl = document.getElementById('pe-layman-text');
+    
     if (peRatio !== null && peRatio !== undefined && medianPe) {
         const peDiff = ((peRatio - medianPe) / medianPe) * 100.0;
         peStatus.innerText = `${peDiff > 0 ? '+' : ''}${peDiff.toFixed(1)}% ${peDiff > 0 ? 'Premium' : 'Discount'}`;
         peStatus.className = peDiff <= 0 ? 'green-text' : 'red-text';
+        
+        if (peLaymanTextEl) {
+            if (peDiff <= 0) {
+                peLaymanTextEl.innerHTML = `The stock trades at a **${Math.abs(peDiff).toFixed(1)}% statistical discount** to its 5-year historical median. Think of this as purchasing premium luxury merchandise during a seasonal clearance sale—paying lower prices for historical peak earnings quality.`;
+            } else {
+                peLaymanTextEl.innerHTML = `The stock trades at a **${peDiff.toFixed(1)}% statistical premium** to its 5-year historical median. Think of this as paying a surge-pricing premium for an in-demand ride during peak hours. Investors are bidding up the price, expecting robust future growth to justify the premium cost.`;
+            }
+        }
     } else {
         peStatus.innerText = 'N/A';
         peStatus.className = 'text-muted';
+        if (peLaymanTextEl) {
+            peLaymanTextEl.innerHTML = `Insufficient historical valuation bandwidth data. Keep monitoring relative sector valuations and general market cycles.`;
+        }
     }
     
     const selectAllCheckbox = document.getElementById('peer-select-all-checkbox');
@@ -1435,6 +1448,58 @@ function renderStockDashboard(p) {
         peerBody.innerHTML = `<tr><td colspan="7" class="center-text text-muted">No peer companies retrieved from Screener.</td></tr>`;
     }
     
+    // Dynamically calculate Sector Median P/E and relative premium/discount summaries
+    const peValues = [];
+    const targetPe = p.fundamentals.pe_ratio;
+    if (targetPe) {
+        peValues.push(targetPe);
+    }
+    if (p.peers && p.peers.length > 0) {
+        p.peers.forEach(peer => {
+            const peRaw = peer["P/E"] || peer["PE"];
+            if (peRaw && peRaw !== "N/A" && peRaw !== "--") {
+                const peVal = parseFloat(peRaw);
+                if (!isNaN(peVal)) {
+                    peValues.push(peVal);
+                }
+            }
+        });
+    }
+    
+    let sectorMedianPe = null;
+    if (peValues.length > 0) {
+        peValues.sort((a, b) => a - b);
+        const half = Math.floor(peValues.length / 2);
+        if (peValues.length % 2 !== 0) {
+            sectorMedianPe = peValues[half];
+        } else {
+            sectorMedianPe = (peValues[half - 1] + peValues[half]) / 2.0;
+        }
+    }
+    
+    const peersSummaryBlock = document.getElementById('peers-summary-block');
+    const peersSummaryText = document.getElementById('peers-summary-text');
+    if (peersSummaryBlock && peersSummaryText) {
+        if (targetPe && sectorMedianPe) {
+            peersSummaryBlock.style.display = 'block';
+            const peDiff = ((targetPe - sectorMedianPe) / sectorMedianPe) * 100.0;
+            let rating = "aligned with sector averages";
+            let premiumAnalogy = `trading completely in-line with the sector peer median of **${sectorMedianPe.toFixed(1)}** (current P/E of **${targetPe.toFixed(1)}**). Think of this as purchasing standard premium merchandise at its fair market list price.`;
+            
+            if (peDiff >= 15.0) {
+                rating = "trading at a relative premium";
+                premiumAnalogy = `trading at a **${peDiff.toFixed(1)}% premium** compared to its sector peers (active P/E of **${targetPe.toFixed(1)}** vs peer median of **${sectorMedianPe.toFixed(1)}**). Think of this as paying a markup for a certified brand-name phone compared to generic competitors—investors are bidding up the price, expecting superior earnings quality to justify the premium cost.`;
+            } else if (peDiff <= -15.0) {
+                rating = "trading at a relative discount";
+                premiumAnalogy = `trading at a **${Math.abs(peDiff).toFixed(1)}% discount** compared to its sector peers (active P/E of **${targetPe.toFixed(1)}** vs peer median of **${sectorMedianPe.toFixed(1)}**). Think of this as purchasing high-quality merchandise during a premium clearance sale—paying lower prices for standard operational earnings power.`;
+            }
+            peersSummaryText.innerHTML = `⚔️ **Sector Valuation Assessment:** The stock is **${rating}** relative to its peer group.<br><br>💡 **Layman Analogy:** ${premiumAnalogy}`;
+        } else {
+            peersSummaryBlock.style.display = 'none';
+        }
+    }
+    
+    // Populate shareholding statistics grid pills
     document.getElementById('sh-promoter').innerText = `${(p.shareholding.Promoter || p.shareholding["Promoters"] || 50.0).toFixed(1)}%`;
     document.getElementById('sh-fii').innerText = `${(p.shareholding.FIIs || p.shareholding["FII"] || 15.0).toFixed(1)}%`;
     document.getElementById('sh-dii').innerText = `${(p.shareholding.DIIs || p.shareholding["DII"] || 15.0).toFixed(1)}%`;
@@ -1444,13 +1509,65 @@ function renderStockDashboard(p) {
     const pledgeAlert = document.getElementById('pledge-alert-box');
     const pledgeText = document.getElementById('pledge-percentage-text');
     
-    pledgeText.innerText = `${pledgePercentage.toFixed(1)}% Pledged shares (${pledgePercentage > 5 ? 'Risk flagged' : 'Low Risk'})`;
-    if (pledgePercentage > 5) {
-        pledgeAlert.className = 'pledging-alert-box alert-red';
+    pledgeText.innerText = `${pledgePercentage.toFixed(1)}% Pledged shares (${pledgePercentage > 5.0 ? 'Risk flagged' : 'Low Risk'})`;
+    
+    if (pledgePercentage > 5.0) {
+        pledgeAlert.style.borderLeft = '3.5px solid var(--color-crimson)';
+        pledgeAlert.style.background = 'rgba(239, 68, 68, 0.04)';
         pledgeAlert.querySelector('.alert-icon').innerText = '⚠️';
+        pledgeAlert.querySelector('.alert-icon').style.color = 'var(--color-crimson)';
     } else {
-        pledgeAlert.className = 'pledging-alert-box alert-green';
+        pledgeAlert.style.borderLeft = '3.5px solid var(--color-emerald)';
+        pledgeAlert.style.background = 'rgba(16, 185, 129, 0.04)';
         pledgeAlert.querySelector('.alert-icon').innerText = '✓';
+        pledgeAlert.querySelector('.alert-icon').style.color = 'var(--color-emerald)';
+    }
+    
+    // Synthesize Promoter Skin-in-the-game and Institutional backing analogies
+    const shLaymanEl = document.getElementById('shareholding-layman-text');
+    if (shLaymanEl) {
+        const promoterHold = p.shareholding.Promoter || p.shareholding["Promoters"] || 50.0;
+        const instHold = (p.shareholding.FIIs || p.shareholding["FII"] || 15.0) + (p.shareholding.DIIs || p.shareholding["DII"] || 15.0);
+        
+        let promoterAnalogy = "Promoters have standard operational interest.";
+        if (promoterHold >= 65.0) {
+            promoterAnalogy = `With **${promoterHold.toFixed(1)}%** promoter holdings, skin-in-the-game is exceptionally high. Think of this as a restaurant where the head chef eats their own food every single day—they have massive personal incentives to ensure ultimate quality.`;
+        } else if (promoterHold >= 50.0) {
+            promoterAnalogy = `With **${promoterHold.toFixed(1)}%** promoter holdings, the founders retain absolute voting control. Think of this as a family-run business where the builders have long-term structural commitment to the brand.`;
+        } else if (promoterHold < 35.0) {
+            promoterAnalogy = `With promoter holdings at a low **${promoterHold.toFixed(1)}%**, control is highly diversified. Think of this as a public corporation run by professional managers rather than committed founders.`;
+        }
+        
+        let instAnalogy = "Institutional smart-money represents standard backing.";
+        if (instHold >= 30.0) {
+            instAnalogy = `FII & DII holdings stand at **${instHold.toFixed(1)}%**, indicating a massive institutional floor. Smart-money backing creates a solid pricing support floor, similar to high-profile venture capitalists funding a project.`;
+        } else if (instHold < 10.0) {
+            instAnalogy = `Institutional backing is sparse at **${instHold.toFixed(1)}%**, meaning retail traders represent the core liquidity. This can lead to higher short-term price volatility.`;
+        }
+        
+        let pledgingAnalogy = "Promoter shares are fully unpledged, representing clean corporate governance.";
+        if (pledgePercentage >= 15.0) {
+            pledgingAnalogy = `Critically, promoters have pledged **${pledgePercentage.toFixed(1)}%** of their stock as debt collateral. Think of this as putting your house up as mortgage collateral to fund a risky business—if the stock price crashes, lenders can sell shares, triggering severe panic.`;
+        } else if (pledgePercentage > 0.0) {
+            pledgingAnalogy = `Promoters have pledged a minor **${pledgePercentage.toFixed(1)}%** of their stock as debt collateral, representing low systemic risk.`;
+        }
+        
+        // Update shareholding summary left border color based on pledging risk
+        const shLaymanBlock = document.getElementById('shareholding-layman-block');
+        if (shLaymanBlock) {
+            if (pledgePercentage >= 15.0) {
+                shLaymanBlock.style.borderLeft = '2.5px solid var(--color-crimson)';
+                shLaymanBlock.style.background = 'rgba(239, 68, 68, 0.03)';
+            } else if (pledgePercentage > 5.0) {
+                shLaymanBlock.style.borderLeft = '2.5px solid var(--color-amber)';
+                shLaymanBlock.style.background = 'rgba(245, 158, 11, 0.03)';
+            } else {
+                shLaymanBlock.style.borderLeft = '2.5px solid var(--color-emerald)';
+                shLaymanBlock.style.background = 'rgba(16, 185, 129, 0.03)';
+            }
+        }
+        
+        shLaymanEl.innerHTML = `🛡️ **Institutional Synopsis:** FII & DII holdings account for **${instHold.toFixed(1)}%** of liquidity.<br><br>💡 **Layman Analogy:** ${promoterAnalogy} ${instAnalogy}<br><br>⚠️ **Solvency Warning:** ${pledgingAnalogy}`;
     }
     
     const growthList = document.getElementById('cio-growth-drivers-list');
@@ -2015,6 +2132,9 @@ function drawPeerComparisonChart(dates, series, benchmarkSymbol) {
         }
     });
     resizeObserver.observe(container);
+    
+    // Compile Peer Performance AI Summary block
+    compilePeerPerformanceAISummary(series, benchmarkSymbol);
 }
 
 // Fallback legacy Chart.js drawer
@@ -2130,6 +2250,104 @@ function drawChartJSPeerComparisonChart(dates, series, benchmarkSymbol) {
             }
         }
     });
+    
+    // Compile Peer Performance AI Summary block
+    compilePeerPerformanceAISummary(series, benchmarkSymbol);
+}
+
+function compilePeerPerformanceAISummary(series, benchmarkSymbol) {
+    if (!activeStockProfile || !activeStockProfile.ticker) return;
+
+    const returns = {};
+    Object.keys(series).forEach(key => {
+        const dataArr = series[key];
+        if (dataArr && dataArr.length > 0) {
+            const finalVal = dataArr[dataArr.length - 1];
+            // Cumulative return = final value - 100.0
+            returns[key] = finalVal - 100.0;
+        }
+    });
+
+    const targetTicker = activeStockProfile.ticker;
+    const targetReturn = returns[targetTicker] !== undefined ? returns[targetTicker] : 0.0;
+    
+    // Core default colors
+    const colorsList = ['#10b981', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#38bdf8'];
+    let colorIdx = 0;
+    const seriesColors = {};
+    Object.keys(series).forEach(key => {
+        if (key === targetTicker) {
+            seriesColors[key] = '#00e5ff';
+        } else if (key === benchmarkSymbol) {
+            seriesColors[key] = '#94a3b8';
+        } else {
+            seriesColors[key] = colorsList[colorIdx % colorsList.length];
+            colorIdx++;
+        }
+    });
+
+    // Filter out benchmark symbol from rankings
+    const peerReturns = Object.keys(returns)
+        .filter(key => key !== targetTicker && key !== benchmarkSymbol)
+        .map(key => ({ ticker: key, ret: returns[key] }));
+        
+    const allReturns = [{ ticker: targetTicker, ret: targetReturn }, ...peerReturns];
+    allReturns.sort((a, b) => b.ret - a.ret); // descending order of return
+    
+    const targetRank = allReturns.findIndex(item => item.ticker === targetTicker) + 1;
+    const totalItems = allReturns.length;
+    
+    let summaryHtml = '';
+    
+    summaryHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: start; margin-top: 5px;">';
+    
+    // Column 1: Standing
+    summaryHtml += '  <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04);">';
+    summaryHtml += '    <div style="font-size: 10px; font-weight: 700; color: #ffffff; letter-spacing: 0.04em; margin-bottom: 8px; text-transform: uppercase;">Momentum Standing Table</div>';
+    
+    allReturns.forEach((item, index) => {
+        const isTarget = item.ticker === targetTicker;
+        const color = seriesColors[item.ticker] || '#ffffff';
+        const boldStyle = isTarget ? 'font-weight: 700;' : 'font-weight: 500;';
+        const bgStyle = isTarget ? 'background: rgba(0, 229, 255, 0.05);' : '';
+        const rankMedal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `[${index + 1}]`;
+        const cleanTicker = item.ticker.replace('.NS', '').replace('.BO', '');
+        
+        summaryHtml += `    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; padding: 4px 8px; border-radius: 4px; margin-bottom: 4px; ${bgStyle}">`;
+        summaryHtml += `      <span style="color: ${color}; ${boldStyle}">${rankMedal} ${cleanTicker} ${isTarget ? '(Target)' : ''}</span>`;
+        summaryHtml += `      <strong style="color: ${item.ret >= 0 ? '#10b981' : '#ef4444'};">${item.ret >= 0 ? '+' : ''}${item.ret.toFixed(2)}%</strong>`;
+        summaryHtml += `    </div>`;
+    });
+    summaryHtml += '  </div>';
+    
+    // Column 2: Metaphor
+    summaryHtml += '  <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04); display: flex; flex-direction: column; justify-content: space-between; height: 100%; min-height: 120px;">';
+    summaryHtml += '    <div>';
+    summaryHtml += '      <div style="font-size: 10px; font-weight: 700; color: #ffffff; letter-spacing: 0.04em; margin-bottom: 6px; text-transform: uppercase;">🚴 PEER RACE SYNOPIS (Layman Metaphor)</div>';
+    
+    let raceMetaphor = '';
+    const cleanTargetTicker = targetTicker.replace('.NS', '').replace('.BO', '');
+    if (targetRank === 1) {
+        raceMetaphor = `**Target stock leads the race:** Think of this as a marathon where **${cleanTargetTicker}** has broken away from the pack. It has superior wind resistance and pacing, leaving rivals struggling to keep up with its superior operational stride over this period.`;
+    } else if (targetRank === totalItems) {
+        raceMetaphor = `**Target stock trails the race:** Think of this as a race where **${cleanTargetTicker}** has fallen behind due to strong headwinds or mechanical friction (e.g. margin compression or growth friction). It needs to optimize its gearing to catch up with the leaders.`;
+    } else {
+        raceMetaphor = `**Target stock is in the peloton:** Think of this as a bicycle race where **${cleanTargetTicker}** is riding comfortably in the middle of the pack. It is saving energy by drafting behind the front-runners, waiting for a fresh catalyst to launch a breakaway.`;
+    }
+    
+    summaryHtml += `      <p style="font-size: 10.5px; color: var(--text-muted); line-height: 1.5; margin: 0; font-family: 'Inter', sans-serif;">${raceMetaphor}</p>`;
+    summaryHtml += '    </div>';
+    summaryHtml += '  </div>';
+    summaryHtml += '</div>';
+
+    const textEl = document.getElementById('peer-performance-summary-text');
+    if (textEl) {
+        textEl.innerHTML = summaryHtml;
+    }
+    const blockEl = document.getElementById('peer-performance-summary-block');
+    if (blockEl) {
+        blockEl.style.display = 'block';
+    }
 }
 
 async function renderStrategyAuditMatrix(ticker) {
@@ -2169,47 +2387,55 @@ async function renderStrategyAuditMatrix(ticker) {
             const cell = document.createElement('div');
             cell.className = 'audit-cell';
             cell.style.cursor = 'pointer';
-            cell.style.padding = '8px 12px';
-            cell.style.borderRadius = '6px';
-            cell.style.border = '1px solid var(--border-glass)';
+            cell.style.padding = '12px 14px';
+            cell.style.borderRadius = '8px';
+            cell.style.border = '1px solid rgba(255, 255, 255, 0.05)';
             cell.style.display = 'flex';
             cell.style.justifyContent = 'space-between';
             cell.style.alignItems = 'center';
-            cell.style.background = 'rgba(0,0,0,0.2)';
-            cell.style.transition = 'all 0.2s';
+            cell.style.background = combo.passed ? 'rgba(16, 185, 129, 0.03)' : 'rgba(239, 68, 68, 0.02)';
+            cell.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
             
             cell.addEventListener('mouseenter', () => {
-                cell.style.background = 'rgba(255,255,255,0.04)';
-                cell.style.borderColor = 'rgba(255,255,255,0.15)';
-                cell.style.boxShadow = '0 0 10px rgba(59,130,246,0.1)';
+                cell.style.transform = 'translateY(-2px) scale(1.01)';
+                cell.style.background = combo.passed ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.06)';
+                cell.style.borderColor = combo.passed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+                cell.style.boxShadow = combo.passed ? '0 4px 15px rgba(16, 185, 129, 0.12)' : '0 4px 15px rgba(239, 68, 68, 0.1)';
             });
             cell.addEventListener('mouseleave', () => {
-                cell.style.background = 'rgba(0,0,0,0.2)';
-                cell.style.borderColor = 'var(--border-glass)';
+                cell.style.transform = 'none';
+                cell.style.background = combo.passed ? 'rgba(16, 185, 129, 0.03)' : 'rgba(239, 68, 68, 0.02)';
+                cell.style.borderColor = 'rgba(255, 255, 255, 0.05)';
                 cell.style.boxShadow = 'none';
             });
             
             const titleSpan = document.createElement('span');
-            titleSpan.style.fontSize = '10.5px';
+            titleSpan.style.fontSize = '11px';
             titleSpan.style.fontWeight = '600';
-            titleSpan.style.color = 'var(--text-secondary)';
+            titleSpan.style.color = '#ffffff';
+            titleSpan.style.fontFamily = "'Outfit', sans-serif";
+            titleSpan.style.letterSpacing = '0.02em';
             titleSpan.innerText = styleNames[combo.style] || combo.style;
             
             const statusSpan = document.createElement('span');
             statusSpan.className = 'badge-rec';
             statusSpan.style.fontSize = '9px';
-            statusSpan.style.padding = '1.5px 5px';
+            statusSpan.style.padding = '3px 8px';
+            statusSpan.style.borderRadius = '5px';
+            statusSpan.style.fontWeight = '700';
+            statusSpan.style.letterSpacing = '0.04em';
+            statusSpan.style.border = '1px solid';
             
             if (combo.passed) {
                 statusSpan.style.background = 'rgba(16, 185, 129, 0.12)';
-                statusSpan.style.color = 'var(--color-emerald)';
-                statusSpan.style.borderColor = 'rgba(16, 185, 129, 0.2)';
-                statusSpan.innerText = `PASS (${combo.score})`;
+                statusSpan.style.color = '#10B981';
+                statusSpan.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+                statusSpan.innerText = `🟢 PASS (${combo.score})`;
             } else {
                 statusSpan.style.background = 'rgba(239, 68, 68, 0.12)';
-                statusSpan.style.color = 'var(--color-crimson)';
-                statusSpan.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-                statusSpan.innerText = 'FAIL (Excluded)';
+                statusSpan.style.color = '#EF4444';
+                statusSpan.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                statusSpan.innerText = '🔴 FAIL';
             }
             
             cell.appendChild(titleSpan);
@@ -2221,62 +2447,146 @@ async function renderStrategyAuditMatrix(ticker) {
                 const expDesc = document.getElementById('audit-explain-desc');
                 const panel = document.getElementById('audit-explanation-panel');
                 
+                // Calculate gate compliance rate
+                const totalGates = combo.gates ? combo.gates.length : 0;
+                const passedGates = combo.gates ? combo.gates.filter(g => g.passed).length : 0;
+                const passRate = totalGates > 0 ? (passedGates / totalGates) : 0;
+                
                 if (panel) {
-                    panel.style.background = combo.passed ? 'rgba(16,185,129,0.03)' : 'rgba(239,68,68,0.03)';
-                    panel.style.borderColor = combo.passed ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)';
+                    // Update dynamically depending on selected cell pass rate
+                    let accentColor = 'var(--color-crimson)';
+                    let glowBg = 'rgba(239, 68, 68, 0.02)';
+                    if (passRate >= 0.8) {
+                        accentColor = '#10B981'; // emerald green
+                        glowBg = 'rgba(16, 185, 129, 0.03)';
+                    } else if (passRate >= 0.5) {
+                        accentColor = '#F59E0B'; // amber gold
+                        glowBg = 'rgba(245, 158, 11, 0.03)';
+                    }
+                    panel.style.background = glowBg;
+                    panel.style.borderLeft = `4px solid ${accentColor}`;
                 }
                 
                 if (expTitle) {
                     const stratText = combo.strategy === "bottom_up" ? "Bottom-Up" : combo.strategy === "hybrid" ? "Hybrid" : "Top-Down";
-                    const styleText = styleNames[combo.style];
-                    expTitle.innerHTML = `🔎 <span style="color:#fff; font-weight:800;">${stratText} Strategy + ${styleText}</span> Checklist Diagnostic [${combo.action}]`;
+                    const styleText = styleNames[combo.style] || combo.style;
+                    const actionBadge = combo.passed 
+                        ? `<span style="background: rgba(16, 185, 129, 0.15); color: #10B981; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; border: 1px solid rgba(16,185,129,0.3); margin-left: 8px;">${combo.action}</span>` 
+                        : `<span style="background: rgba(239, 68, 68, 0.15); color: #EF4444; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; border: 1px solid rgba(239,68,68,0.3); margin-left: 8px;">EXCLUDED</span>`;
+                    expTitle.innerHTML = `🔎 <span style="color:#ffffff; font-weight:700;">${stratText} Strategy + ${styleText}</span> Checklist Diagnostic ${actionBadge}`;
                 }
                 
                 if (expDesc) {
                     let html = '';
                     
-                    // Show final score calculation
-                    html += '<div style="margin-bottom:12px; background:rgba(255,255,255,0.02); padding:10px; border-radius:6px; border:1px solid var(--border-glass);">';
-                    html += `<div style="font-size:11px; font-weight:700; color:var(--text-primary); margin-bottom:6px;">AI CONVICTION SCORE BREAKDOWN:</div>`;
+                    // Show final score calculation in 2-column widescreen layout
+                    html += '<div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 15px; margin-bottom: 15px; align-items: start;">';
+                    
+                    // Column 1: Score progress bars
+                    html += '  <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04);">';
+                    html += '    <div style="font-size: 10px; font-weight: 700; color: #ffffff; letter-spacing: 0.04em; margin-bottom: 8px; text-transform: uppercase;">AI Conviction Score Parameters</div>';
                     
                     if (combo.scoring.fundamental_score !== undefined) {
-                        html += `<div style="display:grid; grid-template-columns: 1fr 1fr; gap: 4px 15px; margin-bottom:6px; padding: 4px 8px; background: rgba(0,0,0,0.12); border-radius: 4px; border: 1px solid rgba(255,255,255,0.02);">`;
-                        html += `  <div style="font-size:9.5px; color:var(--text-muted);">• Fundamentals: <strong style="color:#fff; float:right;">${combo.scoring.fundamental_score}/30</strong></div>`;
-                        html += `  <div style="font-size:9.5px; color:var(--text-muted);">• Valuation: <strong style="color:#fff; float:right;">${combo.scoring.valuation_score}/25</strong></div>`;
-                        html += `  <div style="font-size:9.5px; color:var(--text-muted);">• Technicals: <strong style="color:#fff; float:right;">${combo.scoring.technical_score}/25</strong></div>`;
-                        html += `  <div style="font-size:9.5px; color:var(--text-muted);">• Growth: <strong style="color:#fff; float:right;">${combo.scoring.growth_score}/15</strong></div>`;
-                        html += `  <div style="font-size:9.5px; color:var(--text-muted); grid-column: span 2;">• Sentiment & News: <strong style="color:#fff; float:right;">${combo.scoring.sentiment_score}/5</strong></div>`;
-                        html += `</div>`;
+                        const scores = [
+                            { name: 'Fundamentals', score: combo.scoring.fundamental_score, max: 30 },
+                            { name: 'Valuation', score: combo.scoring.valuation_score, max: 25 },
+                            { name: 'Technicals', score: combo.scoring.technical_score, max: 25 },
+                            { name: 'Growth Drivers', score: combo.scoring.growth_score, max: 15 },
+                            { name: 'Sentiment & News', score: combo.scoring.sentiment_score, max: 5 }
+                        ];
+                        
+                        scores.forEach(s => {
+                            const pct = (s.score / s.max) * 100;
+                            let barColor = '#EF4444'; // red
+                            if (pct >= 70) {
+                                barColor = '#10B981'; // emerald green
+                            } else if (pct >= 40) {
+                                barColor = '#F59E0B'; // amber yellow
+                            }
+                            
+                            html += `    <div style="margin-bottom: 8px;">`;
+                            html += `      <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); margin-bottom: 3px;">`;
+                            html += `        <span>${s.name}</span>`;
+                            html += `        <span style="font-weight: 600; color: #ffffff;">${s.score}/${s.max}</span>`;
+                            html += `      </div>`;
+                            html += `      <div style="height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; width: 100%;">`;
+                            html += `        <div style="height: 100%; width: ${pct}%; background: ${barColor}; border-radius: 2px; transition: width 0.3s ease;"></div>`;
+                            html += `      </div>`;
+                            html += `    </div>`;
+                        });
                     }
+                    html += '  </div>';
                     
-                    html += `<div style="display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-secondary); margin-bottom:3px;">`;
-                    html += `  <span>Base Strategy score:</span> <strong>${combo.scoring.base_score}/100</strong>`;
-                    html += `</div>`;
+                    // Column 2: Strategy Summary Card
+                    html += '  <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04); display: flex; flex-direction: column; justify-content: space-between; height: 100%; min-height: 165px;">';
+                    html += '    <div>';
+                    html += '      <div style="font-size: 10px; font-weight: 700; color: #ffffff; letter-spacing: 0.04em; margin-bottom: 8px; text-transform: uppercase;">Allocation Audit</div>';
+                    html += `      <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-secondary); margin-bottom:4px;">`;
+                    html += `        <span>Base Strategy score:</span> <strong style="color: #ffffff;">${combo.scoring.base_score}/100</strong>`;
+                    html += `      </div>`;
                     
                     if (combo.scoring.adjustments && combo.scoring.adjustments.length > 0) {
                         combo.scoring.adjustments.forEach(adj => {
                             const valSign = adj.value >= 0 ? `+${adj.value}` : adj.value;
-                            const valColor = adj.value >= 0 ? 'var(--color-emerald)' : 'var(--color-crimson)';
-                            html += `<div style="display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-secondary); margin-bottom:3px;">`;
-                            html += `  <span>Style Adjustment (${adj.name}):</span> <strong style="color:${valColor};">${valSign}</strong>`;
-                            html += `</div>`;
+                            const valColor = adj.value >= 0 ? '#10B981' : '#EF4444';
+                            html += `      <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-secondary); margin-bottom:4px;">`;
+                            html += `        <span>Style adjustment (${adj.name}):</span> <strong style="color:${valColor};">${valSign}</strong>`;
+                            html += `      </div>`;
                         });
                     }
+                    html += '    </div>';
                     
-                    html += `<div style="display:flex; justify-content:space-between; font-size:11px; font-weight:700; border-top:1px dotted var(--border-glass); padding-top:4px; margin-top:4px;">`;
-                    html += `  <span>Final Conviction Score:</span> <strong style="color:var(--color-primary);">${combo.score}/100</strong>`;
-                    html += `</div>`;
+                    // Large Final Score Badge
+                    const finalColor = combo.passed ? '#10B981' : '#EF4444';
+                    html += `    <div style="border-top: 1px dotted rgba(255,255,255,0.06); padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">`;
+                    html += `      <span style="font-size: 10px; color: var(--text-secondary);">Final Conviction:</span>`;
+                    html += `      <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 4px 10px; display: flex; align-items: center; gap: 4px;">`;
+                    html += `        <span style="font-size: 14px; font-weight: 800; color: ${finalColor};">${combo.score}</span>`;
+                    html += `        <span style="font-size: 9px; color: var(--text-muted);">/100</span>`;
+                    html += `      </div>`;
+                    html += `    </div>`;
+                    html += '  </div>';
                     html += '</div>';
                     
+                    // Sports/Scouting Layman Synopsis Callout Box
+                    let analogyText = '';
+                    let sportsTitle = '';
+                    if (combo.strategy === 'bottom_up') {
+                        sportsTitle = '🏃 INDIVIDUAL ATHLETE SCOUTING (Bottom-Up Analogy)';
+                        analogyText = 'Individual Athlete Scouting is like selecting a world-class competitor purely based on their personal stats—speed, cardiac efficiency, and physical strength. You do not worry about the team they play for; you focus purely on their raw talent, expecting their high individual quality to shine through and win matches.';
+                    } else if (combo.strategy === 'top_down') {
+                        sportsTitle = '🛡️ CHAMPIONSHIP SYSTEM SCOUTING (Top-Down Analogy)';
+                        analogyText = 'Championship System Scouting is like identifying a dominant, world-class system first (e.g. a premier league team with elite support structures, dieticians, and tactics), and then selecting players within that team. The environment is so strong that even average players are highly likely to succeed under this framework.';
+                    } else {
+                        sportsTitle = '⚡ ELITE FRANCHISE SCOUTING (Hybrid Analogy)';
+                        analogyText = 'Elite Franchise Scouting is the optimal scouting design: it identifies a world-class player who possesses exceptional personal athletic metrics, and verifies they are already positioned within an elite, highly supportive championship system. This maximizes upside while minimizing operational failures.';
+                    }
+                    
+                    const statusAnalogy = combo.passed 
+                        ? 'This stock successfully satisfies all deal-breakers—the athlete is perfectly healthy and operates within a supportive tactical layout.'
+                        : 'This stock introduces excessive structural risk—the player is currently carrying an active injury or the system\'s environment introduces deal-breaker hazards, leading to exclusion.';
+
+                    html += `<div style="background: rgba(245, 158, 11, 0.02); border-left: 3px solid #F59E0B; border-radius: 4px; padding: 12px; margin-bottom: 15px; border-top: 1px solid rgba(245, 158, 11, 0.05); border-right: 1px solid rgba(245, 158, 11, 0.05); border-bottom: 1px solid rgba(245, 158, 11, 0.05);">`;
+                    html += `  <div style="font-size: 10px; font-weight: 700; color: #F59E0B; margin-bottom: 4px; letter-spacing: 0.04em;">${sportsTitle}</div>`;
+                    html += `  <p style="font-size: 10.5px; color: var(--text-muted); line-height: 1.55; margin: 0; margin-bottom: 6px; font-family: 'Inter', sans-serif;">${analogyText}</p>`;
+                    html += `  <p style="font-size: 10.5px; color: var(--text-secondary); line-height: 1.55; margin: 0; font-weight: 500; font-family: 'Inter', sans-serif;">🔬 <span style="font-style: italic;">Status Verdict:</span> ${statusAnalogy}</p>`;
+                    html += `</div>`;
+                    
                     // Show Gate-by-Gate checks
-                    html += '<div style="font-size:11px; font-weight:700; color:var(--text-primary); margin-bottom:6px;">GATE CHECKLIST METRICS:</div>';
+                    html += '<div style="font-size:10px; font-weight:700; color:#ffffff; letter-spacing:0.04em; margin-bottom:8px; text-transform:uppercase;">Gate Diagnostic Checklist</div>';
                     html += '<div style="display:grid; grid-template-columns:1fr; gap:6px;">';
                     combo.gates.forEach(gate => {
                         const checkIcon = gate.passed ? '🟢 PASS' : '🔴 FAIL';
-                        const checkColor = gate.passed ? 'var(--color-emerald)' : 'var(--color-crimson)';
-                        html += `<div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.15); padding:6px 10px; border-radius:4px; border: 1px solid rgba(255,255,255,0.03); transition: background 0.2s;">`;
-                        html += `  <span><strong style="color:#fff;">${gate.name}</strong> <span style="font-size:9.5px; color:var(--text-muted); margin-left:5px;">(${gate.details})</span></span>`;
-                        html += `  <strong style="color:${checkColor}; font-size:9.5px; letter-spacing:0.04em;">${checkIcon}</strong>`;
+                        const checkColor = gate.passed ? '#10B981' : '#EF4444';
+                        const bgTint = gate.passed ? 'rgba(16, 185, 129, 0.02)' : 'rgba(239, 68, 68, 0.02)';
+                        const borderTint = gate.passed ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)';
+                        
+                        html += `<div style="display:flex; justify-content:space-between; align-items:center; background:${bgTint}; border: 1px solid ${borderTint}; border-left: 3px solid ${checkColor}; padding:8px 12px; border-radius:6px; transition: background 0.2s;">`;
+                        html += `  <div style="display: flex; flex-direction: column; gap: 2px;">`;
+                        html += `    <span style="font-size: 11px; font-weight: 600; color: #ffffff;">${gate.name}</span>`;
+                        html += `    <span style="font-size: 9.5px; color: var(--text-muted);">${gate.details}</span>`;
+                        html += `  </div>`;
+                        html += `  <strong style="color:${checkColor}; font-size:10px; font-family:'Outfit', sans-serif; letter-spacing:0.04em;">${checkIcon}</strong>`;
                         html += `</div>`;
                     });
                     html += '</div>';
@@ -3044,6 +3354,123 @@ function calculateClientSideDCF() {
     const marginSafetyEl = document.getElementById('dcf-margin-safety');
     marginSafetyEl.innerText = !isNaN(margin) && margin !== null && margin !== undefined ? `${margin > 0 ? '+' : ''}${margin.toFixed(1)}%` : 'N/A';
     marginSafetyEl.className = !isNaN(margin) && margin !== null && margin !== undefined && margin >= 0 ? 'green-text' : 'red-text';
+    
+    // Dynamically update sandbox status badge
+    const dcfStatusBadge = document.getElementById('dcf-status-badge');
+    if (dcfStatusBadge) {
+        dcfStatusBadge.className = 'dcf-indicator';
+        if (margin >= 15.0) {
+            dcfStatusBadge.innerText = 'Significantly Undervalued';
+            dcfStatusBadge.classList.add('undervalued');
+        } else if (margin >= 5.0) {
+            dcfStatusBadge.innerText = 'Moderately Undervalued';
+            dcfStatusBadge.classList.add('undervalued');
+        } else if (margin <= -15.0) {
+            dcfStatusBadge.innerText = 'Significantly Overvalued';
+            dcfStatusBadge.classList.add('overvalued');
+        } else if (margin <= -5.0) {
+            dcfStatusBadge.innerText = 'Moderately Overvalued';
+            dcfStatusBadge.classList.add('overvalued');
+        } else {
+            dcfStatusBadge.innerText = 'Fairly Valued';
+            dcfStatusBadge.classList.add('fair');
+        }
+    }
+
+    // Generate dynamic sandbox AI thesis narrative in real time
+    const thesisTextEl = document.getElementById('dcf-sandbox-thesis-text');
+    if (thesisTextEl) {
+        const activeWaccPct = wacc * 100;
+        const activeGrowthPct = growth * 100;
+        
+        let growthNarrative = "stable, defensive expansion patterns";
+        if (activeGrowthPct >= 20.0) growthNarrative = "extremely aggressive hyper-growth expansion trajectory";
+        else if (activeGrowthPct >= 12.0) growthNarrative = "robust, market-leading premium growth schedules";
+        else if (activeGrowthPct < 6.0) growthNarrative = "conservative, low-single-digit defensive maturity";
+        
+        let waccNarrative = "standard moderate capital costs";
+        if (activeWaccPct >= 13.0) waccNarrative = "punitive, high-risk equity premium hurdle rates, squeezing long-term present value";
+        else if (activeWaccPct <= 9.0) waccNarrative = "favorable, institutional-grade low discount rates, boosting cash flow capitalization";
+        
+        let ratingNarrative = "fairly valued, demanding disciplined buy-limit execution";
+        if (margin >= 15.0) ratingNarrative = "significantly undervalued, offering a massive margin of safety for capital allocation";
+        else if (margin >= 5.0) ratingNarrative = "moderately undervalued, supporting standard accumulation strategies";
+        else if (margin <= -15.0) ratingNarrative = "dangerously overvalued, indicating peak euphoria and elevated entry risks";
+        else if (margin <= -5.0) ratingNarrative = "moderately overvalued, advising defensive holds and patient dip-buying";
+        
+        thesisTextEl.innerHTML = `Under active assumptions of **${activeGrowthPct.toFixed(1)}%** Revenue Growth (${growthNarrative}) discounted at a hurdle rate of **${activeWaccPct.toFixed(1)}%** Hurdle WACC (${waccNarrative}), the equity is estimated to be **${ratingNarrative}** (Margin of Safety: **${margin.toFixed(1)}%**).`;
+    }
+
+    // Highlight closest coordinates in sensitivity matrix heatmap
+    highlightActiveMatrixCoordinate();
+}
+
+function highlightActiveMatrixCoordinate() {
+    if (!activeStockProfile) return;
+    
+    // Read current slider values
+    const waccEl = document.getElementById('sb-wacc');
+    const growthEl = document.getElementById('sb-growth');
+    if (!waccEl || !growthEl) return;
+    
+    const activeWacc = parseFloat(waccEl.value);
+    const activeGrowth = parseFloat(growthEl.value);
+    
+    const baseWacc = activeStockProfile.dcf_model.wacc !== null && activeStockProfile.dcf_model.wacc !== undefined ? activeStockProfile.dcf_model.wacc : 10.0;
+    const baseGrowth = activeStockProfile.fundamentals.sales_growth_3y_pct || 12.0;
+    
+    // WACC row factors (same as in renderDCFSensitivityMatrix)
+    const waccRates = [baseWacc - 2.0, baseWacc - 1.0, baseWacc, baseWacc + 1.0, baseWacc + 2.0];
+    // Revenue Growth column factors
+    const growthRates = [baseGrowth - 4.0, baseGrowth - 2.0, baseGrowth, baseGrowth + 2.0, baseGrowth + 4.0];
+    
+    // Find closest indexes
+    let closestRowIdx = 0;
+    let minWaccDiff = Infinity;
+    waccRates.forEach((w, idx) => {
+        const diff = Math.abs(w - activeWacc);
+        if (diff < minWaccDiff) {
+            minWaccDiff = diff;
+            closestRowIdx = idx;
+        }
+    });
+    
+    let closestColIdx = 0;
+    let minGrowthDiff = Infinity;
+    growthRates.forEach((g, idx) => {
+        const diff = Math.abs(g - activeGrowth);
+        if (diff < minGrowthDiff) {
+            minGrowthDiff = diff;
+            closestColIdx = idx;
+        }
+    });
+    
+    // Clear all existing coordinate highlights
+    const cells = document.querySelectorAll('.sensitivity-matrix-table td');
+    cells.forEach(cell => {
+        cell.style.outline = 'none';
+        cell.style.boxShadow = 'none';
+        cell.style.transform = 'none';
+        cell.style.fontWeight = 'normal';
+        cell.style.zIndex = 'auto';
+        cell.style.position = 'static';
+    });
+    
+    // Get all rows in table body
+    const rows = document.querySelectorAll('#dcf-sens-body tr');
+    if (rows.length > closestRowIdx) {
+        const targetRow = rows[closestRowIdx];
+        // Target cell is at index closestColIdx + 1 (since index 0 is row label)
+        const targetTd = targetRow.querySelectorAll('td')[closestColIdx + 1];
+        if (targetTd) {
+            targetTd.style.outline = '2px solid var(--neon-blue)';
+            targetTd.style.boxShadow = '0 0 10px rgba(59, 130, 246, 0.8)';
+            targetTd.style.transform = 'scale(1.05)';
+            targetTd.style.fontWeight = '800';
+            targetTd.style.zIndex = '15';
+            targetTd.style.position = 'relative';
+        }
+    }
 }
 
 async function runDynamicSandboxAI() {
@@ -5941,14 +6368,19 @@ function renderDCFSensitivityMatrix(p) {
     const bodyContainer = document.getElementById('dcf-sens-body');
     if (!headersRow || !bodyContainer) return;
     
-    headersRow.innerHTML = '<th>WACC \\ Growth</th>';
+    headersRow.innerHTML = '<th style="background: rgba(255,255,255,0.02); font-weight: 700;">WACC \\ Growth</th>';
     bodyContainer.innerHTML = '';
     
-    const currentWacc = p.dcf_model.wacc; // WACC rate (e.g. 10.5)
+    const currentWacc = p.dcf_model.wacc !== null && p.dcf_model.wacc !== undefined ? p.dcf_model.wacc : 10.0; // WACC rate (e.g. 10.5)
     const baseGrowth = p.fundamentals.sales_growth_3y_pct || 12.0;
-    const currentPrice = p.fundamentals.current_price;
-    const baselineFcf = p.dcf_model.cash_flow_projections[0].fcf / (1 + baseGrowth/100);
-    const mockMcap = p.fundamentals.market_cap_cr * 1e7;
+    const currentPrice = p.fundamentals.current_price || 100.0;
+    
+    let baselineFcf = 10000000;
+    if (p.dcf_model.cash_flow_projections && p.dcf_model.cash_flow_projections.length > 0) {
+        baselineFcf = p.dcf_model.cash_flow_projections[0].fcf / (1 + baseGrowth/100);
+    }
+    
+    const mockMcap = p.fundamentals.market_cap_cr * 1e7 || 1e10;
     const mockOutstandingShares = mockMcap / currentPrice;
     
     // WACC row factors (dynamic offsets)
@@ -5958,13 +6390,14 @@ function renderDCFSensitivityMatrix(p) {
     
     // Render column headers
     growthRates.forEach(g => {
-        headersRow.innerHTML += `<th>${g.toFixed(1)}%</th>`;
+        headersRow.innerHTML += `<th style="background: rgba(255,255,255,0.02); font-weight: 700;">${g.toFixed(1)}%</th>`;
     });
     
     // Compute intrinsic values and build rows
     waccRates.forEach(wVal => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td><strong>WACC ${wVal.toFixed(1)}%</strong></td>`;
+        tr.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+        tr.innerHTML = `<td style="font-weight: 700; color: var(--text-secondary); background: rgba(0,0,0,0.1);">WACC ${wVal.toFixed(1)}%</td>`;
         
         const wDecimal = wVal / 100;
         
@@ -5993,15 +6426,25 @@ function renderDCFSensitivityMatrix(p) {
             intrinsic = Math.max(Math.min(intrinsic, currentPrice * 3), currentPrice * 0.3);
             
             const margin = ((intrinsic - currentPrice) / intrinsic) * 100.0;
-            let cellClass = "sensitivity-cell fair";
-            if (margin >= 10.0) cellClass = "sensitivity-cell undervalued";
-            else if (margin <= -10.0) cellClass = "sensitivity-cell overvalued";
             
-            tr.innerHTML += `<td class="${cellClass}" title="Margin of safety: ${margin.toFixed(1)}%">Rs. ${intrinsic.toFixed(0)}</td>`;
+            // Establish Bloomberg-Style soft heatmaps
+            let cellStyle = "padding: 8px 10px; font-weight: 500; transition: all 0.25s ease;";
+            if (margin >= 10.0) {
+                cellStyle += "background: rgba(16, 185, 129, 0.15) !important; color: var(--color-emerald) !important; border: 1px solid rgba(16, 185, 129, 0.2) !important; font-weight: 700;";
+            } else if (margin <= -10.0) {
+                cellStyle += "background: rgba(239, 68, 68, 0.15) !important; color: var(--color-crimson) !important; border: 1px solid rgba(239, 68, 68, 0.2) !important; font-weight: 700;";
+            } else {
+                cellStyle += "background: rgba(245, 158, 11, 0.1) !important; color: var(--color-amber) !important; border: 1px solid rgba(245, 158, 11, 0.15) !important;";
+            }
+            
+            tr.innerHTML += `<td style="${cellStyle}" title="Estimated Intrinsic: Rs. ${intrinsic.toFixed(2)} | Margin of safety: ${margin.toFixed(1)}%">Rs. ${intrinsic.toFixed(0)}</td>`;
         });
         
         bodyContainer.appendChild(tr);
     });
+    
+    // Pulse highlight closest coordinate matches on startup
+    highlightActiveMatrixCoordinate();
 }
 
 // Street Consensus Comparator Renderer
@@ -6018,7 +6461,7 @@ function renderStreetConsensusComparator(p) {
     
     fairEl.innerText = safeFormatRupees(p.dcf_model.intrinsic_value, 2);
     buyEl.innerText = p.analysis.suggested_buy_price_range ? p.analysis.suggested_buy_price_range.split("Rs. ")[1] || p.analysis.suggested_buy_price_range : "Rs. --";
-    const basePrice = p.fundamentals.current_price;
+    const basePrice = p.fundamentals.current_price || 1.0;
     const stopVal = p.analysis.stop_loss_12m || (basePrice !== null && basePrice !== undefined ? basePrice * 0.88 : null);
     stopEl.innerText = safeFormatRupees(stopVal, 2);
     
@@ -6028,16 +6471,40 @@ function renderStreetConsensusComparator(p) {
     lowEl.innerText = safeFormatRupees(cons.target_low, 0);
     
     let recClass = "green-text";
+    let recBorderColor = "var(--color-emerald)";
+    let recBgColor = "rgba(16, 185, 129, 0.04)";
     if (cons.recommendation) {
         const recLower = cons.recommendation.toLowerCase();
         if (recLower.includes("sell") || recLower.includes("underperform")) {
             recClass = "red-text";
+            recBorderColor = "var(--color-crimson)";
+            recBgColor = "rgba(239, 68, 68, 0.04)";
         } else if (recLower.includes("hold") || recLower.includes("neutral") || recLower.includes("none")) {
             recClass = "yellow-text";
+            recBorderColor = "var(--color-amber)";
+            recBgColor = "rgba(245, 158, 11, 0.04)";
         }
     }
     
-    infoEl.innerHTML = `Based on opinions of <strong>${cons.analyst_count || 14}</strong> institutional analysts. Recommendation: <strong class="${recClass}">${cons.recommendation || 'BUY'}</strong>.`;
+    // Style consensus-analyst-opinion-block border and background dynamically
+    const opinionBlock = document.getElementById('consensus-analyst-opinion-block');
+    if (opinionBlock) {
+        opinionBlock.style.borderLeft = `2.5px solid ${recBorderColor}`;
+        opinionBlock.style.background = recBgColor;
+    }
+    
+    let opinionNarrative = `Based on institutional consensus of **${cons.analyst_count || 14}** analysts, the street recommendation is a solid <strong class="${recClass}">${cons.recommendation || 'BUY'}</strong>. `;
+    const streetTarget = cons.target_median;
+    const aiTarget = p.dcf_model.intrinsic_value;
+    if (streetTarget && aiTarget) {
+        const streetDiff = ((streetTarget - basePrice) / basePrice) * 100.0;
+        const aiDiff = ((aiTarget - basePrice) / basePrice) * 100.0;
+        opinionNarrative += `Brokers project a **${streetDiff.toFixed(1)}%** upside to their median target of **${safeFormatRupees(streetTarget, 0)}**, while our proprietary quantitative valuation highlights a **${aiDiff.toFixed(1)}%** potential return to fair value (**${safeFormatRupees(aiTarget, 0)}**).`;
+    } else {
+        opinionNarrative += `The broker consensus target estimates represent standard institutional tracking ranges, aligned with active macroeconomic variables.`;
+    }
+    
+    infoEl.innerHTML = opinionNarrative;
 }
 
 // CSV Export Button Controller Bindings
@@ -6867,22 +7334,34 @@ function renderEarningsQuality(p) {
             const cell = document.createElement('div');
             cell.className = 'piotroski-matrix-cell';
             
-            // Cell border styling based on pass/fail
-            if (item.passed) {
-                cell.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-            } else {
-                cell.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-            }
+            const cellColor = item.passed ? 'rgba(16, 185, 129, 0.04)' : 'rgba(239, 68, 68, 0.04)';
+            const cellBorder = item.passed ? '1.5px solid rgba(16, 185, 129, 0.2)' : '1.5px solid rgba(239, 68, 68, 0.2)';
+            
+            cell.style.background = cellColor;
+            cell.style.border = cellBorder;
+            cell.style.borderRadius = '6px';
+            cell.style.padding = '8px 6px';
+            cell.style.cursor = 'pointer';
+            cell.style.transition = 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+            cell.style.display = 'flex';
+            cell.style.flexDirection = 'column';
+            cell.style.alignItems = 'center';
+            cell.style.justifyContent = 'center';
+            cell.style.minHeight = '36px';
+            cell.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
             
             const dotColor = item.passed ? 'var(--color-emerald)' : 'var(--color-crimson)';
             
             cell.innerHTML = `
-                <span class="cell-abbrev">${abbrev}</span>
-                <span class="cell-status-dot" style="background: ${dotColor}; box-shadow: 0 0 3px ${dotColor}"></span>
+                <span class="cell-abbrev" style="font-size: 8.5px; font-weight: 700; color: var(--text-secondary); letter-spacing:0.02em;">${abbrev}</span>
+                <span class="cell-status-dot" style="background: ${dotColor}; box-shadow: 0 0 3px ${dotColor}; width: 5px; height: 5px; border-radius: 50%; margin-top: 4px;"></span>
             `;
             
             // Hover mouse events
             cell.addEventListener('mouseenter', () => {
+                cell.style.transform = 'translateY(-2px) scale(1.03)';
+                cell.style.boxShadow = item.passed ? '0 0 10px rgba(16, 185, 129, 0.3)' : '0 0 10px rgba(239, 68, 68, 0.3)';
+                
                 const titleEl = document.getElementById('eq-explain-title');
                 const descEl = document.getElementById('eq-explain-desc');
                 if (titleEl && descEl) {
@@ -6893,12 +7372,15 @@ function renderEarningsQuality(p) {
             });
             
             cell.addEventListener('mouseleave', () => {
+                cell.style.transform = 'none';
+                cell.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                
                 const titleEl = document.getElementById('eq-explain-title');
                 const descEl = document.getElementById('eq-explain-desc');
                 if (titleEl && descEl) {
-                    titleEl.innerText = 'Hover components for audit details';
+                    titleEl.innerText = 'Hover cells for audit details';
                     titleEl.style.color = 'var(--text-primary)';
-                    descEl.innerText = 'Move cursor over the matrix cells above to verify the dynamic pass/fail checks.';
+                    descEl.innerText = 'Move cursor over the matrix cells above to verify dynamic pass/fail checks.';
                 }
             });
             
@@ -6984,12 +7466,23 @@ function renderEarningsQuality(p) {
             
             const row = document.createElement('div');
             row.className = 'altman-comp-row';
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.justifyContent = 'space-between';
+            row.style.background = 'rgba(255, 255, 255, 0.01)';
+            row.style.border = '1px solid rgba(255, 255, 255, 0.03)';
+            row.style.borderRadius = '5px';
+            row.style.padding = '4px 8px';
+            row.style.fontSize = '9.5px';
+            row.style.gap = '8px';
+            row.style.marginBottom = '2px';
+            
             row.innerHTML = `
-                <span class="altman-comp-label" title="${item.desc}">${item.name}</span>
-                <div class="altman-comp-progress-container">
-                    <div class="altman-comp-progress-fill" style="width: ${barPct}%; background: ${activeColor}; box-shadow: 0 0 2px ${activeColor}"></div>
+                <span class="altman-comp-label" style="font-weight: 600; color: var(--text-secondary); width: 85px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.desc}">${item.name}</span>
+                <div class="altman-comp-progress-container" style="flex: 1; height: 6px; background: rgba(0,0,0,0.3); border-radius: 3px; overflow: hidden; border: 1px solid rgba(255,255,255,0.02);">
+                    <div class="altman-comp-progress-fill" style="height: 100%; width: ${barPct}%; background: ${activeColor}; box-shadow: 0 0 3px ${activeColor}; border-radius: 3px; transition: width 0.8s ease;"></div>
                 </div>
-                <span class="altman-comp-val">${item.coef}×${ratioVal.toFixed(2)} = <strong style="color: ${activeColor}">${contrib >= 0 ? '+' : ''}${contrib.toFixed(2)}</strong></span>
+                <span class="altman-comp-val" style="font-family: monospace; width: 100px; text-align: right; font-size: 8.5px;">${item.coef}×${ratioVal.toFixed(2)} = <strong style="color: ${activeColor}">${contrib >= 0 ? '+' : ''}${contrib.toFixed(2)}</strong></span>
             `;
             zComponents.appendChild(row);
         });
@@ -7000,23 +7493,60 @@ function renderEarningsQuality(p) {
     if (summaryTextEl) {
         let fEval = "";
         if (pScore >= 7) {
-            fEval = `a stellar Piotroski F-Score of ${pScore}/9, reflecting strong operational health, improving margins, and robust cash conversions.`;
+            fEval = `a stellar Piotroski F-Score of **${pScore}/9**, reflecting strong operational health, improving margins, and robust cash conversions.`;
         } else if (pScore >= 4) {
-            fEval = `a moderate Piotroski F-Score of ${pScore}/9, indicating a stable operating core but highlighting a few minor cash flow or asset utilization bottlenecks.`;
+            fEval = `a moderate Piotroski F-Score of **${pScore}/9**, indicating a stable operating core but highlighting a few minor cash flow or asset utilization bottlenecks.`;
         } else {
-            fEval = `a weak Piotroski F-Score of ${pScore}/9, warning of structural operating inefficiencies, deteriorating profitability, or working capital strains.`;
+            fEval = `a weak Piotroski F-Score of **${pScore}/9**, warning of structural operating inefficiencies, deteriorating profitability, or working capital strains.`;
         }
         
         let zEval = "";
         if (zZone.includes("Safe")) {
-            zEval = `Additionally, with an Altman Z-Score of ${zScore.toFixed(2)} (Safe Zone), the company rests in the low-risk solvency category, meaning near-term bankruptcy risk is mathematically negligible.`;
+            zEval = `Additionally, with an Altman Z-Score of **${zScore.toFixed(2)}** (Safe Zone), the company rests in the low-risk solvency category, meaning near-term bankruptcy risk is mathematically negligible.`;
         } else if (zZone.includes("Grey")) {
-            zEval = `However, the Altman Z-Score stands in the Grey Zone at ${zScore.toFixed(2)}, suggesting moderate long-term solvency warnings and a need for cautious capital structure management.`;
+            zEval = `However, the Altman Z-Score stands in the Grey Zone at **${zScore.toFixed(2)}**, suggesting moderate long-term solvency warnings and a need for cautious capital structure management.`;
         } else {
-            zEval = `Critically, the Altman Z-Score of ${zScore.toFixed(2)} puts it in the Distress Zone, indicating heightened leverage pressure and structural solvency risks that demand close monitoring.`;
+            zEval = `Critically, the Altman Z-Score of **${zScore.toFixed(2)}** puts it in the Distress Zone, indicating heightened leverage pressure and structural solvency risks that demand close monitoring.`;
         }
         
-        summaryTextEl.innerHTML = `<strong>AI Synopsis:</strong> The company demonstrates ${fEval} ${zEval}`;
+        let fLayman = "";
+        if (pScore >= 7) {
+            fLayman = "Think of this strong earnings quality F-Score as a clean, highly efficient engine running smoothly with zero oil leaks—reported profits are backed by solid operational cash flow rather than creative accounting tricks.";
+        } else if (pScore >= 4) {
+            fLayman = "Think of this moderate F-Score as a standard family car—it runs fine and is reliable, but has a few minor warning lights on the dashboard related to asset efficiency or cash conversion speed that require checkups.";
+        } else {
+            fLayman = "Think of this weak F-Score as a sputtering vehicle blowing thick smoke—reported earnings are largely paper profits with deteriorating margins and cash flow deficits, raising red flags about operational distress.";
+        }
+        
+        let zLayman = "";
+        if (zZone.includes("Safe")) {
+            zLayman = "Additionally, the Altman solvency indicator places the company in the Safe Zone. Think of it as a fortress with thick, massive concrete walls and large cash reserves—near-term solvency pressure is practically non-existent.";
+        } else if (zZone.includes("Grey")) {
+            zLayman = "However, the Altman Z solvency indicator rests in the Grey Zone. Think of this as a boat sailing in choppy waters—it is not sinking, but the captain needs to carefully manage debts and liabilities to avoid drifting into storm cells.";
+        } else {
+            zLayman = "Critically, the Altman Z solvency indicator puts the company in the Distress Zone. Think of this as a vessel with a severe hull leak taking on water rapidly—the debt burden is heavily crushing equity, presenting solvency risks.";
+        }
+        
+        // Dynamically color highlight the card bottom block borders
+        const summaryBlock = document.getElementById('earnings-quality-summary-block');
+        if (summaryBlock) {
+            let zoneColor = 'var(--text-secondary)';
+            let zoneBg = 'rgba(255,255,255,0.015)';
+            if (zZone === "Safe Zone") {
+                zoneColor = 'var(--color-emerald)';
+                zoneBg = 'rgba(16, 185, 129, 0.03)';
+            } else if (zZone === "Grey Zone") {
+                zoneColor = 'var(--color-amber)';
+                zoneBg = 'rgba(245, 158, 11, 0.03)';
+            } else if (zZone === "Distress Zone") {
+                zoneColor = 'var(--color-crimson)';
+                zoneBg = 'rgba(239, 68, 68, 0.03)';
+            }
+            summaryBlock.style.borderLeft = `2.5px solid ${zoneColor}`;
+            summaryBlock.style.background = zoneBg;
+        }
+        
+        summaryTextEl.innerHTML = `🛡️ **Institutional Synopsis:** The company demonstrates ${fEval} ${zEval}<br><br>💡 **Layman Analogy:** ${fLayman} ${zLayman}`;
     }
 }
 
@@ -7563,29 +8093,35 @@ function setupReturnCalculator() {
                 if (!response.ok) throw new Error("Calculation failed");
                 const data = await response.json();
                 
-                document.getElementById('calc-results-box').style.display = 'flex';
-                document.getElementById('calc-res-invested').innerText = `₹${data.invested_amount.toLocaleString('en-IN', {maximumFractionDigits:2})}`;
-                document.getElementById('calc-res-value').innerText = `₹${data.final_value.toLocaleString('en-IN', {maximumFractionDigits:2})}`;
+                document.getElementById('calc-results-box').style.display = 'grid';
+                document.getElementById('calc-res-invested').innerText = `₹${data.invested_amount.toLocaleString('en-IN', {maximumFractionDigits:0})}`;
+                document.getElementById('calc-res-value').innerText = `₹${data.final_value.toLocaleString('en-IN', {maximumFractionDigits:0})}`;
                 
                 const profitTextEl = document.getElementById('calc-res-profit');
-                profitTextEl.innerText = `₹${data.profit_loss.toLocaleString('en-IN', {maximumFractionDigits:2})} (${data.absolute_return_pct >= 0 ? '+' : ''}${data.absolute_return_pct}%)`;
+                profitTextEl.innerText = `₹${data.profit_loss.toLocaleString('en-IN', {maximumFractionDigits:0})} (${data.absolute_return_pct >= 0 ? '+' : ''}${data.absolute_return_pct}%)`;
                 profitTextEl.className = data.profit_loss >= 0 ? 'green-text' : 'red-text';
                 
                 const annualizedEl = document.getElementById('calc-res-annualized');
                 annualizedEl.innerText = `${data.annualized_return_pct}% p.a.`;
                 annualizedEl.className = data.annualized_return_pct >= 0 ? 'green-text' : 'red-text';
                 
+                const multiplier = data.final_value / (data.invested_amount || 1);
+                const multiplierEl = document.getElementById('calc-capital-multiplier');
+                if (multiplierEl) {
+                    multiplierEl.innerText = `${multiplier.toFixed(1)}x Mult`;
+                    multiplierEl.style.display = 'inline-block';
+                }
+                
                 // Dynamic AI Summary
                 const summaryBlock = document.getElementById('calc-summary-block');
                 const summaryText = document.getElementById('calc-summary-text');
                 if (summaryBlock && summaryText) {
                     summaryBlock.style.display = 'block';
-                    const multiplier = data.final_value / (data.invested_amount || 1);
                     
                     if (selectedReturnCalcType === 'cagr') {
-                        summaryText.innerHTML = `<strong>AI Synopsis:</strong> A lump sum of ₹${data.invested_amount.toLocaleString('en-IN')} invested on ${data.start_date} grew by **${multiplier.toFixed(1)}x** to ₹${data.final_value.toLocaleString('en-IN')}, generating an annualized CAGR of **${data.annualized_return_pct}%**. This represents an absolute gain of ₹${data.profit_loss.toLocaleString('en-IN')} and outperforms average long-term fixed deposit (FD) returns of 6-7%.`;
+                        summaryText.innerHTML = `🛡️ **Institutional Synopsis:** A lump sum of **₹${data.invested_amount.toLocaleString('en-IN')}** invested on **${data.start_date}** grew by **${multiplier.toFixed(1)}x** to **₹${data.final_value.toLocaleString('en-IN')}**, generating an annualized CAGR of **${data.annualized_return_pct}%**. This absolute gain of **₹${data.profit_loss.toLocaleString('en-IN')}** significantly outperforms average historical fixed deposit (FD) benchmarks (6-7% p.a.).`;
                     } else {
-                        summaryText.innerHTML = `<strong>AI Synopsis:</strong> Committing a monthly SIP of ₹${data.monthly_sip.toLocaleString('en-IN')} starting ${data.start_date} resulted in a total investment of ₹${data.invested_amount.toLocaleString('en-IN')}. This systematic approach grew your capital to ₹${data.final_value.toLocaleString('en-IN')} (**${multiplier.toFixed(1)}x** capital multiplier), delivering an annualized IRR of **${data.annualized_return_pct}%** through cost-averaging.`;
+                        summaryText.innerHTML = `🛡️ **Institutional Synopsis:** Committing a monthly SIP of **₹${data.monthly_sip.toLocaleString('en-IN')}** starting **${data.start_date}** accumulated a principal of **₹${data.invested_amount.toLocaleString('en-IN')}**. This systematic cost-averaging grew your capital to **₹${data.final_value.toLocaleString('en-IN')}** (**${multiplier.toFixed(1)}x** multiplier), delivering an annualized IRR of **${data.annualized_return_pct}%**.`;
                     }
                 }
             } catch (e) {
