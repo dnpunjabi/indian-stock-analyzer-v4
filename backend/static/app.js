@@ -6583,6 +6583,9 @@ function setupThemeToggle() {
         document.documentElement.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
         showToast(`Switched to ${newTheme} theme`, 'success');
+        if (typeof updateBacktestChartThemeColors === 'function') {
+            updateBacktestChartThemeColors();
+        }
     };
     
     if (desktopBtn) desktopBtn.addEventListener('click', toggle);
@@ -9861,6 +9864,7 @@ Keep the response professional, mathematically grounded, and extremely concise. 
 
 let backtestSandboxStocks = [];
 let backtestChartInstance = null;
+let activeBacktestLightweightChart = null;
 
 function setupPortfolioBacktester() {
     const portTabDiagnosticsBtn = document.getElementById('port-tab-diagnostics-btn');
@@ -10310,12 +10314,109 @@ async function runPortfolioBacktest() {
 }
 
 function renderBacktestChart(data) {
-    const ctx = document.getElementById('backtest-chart').getContext('2d');
+    const container = document.getElementById('backtest-chart-container');
+    if (!container) return;
+
+    // Check if TradingView Lightweight Charts is available
+    if (typeof LightweightCharts === 'undefined') {
+        console.warn("TradingView Lightweight Charts offline, falling back to Chart.js for backtest chart.");
+        drawChartJSBacktestChart(data);
+        return;
+    }
+
+    // Clean up previous Lightweight Chart instance
+    if (window.activeBacktestLightweightChart) {
+        window.activeBacktestLightweightChart.remove();
+        window.activeBacktestLightweightChart = null;
+    }
+    
+    // Clean up legacy Chart.js chart if exists
+    if (backtestChartInstance) {
+        backtestChartInstance.destroy();
+        backtestChartInstance = null;
+    }
+
+    container.innerHTML = ''; // Clear container
+    const isDarkTheme = document.documentElement.getAttribute('data-theme') !== 'light';
+
+    // 1. Initialize TradingView Chart
+    const chart = LightweightCharts.createChart(container, {
+        width: container.clientWidth,
+        height: 300,
+        layout: {
+            background: { type: 'solid', color: 'transparent' },
+            textColor: isDarkTheme ? '#94a3b8' : '#334155',
+            fontFamily: 'Inter, sans-serif',
+        },
+        grid: {
+            vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+        },
+        timeScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            timeVisible: false,
+        },
+    });
+    window.activeBacktestLightweightChart = chart;
+
+    // 2. Add Area Series for Custom Portfolio
+    const portfolioSeries = chart.addAreaSeries({
+        topColor: 'rgba(59, 130, 246, 0.45)',
+        bottomColor: 'rgba(59, 130, 246, 0.0)',
+        lineColor: '#3b82f6',
+        lineWidth: 2.5,
+        priceFormat: {
+            type: 'custom',
+            formatter: price => '₹' + price.toLocaleString('en-IN', { maximumFractionDigits: 0 }),
+        },
+        title: 'Portfolio',
+    });
+
+    // 3. Add Line Series for Nifty 50 Index
+    const benchmarkSeries = chart.addLineSeries({
+        color: isDarkTheme ? 'rgba(156, 163, 175, 0.6)' : 'rgba(75, 85, 99, 0.7)',
+        lineWidth: 1.5,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        priceFormat: {
+            type: 'custom',
+            formatter: price => '₹' + price.toLocaleString('en-IN', { maximumFractionDigits: 0 }),
+        },
+        title: 'Nifty 50',
+    });
+
+    // 4. Map and set data
+    const portfolioData = [];
+    const benchmarkData = [];
+    for (let i = 0; i < data.dates.length; i++) {
+        const dateStr = data.dates[i].split('T')[0];
+        portfolioData.push({ time: dateStr, value: data.portfolio_values[i] });
+        benchmarkData.push({ time: dateStr, value: data.benchmark_values[i] });
+    }
+
+    portfolioSeries.setData(portfolioData);
+    benchmarkSeries.setData(benchmarkData);
+    chart.timeScale().fitContent();
+}
+
+function drawChartJSBacktestChart(data) {
+    const container = document.getElementById('backtest-chart-container');
+    if (!container) return;
+
+    const restoredCanvas = getOrCreateCanvas('backtest-chart', container);
+    if (!restoredCanvas) return;
+
+    const ctx = restoredCanvas.getContext('2d');
     if (backtestChartInstance) {
         backtestChartInstance.destroy();
     }
     
-    const activeTheme = document.body.getAttribute('data-theme') || 'dark';
+    const activeTheme = document.documentElement.getAttribute('data-theme') || 'dark';
     const gridColor = activeTheme === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)';
     const textColor = activeTheme === 'light' ? '#334155' : '#f8fafc';
     
@@ -10377,11 +10478,32 @@ function renderBacktestChart(data) {
 }
 
 function updateBacktestChartThemeColors() {
+    const activeTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const isLightTheme = activeTheme === 'light';
+
+    if (window.activeBacktestLightweightChart) {
+        window.activeBacktestLightweightChart.applyOptions({
+            layout: {
+                textColor: isLightTheme ? '#334155' : '#94a3b8',
+            },
+            grid: {
+                vertLines: { color: isLightTheme ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.02)' },
+                horzLines: { color: isLightTheme ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.02)' },
+            },
+            rightPriceScale: {
+                borderColor: isLightTheme ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
+            },
+            timeScale: {
+                borderColor: isLightTheme ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
+            },
+        });
+        return;
+    }
+
     if (!backtestChartInstance) return;
     
-    const activeTheme = document.body.getAttribute('data-theme') || 'dark';
-    const gridColor = activeTheme === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)';
-    const textColor = activeTheme === 'light' ? '#334155' : '#f8fafc';
+    const gridColor = isLightTheme ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)';
+    const textColor = isLightTheme ? '#334155' : '#f8fafc';
     
     backtestChartInstance.options.plugins.legend.labels.color = textColor;
     backtestChartInstance.options.scales.x.grid.color = gridColor;
