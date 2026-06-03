@@ -2148,3 +2148,246 @@ def _build_financial_profile(ticker_query: str) -> dict:
     unified_profile["score_metrics"] = scoring_result
     
     return unified_profile
+
+
+def calculate_portfolio_backtest(tickers: list, weights: list, start_date: str, end_date: str, rebalance_freq: str = "none", starting_capital: float = 100000.0, transaction_fee_pct: float = 0.1) -> dict:
+    """
+    Simulates historical portfolio performance of a custom stock weight allocation.
+    Compares the equity growth against the Nifty 50 benchmark index (^NSEI).
+    """
+    # 1. Resolve symbols
+    resolved_tickers = []
+    ticker_map = {}
+    for t in tickers:
+        try:
+            res = resolve_company_ticker(t)
+            yf_ticker = res.get("yf_ticker") or f"{t.strip().upper()}.NS"
+        except Exception:
+            yf_ticker = f"{t.strip().upper()}.NS"
+        resolved_tickers.append(yf_ticker)
+        ticker_map[t] = yf_ticker
+        
+    # Standardize weights
+    weights = [float(w) for w in weights]
+    total_w = sum(weights)
+    if total_w == 0:
+        raise ValueError("Total weights cannot be zero.")
+    # Normalize weights to sum to 1.0
+    weights_ratio = [w / total_w for w in weights]
+    
+    # Download data for all tickers and Nifty 50
+    data_dict = {}
+    dividends_dict = {}
+    min_available_date = None
+    
+    # Fetch ^NSEI first
+    bench_ticker = "^NSEI"
+    try:
+        bench_stock = yf.Ticker(bench_ticker)
+        bench_df = bench_stock.history(start=start_date, end=end_date)
+        if not bench_df.empty:
+            bench_df.index = bench_df.index.tz_localize(None)
+            data_dict[bench_ticker] = bench_df["Close"]
+    except Exception as e:
+        print(f"Error fetching benchmark history: {e}")
+        raise RuntimeError(f"Failed to fetch Nifty 50 benchmark data: {e}")
+
+    actual_start_date = start_date
+    warnings = []
+    
+    for yf_t in resolved_tickers:
+        try:
+            stock = yf.Ticker(yf_t)
+            df = stock.history(start=start_date, end=end_date)
+            if df.empty:
+                df = stock.history(period="max")
+                if not df.empty:
+                    df = df.loc[start_date:end_date]
+            
+            if df.empty:
+                raise ValueError(f"No history available for ticker {yf_t}")
+                
+            df.index = df.index.tz_localize(None)
+            data_dict[yf_t] = df["Close"]
+            
+            # Save dividends
+            if "Dividends" in df.columns:
+                dividends_dict[yf_t] = df["Dividends"]
+            else:
+                dividends_dict[yf_t] = pd.Series(0.0, index=df.index)
+                
+            ticker_first_date = df.index[0]
+            if min_available_date is None or ticker_first_date > min_available_date:
+                min_available_date = ticker_first_date
+                
+        except Exception as e:
+            print(f"Error fetching history for {yf_t}: {e}")
+            raise RuntimeError(f"Failed to fetch historical data for {yf_t}: {e}")
+            
+    # Adjust start date if any stock listed recently
+    req_start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    if min_available_date and min_available_date > req_start_dt:
+        actual_start_date = min_available_date.strftime("%Y-%m-%d")
+        warnings.append(f"Simulation start date adjusted to {actual_start_date} due to shorter trading history for some tickers.")
+        for key in data_dict:
+            data_dict[key] = data_dict[key].loc[min_available_date:]
+        for key in dividends_dict:
+            dividends_dict[key] = dividends_dict[key].loc[min_available_date:]
+            
+    # Combine close prices into a single DataFrame and align dates
+    price_df = pd.DataFrame(data_dict).dropna(subset=resolved_tickers)
+    if price_df.empty:
+        raise ValueError("No overlapping trading days found for the selected tickers.")
+        
+    div_df = pd.DataFrame(dividends_dict).reindex(price_df.index).fillna(0.0)
+    
+    bench_series = price_df[bench_ticker]
+    price_df = price_df[resolved_tickers]
+    
+    dates = price_df.index
+    n_assets = len(resolved_tickers)
+    
+    portfolio_values = []
+    cash = starting_capital
+    initial_prices = price_df.iloc[0].values
+    
+    shares = np.zeros(n_assets)
+    fee_factor = transaction_fee_pct / 100.0
+    total_initial_fee = 0.0
+    
+    for i in range(n_assets):
+        asset_capital = starting_capital * weights_ratio[i]
+        buy_fee = asset_capital * fee_factor
+        net_capital = asset_capital - buy_fee
+        total_initial_fee += buy_fee
+        shares[i] = net_capital / initial_prices[i]
+        
+    cash = 0.0
+    total_fees_paid = total_initial_fee
+    total_dividends_earned = 0.0
+    
+    # Determine rebalancing schedule dates
+    rebalance_dates = []
+    if rebalance_freq != "none":
+        if rebalance_freq == "monthly":
+            last_period = None
+            for d in dates:
+                period = (d.year, d.month)
+                if last_period and period != last_period:
+                    rebalance_dates.append(d)
+                last_period = period
+        elif rebalance_freq == "quarterly":
+            last_period = None
+            for d in dates:
+                period = (d.year, (d.month - 1) // 3)
+                if last_period and period != last_period:
+                    rebalance_dates.append(d)
+                last_period = period
+        elif rebalance_freq == "annually":
+            last_period = None
+            for d in dates:
+                period = d.year
+                if last_period and period != last_period:
+                    rebalance_dates.append(d)
+                last_period = period
+
+    for current_date in dates:
+        current_prices = price_df.loc[current_date].values
+        current_divs = div_df.loc[current_date].values
+        
+        # Accumulate dividends in cash balance
+        daily_div = np.sum(shares * current_divs)
+        cash += daily_div
+        total_dividends_earned += daily_div
+        
+        # Perform rebalancing if scheduled
+        if current_date in rebalance_dates:
+            holdings_value = np.sum(shares * current_prices)
+            total_value = holdings_value + cash
+            target_values = total_value * np.array(weights_ratio)
+            
+            rebalance_fees = 0.0
+            for i in range(n_assets):
+                current_asset_val = shares[i] * current_prices[i]
+                target_asset_val = target_values[i]
+                diff = target_asset_val - current_asset_val
+                rebalance_fees += abs(diff) * fee_factor
+                
+            net_total_value = total_value - rebalance_fees
+            total_fees_paid += rebalance_fees
+            
+            new_shares = np.zeros(n_assets)
+            for i in range(n_assets):
+                new_shares[i] = (net_total_value * weights_ratio[i]) / current_prices[i]
+                
+            shares = new_shares
+            cash = 0.0
+            
+        daily_portfolio_value = np.sum(shares * current_prices) + cash
+        portfolio_values.append(daily_portfolio_value)
+        
+    bench_start_price = bench_series.iloc[0]
+    bench_indexed_values = (bench_series / bench_start_price * starting_capital).tolist()
+    
+    portfolio_series = pd.Series(portfolio_values, index=dates)
+    bench_series_indexed = pd.Series(bench_indexed_values, index=dates)
+    
+    n_days = (dates[-1] - dates[0]).days
+    n_years = n_days / 365.25
+    if n_years <= 0:
+        n_years = 1.0
+        
+    portfolio_cagr = float((portfolio_series.iloc[-1] / starting_capital) ** (1.0 / n_years) - 1.0) * 100.0
+    bench_cagr = float((bench_series_indexed.iloc[-1] / starting_capital) ** (1.0 / n_years) - 1.0) * 100.0
+    
+    def get_max_drawdown(series):
+        roll_max = series.cummax()
+        drawdown = (series - roll_max) / roll_max
+        return float(drawdown.min() * 100.0)
+        
+    portfolio_max_dd = get_max_drawdown(portfolio_series)
+    bench_max_dd = get_max_drawdown(bench_series_indexed)
+    
+    port_daily_ret = portfolio_series.pct_change().dropna()
+    bench_daily_ret = bench_series_indexed.pct_change().dropna()
+    
+    portfolio_vol = float(port_daily_ret.std() * np.sqrt(252)) * 100.0
+    bench_vol = float(bench_daily_ret.std() * np.sqrt(252)) * 100.0
+    
+    rf_rate = 6.5
+    port_excess_ret = portfolio_cagr - rf_rate
+    portfolio_sharpe = float(port_excess_ret / portfolio_vol) if portfolio_vol > 0 else 0.0
+    
+    bench_excess_ret = bench_cagr - rf_rate
+    bench_sharpe = float(bench_excess_ret / bench_vol) if bench_vol > 0 else 0.0
+    
+    daily_dates_str = [d.strftime("%Y-%m-%d") for d in dates]
+    
+    return {
+        "dates": daily_dates_str,
+        "portfolio_values": [round(val, 2) for val in portfolio_values],
+        "benchmark_values": [round(val, 2) for val in bench_indexed_values],
+        "metrics": {
+            "portfolio": {
+                "final_value": round(portfolio_series.iloc[-1], 2),
+                "cagr": round(portfolio_cagr, 2),
+                "max_drawdown": round(portfolio_max_dd, 2),
+                "volatility": round(portfolio_vol, 2),
+                "sharpe_ratio": round(portfolio_sharpe, 2),
+                "total_dividends": round(total_dividends_earned, 2),
+                "total_fees": round(total_fees_paid, 2)
+            },
+            "benchmark": {
+                "final_value": round(bench_series_indexed.iloc[-1], 2),
+                "cagr": round(bench_cagr, 2),
+                "max_drawdown": round(bench_max_dd, 2),
+                "volatility": round(bench_vol, 2),
+                "sharpe_ratio": round(bench_sharpe, 2),
+                "total_dividends": 0.0,
+                "total_fees": 0.0
+            }
+        },
+        "warnings": warnings,
+        "actual_start_date": actual_start_date
+    }
+

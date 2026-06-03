@@ -124,8 +124,8 @@ init_db()
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 # Import analytical and agent engines
-from backend.financial_utils import get_complete_financial_profile, resolve_company_ticker
-from backend.agent import run_cio_parent_agent, run_ai_stock_screener, run_comparison_synthesizer, run_conversational_chat, run_portfolio_doctor, call_groq_llm, run_single_stock_audit
+from backend.financial_utils import get_complete_financial_profile, resolve_company_ticker, calculate_portfolio_backtest
+from backend.agent import run_cio_parent_agent, run_ai_stock_screener, run_comparison_synthesizer, run_conversational_chat, run_portfolio_doctor, call_groq_llm, run_single_stock_audit, generate_backtest_synthesis
 
 def sanitize_nan_values(x):
     """Recursively replaces float('nan'), inf, and -inf with None for JSON compliance."""
@@ -1883,7 +1883,55 @@ async def post_portfolio_doctor(input_data: PortfolioDoctorInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Portfolio Doctor Error: {str(e)}")
 
+
+class PortfolioBacktestRequest(BaseModel):
+    tickers: list
+    weights: list
+    start_date: str
+    end_date: str
+    rebalance_freq: str = "none"
+    starting_capital: float = 100000.0
+    transaction_fee_pct: float = 0.1
+
+
+class PortfolioBacktestSynthesisRequest(BaseModel):
+    metrics: dict
+    tickers_weights: list
+
+
+@app.post("/api/portfolio/backtest")
+async def post_portfolio_backtest(data: PortfolioBacktestRequest):
+    try:
+        result = await asyncio.to_thread(
+            calculate_portfolio_backtest,
+            tickers=data.tickers,
+            weights=data.weights,
+            start_date=data.start_date,
+            end_date=data.end_date,
+            rebalance_freq=data.rebalance_freq,
+            starting_capital=data.starting_capital,
+            transaction_fee_pct=data.transaction_fee_pct
+        )
+        return sanitize_nan_values(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Portfolio Backtest Simulation Error: {str(e)}")
+
+
+@app.post("/api/portfolio/backtest-synthesis")
+async def post_portfolio_backtest_synthesis(data: PortfolioBacktestSynthesisRequest):
+    try:
+        result = await asyncio.to_thread(
+            generate_backtest_synthesis,
+            metrics=data.metrics,
+            tickers_weights=data.tickers_weights
+        )
+        return {"synthesis": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Portfolio Backtest LLM Synthesis Error: {str(e)}")
+
+
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(static_dir, exist_ok=True)
 
 app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+

@@ -5152,6 +5152,141 @@ tr:hover .champion-cell {
 }
 
 
+/* --- PORTFOLIO BACKTESTER PREMIUM STYLES --- */
+#portfolio-backtester-card {
+    background: rgba(30, 41, 59, 0.3) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3) !important;
+    border-radius: 12px !important;
+    padding: 24px !important;
+    transition: all 0.3s ease !important;
+}
+
+[data-theme="light"] #portfolio-backtester-card {
+    background: rgba(255, 255, 255, 0.45) !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.06) !important;
+}
+
+.backtester-inputs-grid input, .backtester-inputs-grid select {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 6px !important;
+    color: var(--text-primary) !important;
+    font-size: 12px !important;
+    transition: all 0.2s ease !important;
+}
+
+.backtester-inputs-grid input:focus, .backtester-inputs-grid select:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.25) !important;
+}
+
+[data-theme="light"] .backtester-inputs-grid input, [data-theme="light"] .backtester-inputs-grid select {
+    background: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+    color: var(--text-primary) !important;
+}
+
+.portfolio-subtab-btn {
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    color: var(--text-muted) !important;
+    padding: 8px 16px !important;
+    border-radius: 6px !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+}
+
+.portfolio-subtab-btn:hover {
+    color: var(--text-primary) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+}
+
+.portfolio-subtab-btn.active {
+    border: 1px solid var(--border-glass) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    color: var(--text-primary) !important;
+}
+
+[data-theme="light"] .portfolio-subtab-btn:hover {
+    background: rgba(0, 0, 0, 0.02) !important;
+}
+
+[data-theme="light"] .portfolio-subtab-btn.active {
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    background: rgba(0, 0, 0, 0.03) !important;
+    color: var(--text-primary) !important;
+}
+
+#backtest-summary-block {
+    background: rgba(15, 23, 42, 0.4) !important;
+    border: 1px solid var(--border-glass) !important;
+    border-left: 4px solid #3b82f6 !important;
+}
+
+[data-theme="light"] #backtest-summary-block {
+    background: rgba(59, 130, 246, 0.04) !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    border-left: 4px solid #3b82f6 !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Backtest Weight Sliders and number inputs styling overrides */
+[data-theme="light"] .backtest-weight-input {
+    background: #ffffff !important;
+    color: var(--text-primary) !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Suggestions dropdown styling */
+#backtest-custom-suggestions {
+    background: #0b1329 !important;
+    border: 1px solid var(--border-glass) !important;
+    border-radius: 4px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+}
+
+[data-theme="light"] #backtest-custom-suggestions {
+    background: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08) !important;
+}
+
+.backtest-suggestion-item {
+    padding: 8px 12px !important;
+    cursor: pointer !important;
+    font-size: 11px !important;
+    border-bottom: 1px solid var(--border-glass) !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    color: var(--text-primary) !important;
+}
+
+.backtest-suggestion-item:hover {
+    background: rgba(59, 130, 246, 0.1) !important;
+}
+
+[data-theme="light"] .backtest-suggestion-item {
+    border-bottom-color: rgba(0,0,0,0.06) !important;
+}
+
+/* Responsive media queries */
+@media (max-width: 900px) {
+    .backtest-results-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+
+
 
 
 

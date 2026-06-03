@@ -707,6 +707,63 @@ class TestPortfolioAPI(unittest.TestCase):
         self.assertEqual(data[0]["base_symbol"], "HAL")
         self.assertEqual(data[0]["name"], "Hindustan Aeronautics")
 
+    @patch("yfinance.Ticker")
+    def test_portfolio_backtest_endpoints(self, mock_ticker):
+        """Verifies portfolio backtesting execution and LLM synthesis endpoints."""
+        mock_stock_inst = MagicMock()
+        mock_bench_inst = MagicMock()
+        
+        def ticker_side_effect(symbol):
+            if symbol == "^NSEI":
+                return mock_bench_inst
+            return mock_stock_inst
+            
+        mock_ticker.side_effect = ticker_side_effect
+        
+        import pandas as pd
+        dates = pd.date_range(start="2023-01-01", end="2023-12-31", freq="D")
+        
+        bench_close = [100.0 + i * 0.1 for i in range(len(dates))]
+        stock_close = [100.0 + i * 0.2 for i in range(len(dates))]
+        divs = [0.0] * len(dates)
+        divs[100] = 2.0
+        
+        df_bench = pd.DataFrame({"Close": bench_close}, index=dates)
+        df_stock = pd.DataFrame({"Close": stock_close, "Dividends": divs}, index=dates)
+        
+        mock_bench_inst.history.return_value = df_bench
+        mock_stock_inst.history.return_value = df_stock
+        
+        payload = {
+            "tickers": ["TATAMOTORS", "INFY"],
+            "weights": [60.0, 40.0],
+            "start_date": "2023-01-01",
+            "end_date": "2023-12-31",
+            "rebalance_freq": "quarterly",
+            "starting_capital": 100000.0,
+            "transaction_fee_pct": 0.1
+        }
+        
+        res = self.client.post("/api/portfolio/backtest", json=payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("dates", data)
+        self.assertIn("portfolio_values", data)
+        self.assertIn("benchmark_values", data)
+        self.assertIn("metrics", data)
+        self.assertGreater(data["metrics"]["portfolio"]["final_value"], 100000.0)
+        self.assertGreater(data["metrics"]["portfolio"]["total_dividends"], 0.0)
+        
+        synth_payload = {
+            "metrics": data["metrics"],
+            "tickers_weights": [{"symbol": "TATAMOTORS", "weight": 60.0}, {"symbol": "INFY", "weight": 40.0}]
+        }
+        mock_summary = "### 🔬 Backtest Summary\nThe portfolio outperformed the benchmark."
+        with patch("backend.main.generate_backtest_synthesis", return_value=mock_summary):
+            synth_res = self.client.post("/api/portfolio/backtest-synthesis", json=synth_payload)
+            self.assertEqual(synth_res.status_code, 200)
+            self.assertEqual(synth_res.json()["synthesis"], mock_summary)
+
     @patch("backend.agent.get_complete_financial_profile")
     def test_stock_audit_endpoint(self, mock_profile_call):
         """Verifies that the /api/stock/audit endpoint returns simulated checks for all combinations."""

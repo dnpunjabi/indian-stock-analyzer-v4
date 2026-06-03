@@ -1873,3 +1873,58 @@ def run_single_stock_audit(symbol: str, horizon: str = "Long-term (3+ years)", r
         "cap_type": p.get("fundamentals", {}).get("cap_type", "large"),
         "combinations": combinations
     }
+
+
+def generate_backtest_synthesis(metrics: dict, tickers_weights: list) -> str:
+    """
+    Calls the Groq LLM to generate an objective performance review of the backtest.
+    """
+    portfolio = metrics.get("portfolio", {})
+    benchmark = metrics.get("benchmark", {})
+    
+    # Format the tickers and weights for the prompt
+    alloc_str = ", ".join([f"{item['symbol']} ({item['weight']}%)" for item in tickers_weights])
+    
+    system_prompt = (
+        "You are an expert investment analyst coordinating research for a high-fidelity Indian stock analytics platform. "
+        "Your task is to analyze historical portfolio backtesting simulation metrics and summarize them for an investor. "
+        "Be objective, direct, and factual. Do not use praise adjectives (like 'great', 'stunning', 'fantastic') and do not use exclamation marks. "
+        "End all sentences with periods."
+    )
+    
+    user_prompt = (
+        f"Generate a professional, structured backtesting synthesis report for the following portfolio configuration:\n\n"
+        f"### Portfolio Allocation: {alloc_str}\n\n"
+        f"### Performance Metrics Comparison (Portfolio vs. Nifty 50 Benchmark):\n"
+        f"- Final Value: ₹{portfolio.get('final_value'):,.2f} vs. ₹{benchmark.get('final_value'):,.2f}\n"
+        f"- CAGR: {portfolio.get('cagr')}% vs. {benchmark.get('cagr')}%\n"
+        f"- Maximum Drawdown: {portfolio.get('max_drawdown')}% vs. {benchmark.get('max_drawdown')}%\n"
+        f"- Annual Volatility: {portfolio.get('volatility')}% vs. {benchmark.get('volatility')}%\n"
+        f"- Sharpe Ratio: {portfolio.get('sharpe_ratio')} vs. {benchmark.get('sharpe_ratio')}\n"
+        f"- Accumulated Dividends: ₹{portfolio.get('total_dividends'):,.2f}\n"
+        f"- Rebalancing Transaction Costs Incurred: ₹{portfolio.get('total_fees'):,.2f}\n\n"
+        f"Please provide your analysis divided into four clear markdown sections:\n"
+        f"1. **Performance Attribution**: Explain the sources of return, contrasting the custom portfolio with the benchmark.\n"
+        f"2. **Risk & Volatility Analysis**: Interpret the maximum drawdown and Sharpe ratio, explaining the risk-adjusted returns.\n"
+        f"3. **Rebalancing & Drag Diagnostics**: Analyze if the rebalancing frequency was useful or if transaction costs eroded too much capital.\n"
+        f"4. **Future Allocation Actionables**: Suggest adjustments to improve performance or mitigate future downside risk."
+    )
+    
+    try:
+        response = call_groq_llm(system_prompt, user_prompt)
+        return response
+    except Exception as e:
+        print(f"Error calling Groq for backtest synthesis: {e}")
+        # Local fallback analysis if Groq fails
+        md = []
+        md.append("### 🔬 Local Backtest Performance Synthesis")
+        if portfolio.get('cagr', 0) > benchmark.get('cagr', 0):
+            md.append("1. **Performance Attribution**: The custom portfolio historically outperformed the Nifty 50 benchmark on a CAGR basis. This indicates that the selected active stock weight allocation successfully captured market returns above the benchmark index.")
+        else:
+            md.append("1. **Performance Attribution**: The custom portfolio historically underperformed the Nifty 50 benchmark. This suggests that the stock weight selection or sector allocation did not keep pace with index components.")
+            
+        md.append(f"2. **Risk & Volatility Analysis**: The portfolio experienced a maximum peak-to-trough drawdown of {portfolio.get('max_drawdown')}% compared to {benchmark.get('max_drawdown')}% for Nifty 50. The Sharpe ratio of {portfolio.get('sharpe_ratio')} indicates the risk-adjusted returns generated per unit of volatility.")
+        md.append(f"3. **Rebalancing & Drag Diagnostics**: Total simulated rebalancing fees and commissions amounted to ₹{portfolio.get('total_fees'):,.2f}, representing transaction friction. Total cash dividends collected amounted to ₹{portfolio.get('total_dividends'):,.2f}.")
+        md.append("4. **Future Allocation Actionables**: To reduce downside volatility, consider diversifying into defensive sectors (such as consumer goods or pharmaceuticals) or adding gold ETF equivalents to lower asset correlations.")
+        return "\n\n".join(md)
+

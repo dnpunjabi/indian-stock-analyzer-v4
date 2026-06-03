@@ -82,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAnalyzerSubtabs(); // Initialize Equity Research Terminal sub-tabs
     setupReturnCalculator(); // New Return Calculator
     setupPortfolioDoctor(); // New Portfolio Doctor
+    setupPortfolioBacktester(); // Historical Backtester
     loadRebalancerStatus(); // Fix #4: load universe status on startup
     setupRebalanceButton(); // Fix #4: wire Sync button
     setupGlobalProfileListeners(); // Dynamic reactive profile switcher!
@@ -9856,3 +9857,514 @@ Keep the response professional, mathematically grounded, and extremely concise. 
         });
     }
 }
+
+
+let backtestSandboxStocks = [];
+let backtestChartInstance = null;
+
+function setupPortfolioBacktester() {
+    const portTabDiagnosticsBtn = document.getElementById('port-tab-diagnostics-btn');
+    const portTabBacktesterBtn = document.getElementById('port-tab-backtester-btn');
+    const portPanelDiagnostics = document.getElementById('port-panel-diagnostics');
+    const portPanelBacktester = document.getElementById('port-panel-backtester');
+    
+    if (!portTabDiagnosticsBtn || !portTabBacktesterBtn) return;
+    
+    // Tab switching event listeners
+    portTabDiagnosticsBtn.addEventListener('click', () => {
+        portTabDiagnosticsBtn.classList.add('active');
+        portTabBacktesterBtn.classList.remove('active');
+        portPanelDiagnostics.style.display = 'block';
+        portPanelBacktester.style.display = 'none';
+        
+        // Reset subtab styling
+        portTabDiagnosticsBtn.style.borderColor = 'var(--border-glass)';
+        portTabDiagnosticsBtn.style.background = 'rgba(255,255,255,0.03)';
+        portTabDiagnosticsBtn.style.color = 'var(--text-primary)';
+        portTabBacktesterBtn.style.borderColor = 'transparent';
+        portTabBacktesterBtn.style.background = 'transparent';
+        portTabBacktesterBtn.style.color = 'var(--text-muted)';
+    });
+    
+    portTabBacktesterBtn.addEventListener('click', async () => {
+        portTabBacktesterBtn.classList.add('active');
+        portTabDiagnosticsBtn.classList.remove('active');
+        portPanelBacktester.style.display = 'block';
+        portPanelDiagnostics.style.display = 'none';
+        
+        // Reset subtab styling
+        portTabBacktesterBtn.style.borderColor = 'var(--border-glass)';
+        portTabBacktesterBtn.style.background = 'rgba(255,255,255,0.03)';
+        portTabBacktesterBtn.style.color = 'var(--text-primary)';
+        portTabDiagnosticsBtn.style.borderColor = 'transparent';
+        portTabDiagnosticsBtn.style.background = 'transparent';
+        portTabDiagnosticsBtn.style.color = 'var(--text-muted)';
+        
+        // Synchronize ledger items to sandbox on first load or tab change
+        await syncLedgerToBacktestSandbox();
+    });
+    
+    // Set default dates
+    const today = new Date();
+    const endStr = today.toISOString().split('T')[0];
+    const threeYearsAgo = new Date();
+    threeYearsAgo.setFullYear(today.getFullYear() - 3);
+    const startStr = threeYearsAgo.toISOString().split('T')[0];
+    
+    const startDateInput = document.getElementById('backtest-start-date');
+    const endDateInput = document.getElementById('backtest-end-date');
+    if (startDateInput) startDateInput.value = startStr;
+    if (endDateInput) endDateInput.value = endStr;
+    
+    // Fee slider listener
+    const feeSlider = document.getElementById('backtest-fee');
+    const feeLabel = document.getElementById('backtest-fee-label');
+    if (feeSlider && feeLabel) {
+        feeSlider.addEventListener('input', () => {
+            feeLabel.innerText = parseFloat(feeSlider.value).toFixed(2) + '%';
+        });
+    }
+    
+    // Autocomplete trial stock input
+    const trialInput = document.getElementById('backtest-custom-stock-input');
+    const trialSuggestions = document.getElementById('backtest-custom-suggestions');
+    if (trialInput && trialSuggestions) {
+        trialInput.addEventListener('input', async () => {
+            const query = trialInput.value.trim();
+            if (query.length < 2) {
+                trialSuggestions.style.display = 'none';
+                return;
+            }
+            try {
+                const res = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.length > 0) {
+                        trialSuggestions.innerHTML = '';
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'backtest-suggestion-item';
+                            div.innerHTML = `<span><strong>${item.base_symbol}</strong> - ${item.name}</span><span style="color:var(--text-muted); font-size:9.5px;">${item.sector}</span>`;
+                            div.addEventListener('click', () => {
+                                trialInput.value = item.base_symbol;
+                                trialSuggestions.style.display = 'none';
+                            });
+                            trialSuggestions.appendChild(div);
+                        });
+                        trialSuggestions.style.display = 'block';
+                    } else {
+                        trialSuggestions.style.display = 'none';
+                    }
+                }
+            } catch (err) {
+                console.error("Backtester suggestions error:", err);
+            }
+        });
+        
+        document.addEventListener('click', (e) => {
+            if (e.target !== trialInput && e.target !== trialSuggestions) {
+                trialSuggestions.style.display = 'none';
+            }
+        });
+    }
+    
+    // Add trial ticker button
+    const addAssetBtn = document.getElementById('backtest-add-custom-btn');
+    if (addAssetBtn && trialInput) {
+        addAssetBtn.addEventListener('click', () => {
+            const sym = trialInput.value.trim().toUpperCase();
+            if (!sym) {
+                showToast("Please enter a stock symbol to add.", "warning");
+                return;
+            }
+            // Check if already in sandbox
+            if (backtestSandboxStocks.some(s => s.symbol === sym)) {
+                showToast(`${sym} is already in the sandbox list.`, "warning");
+                return;
+            }
+            // Determine default weight: remaining weight or 0
+            const currentSum = backtestSandboxStocks.reduce((sum, s) => sum + s.weight, 0);
+            const remaining = Math.max(0, 100 - currentSum);
+            
+            backtestSandboxStocks.push({
+                symbol: sym,
+                name: "Trial Stock",
+                weight: remaining
+            });
+            trialInput.value = '';
+            renderBacktestSandbox();
+        });
+    }
+    
+    // Run simulation button listener
+    const runBacktestBtn = document.getElementById('run-backtest-btn');
+    if (runBacktestBtn) {
+        runBacktestBtn.addEventListener('click', runPortfolioBacktest);
+    }
+    
+    // Watch for theme changes to dynamically update gridlines
+    window.addEventListener('resize', () => {
+        if (backtestChartInstance) {
+            updateBacktestChartThemeColors();
+        }
+    });
+}
+
+async function syncLedgerToBacktestSandbox() {
+    try {
+        // Fetch current active portfolio items
+        const response = await fetch('/api/portfolio');
+        if (!response.ok) throw new Error("Failed to load portfolio details.");
+        const portfolioItems = await response.json();
+        
+        if (portfolioItems.length === 0) {
+            backtestSandboxStocks = [];
+            renderBacktestSandbox();
+            return;
+        }
+        
+        // Calculate allocations based on current valuation: quantity * current_price
+        let totalVal = 0;
+        const itemsWithVal = portfolioItems.map(item => {
+            const price = item.current_price || item.purchase_price || 100;
+            const itemVal = item.quantity * price;
+            totalVal += itemVal;
+            return {
+                symbol: item.symbol,
+                name: item.name || item.symbol,
+                current_value: itemVal
+            };
+        });
+        
+        // Populate weights (normalize to sum to 100)
+        let accumulatedWeight = 0;
+        backtestSandboxStocks = itemsWithVal.map((item, idx) => {
+            let weight = 0;
+            if (totalVal > 0) {
+                if (idx === itemsWithVal.length - 1) {
+                    weight = Math.round((100 - accumulatedWeight) * 100) / 100;
+                } else {
+                    weight = Math.round((item.current_value / totalVal) * 100 * 100) / 100;
+                    accumulatedWeight += weight;
+                }
+            } else {
+                weight = Math.round((100 / itemsWithVal.length) * 100) / 100;
+            }
+            return {
+                symbol: item.symbol,
+                name: item.name,
+                weight: weight
+            };
+        });
+        
+        renderBacktestSandbox();
+    } catch (e) {
+        console.error("Sync portfolio to backtest error:", e);
+        showToast("Could not import holdings ledger: " + e.message, "error");
+    }
+}
+
+function renderBacktestSandbox() {
+    const sandboxBody = document.getElementById('backtest-sandbox-body');
+    if (!sandboxBody) return;
+    
+    sandboxBody.innerHTML = '';
+    
+    if (backtestSandboxStocks.length === 0) {
+        sandboxBody.innerHTML = '<tr><td colspan="3" class="center-text text-muted" style="padding: 20px;">No assets selected. Add experimental tickers above or sync active holdings to initialize.</td></tr>';
+        validateSandboxAllocation();
+        return;
+    }
+    
+    backtestSandboxStocks.forEach((stock, index) => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid var(--border-glass)';
+        
+        tr.innerHTML = `
+            <td style="padding: 10px;">
+                <strong>${stock.symbol}</strong><br>
+                <span style="font-size: 10px; color: var(--text-muted);">${stock.name}</span>
+            </td>
+            <td style="padding: 10px; text-align: right;">
+                <input type="number" min="0" max="100" step="1" value="${stock.weight}" class="backtest-weight-input" style="padding: 4px 8px; font-size:11px; border-radius: 4px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); width: 80px; text-align: right;">
+            </td>
+            <td style="padding: 10px; text-align: center;">
+                <button class="btn-secondary" style="font-size: 10px; padding: 2px 6px; height: auto; border-radius: 4px; color: var(--color-crimson); border-color: rgba(239,68,68,0.2);" onclick="deleteSandboxAsset(${index})">Delete</button>
+            </td>
+        `;
+        
+        // Listen to weight input changes
+        const weightInput = tr.querySelector('.backtest-weight-input');
+        if (weightInput) {
+            weightInput.addEventListener('input', () => {
+                let val = parseFloat(weightInput.value);
+                if (isNaN(val) || val < 0) val = 0;
+                if (val > 100) val = 100;
+                backtestSandboxStocks[index].weight = val;
+                validateSandboxAllocation();
+            });
+        }
+        
+        sandboxBody.appendChild(tr);
+    });
+    
+    validateSandboxAllocation();
+}
+
+window.deleteSandboxAsset = function(index) {
+    backtestSandboxStocks.splice(index, 1);
+    renderBacktestSandbox();
+};
+
+function validateSandboxAllocation() {
+    const totalWeightLabel = document.getElementById('backtest-total-weight-label');
+    const validationBadge = document.getElementById('backtest-validation-badge');
+    const validationText = document.getElementById('backtest-validation-text');
+    const runBtn = document.getElementById('run-backtest-btn');
+    
+    if (!totalWeightLabel || !validationBadge || !validationText || !runBtn) return;
+    
+    const sum = Math.round(backtestSandboxStocks.reduce((sum, s) => sum + s.weight, 0) * 100) / 100;
+    totalWeightLabel.innerText = sum + '%';
+    
+    if (sum === 100) {
+        validationBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+        validationBadge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+        validationBadge.style.color = '#10b981';
+        validationBadge.innerText = 'Valid Weights';
+        
+        totalWeightLabel.style.color = '#10b981';
+        validationText.innerHTML = `Allocated: <strong style="color: #10b981;">100%</strong>. Weights match target constraints. Ready to simulate.`;
+        
+        runBtn.disabled = false;
+        runBtn.style.opacity = '1.0';
+        runBtn.style.cursor = 'pointer';
+    } else {
+        validationBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+        validationBadge.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+        validationBadge.style.color = '#ef4444';
+        validationBadge.innerText = 'Weight Mismatch';
+        
+        totalWeightLabel.style.color = '#ef4444';
+        validationText.innerHTML = `Allocated: <strong style="color: #ef4444;">${sum}%</strong>. Weights must equal 100% to run simulation.`;
+        
+        runBtn.disabled = true;
+        runBtn.style.opacity = '0.5';
+        runBtn.style.cursor = 'not-allowed';
+    }
+}
+
+async function runPortfolioBacktest() {
+    const runBtn = document.getElementById('run-backtest-btn');
+    const startDateInput = document.getElementById('backtest-start-date');
+    const endDateInput = document.getElementById('backtest-end-date');
+    const rebalanceSelect = document.getElementById('backtest-rebalance-select');
+    const capitalInput = document.getElementById('backtest-capital');
+    const feeSlider = document.getElementById('backtest-fee');
+    
+    const resultsContainer = document.getElementById('backtest-results-container');
+    const warningBox = document.getElementById('backtest-warning-box');
+    const warningText = document.getElementById('backtest-warning-text');
+    const summaryBlock = document.getElementById('backtest-summary-block');
+    const summaryText = document.getElementById('backtest-summary-text');
+    
+    if (backtestSandboxStocks.length === 0) return;
+    
+    const sum = backtestSandboxStocks.reduce((sum, s) => sum + s.weight, 0);
+    if (Math.round(sum) !== 100) {
+        showToast("Sum of weights must equal 100%.", "warning");
+        return;
+    }
+    
+    runBtn.disabled = true;
+    runBtn.innerText = "Simulating...";
+    runBtn.style.opacity = '0.7';
+    
+    if (warningBox) warningBox.style.display = 'none';
+    if (resultsContainer) resultsContainer.style.display = 'none';
+    
+    try {
+        const payload = {
+            tickers: backtestSandboxStocks.map(s => s.symbol),
+            weights: backtestSandboxStocks.map(s => s.weight),
+            start_date: startDateInput.value,
+            end_date: endDateInput.value,
+            rebalance_freq: rebalanceSelect.value,
+            starting_capital: parseFloat(capitalInput.value),
+            transaction_fee_pct: parseFloat(feeSlider.value)
+        };
+        
+        const response = await fetch('/api/portfolio/backtest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || "Backtest failed.");
+        }
+        
+        const data = await response.json();
+        
+        // 1. Check for warnings
+        if (data.warnings && data.warnings.length > 0) {
+            if (warningBox && warningText) {
+                warningText.innerText = data.warnings.join(' ');
+                warningBox.style.display = 'block';
+            }
+        }
+        
+        // 2. Render comparative metrics table
+        document.getElementById('backtest-final-val').innerText = '₹' + data.metrics.portfolio.final_value.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('bench-final-val').innerText = '₹' + data.metrics.benchmark.final_value.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        document.getElementById('backtest-cagr').innerText = data.metrics.portfolio.cagr + '%';
+        document.getElementById('bench-cagr').innerText = data.metrics.benchmark.cagr + '%';
+        
+        document.getElementById('backtest-max-dd').innerText = data.metrics.portfolio.max_drawdown + '%';
+        document.getElementById('bench-max-dd').innerText = data.metrics.benchmark.max_drawdown + '%';
+        
+        document.getElementById('backtest-volatility').innerText = data.metrics.portfolio.volatility + '%';
+        document.getElementById('bench-volatility').innerText = data.metrics.benchmark.volatility + '%';
+        
+        document.getElementById('backtest-sharpe').innerText = data.metrics.portfolio.sharpe_ratio;
+        document.getElementById('bench-sharpe').innerText = data.metrics.benchmark.sharpe_ratio;
+        
+        document.getElementById('backtest-dividends').innerText = '₹' + data.metrics.portfolio.total_dividends.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        document.getElementById('backtest-fees-paid').innerText = '₹' + data.metrics.portfolio.total_fees.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        
+        // 3. Render Chart
+        renderBacktestChart(data);
+        
+        if (resultsContainer) resultsContainer.style.display = 'block';
+        
+        // 4. Trigger LLM summary synthesis
+        if (summaryText) {
+            summaryText.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px; padding: 10px 0;">
+                    <div class="spinner" style="width:16px; height:16px; border-width:2px; border-top-color:#3b82f6;"></div>
+                    <span style="font-size:11.5px; color:var(--text-secondary);">Equities Advisor is synthesizing backtesting metrics...</span>
+                </div>
+            `;
+            
+            try {
+                const synthPayload = {
+                    metrics: data.metrics,
+                    tickers_weights: backtestSandboxStocks.map(s => ({ symbol: s.symbol, weight: s.weight }))
+                };
+                
+                const synthResponse = await fetch('/api/portfolio/backtest-synthesis', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(synthPayload)
+                });
+                
+                if (synthResponse.ok) {
+                    const synthData = await synthResponse.json();
+                    summaryText.innerHTML = synthData.synthesis
+                        .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary);">$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                        .replace(/\n/g, '<br>');
+                } else {
+                    throw new Error("Synthesis API failed.");
+                }
+            } catch (err) {
+                console.error("Backtest synthesis error:", err);
+                summaryText.innerHTML = `<span style="color:#ef4444; font-size:11.5px;">Unable to fetch AI Advisor summary. Please review the table metrics above.</span>`;
+            }
+        }
+        
+    } catch (e) {
+        console.error(e);
+        showToast("Error running simulation: " + e.message, "error");
+    } finally {
+        runBtn.disabled = false;
+        runBtn.innerText = "Run Backtest Simulation";
+        runBtn.style.opacity = '1.0';
+    }
+}
+
+function renderBacktestChart(data) {
+    const ctx = document.getElementById('backtest-chart').getContext('2d');
+    if (backtestChartInstance) {
+        backtestChartInstance.destroy();
+    }
+    
+    const activeTheme = document.body.getAttribute('data-theme') || 'dark';
+    const gridColor = activeTheme === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)';
+    const textColor = activeTheme === 'light' ? '#334155' : '#f8fafc';
+    
+    backtestChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.dates,
+            datasets: [
+                {
+                    label: 'Custom Portfolio',
+                    data: data.portfolio_values,
+                    borderColor: '#3b82f6',
+                    borderWidth: 2,
+                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                    fill: true,
+                    tension: 0.15,
+                    pointRadius: 0
+                },
+                {
+                    label: 'Nifty 50 Index',
+                    data: data.benchmark_values,
+                    borderColor: '#9ca3af',
+                    borderWidth: 1.5,
+                    borderDash: [5, 5],
+                    backgroundColor: 'transparent',
+                    fill: false,
+                    tension: 0.1,
+                    pointRadius: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: { color: textColor, font: { family: 'Inter', size: 10 } }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, font: { family: 'Inter', size: 9 } }
+                },
+                y: {
+                    grid: { color: gridColor },
+                    ticks: {
+                        color: textColor,
+                        font: { family: 'Inter', size: 9 },
+                        callback: function(value) {
+                            return '₹' + value.toLocaleString('en-IN');
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateBacktestChartThemeColors() {
+    if (!backtestChartInstance) return;
+    
+    const activeTheme = document.body.getAttribute('data-theme') || 'dark';
+    const gridColor = activeTheme === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)';
+    const textColor = activeTheme === 'light' ? '#334155' : '#f8fafc';
+    
+    backtestChartInstance.options.plugins.legend.labels.color = textColor;
+    backtestChartInstance.options.scales.x.grid.color = gridColor;
+    backtestChartInstance.options.scales.x.ticks.color = textColor;
+    backtestChartInstance.options.scales.y.grid.color = gridColor;
+    backtestChartInstance.options.scales.y.ticks.color = textColor;
+    
+    backtestChartInstance.update();
+}
+

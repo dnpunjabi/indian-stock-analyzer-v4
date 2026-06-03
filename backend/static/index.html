@@ -1830,104 +1830,295 @@
                     <p>Orchestrate institutional-grade diagnostic audits, analyze concentration indices, measure sector exposure, and receive active mathematical rebalancing strategies compiled by the AI agent.</p>
                 </div>
 
-                <div class="card" id="portfolio-doctor-card" style="margin-top: 20px;">
-                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border: none; padding: 0; margin-bottom: 15px;">
-                        <h3 style="display: flex; align-items: center; gap: 8px; margin: 0;">
-                            <span>🩺 Standalone AI Portfolio Doctor</span>
-                            <span class="badge-rec" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Advisor Active</span>
-                        </h3>
-                        <button class="btn-primary" id="run-portfolio-doctor-btn" style="display: none;">Analyze Portfolio Health</button>
-                    </div>
-                    <p style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.4;">
-                        Build your comprehensive investment ledger below by selecting stocks from your custom watchlists or searching any stock online directly. Input your acquisition quantities and average buy prices to run your active diagnostics.
-                    </p>
+                <!-- Portfolio Doctor Sub-navigation Tabs -->
+                <div class="portfolio-subtabs-wrapper no-print" style="display: flex; gap: 10px; margin-top: 15px; margin-bottom: 5px;">
+                    <button class="portfolio-subtab-btn active" id="port-tab-diagnostics-btn" style="cursor: pointer; padding: 8px 16px; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary); outline: none;">🩺 Diagnostics Audit</button>
+                    <button class="portfolio-subtab-btn" id="port-tab-backtester-btn" style="cursor: pointer; padding: 8px 16px; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; border: 1px solid transparent; background: transparent; color: var(--text-muted); outline: none;">📊 Historical Backtester</button>
+                </div>
 
-                    <div id="portfolio-doctor-empty-state" style="padding: 30px; text-align: center; border: 1px dashed var(--border-glass); border-radius: 8px; color: var(--text-secondary); background: rgba(255,255,255,0.01); margin-bottom: 20px;">
-                        <span style="font-size: 24px; display: block; margin-bottom: 10px;">🩺</span>
-                        No holdings detected. Add stocks from your watchlists or search symbols online above to initialize the AI Portfolio Doctor.
-                    </div>
-                    
-                    <div class="portfolio-inputs-grid" id="portfolio-inputs-grid" style="display: none; grid-template-columns: 1.8fr 1fr; gap: 25px;">
-                        <div>
-                            <h4 style="font-size: 12px; color: var(--text-primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0;">Acquisition Ledger</h4>
-                            
-                            <!-- Add Holdings Ledger Panel -->
-                            <div class="no-print" style="display: flex; gap: 12px; align-items: center; background: rgba(30, 41, 59, 0.25); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px 15px; margin-bottom: 15px; flex-wrap: wrap;">
-                                <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.03em;">ADD TO LEDGER:</span>
+                <!-- PANEL 1: DIAGNOSTICS AUDIT -->
+                <div id="port-panel-diagnostics" class="portfolio-panel">
+                    <div class="card" id="portfolio-doctor-card" style="margin-top: 15px;">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border: none; padding: 0; margin-bottom: 15px;">
+                            <h3 style="display: flex; align-items: center; gap: 8px; margin: 0;">
+                                <span>🩺 Standalone AI Portfolio Doctor</span>
+                                <span class="badge-rec" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Advisor Active</span>
+                            </h3>
+                            <button class="btn-primary" id="run-portfolio-doctor-btn" style="display: none;">Analyze Portfolio Health</button>
+                        </div>
+                        <p style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.4;">
+                            Build your comprehensive investment ledger below by selecting stocks from your custom watchlists or searching any stock online directly. Input your acquisition quantities and average buy prices to run your active diagnostics.
+                        </p>
+
+                        <div id="portfolio-doctor-empty-state" style="padding: 30px; text-align: center; border: 1px dashed var(--border-glass); border-radius: 8px; color: var(--text-secondary); background: rgba(255,255,255,0.01); margin-bottom: 20px;">
+                            <span style="font-size: 24px; display: block; margin-bottom: 10px;">🩺</span>
+                            No holdings detected. Add stocks from your watchlists or search symbols online above to initialize the AI Portfolio Doctor.
+                        </div>
+                        
+                        <div class="portfolio-inputs-grid" id="portfolio-inputs-grid" style="display: none; grid-template-columns: 1.8fr 1fr; gap: 25px;">
+                            <div>
+                                <h4 style="font-size: 12px; color: var(--text-primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0;">Acquisition Ledger</h4>
                                 
-                                <!-- Select from watchlist -->
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <select id="portfolio-watchlist-stock-select" style="padding: 4px 8px; border-radius: 4px; font-size:11px; cursor: pointer; min-width: 150px;">
-                                        <option value="" disabled selected>Choose from Watchlist</option>
-                                    </select>
-                                    <button id="portfolio-add-from-watchlist-btn" class="btn-primary" style="font-size: 11px; padding: 4px 10px; height: auto;">+ Add Selected</button>
+                                <!-- Add Holdings Ledger Panel -->
+                                <div class="no-print" style="display: flex; gap: 12px; align-items: center; background: rgba(30, 41, 59, 0.25); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px 15px; margin-bottom: 15px; flex-wrap: wrap;">
+                                    <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.03em;">ADD TO LEDGER:</span>
+                                    
+                                    <!-- Select from watchlist -->
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <select id="portfolio-watchlist-stock-select" style="padding: 4px 8px; border-radius: 4px; font-size:11px; cursor: pointer; min-width: 150px;">
+                                            <option value="" disabled selected>Choose from Watchlist</option>
+                                        </select>
+                                        <button id="portfolio-add-from-watchlist-btn" class="btn-primary" style="font-size: 11px; padding: 4px 10px; height: auto;">+ Add Selected</button>
+                                    </div>
+                                    
+                                    <span style="font-size: 11px; color: var(--text-muted);">or</span>
+                                    
+                                    <!-- Add custom stock symbol with autocomplete suggestions list -->
+                                    <div style="display: flex; align-items: center; gap: 6px; position: relative;">
+                                        <input type="text" id="portfolio-custom-stock-input" placeholder="Type stock (e.g. HAL)..." style="padding: 4px 8px; font-size:11px; border-radius: 4px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); width: 150px; outline: none;" autocomplete="off">
+                                        <div id="portfolio-custom-suggestions" style="display: none;"></div>
+                                        <button id="portfolio-add-custom-btn" class="btn-primary" style="font-size: 11px; padding: 4px 10px; height: auto;">+ Add Custom</button>
+                                    </div>
                                 </div>
+
+                                <div class="ledger-table-wrap" style="max-height: 350px; overflow: auto; border: 1px solid var(--border-glass); border-radius: 8px;">
+                                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
+                                        <thead>
+                                            <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-glass);">
+                                                <th style="padding: 10px; color: var(--text-secondary);">Stock</th>
+                                                <th style="padding: 10px; color: var(--text-secondary); text-align: right;">Quantity</th>
+                                                <th style="padding: 10px; color: var(--text-secondary); text-align: right;">Avg Price (₹)</th>
+                                                <th style="padding: 10px; color: var(--text-secondary); text-align: right;">Current Price (₹)</th>
+                                                <th style="padding: 10px; color: var(--text-secondary); text-align: right;">Invested Value (₹)</th>
+                                                <th style="padding: 10px; color: var(--text-secondary); text-align: right;">Current Value (₹)</th>
+                                                <th style="padding: 10px; color: var(--text-secondary); text-align: right;">P&L (₹)</th>
+                                                <th style="padding: 10px; color: var(--text-secondary); text-align: right;">Target buy range (₹)</th>
+                                                <th style="padding: 10px; color: var(--text-secondary); text-align: right;">Target sell range (₹)</th>
+                                                <th class="no-print" style="padding: 10px; color: var(--text-secondary); text-align: center; width: 60px;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="portfolio-ledger-body">
+                                            <!-- Loaded dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 style="font-size: 12px; color: var(--text-primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0;">Portfolio Vital Diagnostics</h4>
                                 
-                                <span style="font-size: 11px; color: var(--text-muted);">or</span>
-                                
-                                <!-- Add custom stock symbol with autocomplete suggestions list -->
+                                <div class="card" style="margin: 0; padding: 15px; margin-bottom: 15px; background: rgba(255,255,255,0.01);">
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 10px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;">
+                                        <span style="color: var(--text-secondary);">Total Capital Invested:</span>
+                                        <span id="port-total-invested" style="font-weight: 700; color: var(--text-primary);">₹0.00</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 10px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;">
+                                        <span style="color: var(--text-secondary);">Current Portfolio Value:</span>
+                                        <span id="port-current-value" style="font-weight: 700; color: var(--text-primary);">₹0.00</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 10px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;">
+                                        <span style="color: var(--text-secondary);">Total Net Profit/Loss:</span>
+                                        <span id="port-total-pl" style="font-weight: 700; color: var(--text-primary);">₹0.00</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 10px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;">
+                                        <span style="color: var(--text-primary); font-weight: 600;">Health Score:</span>
+                                        <strong id="port-health-score" style="font-size: 16px; color: var(--neon-green);">--/100</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                                        <span style="color: var(--text-secondary);">Diversification Index:</span>
+                                        <span id="port-concentration-label" style="font-weight: 600;">Well Diversified</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Doctor's Detailed Prescription -->
+                        <div id="portfolio-doctor-prescription-box" style="display: none; margin-top: 25px; border-top: 1px dashed var(--border-glass); padding-top: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h4 style="font-size: 13px; color: var(--neon-green); border-left: 3px solid var(--neon-green); padding-left: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">Actionable Doctor's Prescription</h4>
+                                <button class="btn-secondary no-print" id="print-portfolio-report-btn" style="font-size: 11px; padding: 5px 10px; height: auto; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight:600;"><span style="font-size: 12px;">🖨️</span> Print Diagnostic Report</button>
+                            </div>
+                            <div id="portfolio-prescription-content" style="font-size: 12.5px; line-height: 1.6; color: var(--text-muted); background: rgba(255,255,255,0.01); border: 1px solid var(--border-glass); padding: 20px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
+                                <!-- Diagnostic text loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANEL 2: HISTORICAL BACKTESTER -->
+                <div id="port-panel-backtester" class="portfolio-panel" style="display: none;">
+                    <div class="card" id="portfolio-backtester-card" style="margin-top: 15px;">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border: none; padding: 0; margin-bottom: 15px;">
+                            <h3 style="display: flex; align-items: center; gap: 8px; margin: 0;">
+                                <span>📊 Historical Portfolio Backtesting Sandbox</span>
+                                <span class="badge-rec" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);">Backtester Active</span>
+                            </h3>
+                        </div>
+                        <p style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.4;">
+                            Configure historical parameters and asset allocation weights to simulate the portfolio performance compared against the Nifty 50 benchmark index.
+                        </p>
+
+                        <!-- Backtester Configuration Inputs Grid -->
+                        <div class="backtester-inputs-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Start Date</label>
+                                <input type="date" id="backtest-start-date" style="padding: 8px; border-radius: 6px; font-size: 12px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); outline: none;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">End Date</label>
+                                <input type="date" id="backtest-end-date" style="padding: 8px; border-radius: 6px; font-size: 12px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); outline: none;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Rebalancing Frequency</label>
+                                <select id="backtest-rebalance-select" style="padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer; outline: none; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass);">
+                                    <option value="none" selected>No Rebalancing (Buy & Hold)</option>
+                                    <option value="monthly">Monthly Rebalancing</option>
+                                    <option value="quarterly">Quarterly Rebalancing</option>
+                                    <option value="annually">Annual Rebalancing</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <label style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Starting Capital (₹)</label>
+                                <input type="number" id="backtest-capital" value="100000" min="1000" step="1000" style="padding: 8px; border-radius: 6px; font-size: 12px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); outline: none;">
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <label style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Fee & Slippage</label>
+                                    <span id="backtest-fee-label" style="font-size: 11px; color: var(--neon-green); font-weight: 700;">0.10%</span>
+                                </div>
+                                <input type="range" id="backtest-fee" min="0.0" max="1.0" step="0.05" value="0.10" style="width: 100%; cursor: pointer;">
+                            </div>
+                        </div>
+
+                        <!-- Sandbox Allocation Panel -->
+                        <div class="sandbox-allocation-section" style="border-top: 1px dashed var(--border-glass); padding-top: 15px; margin-bottom: 25px;">
+                            <h4 style="font-size: 12px; color: var(--text-primary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0;">Asset Allocation Weights</h4>
+                            
+                            <!-- Add Sandbox Ticker panel -->
+                            <div class="no-print" style="display: flex; gap: 12px; align-items: center; background: rgba(30, 41, 59, 0.25); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px 15px; margin-bottom: 15px; flex-wrap: wrap;">
+                                <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.03em;">ADD EXPERIMENTAL TICKER:</span>
                                 <div style="display: flex; align-items: center; gap: 6px; position: relative;">
-                                    <input type="text" id="portfolio-custom-stock-input" placeholder="Type stock (e.g. HAL)..." style="padding: 4px 8px; font-size:11px; border-radius: 4px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); width: 150px; outline: none;" autocomplete="off">
-                                    <div id="portfolio-custom-suggestions" style="display: none;"></div>
-                                    <button id="portfolio-add-custom-btn" class="btn-primary" style="font-size: 11px; padding: 4px 10px; height: auto;">+ Add Custom</button>
+                                    <input type="text" id="backtest-custom-stock-input" placeholder="Type stock (e.g. RELIANCE)..." style="padding: 4px 8px; font-size:11px; border-radius: 4px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); width: 180px; outline: none;" autocomplete="off">
+                                    <div id="backtest-custom-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #0b1329; border: 1px solid var(--border-glass); border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 10;"></div>
+                                    <button id="backtest-add-custom-btn" class="btn-primary" style="font-size: 11px; padding: 4px 10px; height: auto;">+ Add Asset</button>
                                 </div>
                             </div>
 
-                            <div class="ledger-table-wrap" style="max-height: 350px; overflow: auto; border: 1px solid var(--border-glass); border-radius: 8px;">
+                            <!-- Sandbox Table -->
+                            <div class="sandbox-table-wrap" style="border: 1px solid var(--border-glass); border-radius: 8px; overflow: hidden; margin-bottom: 15px;">
                                 <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 12px;">
                                     <thead>
                                         <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-glass);">
                                             <th style="padding: 10px; color: var(--text-secondary);">Stock</th>
-                                            <th style="padding: 10px; color: var(--text-secondary);">Sector</th>
-                                            <th style="padding: 10px; color: var(--text-secondary); width: 100px;">Qty Held</th>
-                                            <th style="padding: 10px; color: var(--text-secondary); width: 140px;">Avg Buy Price (₹)</th>
-                                            <th style="padding: 10px; color: var(--text-secondary); width: 80px;">Actions</th>
+                                            <th style="padding: 10px; color: var(--text-secondary); text-align: right;">Target Weight (%)</th>
+                                            <th style="padding: 10px; color: var(--text-secondary); text-align: center; width: 60px;">Action</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="portfolio-ledger-body">
-                                        <!-- Loaded dynamically -->
+                                    <tbody id="backtest-sandbox-body">
+                                        <!-- Loaded dynamically via js -->
                                     </tbody>
                                 </table>
                             </div>
+
+                            <!-- Allocation validation indicator -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 10px 15px; border-radius: 8px; margin-bottom: 20px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span id="backtest-validation-badge" class="badge-rec" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">Weight Mismatch</span>
+                                    <span id="backtest-validation-text" style="font-size: 11.5px; color: var(--text-secondary);">Allocated: <strong id="backtest-total-weight-label" style="color: #ef4444;">0%</strong>. Weights must equal 100% to run simulation.</span>
+                                </div>
+                                <button class="btn-primary" id="run-backtest-btn" disabled style="min-width: 180px; height: 36px; border-radius: 6px; font-weight: 700; opacity: 0.5; cursor: not-allowed;">Run Backtest Simulation</button>
+                            </div>
                         </div>
-                        
-                        <div style="display: flex; flex-direction: column; gap: 15px;">
-                            <h4 style="font-size: 12px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">Portfolio Balance Sheet</h4>
-                            <div class="portfolio-balance-card">
-                                <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                                    <span style="color: var(--text-secondary);">Total Investment:</span>
-                                    <strong id="port-total-investment">₹0.00</strong>
+
+                        <!-- Simulation warnings -->
+                        <div id="backtest-warning-box" style="display: none; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 6px; padding: 12px; margin-bottom: 20px; font-size: 11.5px; color: #f59e0b; line-height: 1.45;">
+                            <span style="font-weight: 700; margin-right: 4px;">⚠️ Warning:</span> <span id="backtest-warning-text"></span>
+                        </div>
+
+                        <!-- Simulation Results (Initially Hidden) -->
+                        <div id="backtest-results-container" style="display: none; border-top: 1px dashed var(--border-glass); padding-top: 25px;">
+                            <h4 style="font-size: 13px; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 15px; margin-top: 0;">Simulation Results Summary</h4>
+                            
+                            <div class="backtest-results-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 25px;">
+                                <!-- Equity Curve Chart Wrapper -->
+                                <div class="card" style="margin: 0; padding: 15px; display: flex; flex-direction: column;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                        <span style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Equity Growth Curve (Portfolio vs. Nifty 50)</span>
+                                    </div>
+                                    <div style="flex-grow: 1; min-height: 300px; position: relative;">
+                                        <canvas id="backtest-chart"></canvas>
+                                    </div>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                                    <span style="color: var(--text-secondary);">Current Valuation:</span>
-                                    <strong id="port-total-value">₹0.00</strong>
+
+                                <!-- Performance Statistics Table -->
+                                <div class="card" style="margin: 0; padding: 15px;">
+                                    <div style="margin-bottom: 12px;">
+                                        <span style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Risk/Return Parameters</span>
+                                    </div>
+                                    <div class="table-scroll" style="border: 1px solid var(--border-glass); border-radius: 6px;">
+                                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; line-height: 1.45;">
+                                            <thead>
+                                                <tr style="background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border-glass);">
+                                                    <th style="padding: 8px; color: var(--text-secondary);">Parameter</th>
+                                                    <th style="padding: 8px; color: var(--neon-green); text-align: right; font-weight: 700;">Portfolio</th>
+                                                    <th style="padding: 8px; color: var(--text-secondary); text-align: right;">Nifty 50</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr style="border-bottom: 1px solid var(--border-glass);">
+                                                    <td style="padding: 8px; color: var(--text-secondary);">Final Value</td>
+                                                    <td id="backtest-final-val" style="padding: 8px; text-align: right; font-weight: 700; color: var(--text-primary);">--</td>
+                                                    <td id="bench-final-val" style="padding: 8px; text-align: right; color: var(--text-secondary);">--</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid var(--border-glass);">
+                                                    <td style="padding: 8px; color: var(--text-secondary);">CAGR (%)</td>
+                                                    <td id="backtest-cagr" style="padding: 8px; text-align: right; font-weight: 700; color: var(--text-primary);">--</td>
+                                                    <td id="bench-cagr" style="padding: 8px; text-align: right; color: var(--text-secondary);">--</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid var(--border-glass);">
+                                                    <td style="padding: 8px; color: var(--text-secondary);">Max Drawdown (%)</td>
+                                                    <td id="backtest-max-dd" style="padding: 8px; text-align: right; font-weight: 700; color: var(--text-primary);">--</td>
+                                                    <td id="bench-max-dd" style="padding: 8px; text-align: right; color: var(--text-secondary);">--</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid var(--border-glass);">
+                                                    <td style="padding: 8px; color: var(--text-secondary);">Annual Volatility (%)</td>
+                                                    <td id="backtest-volatility" style="padding: 8px; text-align: right; font-weight: 700; color: var(--text-primary);">--</td>
+                                                    <td id="bench-volatility" style="padding: 8px; text-align: right; color: var(--text-secondary);">--</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid var(--border-glass);">
+                                                    <td style="padding: 8px; color: var(--text-secondary);">Sharpe Ratio</td>
+                                                    <td id="backtest-sharpe" style="padding: 8px; text-align: right; font-weight: 700; color: var(--text-primary);">--</td>
+                                                    <td id="bench-sharpe" style="padding: 8px; text-align: right; color: var(--text-secondary);">--</td>
+                                                </tr>
+                                                <tr style="border-bottom: 1px solid var(--border-glass);">
+                                                    <td style="padding: 8px; color: var(--text-secondary);">Total Dividends</td>
+                                                    <td id="backtest-dividends" style="padding: 8px; text-align: right; font-weight: 700; color: var(--text-primary);">--</td>
+                                                    <td style="padding: 8px; text-align: right; color: var(--text-secondary);">N/A</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding: 8px; color: var(--text-secondary);">Transaction Costs</td>
+                                                    <td id="backtest-fees-paid" style="padding: 8px; text-align: right; font-weight: 700; color: var(--text-primary);">--</td>
+                                                    <td style="padding: 8px; text-align: right; color: var(--text-secondary);">₹0.00</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                                <div style="display: flex; justify-content: space-between; font-size: 12px;">
-                                    <span style="color: var(--text-secondary);">Total Profit/Loss:</span>
-                                    <strong id="port-total-pl">₹0.00 (0.00%)</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; font-size: 12px; border-top: 1px dashed var(--border-glass); padding-top: 10px;">
-                                    <span style="color: var(--text-primary); font-weight: 600;">Health Score:</span>
-                                    <strong id="port-health-score" style="font-size: 16px; color: var(--neon-green);">--/100</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; font-size: 11px;">
-                                    <span style="color: var(--text-secondary);">Diversification Index:</span>
-                                    <span id="port-concentration-label" style="font-weight: 600;">Well Diversified</span>
+                            </div>
+
+                            <!-- AI Synthesis summary block -->
+                            <div id="backtest-summary-block" style="border-left: 4px solid #3b82f6; border-radius: 8px; padding: 18px; text-align: left; width: 100%; box-sizing: border-box; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-glass); border-left-width: 4px; margin-top: 20px;">
+                                <h4 style="font-size: 13px; color: #3b82f6; margin-top: 0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px dashed var(--border-glass); padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between; font-family: 'Outfit', sans-serif;">
+                                    <span>🔬 AI Backtest Performance Synthesis</span>
+                                    <span style="font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Simulation Diagnosis</span>
+                                </h4>
+                                <div id="backtest-summary-text" style="font-size: 12.5px; line-height: 1.7; font-family: 'Inter', sans-serif; color: var(--text-secondary);">
+                                    <!-- LLM Synthesis loaded dynamically -->
                                 </div>
                             </div>
                         </div>
                     </div>
-                    
-                    <!-- Doctor's Detailed Prescription -->
-                    <div id="portfolio-doctor-prescription-box" style="display: none; margin-top: 25px; border-top: 1px dashed var(--border-glass); padding-top: 20px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <h4 style="font-size: 13px; color: var(--neon-green); border-left: 3px solid var(--neon-green); padding-left: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">Actionable Doctor's Prescription</h4>
-                            <button class="btn-secondary no-print" id="print-portfolio-report-btn" style="font-size: 11px; padding: 5px 10px; height: auto; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight:600;"><span style="font-size: 12px;">🖨️</span> Print Diagnostic Report</button>
-                        </div>
-                        <div id="portfolio-prescription-content" style="font-size: 12.5px; line-height: 1.6; color: var(--text-muted); background: rgba(255,255,255,0.01); border: 1px solid var(--border-glass); padding: 20px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
-                            <!-- Diagnostic text loaded here -->
-                        </div>
-                    </div>
+                </div>
             </section>
 
             <!-- Institutional Footer -->
