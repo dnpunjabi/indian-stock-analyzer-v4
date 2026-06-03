@@ -5283,11 +5283,19 @@ tr:hover .champion-cell {
     .backtest-results-grid {
         grid-template-columns: 1fr !important;
     }
+}/* Date input calendar picker indicator color styling overrides */
+input[type="date"] {
+    position: relative !important;
 }
-
-
-
-
-
-
-
+input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer !important;
+    filter: invert(1) !important;
+    opacity: 0.65 !important;
+    transition: opacity 0.2s !important;
+}
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1.0 !important;
+}
+[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0) !important;
+}
