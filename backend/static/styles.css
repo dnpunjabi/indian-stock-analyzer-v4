@@ -5334,3 +5334,71 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     transform: rotate(-90deg);
 }
 
+
+/* --- PREMIUM RESPONSIVE OVERRIDES --- */
+.portfolio-inputs-grid {
+    display: grid;
+    grid-template-columns: 1.8fr 1fr;
+    gap: 25px;
+}
+
+.tax-holdings-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 20px;
+}
+
+.tax-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.tax-breakdown-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.backtest-action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+@media (max-width: 900px) {
+    .portfolio-inputs-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .tax-holdings-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .tax-summary-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    .tax-breakdown-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .backtest-action-bar {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+    #run-backtest-btn {
+        width: 100% !important;
+        margin-top: 5px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .tax-summary-grid {
+        grid-template-columns: 1fr !important;
+    }
+    #tax-manual-add-form button[type="submit"] {
+        width: 100% !important;
+        margin-top: 10px !important;
+    }
+}
+

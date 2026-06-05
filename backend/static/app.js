@@ -1201,9 +1201,6 @@ function renderStockDashboard(p) {
             <div style="font-size:12.5px; line-height:1.6; color:var(--text-secondary); margin-bottom:12px; font-weight:400;">
                 ${text}
             </div>
-            <div style="font-size:11px; color:var(--text-muted); line-height: 1.45; border-left: 2.5px solid var(--color-primary); padding-left: 8px; margin-top: 15px; background: rgba(59, 130, 246, 0.03); padding-top: 8px; padding-bottom: 8px; border-radius: 0 4px 4px 0; width: 100%; box-sizing: border-box;">
-                💡 <strong>Layman Business Translation:</strong> ${laymanSummary}
-            </div>
         `;
     }
     const bsContent = document.getElementById('business-summary-content');
@@ -4214,8 +4211,45 @@ function renderComparisonArena(data) {
         </div>
         `;
         
-        thesisHTML += data.thesis;
-        compareThesisEl.innerHTML = thesisHTML;
+        if (data.thesis) {
+            thesisHTML += data.thesis;
+            compareThesisEl.innerHTML = thesisHTML;
+        } else {
+            thesisHTML += `
+            <div id="generate-battleground-thesis-container" style="text-align: center; padding: 20px 10px; border: 1px dashed var(--border-glass); border-radius: 8px; margin-top: 20px; background: rgba(255,255,255,0.01);">
+                <p style="margin-bottom: 15px; color: var(--text-secondary); font-size: 12.5px;">AI Sector Battleground Thesis analysis is ready to benchmark these assets.</p>
+                <button id="generate-battleground-thesis-btn" class="btn-primary" style="padding: 8px 16px; font-size: 12px; font-weight: 600; border-radius: 6px;">
+                    ⚔️ Generate AI Sector Battleground Thesis & Tactical Analysis
+                </button>
+            </div>
+            `;
+            compareThesisEl.innerHTML = thesisHTML;
+            
+            document.getElementById('generate-battleground-thesis-btn').addEventListener('click', async () => {
+                const btnContainer = document.getElementById('generate-battleground-thesis-container');
+                btnContainer.innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
+                        <span class="spinner" style="display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--neon-green); border-radius: 50%; animation: spin 1s linear infinite;"></span>
+                        <p style="color: var(--neon-green); font-weight: 600; font-size: 12px; margin: 0;">Generating Battleground Thesis (calling LLM)...</p>
+                    </div>
+                `;
+                
+                try {
+                    const symbolsInput = document.getElementById('compare-symbols-input').value;
+                    const res = await fetch(`/api/compare?tickers=${encodeURIComponent(symbolsInput)}&generate_thesis=true`);
+                    if (!res.ok) throw new Error("Failed to generate AI battleground thesis");
+                    const responseData = await res.json();
+                    
+                    if (responseData.thesis) {
+                        btnContainer.outerHTML = responseData.thesis;
+                    } else {
+                        btnContainer.innerHTML = `<p style="color: var(--neon-red); font-size: 12px;">Failed to load thesis content.</p>`;
+                    }
+                } catch (err) {
+                    btnContainer.innerHTML = `<p style="color: var(--neon-red); font-size: 12px;">Error: ${err.message}</p>`;
+                }
+            });
+        }
     }
     
     const compareBox = document.getElementById('comparison-results-box');
@@ -10557,8 +10591,8 @@ async function loadTaxHarvestingReport() {
         const prescriptionBox = document.getElementById('tax-prescription-box');
         const prescriptionContent = document.getElementById('tax-prescription-content');
         if (prescriptionBox && prescriptionContent) {
+            prescriptionBox.style.display = 'block';
             if (report.prescription) {
-                prescriptionBox.style.display = 'block';
                 let mdText = report.prescription;
                 let html = mdText
                     .replace(/^# (.*$)/gim, '<h2 style="color:var(--neon-green); margin-top:20px; font-size:16px;">$1</h2>')
@@ -10570,7 +10604,43 @@ async function loadTaxHarvestingReport() {
                     .replace(/\n/g, '<br>');
                 prescriptionContent.innerHTML = html;
             } else {
-                prescriptionBox.style.display = 'none';
+                prescriptionContent.innerHTML = `
+                    <div style="text-align: center; padding: 25px 15px;">
+                        <p style="margin-bottom: 15px; color: var(--text-secondary); font-size: 13px;">AI Capital Gains Diagnostic Prescription is ready to analyze your tax harvesting strategy.</p>
+                        <button id="generate-tax-prescription-btn" class="btn-primary" style="padding: 10px 20px; font-size: 12px; font-weight: 700; border-radius: 6px;">
+                            📋 Generate Detailed AI Tax Prescription
+                        </button>
+                    </div>
+                `;
+                document.getElementById('generate-tax-prescription-btn').addEventListener('click', async () => {
+                    prescriptionContent.innerHTML = `
+                        <div style="text-align: center; padding: 25px 15px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;">
+                            <span class="spinner" style="display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.1); border-top-color: var(--neon-green); border-radius: 50%; animation: spin 1s linear infinite;"></span>
+                            <p style="color: var(--neon-green); font-weight: 600; font-size: 13px; margin: 0;">Generating AI Tax Prescription (calling LLM)...</p>
+                        </div>
+                    `;
+                    try {
+                        const res = await fetch('/api/portfolio/tax-report?generate_prescription=true');
+                        if (!res.ok) throw new Error("Failed to generate AI prescription");
+                        const data = await res.json();
+                        if (data.prescription) {
+                            let mdText = data.prescription;
+                            let html = mdText
+                                .replace(/^# (.*$)/gim, '<h2 style="color:var(--neon-green); margin-top:20px; font-size:16px;">$1</h2>')
+                                .replace(/^## (.*$)/gim, '<h3 style="color:var(--text-primary); margin-top:15px; font-size:14px; border-bottom: 1px dashed var(--border-glass); padding-bottom:5px;">$1</h3>')
+                                .replace(/^### (.*$)/gim, '<h4 style="color:var(--text-secondary); margin-top:10px; font-size:12px;">$1</h4>')
+                                .replace(/^\> (.*$)/gim, '<blockquote style="border-left:3px solid var(--color-amber); padding-left:10px; margin:10px 0; color:var(--text-primary); background:rgba(245,158,11,0.05); padding:8px; border-radius:4px;">$1</blockquote>')
+                                .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary);">$1</strong>')
+                                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                                .replace(/\n/g, '<br>');
+                            prescriptionContent.innerHTML = html;
+                        } else {
+                            prescriptionContent.innerHTML = `<p style="color: var(--neon-red); text-align: center;">Failed to load prescription content.</p>`;
+                        }
+                    } catch (err) {
+                        prescriptionContent.innerHTML = `<p style="color: var(--neon-red); text-align: center;">Error: ${err.message}</p>`;
+                    }
+                });
             }
         }
     } catch (err) {

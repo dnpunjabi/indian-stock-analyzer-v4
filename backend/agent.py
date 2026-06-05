@@ -892,7 +892,7 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
     return results
 
 # 6. Comparison Arena Synthesizer
-def run_comparison_synthesizer(tickers: list) -> dict:
+def run_comparison_synthesizer(tickers: list, generate_thesis: bool = False) -> dict:
     """Performs side-by-side benchmarking of up to 10 competitor stocks."""
     profiles = []
     for ticker in tickers[:10]:
@@ -925,39 +925,41 @@ def run_comparison_synthesizer(tickers: list) -> dict:
             "trend": p["technicals"].get("trend_50_vs_200", "Neutral")
         })
         
-    system_prompt = (
-        "You are a Senior Portfolio Manager and Sector Strategist at a premier hedge fund.\n"
-        "Your task is to perform a rigorous, side-by-side comparative analysis of the provided stock benchmark matrix.\n"
-        "You MUST analyze and discuss every peer company listed in the matrix systematically, comparing:\n"
-        "1. Fundamental strength & capital efficiency (ROE, ROCE, and leverage/debt-to-equity ratio).\n"
-        "2. Valuation pricing premiums & safety margins (PE multiples and DCF margins of safety).\n"
-        "3. Technical entry timing (RSI levels and moving average support/trend crossovers).\n"
-        "Structure your thesis into three highly professional, narrative-rich sections (using HTML headings <h4> for titles):\n"
-        "- <h4>Rival Quality & Solvency Standings</h4>: Benchmark operational efficiency and debt safety limits.\n"
-        "- <h4>Valuation Premiums & Safety Margins</h4>: Compare relative pricing premiums and intrinsic margins of safety.\n"
-        "- <h4>Strategic Sector Champion & Avoid Recommendation</h4>: Declare the mathematically superior Sector Champion with a firm investment rationale, and identify the worst risk-reward asset to avoid completely.\n"
-        "Ensure all details, scores, and numbers exactly match the provided comparative matrix. Do not invent any numbers, other ticker symbols, or compile hallucinated details. Keep the language highly professional and factual, ending all sentences with periods, and omitting exclamation marks."
-    )
-    
-    user_prompt = f"Rivals Comparison Matrix:\n{json.dumps(matrix, indent=2)}"
-    battleground_thesis = call_groq_llm(system_prompt, user_prompt, max_tokens=1000)
-    
-    # Elegant fallback Battleground Thesis if Groq key 401 triggers (Finding 7 resolution!)
-    if "ERROR_401" in battleground_thesis or not groq_client:
-        sorted_matrix = sorted(matrix, key=lambda x: x["margin_of_safety"] + x["roe"], reverse=True)
-        winner = sorted_matrix[0]
-        loser = sorted_matrix[-1]
-        
-        battleground_thesis = (
-            f"<h4>AI Comparative Analysis (Local Fallback Workstation)</h4>"
-            f"<p>Our quantitative comparative matrix across these benchmarked assets indicates a clear winner: "
-            f"<strong>{winner['company_name']} ({winner['ticker']})</strong> is the strongest risk-adjusted buy candidate in this group. "
-            f"{winner['company_name']} leads its peers with a high Return on Equity (ROE) of {winner['roe']:.1f}% and the highest "
-            f"DCF margin of safety of {winner['margin_of_safety']:.1f}%. It operates with a manageable debt-to-equity ratio of {winner['debt_eq']:.2f}.</p>"
-            f"<p>Conversely, <strong>{loser['company_name']} ({loser['ticker']})</strong> represents the least attractive asset to allocate capital "
-            f"to at this juncture. It trades at a relative PE multiple of {loser['pe']:.1f} and provides a lower margin of safety ({loser['margin_of_safety']:.1f}%), "
-            f"coupled with higher leverage flags. Technically, the asset is trading below key moving supports, presenting near-term downside risks.</p>"
+    battleground_thesis = ""
+    if generate_thesis:
+        system_prompt = (
+            "You are a Senior Portfolio Manager and Sector Strategist at a premier hedge fund.\n"
+            "Your task is to perform a rigorous, side-by-side comparative analysis of the provided stock benchmark matrix.\n"
+            "You MUST analyze and discuss every peer company listed in the matrix systematically, comparing:\n"
+            "1. Fundamental strength & capital efficiency (ROE, ROCE, and leverage/debt-to-equity ratio).\n"
+            "2. Valuation pricing premiums & safety margins (PE multiples and DCF margins of safety).\n"
+            "3. Technical entry timing (RSI levels and moving average support/trend crossovers).\n"
+            "Structure your thesis into three highly professional, narrative-rich sections (using HTML headings <h4> for titles):\n"
+            "- <h4>Rival Quality & Solvency Standings</h4>: Benchmark operational efficiency and debt safety limits.\n"
+            "- <h4>Valuation Premiums & Safety Margins</h4>: Compare relative pricing premiums and intrinsic margins of safety.\n"
+            "- <h4>Strategic Sector Champion & Avoid Recommendation</h4>: Declare the mathematically superior Sector Champion with a firm investment rationale, and identify the worst risk-reward asset to avoid completely.\n"
+            "Ensure all details, scores, and numbers exactly match the provided comparative matrix. Do not invent any numbers, other ticker symbols, or compile hallucinated details. Keep the language highly professional and factual, ending all sentences with periods, and omitting exclamation marks."
         )
+        
+        user_prompt = f"Rivals Comparison Matrix:\n{json.dumps(matrix, indent=2)}"
+        battleground_thesis = call_groq_llm(system_prompt, user_prompt, max_tokens=1000)
+        
+        # Elegant fallback Battleground Thesis if Groq key 401 triggers (Finding 7 resolution!)
+        if "ERROR_401" in battleground_thesis or not groq_client:
+            sorted_matrix = sorted(matrix, key=lambda x: x["margin_of_safety"] + x["roe"], reverse=True)
+            winner = sorted_matrix[0]
+            loser = sorted_matrix[-1]
+            
+            battleground_thesis = (
+                f"<h4>AI Comparative Analysis (Local Fallback Workstation)</h4>"
+                f"<p>Our quantitative comparative matrix across these benchmarked assets indicates a clear winner: "
+                f"<strong>{winner['company_name']} ({winner['ticker']})</strong> is the strongest risk-adjusted buy candidate in this group. "
+                f"{winner['company_name']} leads its peers with a high Return on Equity (ROE) of {winner['roe']:.1f}% and the highest "
+                f"DCF margin of safety of {winner['margin_of_safety']:.1f}%. It operates with a manageable debt-to-equity ratio of {winner['debt_eq']:.2f}.</p>"
+                f"<p>Conversely, <strong>{loser['company_name']} ({loser['ticker']})</strong> represents the least attractive asset to allocate capital "
+                f"to at this juncture. It trades at a relative PE multiple of {loser['pe']:.1f} and provides a lower margin of safety ({loser['margin_of_safety']:.1f}%), "
+                f"coupled with higher leverage flags. Technically, the asset is trading below key moving supports, presenting near-term downside risks.</p>"
+            )
     
     return {
         "matrix": matrix,
@@ -1205,7 +1207,7 @@ def generate_local_tax_prescription(summary: dict, tranches: list, harvesting: l
     return "\n".join(md)
 
 
-def calculate_portfolio_taxes(portfolio_items: list) -> dict:
+def calculate_portfolio_taxes(portfolio_items: list, run_prescription: bool = False) -> dict:
     """
     Computes Indian capital gains taxation (STCG vs LTCG) and identifies Tax-Loss Harvesting opportunities.
     STCG: <= 365 days, taxed at 20%
@@ -1339,61 +1341,63 @@ def calculate_portfolio_taxes(portfolio_items: list) -> dict:
     net_ltcg_tax = net_ltcg * 0.125
     total_tax_liability = net_stcg_tax + net_ltcg_tax
     
-    # Generate Detailed AI Tax Summary (prospectus)
-    sys_prompt = (
-        "You are the Ultimate AI Tax Doctor, an institutional wealth strategist specializing in Indian Equity capital gains taxation. "
-        "Review the provided portfolio tax summary, tranche age classifications, and harvesting opportunities. "
-        "Write a detailed tax optimization prospectus in professional markdown. Highlight:\n"
-        "1. Net Tax liability status (based on STCG @ 20% and LTCG @ 12.5%).\n"
-        "2. Exact Tax-Loss Harvesting strategies (selling specific loss-making tranches to offset current gains or carry forward losses).\n"
-        "3. Specific re-investment recommendations to maintain market exposure (e.g. if selling INFY.NS for loss harvesting, suggest buying a similar tech stock like TCS.NS or WIPRO.NS to avoid style drift).\n"
-        "4. Long-term tax avoidance planning (such as harvesting up to Rs. 1.25 Lakh of LTCG per year tax-free under Section 112A).\n"
-        "Format with clean headers, bold bullet points, and actionable warnings. Do not use generic filler words."
-    )
-    
-    tranches_str = "\n".join([
-        f"- {t['symbol']}: Cost Rs.{t['investment_cost']}, Current Value Rs.{t['current_value']}, PL: {t['profit_loss']} ({t['profit_loss_pct']}%), Age: {t['holding_days']} days ({t['classification']})"
-        for t in tranches_detail
-    ])
-    
-    harvest_str = "\n".join([
-        f"- {h['symbol']}: Unrealized loss of Rs.{h['unrealized_loss']}, Tax Saving potential: Rs.{h['potential_savings']} (Acquired: {h['purchase_date']})"
-        for h in harvesting_candidates
-    ])
-    
-    user_prompt = (
-        f"### TAX SUMMARY OVERVIEW\n"
-        f"- Total Portfolio Cost: Rs. {total_cost:,.2f}\n"
-        f"- Current Valuation: Rs. {total_value:,.2f}\n"
-        f"- Unrealized P&L: Rs. {total_unrealized_pl:,.2f}\n"
-        f"- Estimated Capital Gains Tax Liability: Rs. {total_tax_liability:,.2f}\n"
-        f"- Potential Harvesting Tax Savings: Rs. {total_harvest_savings:,.2f}\n\n"
-        f"### TRANCHE HOLDINGS DETAIL\n"
-        f"{tranches_str}\n\n"
-        f"### TAX LOSS HARVESTING OPPORTUNITIES\n"
-        f"{harvest_str if harvest_str else 'No harvesting candidates available.'}\n\n"
-        f"Please provide your expert capital gains optimization diagnostic prescription."
-    )
-    
-    diagnosis = call_groq_llm(sys_prompt, user_prompt, max_tokens=2500)
-    
-    if "ERROR_401" in diagnosis or "ERROR" in diagnosis or not groq_client:
-        diagnosis = generate_local_tax_prescription(
-            {
-                "total_cost": total_cost,
-                "total_value": total_value,
-                "total_unrealized_pl": total_unrealized_pl,
-                "stcg_unrealized_pl": stcg_gains + stcg_losses,
-                "stcg_tax": net_stcg_tax,
-                "ltcg_unrealized_pl": ltcg_gains + ltcg_losses,
-                "ltcg_tax": net_ltcg_tax,
-                "total_tax_liability": total_tax_liability,
-                "total_harvestable_loss": total_harvestable_loss,
-                "total_harvest_savings": total_harvest_savings
-            },
-            tranches_detail,
-            harvesting_candidates
+    diagnosis = ""
+    if run_prescription:
+        # Generate Detailed AI Tax Summary (prospectus)
+        sys_prompt = (
+            "You are the Ultimate AI Tax Doctor, an institutional wealth strategist specializing in Indian Equity capital gains taxation. "
+            "Review the provided portfolio tax summary, tranche age classifications, and harvesting opportunities. "
+            "Write a detailed tax optimization prospectus in professional markdown. Highlight:\n"
+            "1. Net Tax liability status (based on STCG @ 20% and LTCG @ 12.5%).\n"
+            "2. Exact Tax-Loss Harvesting strategies (selling specific loss-making tranches to offset current gains or carry forward losses).\n"
+            "3. Specific re-investment recommendations to maintain market exposure (e.g. if selling INFY.NS for loss harvesting, suggest buying a similar tech stock like TCS.NS or WIPRO.NS to avoid style drift).\n"
+            "4. Long-term tax avoidance planning (such as harvesting up to Rs. 1.25 Lakh of LTCG per year tax-free under Section 112A).\n"
+            "Format with clean headers, bold bullet points, and actionable warnings. Do not use generic filler words."
         )
+        
+        tranches_str = "\n".join([
+            f"- {t['symbol']}: Cost Rs.{t['investment_cost']}, Current Value Rs.{t['current_value']}, PL: {t['profit_loss']} ({t['profit_loss_pct']}%), Age: {t['holding_days']} days ({t['classification']})"
+            for t in tranches_detail
+        ])
+        
+        harvest_str = "\n".join([
+            f"- {h['symbol']}: Unrealized loss of Rs.{h['unrealized_loss']}, Tax Saving potential: Rs.{h['potential_savings']} (Acquired: {h['purchase_date']})"
+            for h in harvesting_candidates
+        ])
+        
+        user_prompt = (
+            f"### TAX SUMMARY OVERVIEW\n"
+            f"- Total Portfolio Cost: Rs. {total_cost:,.2f}\n"
+            f"- Current Valuation: Rs. {total_value:,.2f}\n"
+            f"- Unrealized P&L: Rs. {total_unrealized_pl:,.2f}\n"
+            f"- Estimated Capital Gains Tax Liability: Rs. {total_tax_liability:,.2f}\n"
+            f"- Potential Harvesting Tax Savings: Rs. {total_harvest_savings:,.2f}\n\n"
+            f"### TRANCHE HOLDINGS DETAIL\n"
+            f"{tranches_str}\n\n"
+            f"### TAX LOSS HARVESTING OPPORTUNITIES\n"
+            f"{harvest_str if harvest_str else 'No harvesting candidates available.'}\n\n"
+            f"Please provide your expert capital gains optimization diagnostic prescription."
+        )
+        
+        diagnosis = call_groq_llm(sys_prompt, user_prompt, max_tokens=2500)
+        
+        if "ERROR_401" in diagnosis or "ERROR" in diagnosis or not groq_client:
+            diagnosis = generate_local_tax_prescription(
+                {
+                    "total_cost": total_cost,
+                    "total_value": total_value,
+                    "total_unrealized_pl": total_unrealized_pl,
+                    "stcg_unrealized_pl": stcg_gains + stcg_losses,
+                    "stcg_tax": net_stcg_tax,
+                    "ltcg_unrealized_pl": ltcg_gains + ltcg_losses,
+                    "ltcg_tax": net_ltcg_tax,
+                    "total_tax_liability": total_tax_liability,
+                    "total_harvestable_loss": total_harvestable_loss,
+                    "total_harvest_savings": total_harvest_savings
+                },
+                tranches_detail,
+                harvesting_candidates
+            )
         
     return {
         "summary": {

@@ -983,13 +983,13 @@ async def get_chart_data(ticker: str, period: str = "1y", interval: str = "1d"):
         raise HTTPException(status_code=500, detail=f"Price series could not be retrieved from Yahoo Chart API: {str(e)}")
 
 @app.get("/api/compare")
-async def compare_rivals(tickers: str):
+async def compare_rivals(tickers: str, generate_thesis: bool = False):
     """Benchmarks rivals side-by-side."""
     if not tickers:
         raise HTTPException(status_code=400, detail="Tickers parameter is required.")
     ticker_list = [t.strip().upper() for t in tickers.split(",")]
     try:
-        comparison = await asyncio.to_thread(run_comparison_synthesizer, ticker_list)
+        comparison = await asyncio.to_thread(run_comparison_synthesizer, ticker_list, generate_thesis)
         return comparison
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Comparison aggregator error: {str(e)}")
@@ -2155,7 +2155,7 @@ async def upload_portfolio_file(file: UploadFile = File(...)):
     return {"status": "success", "imported": imported_count, "errors": errors}
 
 @app.get("/api/portfolio/tax-report")
-async def get_portfolio_tax_report():
+async def get_portfolio_tax_report(generate_prescription: bool = False):
     try:
         with get_db() as conn:
             cursor = conn.cursor()
@@ -2164,7 +2164,7 @@ async def get_portfolio_tax_report():
         
         # Calculate active holdings dynamically via FIFO netting for unrealized loss harvesting
         active_holdings = compute_active_holdings(portfolio_items)
-        tax_report = await asyncio.to_thread(calculate_portfolio_taxes, active_holdings)
+        tax_report = await asyncio.to_thread(calculate_portfolio_taxes, active_holdings, generate_prescription)
         return tax_report
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Tax Analysis Error: {str(e)}")
