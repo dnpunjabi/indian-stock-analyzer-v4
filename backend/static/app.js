@@ -3048,17 +3048,6 @@ function drawStockChartCanvas(data) {
     });
     window.activeLightweightChart = chart;
 
-    // Auto-resize observer to handle device rotation, zoom, and container updates
-    const resizeObserver = new ResizeObserver(entries => {
-        if (!entries || entries.length === 0) return;
-        const width = entries[0].contentRect.width;
-        const newHeight = window.innerWidth <= 768 ? 250 : 380;
-        if (window.activeLightweightChart) {
-            window.activeLightweightChart.resize(width, newHeight);
-        }
-    });
-    resizeObserver.observe(container);
-
     const showSma50 = document.getElementById('toggle-sma50')?.checked ?? true;
     const showSma200 = document.getElementById('toggle-sma200')?.checked ?? true;
     const showBB = document.getElementById('toggle-bb')?.checked ?? false;
@@ -3240,7 +3229,8 @@ function drawStockChartCanvas(data) {
     // Trigger Resize Handler
     const resizeObserver = new ResizeObserver(entries => {
         for (let entry of entries) {
-            chart.resize(entry.contentRect.width, 380);
+            const newHeight = window.innerWidth <= 768 ? 250 : 380;
+            chart.resize(entry.contentRect.width, newHeight);
         }
     });
     resizeObserver.observe(container);
