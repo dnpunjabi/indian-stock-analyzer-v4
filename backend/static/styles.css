@@ -5777,4 +5777,206 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     }
 }
 
+/* ========================================================
+   ADDITIONAL MOBILE RESPONSIVENESS AND COLLISION OVERRIDES
+   ======================================================== */
+
+/* 1. Prevent equities AI Co-pilot slide-out drawer from being overshadowed by headers */
+.chat-drawer-container {
+    z-index: 100000 !important;
+}
+
+/* 2. Wrap long buttons dynamically so they don't break horizontal margins on mobile */
+@media (max-width: 768px) {
+    .btn-primary, 
+    .btn-secondary,
+    .analyze-asset-btn,
+    .risk-horizon-btn {
+        white-space: normal !important;
+        height: auto !important;
+        word-break: break-word !important;
+        text-align: center !important;
+    }
+    
+    .chat-drawer-container {
+        z-index: 100500 !important;
+    }
+}
+
+/* 3. Equity Research Terminal (control panel) mobile layout overrides */
+@media (max-width: 650px) {
+    .workspace-header-actions {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 12px !important;
+    }
+    
+    .search-box-container {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        gap: 8px !important;
+    }
+    
+    .analyzer-input-wrap {
+        width: 100% !important;
+    }
+    
+    .analyze-asset-btn {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+    
+    .workspace-action-group {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 8px !important;
+    }
+    
+    #add-to-watchlist-container {
+        width: 100% !important;
+        justify-content: space-between !important;
+    }
+    
+    #add-to-watchlist-container select {
+        flex-grow: 1 !important;
+    }
+    
+    #export-pdf-btn {
+        width: 100% !important;
+    }
+}
+
+/* 4. Executive Summary subtab layout overrides */
+@media (max-width: 600px) {
+    .prospectus-breakdown {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+    
+    .price-targets-block {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+}
+
+/* 5. Peers & Owners, Shareholding layout overrides */
+.table-scroll {
+    overflow-x: auto !important;
+    width: 100% !important;
+}
+
+@media (max-width: 650px) {
+    #peers-card .card-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 10px !important;
+    }
+    
+    #peers-card .card-header > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 8px !important;
+    }
+    
+    #custom-peer-input {
+        width: 100% !important;
+    }
+    
+    #add-custom-peer-btn, 
+    #quick-compare-peers-btn {
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .pe-stat-list {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* 6. Agent Strategy Audit mobile column collapse */
+@media (max-width: 768px) {
+    .audit-matrix-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+}
+
+/* 7. Peer Benchmarking Arena (Rival comparison / Battleground) */
+.battleground-thesis-content {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    max-width: 100% !important;
+}
+
+.battleground-thesis-content * {
+    max-width: 100% !important;
+    word-wrap: break-word !important;
+}
+
+#generate-battleground-thesis-container {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* 8. Watchlist Registry mobile card-header and actions layout */
+@media (max-width: 768px) {
+    #tab-watchlist .card-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+    
+    #tab-watchlist .card-header > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 8px !important;
+    }
+    
+    #watchlist-inline-add-container {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 8px !important;
+    }
+    
+    #watchlist-inline-add-container > div {
+        width: 100% !important;
+    }
+    
+    #watchlist-inline-add-input {
+        width: 100% !important;
+    }
+    
+    #watchlist-inline-add-btn,
+    #analyze-watchlist-btn,
+    #delete-watchlist-btn {
+        width: 100% !important;
+        text-align: center !important;
+    }
+    
+    #watchlist-analysis-results > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+    
+    #watchlist-analysis-results > div > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 8px !important;
+    }
+    
+    #run-watchlist-summary-btn,
+    #print-watchlist-report-btn {
+        width: 100% !important;
+    }
+}
+
 
