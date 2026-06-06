@@ -490,13 +490,17 @@
                     </div>
 
                     <!-- Subsection Sub-Tabs navigation bar for Equity Research Terminal -->
-                    <div class="analyzer-subtabs no-print" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px; overflow-x: auto; scrollbar-width: none;">
-                        <button class="subtab-btn active" data-subtab="summary">📋 Executive Summary</button>
-                        <button class="subtab-btn" data-subtab="valuation">📊 Valuation & DCF</button>
-                        <button class="subtab-btn" data-subtab="technical">📉 Technical Timing</button>
-                        <button class="subtab-btn" data-subtab="fundamental">🩺 Ratios & Earnings</button>
-                        <button class="subtab-btn" data-subtab="peers">👥 Peers & Ownership</button>
-                        <button class="subtab-btn" data-subtab="audit">🔬 Agent Strategy Audit</button>
+                    <div class="subtabs-scroll-container no-print">
+                        <button class="subtabs-nav-btn prev-btn hidden" aria-label="Scroll left">◀</button>
+                        <div class="analyzer-subtabs">
+                            <button class="subtab-btn active" data-subtab="summary">📋 Executive Summary</button>
+                            <button class="subtab-btn" data-subtab="valuation">📊 Valuation & DCF</button>
+                            <button class="subtab-btn" data-subtab="technical">📉 Technical Timing</button>
+                            <button class="subtab-btn" data-subtab="fundamental">🩺 Ratios & Earnings</button>
+                            <button class="subtab-btn" data-subtab="peers">👥 Peers & Ownership</button>
+                            <button class="subtab-btn" data-subtab="audit">🔬 Agent Strategy Audit</button>
+                        </div>
+                        <button class="subtabs-nav-btn next-btn hidden" aria-label="Scroll right">▶</button>
                     </div>
 
                     <!-- Enterprise Workspace Layout -->

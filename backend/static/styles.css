@@ -3927,17 +3927,35 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* ==================== ANALYZER SUB-TABS (BLOOMBERG-STYLE) ==================== */
 .analyzer-subtabs {
-    scrollbar-width: none; /* Hide standard scrollbars */
+    scrollbar-width: thin; /* Show thin scrollbar for Firefox */
+    scrollbar-color: rgba(59, 130, 246, 0.35) rgba(255, 255, 255, 0.02);
     border-bottom: 1px solid var(--border-glass) !important;
     padding-bottom: 12px;
-    margin-bottom: 24px !important;
+    margin-bottom: 0px !important; /* Managed by scroll-container wrapper */
     display: flex;
     gap: 8px;
     overflow-x: auto;
+    scroll-behavior: smooth;
 }
 
 .analyzer-subtabs::-webkit-scrollbar {
-    display: none; /* Hide scrollbars for Chrome/Safari */
+    height: 4px !important; /* Clean thin scrollbar */
+    display: block !important;
+}
+
+.analyzer-subtabs::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02) !important;
+    border-radius: 4px !important;
+}
+
+.analyzer-subtabs::-webkit-scrollbar-thumb {
+    background: rgba(59, 130, 246, 0.35) !important; /* Primary blue tint for thumb */
+    border-radius: 4px !important;
+    transition: background 0.2s ease !important;
+}
+
+.analyzer-subtabs::-webkit-scrollbar-thumb:hover {
+    background: rgba(59, 130, 246, 0.6) !important;
 }
 
 .subtab-btn {
@@ -6053,21 +6071,96 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* ========================================================
    HORIZONTAL SCROLLABLE SUBTABS FOR WORKSPACE
    ======================================================== */
+.subtabs-scroll-container {
+    position: relative;
+    width: 100%;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+}
+
 .analyzer-subtabs {
     display: flex !important;
     flex-wrap: nowrap !important;
+    gap: 8px !important;
+    margin-bottom: 0 !important;
+    border-bottom: 1px solid var(--border-glass) !important;
+    padding-bottom: 12px !important;
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    scrollbar-width: none !important; /* Hide scrollbars for Firefox */
+    scroll-behavior: smooth;
+    width: 100%;
+    scrollbar-width: thin !important; /* Force thin scrollbar in Firefox */
+    scrollbar-color: var(--color-primary-glow, rgba(59, 130, 246, 0.35)) var(--border-glass) !important;
 }
 
 .analyzer-subtabs::-webkit-scrollbar {
-    display: none !important; /* Hide scrollbars for Chrome/Safari */
+    height: 4px !important;
+    display: block !important;
+}
+
+.analyzer-subtabs::-webkit-scrollbar-track {
+    background: var(--border-glass, rgba(255, 255, 255, 0.02)) !important;
+    border-radius: 4px !important;
+}
+
+.analyzer-subtabs::-webkit-scrollbar-thumb {
+    background: var(--color-primary-glow, rgba(59, 130, 246, 0.35)) !important;
+    border-radius: 4px !important;
+    transition: background 0.2s ease !important;
+}
+
+.analyzer-subtabs::-webkit-scrollbar-thumb:hover {
+    background: var(--color-primary, #3b82f6) !important;
 }
 
 .subtab-btn {
     flex-shrink: 0 !important;
     white-space: nowrap !important;
+}
+
+/* Nav navigation arrows */
+.subtabs-nav-btn {
+    position: absolute;
+    top: calc(50% - 6px); /* Align relative to buttons, ignoring padding-bottom */
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-sidebar, rgba(11, 15, 29, 0.95));
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    font-size: 10px;
+    outline: none;
+}
+
+.subtabs-nav-btn:hover {
+    background: var(--color-primary, #3b82f6);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 0 10px var(--color-primary-glow);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.subtabs-nav-btn.prev-btn {
+    left: -14px;
+}
+
+.subtabs-nav-btn.next-btn {
+    right: -14px;
+}
+
+.subtabs-nav-btn.hidden {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
 }
 
 

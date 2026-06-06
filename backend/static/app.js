@@ -8530,6 +8530,49 @@ function setupAnalyzerSubtabs() {
     const subtabButtons = document.querySelectorAll('.subtab-btn');
     if (subtabButtons.length === 0) return;
 
+    const container = document.querySelector('.analyzer-subtabs');
+    const prevBtn = document.querySelector('.subtabs-scroll-container .prev-btn');
+    const nextBtn = document.querySelector('.subtabs-scroll-container .next-btn');
+
+    function updateNavButtons() {
+        if (!container || !prevBtn || !nextBtn) return;
+        const scrollLeft = container.scrollLeft;
+        const maxScroll = container.scrollWidth - container.clientWidth;
+
+        // Show prev button if we have scrolled right at all
+        if (scrollLeft > 2) {
+            prevBtn.classList.remove('hidden');
+        } else {
+            prevBtn.classList.add('hidden');
+        }
+
+        // Show next button if we have more room to scroll right
+        if (scrollLeft < maxScroll - 2) {
+            nextBtn.classList.remove('hidden');
+        } else {
+            nextBtn.classList.add('hidden');
+        }
+    }
+
+    if (container) {
+        container.addEventListener('scroll', updateNavButtons);
+        window.addEventListener('resize', updateNavButtons);
+        // Initial check
+        setTimeout(updateNavButtons, 150);
+    }
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            container.scrollBy({ left: -200, behavior: 'smooth' });
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            container.scrollBy({ left: 200, behavior: 'smooth' });
+        });
+    }
+
     subtabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             // Remove active state from all buttons
@@ -8538,6 +8581,9 @@ function setupAnalyzerSubtabs() {
             });
             // Add active state to clicked button
             btn.classList.add('active');
+
+            // Programmatically center the selected tab
+            btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 
             const activeSubtab = btn.getAttribute('data-subtab');
 
@@ -8556,6 +8602,7 @@ function setupAnalyzerSubtabs() {
             // Trigger window resize to force Chart.js to scale correctly to newly visible grids
             setTimeout(() => {
                 window.dispatchEvent(new Event('resize'));
+                updateNavButtons();
             }, 50);
         });
     });
@@ -8566,6 +8613,7 @@ function setupAnalyzerSubtabs() {
         if (firstBtn) {
             firstBtn.click();
         }
+        setTimeout(updateNavButtons, 200);
     };
 }
 
