@@ -9181,6 +9181,11 @@ async function loadPortfolioDoctorLedger(forceRefresh = false) {
             // Dynamic value calculations
             const qty = item.quantity || 0;
             const avgPrice = item.purchase_price || 0;
+            
+            tr.setAttribute('data-symbol', item.symbol);
+            tr.setAttribute('data-qty', qty);
+            tr.setAttribute('data-price', avgPrice);
+            
             const currentPrice = item.current_price || avgPrice || 0;
             const dayChangePct = item.day_change_pct || 0.0;
             
@@ -9414,14 +9419,30 @@ async function runPortfolioDoctorAnalysis() {
     const runBtn = document.getElementById('run-portfolio-doctor-btn');
     if (!runBtn) return;
     
-    const qtyInputs = document.querySelectorAll('.portfolio-qty-input');
-    const priceInputs = document.querySelectorAll('.portfolio-price-input');
+    const rows = document.querySelectorAll('#portfolio-ledger-body tr');
     
     const items = [];
-    qtyInputs.forEach((input, index) => {
-        const symbol = input.getAttribute('data-symbol');
-        const qty = parseFloat(input.value) || 0;
-        const price = parseFloat(priceInputs[index].value) || 0;
+    rows.forEach(tr => {
+        const symbol = tr.getAttribute('data-symbol');
+        if (!symbol) return;
+        
+        const qtyInput = tr.querySelector('.portfolio-qty-input');
+        const priceInput = tr.querySelector('.portfolio-price-input');
+        
+        let qty = 0;
+        let price = 0;
+        
+        if (qtyInput) {
+            qty = parseFloat(qtyInput.value) || 0;
+        } else {
+            qty = parseFloat(tr.getAttribute('data-qty')) || 0;
+        }
+        
+        if (priceInput) {
+            price = parseFloat(priceInput.value) || 0;
+        } else {
+            price = parseFloat(tr.getAttribute('data-price')) || 0;
+        }
         
         if (symbol && qty > 0) {
             items.push({ symbol, quantity: qty, buy_price: price });
