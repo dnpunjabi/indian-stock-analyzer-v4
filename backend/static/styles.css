@@ -6240,5 +6240,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     }
 }
 
+/* --- LIGHT THEME GLOBAL LOADER OVERLAY OVERRIDE --- */
+[data-theme="light"] .loader-overlay {
+    background-color: rgba(243, 244, 246, 0.95) !important;
+}
+
 
 
