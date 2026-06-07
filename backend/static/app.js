@@ -5167,6 +5167,69 @@ async function loadStockSynthesis(symbol) {
         formattedText = formattedText.replace(/### V\. CIO Investment Prospectus & Conviction Summary/g, 
             `<div class="synthesis-header-block" style="display: flex; align-items: center; margin-top: 16px; margin-bottom: 8px; padding: 6px 12px; border-radius: 6px; background: var(--bg-glass); border-left: 3px solid var(--color-primary); font-size: 11.5px; font-weight: 700; color: var(--text-primary);"><span style="margin-right:8px;">V. CIO Conviction Summary</span> ${recBadge}</div>`);
 
+        // Parse markdown tables to HTML tables first
+        if (formattedText.includes('|')) {
+            const lines = formattedText.split('\n');
+            let inTable = false;
+            let tableHtml = '';
+            let parsedLines = [];
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line.startsWith('|') && line.endsWith('|')) {
+                    if (!inTable) {
+                        inTable = true;
+                        tableHtml = '<div style="overflow-x:auto; margin: 12px 0;"><table class="synthesis-markdown-table" style="width:100%; border-collapse:collapse; font-size:10px; border:1px solid var(--border-glass); background:rgba(255,255,255,0.01);">';
+                    }
+                    
+                    if (line.includes('---') || line.includes(':---')) {
+                        continue; // skip separator row
+                    }
+                    
+                    const cells = line.split('|').slice(1, -1).map(c => c.trim());
+                    const isHeader = !tableHtml.includes('<tbody>');
+                    const tag = isHeader ? 'th' : 'td';
+                    
+                    let rowHtml = '<tr>';
+                    for (let cell of cells) {
+                        let cellStyle = `padding:6px 8px; border:1px solid var(--border-glass); text-align:center;`;
+                        let colorSpan = cell;
+                        if (tag === 'th') {
+                            cellStyle += 'font-weight:700; color:var(--text-muted); background:rgba(255,255,255,0.02);';
+                        } else {
+                            if (cell.startsWith('+')) {
+                                colorSpan = `<span style="color:var(--color-emerald); font-weight:600;">${cell}</span>`;
+                            } else if (cell.startsWith('-') && !cell.includes('vs')) {
+                                colorSpan = `<span style="color:#f43f5e; font-weight:600;">${cell}</span>`;
+                            }
+                            cellStyle += 'color:var(--text-primary);';
+                        }
+                        rowHtml += `<${tag} style="${cellStyle}">${colorSpan}</${tag}>`;
+                    }
+                    rowHtml += '</tr>';
+                    
+                    if (isHeader) {
+                        tableHtml += '<thead>' + rowHtml + '</thead><tbody>';
+                    } else {
+                        tableHtml += rowHtml;
+                    }
+                } else {
+                    if (inTable) {
+                        inTable = false;
+                        tableHtml += '</tbody></table></div>';
+                        parsedLines.push(tableHtml);
+                        tableHtml = '';
+                    }
+                    parsedLines.push(lines[i]);
+                }
+            }
+            if (inTable) {
+                tableHtml += '</tbody></table></div>';
+                parsedLines.push(tableHtml);
+            }
+            formattedText = parsedLines.join('\n');
+        }
+
         formattedText = formattedText
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/### (.*?)\n/g, '<h3>$1</h3>')

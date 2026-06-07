@@ -1122,6 +1122,21 @@ async def get_synthesis(
         sector_bench_symbol = sector_risk.get("benchmark_symbol", "^NSEI")
         sector_bench_name = sector_risk.get("benchmark_name", "Nifty 50")
 
+        nifty50_stock_ret = nifty50_risk.get("annual_stock_ret_pct", 0.0)
+        nifty50_bench_ret = nifty50_risk.get("annual_bench_ret_pct", 0.0)
+        sector_stock_ret = sector_risk.get("annual_stock_ret_pct", nifty50_stock_ret)
+        sector_bench_ret = sector_risk.get("annual_bench_ret_pct", nifty50_bench_ret)
+
+        nifty50_alpha_str = f"+{nifty50_alpha:.2f}%" if nifty50_alpha >= 0 else f"{nifty50_alpha:.2f}%"
+        sector_alpha_str = f"+{sector_alpha:.2f}%" if sector_alpha >= 0 else f"{sector_alpha:.2f}%"
+
+        matrix_md = (
+            f"| Benchmark | Beta (β) | Alpha (α) | Correlation (ρ) | Benchmark Ret |\n"
+            f"| :--- | :---: | :---: | :---: | :---: |\n"
+            f"| Nifty 50 Index (Broad Market) | {nifty50_beta:.3f} | {nifty50_alpha_str} | {nifty50_corr:.3f} | {nifty50_bench_ret:.2f}% vs {nifty50_stock_ret:.2f}% |\n"
+            f"| {sector_bench_name} Index (Suggested) | {sector_beta:.3f} | {sector_alpha_str} | {sector_corr:.3f} | {sector_bench_ret:.2f}% vs {sector_stock_ret:.2f}% |"
+        )
+
         # Market capture ratios
         capture_ratios = profile.get("capture_ratios", {})
         up_capture = capture_ratios.get("up_capture", 100.0)
@@ -1213,12 +1228,12 @@ async def get_synthesis(
             "Detail moving averages (50-day and 200-day SMAs), 14-day RSI momentum, volume patterns, breakout status, and current price positioning relative to Fibonacci retracement levels (e.g., golden ratio boundary, support/resistance bands).\n"
             "\n"
             "### IV. CAPM Risk Analytics & Market Capture\n"
-            "Synthesize the asset's risk profile relative to BOTH the Nifty 50 benchmark index AND its size-specific capitalization index. Compare the systematic Beta (sensitivity), Alpha (excess return), and Pearson Correlation for both indices. Discuss the Upside/Downside Market Capture percentages, and historical drawdown/volatility limits (Max Drawdown % and recovery profile).\n"
+            "Synthesize the asset's risk profile relative to BOTH the Nifty 50 benchmark index AND its size-specific capitalization index. Compare the systematic Beta (sensitivity), Alpha (excess return), and Pearson Correlation for both indices. Discuss the Upside/Downside Market Capture percentages, and historical drawdown/volatility limits (Max Drawdown % and recovery profile). Make sure to append the EXACT markdown table representing the Polymorphic Benchmark Comparison Matrix at the end of this section (do not omit or alter it).\n"
             "\n"
             "### V. CIO Investment Prospectus & Conviction Summary\n"
             "State your final strategic consensus recommendation (BUY/SELL/HOLD) aligned with the investor's horizon and risk profile. Incorporate the Composite Conviction Score (1-100), define actionable suggested Entry (Buy) and Exit (Sell) Price Ranges, and synthesize key catalysts and risk flags.\n"
             "\n"
-            "Maintain a professional, objective, and analytical tone. Highlight key figures, scores, ratios, and price limits using bold formatting (e.g. **Rs. 1,420**, **78.6%**, **Beta of 1.15**). Do not use bullet points or list items; write in clean, narrative paragraphs under each heading."
+            "Maintain a professional, objective, and analytical tone. Highlight key figures, scores, ratios, and price limits using bold formatting (e.g. **Rs. 1,420**, **78.6%**, **Beta of 1.15**). Do not use bullet points or list items; write in clean, narrative paragraphs under each heading, except for the comparison matrix table under section IV which must be formatted as a markdown table."
         )
 
         user_prompt = f"""
@@ -1250,6 +1265,8 @@ async def get_synthesis(
         - Relative to {sector_bench_name} ({sector_bench_symbol}): Beta: {sector_beta:.2f}, Alpha: {sector_alpha:.2f}%, Correlation: {sector_corr:.2f}
         - Market Capture Ratios: Upside Market Capture: {up_capture:.1f}% | Downside Market Capture: {down_capture:.1f}% (relative to {bench_symbol})
         - Max Drawdown: {max_dd:.1f}% (Worst Drawdown Duration: {worst_dd_days} days)
+        - Exact Polymorphic Benchmark Comparison Matrix Markdown Table (print this EXACT table at the end of Section IV):
+{matrix_md}
         
         5. CIO Investment Prospectus & Conviction:
         - Composite AI Score: {final_score}/100
@@ -1288,7 +1305,9 @@ async def get_synthesis(
                 f"Under CAPM risk parameters, the stock exhibits a **Beta of {nifty50_beta:.2f}**, an **Alpha of {nifty50_alpha:.2f}%**, and a correlation of **{nifty50_corr:.2f}** relative to the Nifty 50 index. "
                 f"Relative to {sector_bench_name}, it reports a **Beta of {sector_beta:.2f}**, an **Alpha of {sector_alpha:.2f}%**, and a correlation of **{sector_corr:.2f}**. "
                 f"The systematic pricing sensitivity is supported by an **Upside Capture of {up_capture:.1f}%** and a **Downside Capture of {down_capture:.1f}%**. "
-                f"Historically, the asset has a **Maximum Drawdown of {max_dd:.1f}%** with a recovery period of **{worst_dd_days} days**."
+                f"Historically, the asset has a **Maximum Drawdown of {max_dd:.1f}%** with a recovery period of **{worst_dd_days} days**.\n\n"
+                f"**Polymorphic Benchmark Comparison Matrix:**\n\n"
+                f"{matrix_md}"
             )
             p5 = (
                 f"### V. CIO Investment Prospectus & Conviction Summary\n"
