@@ -1246,7 +1246,13 @@ async def get_synthesis(
         technical_status = technicals.get("breakout_status", "Consolidating")
         capm_status = "Defensive Value Creator" if (nifty50_beta < 0.95 and nifty50_alpha > 0) else ("Value Destroyer" if nifty50_alpha < 0 else "Hot Beta Ride")
         
-        verdict_action = "TACTICAL BUY" if recommendation == "BUY" else ("STRATEGIC AVOID" if recommendation == "SELL" else "NEUTRAL HOLD")
+        rec_upper = str(recommendation).upper()
+        if "BUY" in rec_upper:
+            verdict_action = "TACTICAL BUY"
+        elif "SELL" in rec_upper:
+            verdict_action = "STRATEGIC AVOID"
+        else:
+            verdict_action = "NEUTRAL HOLD"
         
         verdict_matrix_md = (
             f"| Strategic Dimension | Supporting Key Metrics | Programmatic AI Verdict |\n"
