@@ -1096,6 +1096,31 @@ async def get_synthesis(
         rsi = technicals.get("rsi", 50.0)
         sma_50 = technicals.get("sma_50", 0.0)
         sma_200 = technicals.get("sma_200", 0.0)
+        
+        # Advanced Volatility & Momentum Indicators
+        bb_lower = technicals.get("bb_lower", 0.0)
+        bb_upper = technicals.get("bb_upper", 0.0)
+        atr = technicals.get("atr", 0.0)
+        macd = technicals.get("macd", 0.0)
+        macd_signal = technicals.get("macd_signal", 0.0)
+        macd_hist = technicals.get("macd_hist", 0.0)
+        vpt = technicals.get("vpt", 0.0)
+        adx = technicals.get("adx", 22.0)
+        volume_vs_avg20 = technicals.get("volume_vs_avg20", 1.0)
+
+        # Volatility Squeeze & ATR ratio calculation
+        squeeze_pct = ((bb_upper - bb_lower) / bb_lower * 100) if bb_lower > 0 else 0.0
+        volatility_ratio = (atr / current_price * 100) if current_price > 0 else 0.0
+        vol_level = "Low"
+        if volatility_ratio > 3.0:
+            vol_level = "High"
+        elif volatility_ratio > 1.5:
+            vol_level = "Moderate"
+            
+        atr_stop_loss = (current_price - 2 * atr) if (atr > 0 and current_price > 0) else 0.0
+        macd_status = "Bullish Crossover" if macd_hist > 0 else ("Bearish Divergence" if macd_hist < 0 else "Neutral")
+        vpt_status = "Expanding Accumulation" if vpt > 0 else "Neutral/Contracting"
+        
         scoring = profile.get("score_metrics", {})
         final_score = scoring.get("final_score", 50)
         recommendation = profile.get("analysis", {}).get("recommendation", scoring.get("action", "HOLD"))
@@ -1212,7 +1237,27 @@ async def get_synthesis(
             pb_comp_type = "premium" if diff_pb > 0 else "discount"
             pb_comparison = f"trades at a **{abs(diff_pb):.1f}% {pb_comp_type}** to peer group median PB (**{median_peer_pb:.2f}**)"
 
-        # Formulate institutional prompt
+        pe_diff_pct = 0.0
+        if target_pe > 0 and median_peer_pe > 0:
+            pe_diff_pct = ((target_pe - median_peer_pe) / median_peer_pe) * 100
+            
+        solvency_status = "Solvency: Safe" if altman_z_score >= 1.81 else "Solvency: Distress"
+        valuation_status = "Undervalued" if margin_of_safety >= 15.0 else ("Overvalued" if margin_of_safety < -5.0 else "Fairly Valued")
+        technical_status = technicals.get("breakout_status", "Consolidating")
+        capm_status = "Defensive Value Creator" if (nifty50_beta < 0.95 and nifty50_alpha > 0) else ("Value Destroyer" if nifty50_alpha < 0 else "Hot Beta Ride")
+        
+        verdict_action = "TACTICAL BUY" if recommendation == "BUY" else ("STRATEGIC AVOID" if recommendation == "SELL" else "NEUTRAL HOLD")
+        
+        verdict_matrix_md = (
+            f"| Strategic Dimension | Supporting Key Metrics | Programmatic AI Verdict |\n"
+            f"| :--- | :--- | :--- |\n"
+            f"| **I. Solvency & Quality** | F-Score: **{piotroski_score}/9**, Z-Score: **{altman_z_score:.2f}** | **{solvency_status}** |\n"
+            f"| **II. Valuation & Margin** | Intrinsic MOS: **{margin_of_safety:+.1f}%**, PE vs Peers: **{pe_diff_pct:+.1f}%** | **{valuation_status}** |\n"
+            f"| **III. Technical Velocity** | RSI: **{rsi:.1f}**, Trend: **{technicals.get('trend_50_vs_200', 'Neutral')}** | **{technical_status}** |\n"
+            f"| **IV. CAPM Risk-Reward** | Beta: **{nifty50_beta:.2f}**, Alpha: **{nifty50_alpha_str}** | **{capm_status}** |\n"
+            f"| **V. CIO Bottom-Line** | Composite Score: **{final_score}/100** | **{verdict_action}** |"
+        )
+
         system_prompt = (
             "You are the Chief Investment Officer (CIO) of a premier Indian equities advisory firm.\n"
             "Your task is to compile a highly coherent, institutional-grade 360-degree equity research prospectus for the specified stock.\n"
@@ -1225,15 +1270,15 @@ async def get_synthesis(
             "Analyze the DCF intrinsic value against the current price, the margin of safety, and historical valuation bands. Compare trailing/forward PE and Price-to-Book ratios relative to the peer group and sector medians. Describe any valuation premium or discount.\n"
             "\n"
             "### III. Technical Timing & Fibonacci Zones\n"
-            "Detail moving averages (50-day and 200-day SMAs), 14-day RSI momentum, volume patterns, breakout status, and current price positioning relative to Fibonacci retracement levels (e.g., golden ratio boundary, support/resistance bands).\n"
+            "Detail moving averages (50-day and 200-day SMAs), 14-day RSI momentum, volume patterns, breakout status, and current price positioning relative to Fibonacci retracement levels. You MUST analyze and synthesize the advanced Volatility & Momentum indicators, including the Bollinger Band squeeze width, ATR volatility ratio, Volatility-adjusted 2x ATR stop floor, MACD signal status, and Volume Price Trend (VPT) dynamics.\n"
             "\n"
             "### IV. CAPM Risk Analytics & Market Capture\n"
             "Synthesize the asset's risk profile relative to BOTH the Nifty 50 benchmark index AND its size-specific capitalization index. Compare the systematic Beta (sensitivity), Alpha (excess return), and Pearson Correlation for both indices. Discuss the Upside/Downside Market Capture percentages, and historical drawdown/volatility limits (Max Drawdown % and recovery profile). Make sure to append the EXACT markdown table representing the Polymorphic Benchmark Comparison Matrix at the end of this section (do not omit or alter it).\n"
             "\n"
             "### V. CIO Investment Prospectus & Conviction Summary\n"
-            "State your final strategic consensus recommendation (BUY/SELL/HOLD) aligned with the investor's horizon and risk profile. Incorporate the Composite Conviction Score (1-100), define actionable suggested Entry (Buy) and Exit (Sell) Price Ranges, and synthesize key catalysts and risk flags.\n"
+            "State your final strategic consensus recommendation (BUY/SELL/HOLD) aligned with the investor's horizon and risk profile. Incorporate the Composite Conviction Score (1-100), define actionable suggested Entry (Buy) and Exit (Sell) Price Ranges, and synthesize key catalysts and risk flags. Finally, you MUST append the exact markdown table of the Strategic Investment Verdict Matrix at the end of this section to summarize all programmatic dimensions and verdicts.\n"
             "\n"
-            "Maintain a professional, objective, and analytical tone. Highlight key figures, scores, ratios, and price limits using bold formatting (e.g. **Rs. 1,420**, **78.6%**, **Beta of 1.15**). Do not use bullet points or list items; write in clean, narrative paragraphs under each heading, except for the comparison matrix table under section IV which must be formatted as a markdown table."
+            "Maintain a professional, objective, and analytical tone. Highlight key figures, scores, ratios, and price limits using bold formatting (e.g. **Rs. 1,420**, **78.6%**, **Beta of 1.15**). Do not use bullet points or list items; write in clean, narrative paragraphs under each heading, except for the tables under section IV and V which must be formatted as markdown tables."
         )
 
         user_prompt = f"""
@@ -1253,12 +1298,17 @@ async def get_synthesis(
         - PE Ratio: {target_pe:.1f} (Peer Group Median PE: {median_peer_pe:.2f}, Comparison: {valuation_comparison})
         - PB Ratio: {target_pb:.2f} (Peer Group Median PB: {median_peer_pb:.2f}, Comparison: {pb_comparison})
         
-        3. Technical Timing & Fibonacci Retracements:
+        3. Technical Timing, Volatility & Momentum:
         - 14-day RSI: {rsi:.1f} ({technicals.get('rsi_status', 'Neutral')})
         - 50-day SMA: Rs. {sma_50} | 200-day SMA: Rs. {sma_200} (Trend: {technicals.get('trend_50_vs_200', 'N/A')})
         - Breakout Status: {technicals.get('breakout_status', 'N/A')} ({technicals.get('breakout_desc', 'N/A')})
         - Fibonacci Levels: {json.dumps(fib_levels)}
         - Current Fibonacci Retracement Zone: {fib_zone}
+        - Bollinger Bands: Lower: Rs. {bb_lower:.2f} | Upper: Rs. {bb_upper:.2f} (Squeeze Width: {squeeze_pct:.1f}%)
+        - ATR: Rs. {atr:.2f} (Volatility Rating: {vol_level} at {volatility_ratio:.1f}% ratio)
+        - Volatility-Adjusted 2x ATR Stop Floor: Rs. {atr_stop_loss:.2f}
+        - MACD Value: {macd:.2f} (Signal: {macd_signal:.2f}, Hist: {macd_hist:.2f}, Status: {macd_status})
+        - Volume Price Trend (VPT): {vpt:.0f} ({vpt_status})
         
         4. CAPM Risk Analytics & Market Capture:
         - Relative to Nifty 50: Beta: {nifty50_beta:.2f}, Alpha: {nifty50_alpha:.2f}%, Correlation: {nifty50_corr:.2f}
@@ -1274,6 +1324,8 @@ async def get_synthesis(
         - Suggested Buy Range: {profile.get('analysis', {}).get('suggested_buy_price_range', 'N/A')}
         - Suggested Sell Range: {profile.get('analysis', {}).get('suggested_sell_price_range', 'N/A')}
         - Analyst Target Median: Rs. {profile.get('consensus', {}).get('target_median', 'N/A')}
+        - Exact Strategic Investment Verdict Matrix Markdown Table (print this EXACT table at the end of Section V):
+{verdict_matrix_md}
         """
 
         synthesis_text = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
@@ -1297,8 +1349,14 @@ async def get_synthesis(
                 f"### III. Technical Timing & Fibonacci Zones\n"
                 f"Technically, the stock is in a **{technicals.get('trend_50_vs_200', 'Neutral')}** trend structure, trading relative to its "
                 f"50-day SMA of **Rs. {sma_50}** and 200-day SMA of **Rs. {sma_200}**. Momentum is **{technicals.get('rsi_status', 'Neutral')}** "
-                f"with an RSI of **{rsi:.1f}**. Breakout status is currently **{technicals.get('breakout_status', 'CONSOLIDATING')}**. The price is positioned "
-                f"**{fib_zone}**."
+                f"with an RSI of **{rsi:.1f}**. Breakout status is currently **{technicals.get('breakout_status', 'CONSOLIDATING')}** ({technicals.get('breakout_desc', '')}). "
+                f"The price is positioned **{fib_zone}**.\n\n"
+                f"**Volatility & Momentum Metrics:**\n"
+                f"- **Bollinger Bands**: Lower: **Rs. {bb_lower:.2f}** | Upper: **Rs. {bb_upper:.2f}** (Squeeze Width: **{squeeze_pct:.1f}%**)\n"
+                f"- **Average True Range (ATR)**: **Rs. {atr:.2f}** (Volatility Rating: **{vol_level}** at **{volatility_ratio:.1f}%** ratio)\n"
+                f"- **Volatility Stop-Loss Floor (2x ATR)**: **Rs. {atr_stop_loss:.2f}**\n"
+                f"- **MACD**: **{macd:.2f}** (Signal: **{macd_signal:.2f}** | Status: **{macd_status}**)\n"
+                f"- **Volume Price Trend (VPT)**: **{vpt:.0f}** (**{vpt_status}**)"
             )
             p4 = (
                 f"### IV. CAPM Risk Analytics & Market Capture\n"
@@ -1313,7 +1371,9 @@ async def get_synthesis(
                 f"### V. CIO Investment Prospectus & Conviction Summary\n"
                 f"Our institutional Composite AI Score is **{final_score}/100** with a recommended action of **{recommendation}** "
                 f"for a **{horizon}** horizon. Actionable entry ranges are identified at **{profile.get('analysis', {}).get('suggested_buy_price_range', 'Rs. ' + str(round(current_price * 0.95)) + ' - Rs. ' + str(round(current_price * 1.02)))}**, "
-                f"targeting an exit range of **{profile.get('analysis', {}).get('suggested_sell_price_range', 'Rs. ' + str(round(current_price * 1.15)) + ' - Rs. ' + str(round(current_price * 1.25)))}**."
+                f"targeting an exit range of **{profile.get('analysis', {}).get('suggested_sell_price_range', 'Rs. ' + str(round(current_price * 1.15)) + ' - Rs. ' + str(round(current_price * 1.25)))}**.\n\n"
+                f"**Strategic Investment Verdict Matrix:**\n\n"
+                f"{verdict_matrix_md}"
             )
             synthesis_text = f"{p1}\n\n{p2}\n\n{p3}\n\n{p4}\n\n{p5}"
 
