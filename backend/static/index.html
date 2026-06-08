@@ -60,6 +60,12 @@
                 <button class="nav-btn" id="tab-portfolio-btn" data-title="Portfolio Optimization Doctor">
                     <span class="btn-icon">💼</span> <span class="btn-text">Portfolio Optimization Doctor</span>
                 </button>
+                <button class="nav-btn" id="tab-swing-scan-btn" data-title="Swing Setup Scanner">
+                    <span class="btn-icon">⚡</span> <span class="btn-text">Swing Setup Scanner</span>
+                </button>
+                <button class="nav-btn" id="tab-swing-btn" data-title="Swing Workspace & Sizer">
+                    <span class="btn-icon">🎯</span> <span class="btn-text">Swing Workspace & Sizer</span>
+                </button>
                 <button class="nav-btn" id="tab-alerts-btn" data-title="Institutional Alert Center">
                     <span class="btn-icon">🚨</span> <span class="btn-text">Institutional Alert Center</span>
                 </button>
@@ -346,6 +352,27 @@
                             </tbody>
                         </table>
                     </div>
+                    <!-- Smart Pagination Controls for AI Screener -->
+                    <div id="screener-results-pagination" class="no-print" style="display: none; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px;">
+                        <button class="btn-secondary" id="screener-results-prev-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>◀ Prev</button>
+                        
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span id="screener-results-page-info" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Page 1 of 1</span>
+                            
+                            <div style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-glass); padding-left: 15px;">
+                                <span style="font-size: 10px; color: var(--text-secondary);">Records per page:</span>
+                                <select id="screener-results-pagesize-select" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer; outline: none; height: 24px;">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="btn-secondary" id="screener-results-next-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>Next ▶</button>
+                    </div>
                 </div>
             </section>
 
@@ -417,6 +444,27 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    <!-- Smart Pagination Controls for Index Universe Registry -->
+                    <div id="universe-explorer-pagination" class="no-print" style="display: none; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px;">
+                        <button class="btn-secondary" id="universe-explorer-prev-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>◀ Prev</button>
+                        
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span id="universe-explorer-page-info" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Page 1 of 1</span>
+                            
+                            <div style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-glass); padding-left: 15px;">
+                                <span style="font-size: 10px; color: var(--text-secondary);">Records per page:</span>
+                                <select id="universe-explorer-pagesize-select" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer; outline: none; height: 24px;">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="btn-secondary" id="universe-explorer-next-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>Next ▶</button>
                     </div>
                 </div>
             </section>
@@ -1893,6 +1941,26 @@
                                 </tbody>
                             </table>
                         </div>
+                        <!-- Smart Pagination Controls for Watchlist Registry -->
+                        <div id="watchlist-table-pagination" class="no-print" style="display: none; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px;">
+                            <button class="btn-secondary" id="watchlist-table-prev-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>◀ Prev</button>
+                            
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <span id="watchlist-table-page-info" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Page 1 of 1</span>
+                                
+                                <div style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-glass); padding-left: 15px;">
+                                    <span style="font-size: 10px; color: var(--text-secondary);">Records per page:</span>
+                                    <select id="watchlist-table-pagesize-select" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer; outline: none; height: 24px;">
+                                        <option value="5">5</option>
+                                        <option value="10" selected>10</option>
+                                        <option value="20">20</option>
+                                        <option value="50">50</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <button class="btn-secondary" id="watchlist-table-next-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>Next ▶</button>
+                        </div>
 
                         <!-- Watchlist Batch Analysis Results Summary -->
                         <div id="watchlist-analysis-results" style="display: none; margin-top: 25px; border-top: 1px dashed var(--border-glass); padding-top: 20px;">
@@ -2470,6 +2538,331 @@
                                     <!-- Rebalancing trades loaded dynamically -->
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 8A: SWING SETUP SCANNER -->
+            <section class="workspace-tab" id="tab-swing-scan" style="display: none; font-family: 'Inter', sans-serif;">
+                <div class="section-header no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div>
+                        <h2 style="display: flex; align-items: center; gap: 8px;">
+                            ⚡ Swing Setup Scanner 
+                            <span id="swing-scan-nifty-badge" class="header-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);">Nifty 50: --</span>
+                            <span id="swing-scan-horizon-badge" class="header-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.25);">Short-Term (5-15 Days)</span>
+                        </h2>
+                        <p>Identify breakout signals, support zones, and technical setups across cap segments.</p>
+                        <!-- Global Bearish Index Warning Banner -->
+                        <div id="swing-scan-regime-warning" class="no-print" style="display: none; margin-top: 10px; padding: 10px 14px; border-radius: 8px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #f87171; font-size: 11.5px; align-items: center; gap: 8px; width: 100%; box-sizing: border-box;">
+                            <span>⚠️</span> <strong>Bearish Market Regime Alert</strong>: Nifty 50 is currently trading below its daily 20 EMA. Breakout strategies are highly restricted. Focus on defensive setups or cash preservation.
+                        </div>
+                    </div>
+                    <!-- Horizon Segmented Switch -->
+                    <div class="horizon-toggle" style="display: flex; gap: 4px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass); padding: 3px; border-radius: 8px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.15);">
+                        <button class="btn-secondary active" id="swing-scan-horizon-short-btn" style="font-size: 10px; padding: 6px 12px; height: auto; border: none; border-radius: 6px; font-weight: 700; transition: all 0.2s;" data-horizon="short">⚡ Short-Term (5-15 Days)</button>
+                        <button class="btn-secondary" id="swing-scan-horizon-medium-btn" style="font-size: 10px; padding: 6px 12px; height: auto; border: none; border-radius: 6px; font-weight: 700; transition: all 0.2s;" data-horizon="medium">📈 Medium-Term (1-6 Months)</button>
+                    </div>
+                </div>
+
+                <!-- Styled exactly like Quant Screener Controls Card -->
+                <div class="screener-controls-card">
+                    <div class="screener-controls-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Technical Strategy Setup</label>
+                            <select id="swing-scan-strategy" style="padding: 10px 14px; border-radius: 8px; font-size: 11.5px; cursor: pointer; outline: none; transition: all 0.2s; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);">
+                                <option value="ALL" selected>ALL Setups (Combined)</option>
+                                <option value="RSI">RSI Pullback (Mean Reversion)</option>
+                                <option value="MACD">MACD Bullish crossover state</option>
+                                <option value="EMA">EMA Golden Cross State (50/200)</option>
+                                <option value="BB">Bollinger Squeeze Breakout</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Market Cap Universe</label>
+                            <select id="swing-scan-universe" style="padding: 10px 14px; border-radius: 8px; font-size: 11.5px; cursor: pointer; outline: none; transition: all 0.2s; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);">
+                                <option value="all" selected>All Cap Classes</option>
+                                <option value="large">Large Cap Index (Nifty 50/100)</option>
+                                <option value="mid">Mid Cap Index (Nifty Midcap 150)</option>
+                                <option value="small">Small Cap Index (Nifty Smallcap 250)</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="display: flex; justify-content: space-between; font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+                                <label>Min Volume Ratio (vs 20d Avg)</label>
+                                <span id="swing-volume-ratio-val">1.0x</span>
+                            </div>
+                            <input type="range" id="swing-scan-volume" min="0.5" max="3.0" step="0.1" value="1.0" style="width: 100%; height: 38px;">
+                            <span style="font-size: 8.5px; color: var(--text-muted); line-height: 1.25; display: block; margin-top: -4px;">
+                                <strong>Min Volume Ratio Filtering Usage:</strong> A value of 2.0x means current daily volume is double the stock's 20-day historical average. Set higher values (e.g., &ge; 1.5x) to screen out low-volume, low-liquidity noise and ensure the trade setup is supported by active institutional accumulation.
+                            </span>
+                        </div>
+                    </div>
+
+                    <button class="analyze-asset-btn" id="run-swing-scan-btn" style="min-width: 250px; height: 42px; border-radius: 8px; font-weight: 700; transition: all 0.3s ease; margin: 0 auto; display: block;">
+                        <span class="analyze-btn-icon" style="font-size: 14px;">⚡</span>
+                        <span style="font-family: 'Outfit', sans-serif; font-size: 12.5px; letter-spacing: 0.02em; color: #ffffff;">Run Technical Scanner</span>
+                    </button>
+                </div>
+
+                <!-- Screener Results styling matching Quant Screener Results -->
+                <div class="screener-results-container card" id="swing-scan-results-card" style="margin-top: 25px;">
+                    <div class="card-header screener-card-header" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 15px; width: 100%;">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.03em;">SWING SETUP SCANNER RESULTS</h3>
+                            <span style="font-size: 9.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;" id="swing-scan-results-subtitle">Swept Technical Breakout Candidates (Short-Term Horizon)</span>
+                        </div>
+                    </div>
+
+                    <!-- Candidates List Table -->
+                    <div class="table-scroll" style="border: 1px solid var(--border-glass); border-radius: 8px; max-height: 480px; overflow-y: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11px;">
+                            <thead>
+                                <tr style="position: sticky; top: 0; z-index: 10; cursor: pointer;">
+                                    <th id="swing-th-symbol" style="padding: 10px;">Ticker <span class="sort-indicator"></span></th>
+                                    <th id="swing-th-score" style="padding: 10px; text-align: center;">Score <span class="sort-indicator"></span></th>
+                                    <th id="swing-th-trigger" style="padding: 10px;">Trigger Setup <span class="sort-indicator"></span></th>
+                                    <th id="swing-th-delivery" style="padding: 10px; text-align: right;">Delivery % <span class="sort-indicator"></span></th>
+                                    <th id="swing-th-quality" style="padding: 10px; text-align: center;">F/Z Quality <span class="sort-indicator"></span></th>
+                                    <th id="swing-th-price" style="padding: 10px; text-align: right;">Price <span class="sort-indicator"></span></th>
+                                    <th id="swing-th-volume" style="padding: 10px; text-align: right;">Vol. Ratio <span class="sort-indicator"></span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="swing-scan-body">
+                                <tr>
+                                    <td colspan="7" style="padding: 25px; text-align: center; color: var(--text-muted);">
+                                        No scan results loaded yet. Configure filters and click "Run Technical Scanner" above.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Smart Pagination Controls with Records per Page selection -->
+                    <div id="swing-scan-pagination" class="no-print" style="display: none; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px;">
+                        <button class="btn-secondary" id="swing-scan-prev-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>◀ Prev</button>
+                        
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span id="swing-scan-page-info" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Page 1 of 1</span>
+                            
+                            <div style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-glass); padding-left: 15px;">
+                                <span style="font-size: 10px; color: var(--text-secondary);">Records per page:</span>
+                                <select id="swing-scan-pagesize-select" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer; outline: none; height: 24px;">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="btn-secondary" id="swing-scan-next-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>Next ▶</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION 8: SWING TRADING WORKSPACE -->
+            <section class="workspace-tab" id="tab-swing" style="display: none; font-family: 'Inter', sans-serif;">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h2>🎯 Swing Trading Workspace & Risk Sizer</h2>
+                        <p>Analyze entry boundaries, optimize risk position sizing, run backtest simulations, and review corporate dockets.</p>
+                    </div>
+                    <!-- Strategy Horizon Status Badge -->
+                    <div id="swing-workspace-horizon-badge" class="no-print" style="font-size: 10.5px; padding: 5px 12px; border-radius: 99px; font-weight: 700; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.25); display: inline-flex; align-items: center; gap: 6px;">
+                        <span>⚡</span> Short-Term Swing (5-15 Days)
+                    </div>
+                    <button class="btn-primary no-print" id="print-swing-trade-btn" style="display: inline-flex; align-items: center; gap: 6px;">
+                        <span>🖨️</span> Print Swing Trade Docket
+                    </button>
+                </div>
+
+                <!-- Empty Active State placeholder -->
+                <div class="card no-print" id="swing-empty-state" style="text-align: center; padding: 40px 20px;">
+                    <div style="font-size: 32px; margin-bottom: 12px;">📊</div>
+                    <h3 style="margin: 0 0 8px 0; color: var(--text-primary);">No Active Swing Trade Loaded</h3>
+                    <p style="margin: 0; font-size: 12px; color: var(--text-muted);">Go to "⚡ Swing Setup Scanner" in the sidebar and click on a scanned candidate ticker to load details here, or use the stock lookup.</p>
+                </div>
+
+                <div id="swing-active-container" style="display: none; flex-direction: column; gap: 20px;">
+                            <!-- Business Summary Card (Top context) -->
+                            <div class="card" id="swing-summary-card">
+                                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border: none; padding: 0; width: 100%;">
+                                    <h3 style="margin: 0; display: flex; align-items: center; gap: 6px;">
+                                        <span>🏢</span> Corporate Profile & Business Summary
+                                    </h3>
+                                    <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Company description</span>
+                                </div>
+                                <div id="swing-business-summary-text" style="font-size: 11.5px; line-height: 1.6; color: var(--text-secondary);">
+                                    Select a candidate script to load the corporate business summary profile details.
+                                </div>
+                            </div>
+
+                            <!-- Active Candidate Details & Position Sizing -->
+                            <div class="card" id="swing-docket-print-area">
+                                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border: none; padding: 0; width: 100%;">
+                                    <div>
+                                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <h3 style="margin: 0;" id="swing-active-title">SJVN Limited (SJVN.NS)</h3>
+                                            <button class="btn-secondary no-print" id="swing-active-research-btn" style="font-size: 9px; padding: 2px 8px; height: auto;" title="Analyze in Equity Research Terminal">🔬 Research Stock</button>
+                                        </div>
+                                        <span id="swing-active-desc" style="font-size: 10px; color: var(--color-emerald); font-weight: 600; display: block; margin-top: 3px;">MACD Bullish Crossover Setup Active</span>
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
+                                        <span class="badge-ticker" id="swing-active-badge-ticker" style="font-size: 10.5px; padding: 3px 8px;">SJVN.NS</span>
+                                        <span class="print-only" id="swing-print-horizon-label" style="font-size: 9px; font-weight: 700; color: #1e40af; border: 1px solid #93c5fd; background: #eff6ff; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; display: none;">Short-Term Swing Trade</span>
+                                    </div>
+                                </div>
+
+                                <div class="backtest-results-grid" style="grid-template-columns: 1fr 1.2fr; gap: 15px; margin-bottom: 15px;">
+                                    <!-- Sizer inputs -->
+                                    <div style="display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-glass); padding: 12px; border-radius: 8px;">
+                                        <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-top: 0; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 4px;">Position Sizing Rules</h4>
+                                        <!-- Fundamental Quality Diagnostics Badge -->
+                                        <div id="swing-fundamental-badge-container" style="display: none; align-items: center; justify-content: space-between; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; font-size: 11px;">
+                                            <span style="font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">🏢 Quality Diagnostics:</span>
+                                            <div style="display: flex; gap: 8px;">
+                                                <strong id="swing-fundamental-piotroski" style="font-size: 11.5px; padding: 2px 6px; border-radius: 4px;">--</strong>
+                                                <strong id="swing-fundamental-altman" style="font-size: 11.5px; padding: 2px 6px; border-radius: 4px;">--</strong>
+                                            </div>
+                                        </div>
+                                        <div class="profile-field" style="margin: 0; display: flex; flex-direction: column; gap: 4px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                                <label style="font-size: 10.5px; width: 50%; font-weight: 600;">Account Capital</label>
+                                                <input type="number" id="swing-capital" value="500000" style="width: 50%; height: 26px; border-radius: 4px; background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); padding: 0 6px; font-size: 11px;">
+                                            </div>
+                                            <span style="font-size: 8.5px; color: var(--text-muted); line-height: 1.2;">Your total trading wallet size. Allocation sizes are calculated as a fraction of this sum.</span>
+                                        </div>
+                                        <div class="profile-field" style="margin: 0; display: flex; flex-direction: column; gap: 4px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                                <label style="font-size: 10.5px; width: 50%; font-weight: 600;">Risk Per Trade %</label>
+                                                <input type="number" id="swing-risk-pct" value="1.0" step="0.1" style="width: 50%; height: 26px; border-radius: 4px; background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); padding: 0 6px; font-size: 11px;">
+                                            </div>
+                                            <span style="font-size: 8.5px; color: var(--text-muted); line-height: 1.2;">The maximum % of total capital you are willing to lose if this trade hits the Stop Loss.</span>
+                                        </div>
+                                        <div class="profile-field" style="margin: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                            <label style="font-size: 10.5px; width: 50%; font-weight: 600;">Entry Price (Rs.)</label>
+                                            <input type="number" id="swing-entry-price" value="0.0" step="0.05" style="width: 50%; height: 26px; border-radius: 4px; background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); padding: 0 6px; font-size: 11px;">
+                                        </div>
+                                        <div class="profile-field" style="margin: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                            <label style="font-size: 10.5px; width: 50%; font-weight: 600;">Stop Loss (Rs.)</label>
+                                            <input type="number" id="swing-stop-loss" value="0.0" step="0.05" style="width: 50%; height: 26px; border-radius: 4px; background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); padding: 0 6px; font-size: 11px;">
+                                        </div>
+                                        <div class="profile-field" style="margin: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                                            <label style="font-size: 10.5px; width: 50%; font-weight: 600;">Take Profit (Rs.)</label>
+                                            <input type="number" id="swing-take-profit" value="0.0" step="0.05" style="width: 50%; height: 26px; border-radius: 4px; background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); padding: 0 6px; font-size: 11px;">
+                                        </div>
+                                    </div>
+
+                                    <!-- Sizer dynamic outputs -->
+                                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-grow: 1;">
+                                            <div class="synthesis-micro-item" style="padding: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center;">
+                                                <span class="synthesis-micro-lbl" style="font-size: 9px;">Shares to Buy</span>
+                                                <strong id="swing-shares-output" style="font-size: 15px; color: var(--color-primary-light);">--</strong>
+                                            </div>
+                                            <div class="synthesis-micro-item" style="padding: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center;">
+                                                <span class="synthesis-micro-lbl" style="font-size: 9px;">Capital Required</span>
+                                                <strong id="swing-capital-required-output" style="font-size: 15px; color: var(--color-primary-light);">--</strong>
+                                            </div>
+                                            <div class="synthesis-micro-item" style="padding: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center;">
+                                                <span class="synthesis-micro-lbl" style="font-size: 9px;">Total Risk Amt</span>
+                                                <strong id="swing-risk-amount-output" style="font-size: 14px; color: #ef4444;">--</strong>
+                                            </div>
+                                            <div class="synthesis-micro-item" style="padding: 10px; margin: 0; display: flex; flex-direction: column; justify-content: center;">
+                                                <span class="synthesis-micro-lbl" style="font-size: 9px;">Reward Potential</span>
+                                                <strong id="swing-reward-amount-output" style="font-size: 14px; color: var(--color-emerald);">--</strong>
+                                            </div>
+                                            <div class="synthesis-micro-item" style="grid-column: span 2; padding: 10px; margin: 0; display: flex; justify-content: space-between; align-items: center;">
+                                                <span class="synthesis-micro-lbl" style="font-size: 9px;">Risk-to-Reward Ratio</span>
+                                                <strong id="swing-rr-ratio-output" style="font-size: 12.5px; color: var(--text-primary);">--</strong>
+                                            </div>
+                                        </div>
+                                        <span style="font-size: 8.5px; color: var(--text-muted); line-height: 1.25; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 6px; display: block; text-align: center;">
+                                            <strong>Risk-to-Reward Ratio Explanation:</strong> A ratio of 1:1.50 means you risk Rs. 1.00 of your capital to potentially capture Rs. 1.50 in net reward.
+                                        </span>
+                                    </div>
+                                </div>
+                                </div>
+
+                                <!-- Risk visualizer chart & TF Selector -->
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">📊 TradingView Candlestick Chart & Volume Profile (VPVR)</span>
+                                        <div class="no-print" style="display: flex; gap: 4px;">
+                                            <button class="btn-secondary active" id="swing-tf-1d-btn" style="font-size: 9px; padding: 3px 8px; height: auto;">1D</button>
+                                            <button class="btn-secondary" id="swing-tf-1h-btn" style="font-size: 9px; padding: 3px 8px; height: auto;">1H</button>
+                                        </div>
+                                    </div>
+                                    <div id="swing-risk-chart" style="width: 100%; height: 260px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-glass); background: #0f172a; position: relative;">
+                                        <!-- Loaded dynamically via Lightweight Charts -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Backtest Card -->
+                            <div class="card" id="swing-backtest-card">
+                                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border: none; padding: 0; width: 100%;">
+                                    <h3 id="swing-backtest-header-title" style="margin: 0;">📉 90-Day Tactical Swing Strategy Backtest</h3>
+                                    <button class="btn-primary no-print" id="run-swing-backtest-btn" style="font-size: 10px; padding: 4px 12px; height: auto;">
+                                        Run Simulation Backtest
+                                    </button>
+                                </div>
+
+                                <div class="backtest-results-grid" style="grid-template-columns: 1.2fr 1fr; gap: 15px;">
+                                    <div style="width: 100%; height: 180px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-glass); background: #0f172a;" id="swing-backtest-chart">
+                                        <!-- Loaded dynamically via Lightweight Charts -->
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; justify-content: space-between; background: rgba(255,255,255,0.01); border: 1px solid var(--border-glass); padding: 12px; border-radius: 8px;">
+                                        <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin-top: 0; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 4px;">Backtest Parameters</h4>
+                                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                                            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                                                <span style="color: var(--text-secondary);">Trades Executed:</span>
+                                                <strong id="swing-bt-trades" style="color: var(--text-primary);">--</strong>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                                                <span style="color: var(--text-secondary);">Win Rate (%):</span>
+                                                <strong id="swing-bt-winrate" style="color: var(--text-primary);">--</strong>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                                                <span style="color: var(--text-secondary);">Profit Factor:</span>
+                                                <strong id="swing-bt-profitfactor" style="color: var(--text-primary);">--</strong>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                                                <span style="color: var(--text-secondary);">Avg Hold Days:</span>
+                                                <strong id="swing-bt-holddays" style="color: var(--text-primary);">--</strong>
+                                            </div>
+                                        </div>
+                                        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 8px;">
+                                            <h5 style="font-size: 9px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 4px 0;">Layman Performance Glossary</h5>
+                                            <p style="font-size: 8px; color: var(--text-muted); line-height: 1.45; margin: 0;">
+                                                • <strong>Trades Executed</strong>: How many times this signal strategy triggered in the past 90 days.<br>
+                                                • <strong>Win Rate</strong>: % of simulated trades that hit target exit zones instead of stop losses.<br>
+                                                • <strong>Profit Factor</strong>: Gross profits divided by gross losses. A value above 1.50 denotes a strong historical setup edge.<br>
+                                                • <strong>Avg Hold Days</strong>: Average calendar days held per trade before targets/stops are touched.
+                                            </p>
+                                        </div>
+                                </div>
+                                <div id="swing-bt-filter-status" style="margin-top: 15px; padding: 10px 14px; border-radius: 8px; font-size: 11px; font-weight: 700; display: none; align-items: center; gap: 8px; box-sizing: border-box; width: 100%;"></div>
+                            </div>
+
+                            <!-- AI Summary Card -->
+                            <div class="card" id="swing-ai-card">
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border-glass); padding-bottom: 10px; margin-bottom: 15px;">
+                                    <h3 id="swing-ai-docket-title" style="margin: 0; display: flex; align-items: center; gap: 6px;">
+                                        <span>🤖</span> AI SWING TACTICAL DOCKET
+                                    </h3>
+                                    <button class="btn-primary no-print" id="generate-swing-ai-btn" style="font-size: 10px; padding: 4px 12px; height: auto;">
+                                        Generate AI Summary Thesis
+                                    </button>
+                                </div>
+                                <div class="battleground-thesis-content" id="swing-ai-summary-text" style="font-size: 12px; line-height: 1.65; color: var(--text-muted); min-height: 40px;">
+                                    Click "Generate AI Summary Thesis" above to compile the institutional short-term catalysts and technical dockets.
+                                </div>
+                            </div>
+
                         </div>
                     </div>
                 </div>
