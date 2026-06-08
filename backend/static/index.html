@@ -546,6 +546,7 @@
                             <button class="subtab-btn" data-subtab="fundamental">🩺 Ratios & Earnings</button>
                             <button class="subtab-btn" data-subtab="peers">👥 Peers & Ownership</button>
                             <button class="subtab-btn" data-subtab="audit">🔬 Agent Strategy Audit</button>
+                            <button class="subtab-btn" data-subtab="volume">📋 Price Volume Dynamics</button>
                         </div>
                         <button class="subtabs-nav-btn next-btn hidden" aria-label="Scroll right">▶</button>
                     </div>
@@ -1605,6 +1606,114 @@
                             </div>
                         </div>
 
+                        <!-- SECTION 9: PRICE VOLUME DYNAMICS -->
+                        <div class="card col-span-4 no-print card-hidden" id="volume-dynamics-card" data-subtab="volume">
+                            <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border-glass); padding-bottom: 15px; margin-bottom: 15px;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-primary);">📊 PRICE VOLUME DYNAMICS & VSA AUDIT</h3>
+                                    <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;">Institutional Accumulation & Volume Spread Analysis</span>
+                                </div>
+                                <span class="badge-rec" id="volume-ticker-badge" style="background: rgba(59,130,246,0.12); color: var(--color-primary); border-color: rgba(59,130,246,0.25); font-weight: 700; font-size: 11px; padding: 4px 10px; border-radius: 6px;">TCS.NS</span>
+                            </div>
+                            
+                            <!-- VSA Diagnosis Alert Panel -->
+                            <div id="vsa-diagnosis-panel" style="margin-bottom: 20px; border-left: 4px solid var(--color-primary); background: rgba(59, 130, 246, 0.05); padding: 15px; border-radius: 6px;">
+                                <h4 style="font-size: 12.5px; color: var(--color-primary-light); margin-top: 0; margin-bottom: 8px; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px;">
+                                    <span id="vsa-status-icon">🟢</span> <span id="vsa-pattern-title">Normal Price Action</span>
+                                </h4>
+                                <p id="vsa-pattern-desc" style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.6; margin: 0; font-family: 'Inter', sans-serif;">
+                                    No significant Volume Spread Analysis anomalies detected. Normal price action trading within standard volatility limits.
+                                </p>
+                                <span style="display: block; font-size: 9.5px; color: var(--text-muted); margin-top: 6px; font-style: italic; font-family: 'Inter', sans-serif;">ℹ️ <strong>Layman:</strong> Volume Spread Analysis (VSA) scans price spread sizes vs traded volumes to detect institutional buying or selling pressure.</span>
+                            </div>
+
+                            <!-- Z-Score Deliverable Value & POC metrics -->
+                            <div style="margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
+                                <div style="background: var(--bg-card-hover); border: 1px solid var(--border-glass); padding: 12px 16px; border-radius: 8px; flex: 1; min-width: 200px;">
+                                    <span style="font-size: 10px; color: var(--text-muted); display: block; text-transform: uppercase; font-family: 'Outfit', sans-serif; font-weight: 700; letter-spacing: 0.04em;">Deliverable Value Z-Score</span>
+                                    <strong id="volume-dvi-zscore" style="font-size: 18px; color: var(--text-primary); display: block; margin-top: 4px;">+0.00</strong>
+                                    <span id="volume-dvi-label" style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 2px;">Neutral volume accumulation (standard deviations)</span>
+                                    <div style="font-size: 9.5px; color: var(--text-muted); margin-top: 6px; border-top: 1px solid var(--border-glass); padding-top: 6px; font-family: 'Inter', sans-serif;">
+                                        ℹ️ <strong>Layman:</strong> Measures delivery spikes. Z &ge; 2.0 indicates large institutions (Smart Money) are actively acquiring shares to hold rather than short-term day trading.
+                                    </div>
+                                </div>
+                                <div style="background: var(--bg-card-hover); border: 1px solid var(--border-glass); padding: 12px 16px; border-radius: 8px; flex: 1; min-width: 200px;">
+                                    <span style="font-size: 10px; color: var(--text-muted); display: block; text-transform: uppercase; font-family: 'Outfit', sans-serif; font-weight: 700; letter-spacing: 0.04em;">Institutional Support POC</span>
+                                    <strong id="volume-poc-price" style="font-size: 18px; color: var(--color-primary-light); display: block; margin-top: 4px;">Rs. --</strong>
+                                    <span style="font-size: 10px; color: var(--text-muted); display: block; margin-top: 2px;">Highest traded volume price level (Point of Control)</span>
+                                    <div style="font-size: 9.5px; color: var(--text-muted); margin-top: 6px; border-top: 1px solid var(--border-glass); padding-top: 6px; font-family: 'Inter', sans-serif;">
+                                        ℹ️ <strong>Layman:</strong> The price point where the absolute highest amount of share volume was traded in 60 days. Frequently acts as a solid support floor.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- AI/LLM Summary Section -->
+                            <div id="volume-ai-summary-container" style="margin-bottom: 20px; background: rgba(59, 130, 246, 0.04); border: 1px solid var(--border-glass); padding: 15px; border-radius: 8px; border-left: 4px solid var(--color-primary);">
+                                <h4 style="margin: 0 0 8px 0; font-family: 'Outfit', sans-serif; font-size: 12.5px; font-weight: 700; color: var(--color-primary-light); display: flex; align-items: center; gap: 6px;">
+                                    <span>🤖 AI Price-Volume Analytical Synthesis</span>
+                                </h4>
+                                <div id="volume-ai-summary-text" style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.6; font-family: 'Inter', sans-serif;">
+                                    Generating AI synthesis...
+                                </div>
+                            </div>
+
+                            <!-- Twin Lightweight Charts Containers -->
+                            <div style="display: flex; flex-direction: column; gap: 15px;">
+                                <!-- Top Price-Candle Chart -->
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; font-family: 'Outfit', sans-serif; letter-spacing: 0.05em;">📈 Price Candles & Volume Profile (VPVR)</span>
+                                    <span style="font-size: 9.5px; color: var(--text-muted); display: block; margin-bottom: 4px; font-family: 'Inter', sans-serif;">
+                                        ℹ️ <strong>Layman:</strong> Standard price candles combined with horizontal bars on the right showing where volume was traded at each price. Red dashed line is the Point of Control (POC).
+                                    </span>
+                                    <div id="volume-price-chart" style="width: 100%; height: 350px; background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 8px; position: relative;"></div>
+                                </div>
+                                <!-- Bottom Stacked Delivery Volume Chart -->
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; font-family: 'Outfit', sans-serif; letter-spacing: 0.05em;">📊 Traded Volume: deliverable (dark) vs speculative (light)</span>
+                                    <span style="font-size: 9.5px; color: var(--text-muted); display: block; margin-bottom: 4px; font-family: 'Inter', sans-serif;">
+                                        ℹ️ <strong>Layman:</strong> Splits total volume into actual shares delivered to investors (dark bars - buying to hold) vs. shares traded intraday (light bars - short-term speculation).
+                                    </span>
+                                    <div id="volume-delivery-chart" style="width: 100%; height: 180px; background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 8px; position: relative;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bulk & Block Deals List -->
+                        <div class="card col-span-4 card-hidden" id="bulk-deals-card" data-subtab="volume" style="margin-top: 20px;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border: none; padding: 0; margin-bottom: 15px;">
+                                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                                    <span style="color: var(--text-primary);">🤝 INSTITUTIONAL BULK & BLOCK DEALS</span>
+                                </h3>
+                                <span style="font-size: 9.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Large Block Transfers Timeline</span>
+                            </div>
+                            <p style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.6; margin-top: 0; margin-bottom: 15px; font-family: 'Inter', sans-serif;">
+                                Bulk and block deals represent significant transfers of company ownership. Purchases exceeding 0.5% equity are highlighted to monitor fund entries.<br>
+                                <span style="font-size: 9.5px; color: var(--text-muted); display: block; margin-top: 4px; font-family: 'Inter', sans-serif;">
+                                    ℹ️ <strong>Layman:</strong> Lists massive stock transactions executed privately by mutual funds, promoters, or large institutions. Green "BUY" deals indicate heavy institutional confidence.
+                                </span>
+                            </p>
+                            <div class="table-scroll">
+                                <table class="data-table small-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Client Name</th>
+                                            <th>Type</th>
+                                            <th>Quantity</th>
+                                            <th>Price</th>
+                                            <th>Equity %</th>
+                                            <th>Deal Window</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bulk-deals-body">
+                                        <tr>
+                                            <td colspan="7" class="center-text text-muted" style="padding: 15px;">No bulk or block deals recorded for this ticker.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
                         <!-- Governance & News Feed -->
                         <div class="card col-span-4 no-print" data-subtab="summary">
                             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border: none; padding: 0; width: 100%;">
@@ -1667,6 +1776,18 @@
                                 <div class="synthesis-micro-item">
                                     <span class="synthesis-micro-lbl">Piotroski Quality</span>
                                     <strong id="synthesis-micro-piotroski">--/9</strong>
+                                </div>
+                                <div class="synthesis-micro-item">
+                                    <span class="synthesis-micro-lbl">Delivery Z-Score</span>
+                                    <strong id="synthesis-micro-zscore">--</strong>
+                                </div>
+                                <div class="synthesis-micro-item">
+                                    <span class="synthesis-micro-lbl">VSA Setup</span>
+                                    <strong id="synthesis-micro-vsa">--</strong>
+                                </div>
+                                <div class="synthesis-micro-item">
+                                    <span class="synthesis-micro-lbl">POC Floor</span>
+                                    <strong id="synthesis-micro-poc">--</strong>
                                 </div>
                             </div>
 
@@ -2576,7 +2697,13 @@
                                 <option value="MACD">MACD Bullish crossover state</option>
                                 <option value="EMA">EMA Golden Cross State (50/200)</option>
                                 <option value="BB">Bollinger Squeeze Breakout</option>
+                                <option value="VSA_ACCUMULATION">Wyckoff VSA Institutional Accumulation</option>
+                                <option value="VSA_PULLBACK">VSA Pullback Confirmation</option>
                             </select>
+                            <div id="swing-strategy-guide-panel" style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.35; margin-top: 4px; padding: 8px 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--border-glass); box-sizing: border-box; transition: all 0.2s ease;">
+                                <span id="swing-strategy-guide-text"><strong>ALL Setups:</strong> Scans for all technical setups combined, identifying the strongest breakout or pullback candidates for the selected horizon.</span>
+                                <span style="display: inline-block; margin-top: 2px;"><a href="#" id="swing-strategy-cheat-btn" style="color: #3b82f6; text-decoration: none; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;">[📖 Strategy Cheat Sheet]</a></span>
+                            </div>
                         </div>
 
                         <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -2890,6 +3017,79 @@
             <div class="spinner"></div>
             <h3 id="loader-title">Consulting Apex Agentic AI Engine...</h3>
             <p id="loader-subtitle">CIO Parent Agent is spawning specialized subagents asynchronously to research fundamentals, technical chart lines, news sentiment, and promoter pledging status.</p>
+        </div>
+    </div>
+
+    <!-- Swing Strategy Glossary Modal -->
+    <div id="swing-strategy-glossary-modal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(3, 7, 18, 0.85); backdrop-filter: blur(10px); z-index: 9999; justify-content: center; align-items: center; box-sizing: border-box; padding: 20px;">
+        <div class="modal-card" style="background: var(--bg-sidebar); border: 1px solid var(--border-glass); border-radius: 12px; width: 100%; max-width: 850px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);">
+            <div class="modal-card-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.02);">
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif; font-size: 16px; color: var(--text-primary);">
+                    📖 Technical Strategy Setup Cheat Sheet
+                </h3>
+                <button id="swing-glossary-close-btn" style="background: none; border: none; font-size: 20px; color: var(--text-secondary); cursor: pointer; padding: 4px; transition: color 0.2s;" onmouseover="this.style.color='var(--color-crimson)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</button>
+            </div>
+            <div class="modal-card-body" style="padding: 20px; overflow-y: auto; flex: 1;">
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;">
+                    This guide defines the mechanical criteria, scanning logic, and exit rules for both Short-Term and Medium-Term horizons.
+                </p>
+                <div class="table-scroll" style="width: 100%; overflow-x: auto; border-radius: 8px; border: 1px solid var(--border-glass);">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; background: rgba(0,0,0,0.2);">
+                        <thead>
+                            <tr style="background: rgba(255,255,255,0.03); border-bottom: 2px solid var(--border-glass);">
+                                <th style="padding: 12px 14px; color: var(--text-primary); font-weight: 700; font-family: 'Outfit', sans-serif;">Strategy Setup</th>
+                                <th style="padding: 12px 14px; color: var(--text-primary); font-weight: 700; font-family: 'Outfit', sans-serif;">Short-Term Horizon (5-15 Days)</th>
+                                <th style="padding: 12px 14px; color: var(--text-primary); font-weight: 700; font-family: 'Outfit', sans-serif;">Medium-Term Horizon (1-6 Months)</th>
+                                <th style="padding: 12px 14px; color: var(--text-primary); font-weight: 700; font-family: 'Outfit', sans-serif;">Best Tactical Usage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom: 1px solid var(--border-glass);">
+                                <td style="padding: 12px 14px; font-weight: 700; color: var(--text-primary);">ALL Setups</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Checks all tactical setups simultaneously.</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Checks all position trend setups simultaneously.</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Broad-universe scans to find the strongest available swing candidates.</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-glass);">
+                                <td style="padding: 12px 14px; font-weight: 700; color: var(--text-primary);">RSI Pullback</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">RSI &le; 38.0 (Tactical mean reversion)</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">RSI &le; 45.0 (Intermediate pullback consolidation)</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Buying minor dips in overall uptrends.</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-glass);">
+                                <td style="padding: 12px 14px; font-weight: 700; color: var(--text-primary);">MACD Crossover</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Daily MACD Line &gt; Signal Line (New momentum cross)</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Weekly MACD &gt; Signal Line (Established intermediate bias)</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Riding strong momentum swings and trend reversals.</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-glass);">
+                                <td style="padding: 12px 14px; font-weight: 700; color: var(--text-primary);">EMA Cross / Bounce</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">EMA 5 &gt; EMA 20 (Short-term acceleration)</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">EMA 20 &gt; EMA 50 or bounce within 1.5% of 50 EMA</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Trading bounces off dynamic structural support lines.</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-glass);">
+                                <td style="padding: 12px 14px; font-weight: 700; color: var(--text-primary);">Bollinger Squeeze</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Price breaks above Upper Bollinger Band</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Price breaks above Upper Band during high-volume Stage 2</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Catching rapid breakouts from low-volatility squeeze zones.</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-glass);">
+                                <td style="padding: 12px 14px; font-weight: 700; color: var(--text-primary);">Wyckoff VSA</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Bullish VSA setup OR Deliverable Vol Z-Score &ge; 1.5</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Bullish VSA setup OR Deliverable Vol Z-Score &ge; 1.5</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Detecting institutional block buying and supply absorption.</td>
+                            </tr>
+                            <tr style="border-bottom: 1px solid var(--border-glass);">
+                                <td style="padding: 12px 14px; font-weight: 700; color: var(--text-primary);">VSA Pullback</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Confluence: RSI &le; 38.0 + Bullish VSA signal</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Confluence: RSI &le; 45.0 or 50 EMA support + Bullish VSA</td>
+                                <td style="padding: 12px 14px; color: var(--text-secondary);">Institutional dip buying with verified supply absorption.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 

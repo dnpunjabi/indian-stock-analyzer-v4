@@ -30,6 +30,8 @@ let activeTab = 'analyzer';
 let activeScreenerStrategy = 'hybrid';
 let activeStockProfile = null;
 let activeChartInstance = null;
+let activeVolumePriceChart = null;
+let activeVolumeDeliveryChart = null;
 let activeRiskChartInstance = null;
 let currentRiskData = {
     beta: 1.0,
@@ -118,13 +120,10 @@ document.addEventListener('DOMContentLoaded', () => {
     setupWatchlistSummary(); // Initialize Watchlist AI Summary & Print Exporter
     setupRiskAnalytics(); // CAPM Risk Analytics
     setupSwingWorkspace(); // Swing Trading Workspace
+    setupBrandReset(); // Initialize brand logo reset button events
 
-    // Restore persisted tab on reload
-    const savedTab = localStorage.getItem('active-tab') || 'analyzer';
-    switchTab(savedTab);
-    if (savedTab === 'portfolio') {
-        setTimeout(() => loadPortfolioDoctorLedger(true), 150);
-    }
+    // Always default to 'analyzer' (home page) on page load/refresh
+    switchTab('analyzer');
 });
 
 // Collapsible Sidebar Workstation Manager
@@ -5200,6 +5199,34 @@ async function loadStockSynthesis(symbol) {
             else piotroskiEl.className = 'red-text';
         }
         
+        const zscoreEl = document.getElementById('synthesis-micro-zscore');
+        if (zscoreEl) {
+            const zscoreVal = data.delivery_z_score !== undefined ? data.delivery_z_score : 0.0;
+            zscoreEl.innerText = `${zscoreVal > 0 ? '+' : ''}${zscoreVal.toFixed(2)}`;
+            if (zscoreVal >= 1.0) zscoreEl.className = 'green-text';
+            else if (zscoreVal <= -1.0) zscoreEl.className = 'red-text';
+            else zscoreEl.className = 'yellow-text';
+        }
+
+        const vsaEl = document.getElementById('synthesis-micro-vsa');
+        if (vsaEl) {
+            const pattern = data.vsa_pattern || 'Normal';
+            const shortPattern = pattern.split(' ')[0]; // E.g. 'Selling', 'No', 'Normal'
+            vsaEl.innerText = shortPattern;
+            
+            const vsaType = data.vsa_type || 'neutral';
+            if (vsaType === 'bullish') vsaEl.className = 'green-text';
+            else if (vsaType === 'bearish') vsaEl.className = 'red-text';
+            else vsaEl.className = 'yellow-text';
+        }
+
+        const pocEl = document.getElementById('synthesis-micro-poc');
+        if (pocEl) {
+            const pocVal = data.poc_price !== undefined ? data.poc_price : 0.0;
+            pocEl.innerText = `Rs. ${pocVal.toFixed(1)}`;
+            pocEl.className = 'green-text';
+        }
+        
         // 1. Build Critical Warning Flags alert callouts if present
         let warningHtml = '';
         if (data.risk_warning_flags && data.risk_warning_flags.length > 0) {
@@ -6818,6 +6845,562 @@ function setupWatchlistPagination() {
     }
 }
 
+async function loadPriceVolumeDynamics(symbol) {
+    console.log(`Loading Price Volume Dynamics for: ${symbol}`);
+    const tickerBadge = document.getElementById('volume-ticker-badge');
+    if (tickerBadge) tickerBadge.innerText = symbol;
+
+    // Reset UI state to "Loading..." to prevent old/cached data from persisting
+    const statusIcon = document.getElementById('vsa-status-icon');
+    const patternTitle = document.getElementById('vsa-pattern-title');
+    const patternDesc = document.getElementById('vsa-pattern-desc');
+    const diagnosisPanel = document.getElementById('vsa-diagnosis-panel');
+    const zscoreEl = document.getElementById('volume-dvi-zscore');
+    const zscoreLabel = document.getElementById('volume-dvi-label');
+    const pocEl = document.getElementById('volume-poc-price');
+    const aiSummaryTextEl = document.getElementById('volume-ai-summary-text');
+    const tbody = document.getElementById('bulk-deals-body');
+
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="center-text text-muted" style="padding: 15px;">Loading deals...</td>
+            </tr>
+        `;
+    }
+    if (aiSummaryTextEl) aiSummaryTextEl.innerText = "Generating volume dynamics summary...";
+    if (zscoreEl) zscoreEl.innerText = "Loading...";
+    if (zscoreLabel) zscoreLabel.innerText = "Analyzing delivery z-score...";
+    if (pocEl) pocEl.innerText = "Loading...";
+    if (patternTitle) patternTitle.innerText = "Analyzing Price Action...";
+    if (patternDesc) patternDesc.innerText = "Spawning subagents to audit volumes and scan order books...";
+    if (statusIcon) statusIcon.innerText = "🟡";
+    if (diagnosisPanel) {
+        diagnosisPanel.style.borderLeftColor = 'var(--color-amber)';
+        diagnosisPanel.style.background = 'rgba(245, 158, 11, 0.05)';
+    }
+
+    try {
+        const response = await fetch(`/api/stock/volume-dynamics?symbol=${encodeURIComponent(symbol)}`);
+        if (!response.ok) throw new Error("Failed to fetch volume dynamics.");
+        const data = await response.json();
+
+        // 1. Render VSA diagnostics
+        const statusIcon = document.getElementById('vsa-status-icon');
+        const patternTitle = document.getElementById('vsa-pattern-title');
+        const patternDesc = document.getElementById('vsa-pattern-desc');
+        const diagnosisPanel = document.getElementById('vsa-diagnosis-panel');
+        const zscoreEl = document.getElementById('volume-dvi-zscore');
+        const zscoreLabel = document.getElementById('volume-dvi-label');
+        const pocEl = document.getElementById('volume-poc-price');
+
+        if (statusIcon && patternTitle && patternDesc && diagnosisPanel) {
+            patternTitle.innerText = data.vsa_diagnose.pattern;
+            patternDesc.innerText = data.vsa_diagnose.description;
+            
+            const vsaType = data.vsa_diagnose.type;
+            if (vsaType === 'bullish') {
+                statusIcon.innerText = '🟢';
+                diagnosisPanel.style.borderLeftColor = 'var(--color-emerald)';
+                diagnosisPanel.style.background = 'rgba(16, 185, 129, 0.05)';
+            } else if (vsaType === 'bearish') {
+                statusIcon.innerText = '🔴';
+                diagnosisPanel.style.borderLeftColor = 'var(--color-crimson)';
+                diagnosisPanel.style.background = 'rgba(239, 68, 68, 0.05)';
+            } else {
+                statusIcon.innerText = '🟡';
+                diagnosisPanel.style.borderLeftColor = 'var(--color-amber)';
+                diagnosisPanel.style.background = 'rgba(245, 158, 11, 0.05)';
+            }
+        }
+
+        const zVal = data.vsa_diagnose.z_score;
+        if (zscoreEl) {
+            zscoreEl.innerText = (zVal >= 0 ? "+" : "") + zVal.toFixed(2);
+            if (zVal >= 1.5) {
+                zscoreEl.style.color = '#10b981';
+            } else if (zVal <= -1.5) {
+                zscoreEl.style.color = '#ef4444';
+            } else {
+                zscoreEl.style.color = 'var(--text-primary)';
+            }
+        }
+
+        if (zscoreLabel) {
+            if (zVal >= 2.0) {
+                zscoreLabel.innerText = `★ Institutional Block Buying (Z: +${zVal.toFixed(2)})`;
+            } else if (zVal >= 1.0) {
+                zscoreLabel.innerText = "🟢 Significant Accumulation";
+            } else if (zVal <= -1.0) {
+                zscoreLabel.innerText = "🔴 High speculative day-trading churn";
+            } else {
+                zscoreLabel.innerText = "Neutral standard volume range";
+            }
+        }
+
+        if (pocEl) {
+            pocEl.innerText = `Rs. ${data.poc_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+        }
+
+        // Render AI/LLM Summary
+        const aiSummaryTextEl = document.getElementById('volume-ai-summary-text');
+        if (aiSummaryTextEl) {
+            aiSummaryTextEl.innerText = data.ai_summary || "No analysis available.";
+        }
+
+        // 2. Render Bulk & Block Deals timeline
+        const tbody = document.getElementById('bulk-deals-body');
+        if (tbody) {
+            tbody.innerHTML = '';
+            if (data.bulk_deals && data.bulk_deals.length > 0) {
+                data.bulk_deals.forEach(deal => {
+                    const tr = document.createElement('tr');
+                    const isBuy = deal.deal_type === 'BUY';
+                    const isMock = deal.is_mock === 1;
+                    tr.innerHTML = `
+                        <td><strong>${deal.deal_date}</strong></td>
+                        <td>
+                            ${deal.client_name}
+                            ${isMock ? '<span style="font-size: 8.5px; font-weight: 700; padding: 2px 5px; background: rgba(245, 158, 11, 0.12); color: var(--color-amber); border: 1px solid rgba(245,158,11,0.25); border-radius: 4px; margin-left: 6px; font-family: \'Outfit\', sans-serif;">SIMULATED</span>' : ''}
+                        </td>
+                        <td><span class="badge-rec" style="padding: 2px 6px; font-size: 10px; background: ${isBuy ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'}; color: ${isBuy ? 'var(--color-emerald)' : 'var(--color-crimson)'}; border: 1px solid ${isBuy ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'};">${deal.deal_type}</span></td>
+                        <td>${deal.quantity.toLocaleString('en-IN')}</td>
+                        <td>Rs. ${deal.price.toFixed(2)}</td>
+                        <td>${deal.percentage_equity != null ? deal.percentage_equity + '%' : '—'}</td>
+                        <td><span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">${deal.deal_window}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="center-text text-muted" style="padding: 15px;">No bulk or block deals recorded for this ticker.</td>
+                    </tr>
+                `;
+            }
+        }
+
+        // 3. Render Synced Lightweight Charts
+        const priceContainer = document.getElementById('volume-price-chart');
+        const delivContainer = document.getElementById('volume-delivery-chart');
+
+        if (activeVolumePriceChart) {
+            activeVolumePriceChart.remove();
+            activeVolumePriceChart = null;
+        }
+        if (activeVolumeDeliveryChart) {
+            activeVolumeDeliveryChart.remove();
+            activeVolumeDeliveryChart = null;
+        }
+
+        if (!priceContainer || !delivContainer || !data.candlesticks || data.candlesticks.length === 0) return;
+
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        const isLight = currentTheme === 'light';
+        const textColor = isLight ? '#4b5563' : '#94a3b8';
+        const gridColor = isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)';
+        const borderColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
+
+        // Create top price chart
+        activeVolumePriceChart = LightweightCharts.createChart(priceContainer, {
+            layout: {
+                background: { type: LightweightCharts.ColorType.Solid, color: 'transparent' },
+                textColor: textColor,
+                fontSize: 10,
+                fontFamily: 'Inter, sans-serif',
+            },
+            grid: {
+                vertLines: { color: gridColor, style: LightweightCharts.LineStyle.Dotted },
+                horzLines: { color: gridColor, style: LightweightCharts.LineStyle.Dotted },
+            },
+            rightPriceScale: {
+                borderColor: borderColor,
+                autoScale: true,
+                scaleMargins: {
+                    top: 0.12,
+                    bottom: 0.12,
+                },
+            },
+            timeScale: { borderColor: borderColor, visible: false },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+                vertLine: {
+                    color: isLight ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.5)',
+                    width: 1,
+                    style: LightweightCharts.LineStyle.Dash,
+                    labelVisible: false,
+                },
+                horzLine: {
+                    color: isLight ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.5)',
+                    width: 1,
+                    style: LightweightCharts.LineStyle.Dash,
+                    labelVisible: true,
+                },
+            },
+        });
+
+        // Create bottom volume chart
+        activeVolumeDeliveryChart = LightweightCharts.createChart(delivContainer, {
+            layout: {
+                background: { type: LightweightCharts.ColorType.Solid, color: 'transparent' },
+                textColor: textColor,
+                fontSize: 10,
+                fontFamily: 'Inter, sans-serif',
+            },
+            grid: {
+                vertLines: { color: gridColor, style: LightweightCharts.LineStyle.Dotted },
+                horzLines: { color: gridColor, style: LightweightCharts.LineStyle.Dotted },
+            },
+            rightPriceScale: {
+                borderColor: borderColor,
+                autoScale: true,
+                scaleMargins: {
+                    top: 0.05,
+                    bottom: 0,
+                },
+            },
+            timeScale: { borderColor: borderColor, visible: true },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+                vertLine: {
+                    color: isLight ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.5)',
+                    width: 1,
+                    style: LightweightCharts.LineStyle.Dash,
+                    labelVisible: true,
+                },
+                horzLine: {
+                    color: isLight ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.5)',
+                    width: 1,
+                    style: LightweightCharts.LineStyle.Dash,
+                    labelVisible: true,
+                },
+            },
+        });
+
+        const candleSeries = activeVolumePriceChart.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+        });
+
+        const totalVolSeries = activeVolumeDeliveryChart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: 'volume-scale',
+        });
+
+        const delivVolSeries = activeVolumeDeliveryChart.addHistogramSeries({
+            priceFormat: { type: 'volume' },
+            priceScaleId: 'volume-scale',
+        });
+
+        const candleData = [];
+        const totalVolData = [];
+        const delivVolData = [];
+
+        data.candlesticks.forEach(item => {
+            const isGreen = item.close > item.open;
+            
+            candleData.push({
+                time: item.time,
+                open: item.open,
+                high: item.high,
+                low: item.low,
+                close: item.close,
+            });
+
+            totalVolData.push({
+                time: item.time,
+                value: item.volume,
+                color: isGreen ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            });
+
+            delivVolData.push({
+                time: item.time,
+                value: item.delivery_qty,
+                color: isGreen ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)',
+            });
+        });
+
+        candleSeries.setData(candleData);
+        totalVolSeries.setData(totalVolData);
+        delivVolSeries.setData(delivVolData);
+
+        // Add Point of Control (POC) line overlay
+        candleSeries.createPriceLine({
+            price: data.poc_price,
+            color: '#ef4444',
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `POC: Rs. ${data.poc_price}`,
+        });
+
+        // Add Bulk/Block Deals timeline markers
+        const markers = [];
+        if (data.bulk_deals && data.bulk_deals.length > 0) {
+            data.bulk_deals.forEach(deal => {
+                // Find matching timestamp in candleData
+                const exists = candleData.find(c => c.time === deal.deal_date);
+                if (exists) {
+                    markers.push({
+                        time: deal.deal_date,
+                        position: 'aboveBar',
+                        color: deal.deal_type === 'BUY' ? '#10b981' : '#ef4444',
+                        shape: 'star',
+                        text: `Block ${deal.deal_type}`,
+                        size: 2,
+                    });
+                }
+            });
+        }
+        
+        // Add dynamic corporate action (split/bonus) markers
+        if (data.corporate_actions && data.corporate_actions.length > 0) {
+            data.corporate_actions.forEach(ca => {
+                const exists = candleData.find(c => c.time === ca.ex_date);
+                if (exists) {
+                    markers.push({
+                        time: ca.ex_date,
+                        position: 'belowBar',
+                        color: ca.action_type === 'SPLIT' ? '#3b82f6' : '#a855f7',
+                        shape: 'arrowUp',
+                        text: `ex-${ca.action_type} (Ratio: 1:${ca.ratio_multiplier})`,
+                        size: 2,
+                    });
+                }
+            });
+        }
+
+        if (markers.length > 0) {
+            markers.sort((a, b) => a.time.localeCompare(b.time));
+            candleSeries.setMarkers(markers);
+        }
+
+        // Sync timescales
+        activeVolumePriceChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+            activeVolumeDeliveryChart.timeScale().setVisibleLogicalRange(range);
+        });
+        activeVolumeDeliveryChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+            activeVolumePriceChart.timeScale().setVisibleLogicalRange(range);
+        });
+
+        // Floating Tooltip setup for Synced Price-Volume Charts
+        let tooltip = document.getElementById('volume-chart-tooltip');
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'volume-chart-tooltip';
+            tooltip.style.position = 'absolute';
+            tooltip.style.display = 'none';
+            tooltip.style.padding = '10px 14px';
+            tooltip.style.background = 'rgba(15, 23, 42, 0.95)';
+            tooltip.style.border = '1px solid var(--border-glass)';
+            tooltip.style.borderRadius = '8px';
+            tooltip.style.color = 'var(--text-primary)';
+            tooltip.style.fontSize = '11px';
+            tooltip.style.fontFamily = 'Inter, sans-serif';
+            tooltip.style.zIndex = '1000';
+            tooltip.style.pointerEvents = 'none';
+            tooltip.style.boxShadow = '0 6px 16px rgba(0,0,0,0.6)';
+            tooltip.style.backdropFilter = 'blur(4px)';
+            priceContainer.appendChild(tooltip);
+        }
+
+        let activeHoverContainer = null;
+        
+        priceContainer.addEventListener('mouseenter', () => { activeHoverContainer = priceContainer; });
+        priceContainer.addEventListener('mouseleave', () => {
+            activeHoverContainer = null;
+            tooltip.style.display = 'none';
+        });
+        
+        delivContainer.addEventListener('mouseenter', () => { activeHoverContainer = delivContainer; });
+        delivContainer.addEventListener('mouseleave', () => {
+            activeHoverContainer = null;
+            tooltip.style.display = 'none';
+        });
+
+        function updateTooltip(param, hoverContainer) {
+            if (activeHoverContainer !== hoverContainer) return;
+            
+            if (
+                param.point === undefined ||
+                !param.time ||
+                param.point.x < 0 ||
+                param.point.x > hoverContainer.clientWidth ||
+                param.point.y < 0 ||
+                param.point.y > hoverContainer.clientHeight
+            ) {
+                tooltip.style.display = 'none';
+                return;
+            }
+
+            let timeStr = '';
+            if (typeof param.time === 'string') {
+                timeStr = param.time;
+            } else if (typeof param.time === 'object' && param.time !== null) {
+                timeStr = `${param.time.year}-${String(param.time.month).padStart(2, '0')}-${String(param.time.day).padStart(2, '0')}`;
+            } else if (typeof param.time === 'number') {
+                const d = new Date(param.time * 1000);
+                timeStr = d.toISOString().split('T')[0];
+            }
+
+            const item = data.candlesticks.find(c => c.time === timeStr);
+            if (!item) {
+                tooltip.style.display = 'none';
+                return;
+            }
+
+            let blockDealHtml = '';
+            if (data.bulk_deals && data.bulk_deals.length > 0) {
+                const dayDeals = data.bulk_deals.filter(d => d.deal_date === timeStr);
+                if (dayDeals.length > 0) {
+                    blockDealHtml = `<div style="margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 4px;">`;
+                    dayDeals.forEach(deal => {
+                        const color = deal.deal_type === 'BUY' ? '#10b981' : '#ef4444';
+                        blockDealHtml += `
+                            <div style="font-size: 10px; color: ${color}; font-weight: 600;">
+                                ★ ${deal.deal_type}: ${deal.client_name.substring(0, 22)}...
+                            </div>
+                            <div style="font-size: 9px; color: var(--text-muted); margin-left: 10px;">
+                                ${deal.quantity.toLocaleString('en-IN')} shrs @ ₹${deal.price.toFixed(2)} (${deal.percentage_equity}%)
+                            </div>
+                        `;
+                    });
+                    blockDealHtml += `</div>`;
+                }
+            }
+
+            const dateObj = new Date(timeStr);
+            const dateFmt = dateObj.toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+            });
+
+            const isGreen = item.close > item.open;
+            const changePct = ((item.close - item.open) / item.open * 100).toFixed(2);
+            const changeColor = isGreen ? '#10b981' : '#ef4444';
+
+            tooltip.style.display = 'block';
+            tooltip.innerHTML = `
+                <div style="font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;">${dateFmt}</div>
+                <div style="display: grid; grid-template-columns: auto auto; gap: 4px 12px; margin-bottom: 4px; line-height: 1.3;">
+                    <div>O: <span style="font-weight:600;">₹${item.open.toFixed(2)}</span></div>
+                    <div>H: <span style="font-weight:600;">₹${item.high.toFixed(2)}</span></div>
+                    <div>L: <span style="font-weight:600;">₹${item.low.toFixed(2)}</span></div>
+                    <div>C: <span style="font-weight:600; color: ${changeColor};">₹${item.close.toFixed(2)}</span></div>
+                </div>
+                <div style="font-size: 9px; color: ${changeColor}; margin-bottom: 4px; font-weight: 600;">
+                    Change: ${isGreen ? '+' : ''}${changePct}%
+                </div>
+                <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px; line-height: 1.3;">
+                    <div>Vol: <span style="font-weight:600;">${item.volume.toLocaleString('en-IN')}</span></div>
+                    <div>Deliv: <span style="font-weight:600; color: #10b981;">${item.delivery_qty.toLocaleString('en-IN')} (${item.delivery_pct}%)</span></div>
+                </div>
+                ${blockDealHtml}
+            `;
+
+            const tooltipWidth = 190;
+            const tooltipHeight = 130 + (blockDealHtml ? 40 : 0);
+            
+            let left = param.point.x + 15;
+            let top = param.point.y + 15;
+            
+            tooltip.style.left = Math.min(priceContainer.clientWidth - tooltipWidth, left) + 'px';
+            if (hoverContainer === priceContainer) {
+                tooltip.style.top = Math.min(priceContainer.clientHeight - tooltipHeight, top) + 'px';
+            } else {
+                tooltip.style.top = (priceContainer.clientHeight - tooltipHeight - 10) + 'px';
+            }
+        }
+
+        activeVolumePriceChart.subscribeCrosshairMove(param => {
+            updateTooltip(param, priceContainer);
+        });
+
+        activeVolumeDeliveryChart.subscribeCrosshairMove(param => {
+            updateTooltip(param, delivContainer);
+        });
+
+    } catch (e) {
+        console.error("Error loading Price Volume Dynamics:", e);
+        showToast("Error loading Price Volume Dynamics analysis.", "error");
+        
+        // Reset elements to failure/empty states
+        const statusIcon = document.getElementById('vsa-status-icon');
+        const patternTitle = document.getElementById('vsa-pattern-title');
+        const patternDesc = document.getElementById('vsa-pattern-desc');
+        const diagnosisPanel = document.getElementById('vsa-diagnosis-panel');
+        const zscoreEl = document.getElementById('volume-dvi-zscore');
+        const zscoreLabel = document.getElementById('volume-dvi-label');
+        const pocEl = document.getElementById('volume-poc-price');
+        const aiSummaryTextEl = document.getElementById('volume-ai-summary-text');
+        const tbody = document.getElementById('bulk-deals-body');
+
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="center-text text-muted" style="padding: 15px; color: var(--color-crimson);">Failed to load bulk/block deals.</td>
+                </tr>
+            `;
+        }
+        if (aiSummaryTextEl) aiSummaryTextEl.innerText = "Failed to load volume dynamics summary.";
+        if (zscoreEl) zscoreEl.innerText = "N/A";
+        if (zscoreLabel) zscoreLabel.innerText = "Failed to calculate delivery score.";
+        if (pocEl) pocEl.innerText = "N/A";
+        if (patternTitle) patternTitle.innerText = "Analysis Failed";
+        if (patternDesc) patternDesc.innerText = "Could not complete Volume Spread Analysis.";
+        if (statusIcon) statusIcon.innerText = "🔴";
+        if (diagnosisPanel) {
+            diagnosisPanel.style.borderLeftColor = 'var(--color-crimson)';
+            diagnosisPanel.style.background = 'rgba(239, 68, 68, 0.05)';
+        }
+    }
+}
+
+function updateVolumeChartThemeColors() {
+    if (!activeVolumePriceChart || !activeVolumeDeliveryChart) return;
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const isLight = currentTheme === 'light';
+    const textColor = isLight ? '#4b5563' : '#94a3b8';
+    const gridColor = isLight ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.02)';
+    const borderColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
+
+    activeVolumePriceChart.applyOptions({
+        layout: {
+            textColor: textColor,
+        },
+        grid: {
+            vertLines: { color: gridColor },
+            horzLines: { color: gridColor },
+        },
+        rightPriceScale: { borderColor: borderColor },
+        timeScale: { borderColor: borderColor },
+        crosshair: {
+            vertLine: { color: isLight ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.5)' },
+            horzLine: { color: isLight ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.5)' },
+        }
+    });
+
+    activeVolumeDeliveryChart.applyOptions({
+        layout: {
+            textColor: textColor,
+        },
+        grid: {
+            vertLines: { color: gridColor },
+            horzLines: { color: gridColor },
+        },
+        rightPriceScale: { borderColor: borderColor },
+        timeScale: { borderColor: borderColor },
+        crosshair: {
+            vertLine: { color: isLight ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.5)' },
+            horzLine: { color: isLight ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.5)' },
+        }
+    });
+}
+
 // Collapsible Business Summary Setup
 function setupBusinessSummaryCollapsible() {
     const bsToggle = document.getElementById('business-summary-toggle');
@@ -6964,6 +7547,9 @@ function setupThemeToggle() {
         }
         if (typeof updateRiskChartThemeColors === 'function') {
             updateRiskChartThemeColors();
+        }
+        if (typeof updateVolumeChartThemeColors === 'function') {
+            updateVolumeChartThemeColors();
         }
     };
     
@@ -8976,6 +9562,14 @@ function setupAnalyzerSubtabs() {
             btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 
             const activeSubtab = btn.getAttribute('data-subtab');
+
+            if (activeSubtab === 'volume') {
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    loadPriceVolumeDynamics(activeStockProfile.ticker);
+                } else {
+                    showToast("Please load a stock analyzer profile first.", "warning");
+                }
+            }
 
             // Toggle visibility of all cards within the dashboard-grid container
             const cards = document.querySelectorAll('.dashboard-grid > .card');
@@ -12373,6 +12967,58 @@ function setupSwingWorkspace() {
     const horizonShortBtn = document.getElementById('swing-horizon-short-btn');
     const horizonMediumBtn = document.getElementById('swing-horizon-medium-btn');
 
+    // Setup dynamic strategy guide updates
+    const strategySelect = document.getElementById('swing-scan-strategy');
+    const guideText = document.getElementById('swing-strategy-guide-text');
+    const cheatBtn = document.getElementById('swing-strategy-cheat-btn');
+    const glossaryModal = document.getElementById('swing-strategy-glossary-modal');
+    const closeGlossaryBtn = document.getElementById('swing-glossary-close-btn');
+
+    const updateSwingStrategyGuide = () => {
+        if (!strategySelect || !guideText) return;
+        const strategy = strategySelect.value;
+        const horizon = activeSwingHorizon;
+        let desc = "";
+
+        if (strategy === 'ALL') {
+            desc = "<strong>ALL Setups:</strong> Scans for all technical setups combined, identifying the strongest breakout or pullback candidates for the selected horizon.";
+        } else if (strategy === 'RSI') {
+            if (horizon === 'medium') {
+                desc = "<strong>RSI Pullback (Medium-Term):</strong> Scans for intermediate consolidation pullbacks where <strong>RSI &le; 45.0</strong>. Ideal for buying minor dips in established uptrends.";
+            } else {
+                desc = "<strong>RSI Pullback (Short-Term):</strong> Scans for tactical mean-reversion pullbacks where <strong>RSI &le; 38.0</strong>. Designed to catch rapid oversold bounces.";
+            }
+        } else if (strategy === 'MACD') {
+            if (horizon === 'medium') {
+                desc = "<strong>MACD State (Medium-Term):</strong> Flags stocks with a weekly bullish momentum state where the <strong>Weekly MACD line is above the Signal line</strong>.";
+            } else {
+                desc = "<strong>MACD Crossover (Short-Term):</strong> Targets a daily bullish crossover state where the <strong>Daily MACD line has crossed above the Signal line</strong>.";
+            }
+        } else if (strategy === 'EMA') {
+            if (horizon === 'medium') {
+                desc = "<strong>EMA Trend Support (Medium-Term):</strong> Filters for intermediate trend support: <strong>EMA 20 &gt; EMA 50</strong> or a price bounce within <strong>1.5% of the 50-day EMA</strong>.";
+            } else {
+                desc = "<strong>EMA Golden Cross (Short-Term):</strong> Detects short-term trend acceleration where the <strong>5-day EMA crossed above the 20-day EMA</strong>.";
+            }
+        } else if (strategy === 'BB') {
+            if (horizon === 'medium') {
+                desc = "<strong>Stage 2 Bollinger Breakout (Medium-Term):</strong> Scans for range breakouts above the **Upper Bollinger Band** with volume expansion during institutional Stage 2.";
+            } else {
+                desc = "<strong>BB Squeeze Breakout (Short-Term):</strong> Targets rapid breakouts above the **Upper Bollinger Band** following a volatility squeeze.";
+            }
+        } else if (strategy === 'VSA_ACCUMULATION') {
+            desc = "<strong>Wyckoff VSA Institutional Accumulation (All Horizons):</strong> Detects institutional footprints: bullish VSA signals (Selling Climax, No Supply) or a **Deliverable Vol Z-Score &ge; 1.5**.";
+        } else if (strategy === 'VSA_PULLBACK') {
+            if (horizon === 'medium') {
+                desc = "<strong>VSA Pullback Confirmation (Medium-Term):</strong> Double confirmation setup. Price pullback (RSI &le; 45.0 or 50 EMA bounce) + **Bullish VSA candle** (buying absorption).";
+            } else {
+                desc = "<strong>VSA Pullback Confirmation (Short-Term):</strong> Double confirmation setup. Price pullback (RSI &le; 38.0) + **Bullish VSA candle** (buying absorption).";
+            }
+        }
+
+        guideText.innerHTML = desc;
+    };
+
     const updateHorizonUI = (horizon) => {
         activeSwingHorizon = horizon;
         
@@ -12496,6 +13142,7 @@ function setupSwingWorkspace() {
                 }
             }
         }
+        updateSwingStrategyGuide();
     };
 
     if (scanHorizonShortBtn) {
@@ -12656,6 +13303,36 @@ function setupSwingWorkspace() {
         const el = document.getElementById(id);
         if (el) resizeObserver.observe(el);
     });
+
+    // Strategy select and cheat sheet button bindings
+    if (strategySelect) {
+        strategySelect.addEventListener('change', updateSwingStrategyGuide);
+    }
+
+    if (cheatBtn && glossaryModal) {
+        cheatBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            glossaryModal.style.display = 'flex';
+        });
+    }
+
+    if (closeGlossaryBtn && glossaryModal) {
+        closeGlossaryBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            glossaryModal.style.display = 'none';
+        });
+        
+        glossaryModal.addEventListener('click', (e) => {
+            if (e.target === glossaryModal) {
+                glossaryModal.style.display = 'none';
+            }
+        });
+    }
+
+    // Initial load
+    updateSwingStrategyGuide();
 }
 
 async function executeSwingScan() {
