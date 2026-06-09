@@ -1120,6 +1120,84 @@ class TestAlertsEnhancements(unittest.TestCase):
         self.assertIsNotNone(sma_alert)
         self.assertTrue(sma_alert["triggered"])
 
+    @patch("backend.main.get_complete_financial_profile")
+    @patch("backend.main.fetch_history_df")
+    def test_all_other_triggers(self, mock_fetch_history, mock_get_profile):
+        """Tests RSI, PE, RATING, PRICE, SMA, EMA_CROSS, VOL_BREAKOUT, BB_CROSS, MACD_CROSS, and 52W_PROXIMITY alert triggers."""
+        mock_get_profile.return_value = {
+            "fundamentals": {
+                "current_price": 100.0,
+                "pe_ratio": 15.0
+            },
+            "technicals": {
+                "rsi": 28.0,
+                "sma_200": 110.0
+            },
+            "analysis": {
+                "recommendation": "Strong Buy"
+            },
+            "pe_bands": {
+                "median_pe": 20.0
+            }
+        }
+
+        dates = pd.date_range(end="2026-06-09", periods=250, freq="D")
+        
+        df_rsi = pd.DataFrame({"Close": [100.0]*250, "Volume": [100000]*250}, index=dates)
+        df_ema = pd.DataFrame({"Close": [100.0]*200 + [80.0]*49 + [2000.0], "Volume": [100000]*250}, index=dates)
+        df_vol = pd.DataFrame({"Close": [100.0]*250, "Volume": [500000]*249 + [2000000]}, index=dates)
+        df_bb = pd.DataFrame({"Close": [100.0]*248 + [90.0] + [500.0], "Volume": [100000]*250}, index=dates)
+        df_macd = pd.DataFrame({"Close": [100.0]*248 + [95.0] + [150.0], "Volume": [100000]*250}, index=dates)
+        df_prox = pd.DataFrame({"Close": [100.0]*249 + [99.0], "Volume": [100000]*250}, index=dates)
+
+        def history_side_effect(ticker, period, interval):
+            if ticker == "EMA":
+                return df_ema
+            elif ticker == "VOL":
+                return df_vol
+            elif ticker == "BB":
+                return df_bb
+            elif ticker == "MACD":
+                return df_macd
+            elif ticker == "PROX":
+                return df_prox
+            return df_rsi
+
+        mock_fetch_history.side_effect = history_side_effect
+
+        alerts_to_set = [
+            ("TEST", "RSI", "<", "30"),
+            ("TEST", "PE", "<", "MEDIAN"),
+            ("TEST", "RATING", "==", "Strong Buy"),
+            ("TEST", "PRICE", "<", "150"),
+            ("TEST", "SMA", "<", "0"),
+            ("EMA", "EMA_CROSS", ">", "0"),
+            ("VOL", "VOL_BREAKOUT", ">", "2.0"),
+            ("BB", "BB_CROSS", ">", "0"),
+            ("MACD", "MACD_CROSS", ">", "0"),
+            ("PROX", "52W_PROXIMITY", ">", "3.0")
+        ]
+
+        alert_ids = []
+        for ticker, cond, op, val in alerts_to_set:
+            res = self.client.post("/api/alerts/set", json={
+                "ticker": ticker,
+                "condition_type": cond,
+                "operator": op,
+                "value": val
+            })
+            self.assertEqual(res.status_code, 200)
+            alert_ids.append(res.json()["id"])
+
+        check_res = self.client.get("/api/alerts/check")
+        self.assertEqual(check_res.status_code, 200)
+        check_data = check_res.json()
+
+        for aid in alert_ids:
+            alert = next((a for a in check_data["alerts"] if a["id"] == aid), None)
+            self.assertIsNotNone(alert, f"Alert ID {aid} was not found in response.")
+            self.assertTrue(alert["triggered"], f"Alert of type {alert['condition_type']} failed to trigger.")
+
 
 if __name__ == "__main__":
     unittest.main()
