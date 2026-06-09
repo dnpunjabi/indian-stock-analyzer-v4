@@ -4808,13 +4808,13 @@ function updateAlertCheatsheet() {
         defaultVal = "5";
         helper = "Deviation percent (e.g. 5 for 5% above SMA-200, or -5 for 5% below).";
     } else if (condition === "DMA_CROSS") {
-        desc = "<strong>50 SMA vs 200 SMA Crossover:</strong> Classic golden/death cross momentum trigger. Triggers when 50 SMA crosses above (&gt; Golden Cross) or below (&lt; Death Cross) 200 SMA.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 0 (Golden Cross momentum entry) or Operator &lt;, Value 0 (Death Cross exit)</span>";
-        defaultVal = "0";
-        helper = "Set to 0. Trigger evaluates daily crossover condition directly.";
+        desc = "<strong>50 SMA vs 200 SMA Crossover:</strong> Classic golden/death cross momentum trigger. Triggers when 50 SMA crosses 200 SMA. Set a threshold to filter whipsaws (percentage separation buffer).<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 1.5 (Golden Cross with minimum 1.5% separation buffer to filter fake breakouts)</span>";
+        defaultVal = "0.0";
+        helper = "Enter deviation threshold % buffer (e.g. 0.0 for pure cross, or 1.5 for a 1.5% buffer).";
     } else if (condition === "EMA_CROSS") {
-        desc = "<strong>50 EMA vs 200 EMA Crossover:</strong> Trend crossover using Exponential Moving Average, prioritizing recent price movements. Triggers on cross.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 0 (Golden Cross trend entry)</span>";
-        defaultVal = "0";
-        helper = "Set to 0. Trigger evaluates EMA crossover directly.";
+        desc = "<strong>50 EMA vs 200 EMA Crossover:</strong> Trend crossover prioritizing recent price movements. Triggers on cross. Set a threshold to filter whipsaws (percentage separation buffer).<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 1.0 (Golden Cross with minimum 1.0% separation buffer)</span>";
+        defaultVal = "0.0";
+        helper = "Enter deviation threshold % buffer (e.g. 0.0 for pure cross, or 1.0 for a 1.0% buffer).";
     } else if (condition === "VOL_BREAKOUT") {
         desc = "<strong>Volume vs 20d Avg Volume:</strong> Detects institutional smart-money breakouts. Triggers when current volume is X times greater than 20d average.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 2.0 (volume double the 20-day average)</span>";
         defaultOp = ">";
@@ -4825,9 +4825,9 @@ function updateAlertCheatsheet() {
         defaultVal = "0";
         helper = "Set to 0. Triggers immediately on band crossing.";
     } else if (condition === "MACD_CROSS") {
-        desc = "<strong>MACD vs Signal Line Cross:</strong> Moving Average Convergence Divergence trend-following oscillator. Triggers on bullish (&gt; cross above signal) or bearish (&lt; cross below signal) crossover.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 0 (bullish crossover entry) or Operator &lt;, Value 0 (bearish crossover exit)</span>";
-        defaultVal = "0";
-        helper = "Set to 0. Trigger checks MACD crosses signal line.";
+        desc = "<strong>MACD vs Signal Line Cross:</strong> Trend-following oscillator. Triggers on bullish (&gt;) or bearish (&lt;) crossover. Set a threshold to filter whipsaws (absolute point difference buffer).<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 0.5 (Bullish crossover with MACD exceeding Signal by at least 0.5 points)</span>";
+        defaultVal = "0.0";
+        helper = "Enter point buffer threshold (e.g. 0.0 for pure cross, or 0.5 for absolute point difference).";
     } else if (condition === "52W_PROXIMITY") {
         desc = "<strong>Price vs 52-Week Range:</strong> Proximity to historical limits. Triggers when price is within X% of 52w High (&gt;) or 52w Low (&lt;).<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &lt;, Value 3 (within 3% of 52w Low)</span>";
         defaultVal = "3";

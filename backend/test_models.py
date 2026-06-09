@@ -1198,6 +1198,75 @@ class TestAlertsEnhancements(unittest.TestCase):
             self.assertIsNotNone(alert, f"Alert ID {aid} was not found in response.")
             self.assertTrue(alert["triggered"], f"Alert of type {alert['condition_type']} failed to trigger.")
 
+    @patch("backend.main.get_complete_financial_profile")
+    @patch("backend.main.fetch_history_df")
+    def test_crossover_triggers_with_nonzero_buffers(self, mock_fetch_history, mock_get_profile):
+        """Verifies DMA_CROSS, EMA_CROSS, and MACD_CROSS with non-zero threshold buffers."""
+        mock_get_profile.return_value = {
+            "fundamentals": {"current_price": 100.0},
+            "technicals": {"rsi": 50.0}
+        }
+
+        dates = pd.date_range(end="2026-06-09", periods=250, freq="D")
+        
+        df_dma = pd.DataFrame({"Close": [100.0]*200 + [80.0]*49 + [2000.0], "Volume": [100000]*250}, index=dates)
+        df_ema = pd.DataFrame({"Close": [100.0]*200 + [80.0]*49 + [2000.0], "Volume": [100000]*250}, index=dates)
+        df_macd = pd.DataFrame({"Close": [100.0]*248 + [95.0] + [150.0], "Volume": [100000]*250}, index=dates)
+        df_dma_death = pd.DataFrame({"Close": [100.0]*200 + [90.0]*49 + [20.0], "Volume": [100000]*250}, index=dates)
+
+        def history_side_effect(ticker, period, interval):
+            if ticker == "DMA_GOLD_TRIG":
+                return df_dma
+            elif ticker == "DMA_GOLD_NOTRIG":
+                return df_dma
+            elif ticker == "DMA_DEATH_TRIG":
+                return df_dma_death
+            elif ticker == "DMA_DEATH_NOTRIG":
+                return df_dma_death
+            elif ticker == "EMA_GOLD_TRIG":
+                return df_ema
+            elif ticker == "EMA_GOLD_NOTRIG":
+                return df_ema
+            elif ticker == "MACD_TRIG":
+                return df_macd
+            elif ticker == "MACD_NOTRIG":
+                return df_macd
+            return df_dma
+
+        mock_fetch_history.side_effect = history_side_effect
+
+        alerts_to_test = [
+            ("DMA_GOLD_TRIG", "DMA_CROSS", ">", "5.0", True),
+            ("DMA_GOLD_NOTRIG", "DMA_CROSS", ">", "20.0", False),
+            ("DMA_DEATH_TRIG", "DMA_CROSS", "<", "8.0", True),
+            ("DMA_DEATH_NOTRIG", "DMA_CROSS", "<", "10.0", False),
+            ("EMA_GOLD_TRIG", "EMA_CROSS", ">", "2.0", True),
+            ("EMA_GOLD_NOTRIG", "EMA_CROSS", ">", "50.0", False),
+            ("MACD_TRIG", "MACD_CROSS", ">", "1.0", True),
+            ("MACD_NOTRIG", "MACD_CROSS", ">", "4.0", False),
+        ]
+
+        alert_ids = []
+        for ticker, cond, op, val, expected_trigger in alerts_to_test:
+            res = self.client.post("/api/alerts/set", json={
+                "ticker": ticker,
+                "condition_type": cond,
+                "operator": op,
+                "value": val
+            })
+            self.assertEqual(res.status_code, 200)
+            alert_ids.append((res.json()["id"], expected_trigger, cond, val))
+
+        check_res = self.client.get("/api/alerts/check")
+        self.assertEqual(check_res.status_code, 200)
+        check_data = check_res.json()
+
+        for aid, expected_trigger, cond, val in alert_ids:
+            alert = next((a for a in check_data["alerts"] if a["id"] == aid), None)
+            self.assertIsNotNone(alert, f"Alert ID {aid} not found.")
+            self.assertEqual(alert["triggered"], 1 if expected_trigger else 0,
+                             f"Alert {cond} with value {val} trigger state mismatch: expected {expected_trigger}, got {alert['triggered']}")
+
 
 if __name__ == "__main__":
     unittest.main()

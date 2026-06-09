@@ -2279,11 +2279,20 @@ async def check_alerts():
                     ma50_prev, ma50_curr = float(df_clean["MA_50"].iloc[-2]), float(df_clean["MA_50"].iloc[-1])
                     ma200_prev, ma200_curr = float(df_clean["MA_200"].iloc[-2]), float(df_clean["MA_200"].iloc[-1])
                     cur_val = f"50d SMA: Rs. {ma50_curr:.2f} vs 200d SMA: Rs. {ma200_curr:.2f}"
-                    if alert["operator"] == ">": # Golden Cross
-                        if ma50_prev < ma200_prev and ma50_curr >= ma200_curr:
+                    try:
+                        buffer_pct = float(alert["value"])
+                    except Exception:
+                        buffer_pct = 0.0
+                    
+                    diff_prev = ((ma50_prev - ma200_prev) / ma200_prev) * 100
+                    diff_curr = ((ma50_curr - ma200_curr) / ma200_curr) * 100
+                    
+                    if alert["operator"] == ">": # Golden Cross with positive buffer
+                        if diff_prev < buffer_pct and diff_curr >= buffer_pct:
                             triggered = True
-                    elif alert["operator"] == "<": # Death Cross
-                        if ma50_prev > ma200_prev and ma50_curr <= ma200_curr:
+                    elif alert["operator"] == "<": # Death Cross with negative buffer
+                        target_val = -abs(buffer_pct)
+                        if diff_prev > target_val and diff_curr <= target_val:
                             triggered = True
 
             elif alert["condition_type"] == "EMA_CROSS":
@@ -2295,11 +2304,20 @@ async def check_alerts():
                     ma50_prev, ma50_curr = float(df_clean["MA_50"].iloc[-2]), float(df_clean["MA_50"].iloc[-1])
                     ma200_prev, ma200_curr = float(df_clean["MA_200"].iloc[-2]), float(df_clean["MA_200"].iloc[-1])
                     cur_val = f"50d EMA: Rs. {ma50_curr:.2f} vs 200d EMA: Rs. {ma200_curr:.2f}"
-                    if alert["operator"] == ">": # Golden Cross
-                        if ma50_prev < ma200_prev and ma50_curr >= ma200_curr:
+                    try:
+                        buffer_pct = float(alert["value"])
+                    except Exception:
+                        buffer_pct = 0.0
+                    
+                    diff_prev = ((ma50_prev - ma200_prev) / ma200_prev) * 100
+                    diff_curr = ((ma50_curr - ma200_curr) / ma200_curr) * 100
+                    
+                    if alert["operator"] == ">": # Golden Cross with positive buffer
+                        if diff_prev < buffer_pct and diff_curr >= buffer_pct:
                             triggered = True
-                    elif alert["operator"] == "<": # Death Cross
-                        if ma50_prev > ma200_prev and ma50_curr <= ma200_curr:
+                    elif alert["operator"] == "<": # Death Cross with negative buffer
+                        target_val = -abs(buffer_pct)
+                        if diff_prev > target_val and diff_curr <= target_val:
                             triggered = True
 
             elif alert["condition_type"] == "VOL_BREAKOUT":
@@ -2348,11 +2366,20 @@ async def check_alerts():
                     macd_prev, macd_curr = float(df_clean["MACD"].iloc[-2]), float(df_clean["MACD"].iloc[-1])
                     sig_prev, sig_curr = float(df_clean["Signal"].iloc[-2]), float(df_clean["Signal"].iloc[-1])
                     cur_val = f"MACD: {macd_curr:.3f} vs Signal: {sig_curr:.3f}"
+                    try:
+                        buffer_val = float(alert["value"])
+                    except Exception:
+                        buffer_val = 0.0
+                    
+                    diff_prev = macd_prev - sig_prev
+                    diff_curr = macd_curr - sig_curr
+                    
                     if alert["operator"] == ">":
-                        if macd_prev < sig_prev and macd_curr >= sig_curr:
+                        if diff_prev < buffer_val and diff_curr >= buffer_val:
                             triggered = True
                     elif alert["operator"] == "<":
-                        if macd_prev > sig_prev and macd_curr <= sig_curr:
+                        target_val = -abs(buffer_val)
+                        if diff_prev > target_val and diff_curr <= target_val:
                             triggered = True
 
             elif alert["condition_type"] == "52W_PROXIMITY":
