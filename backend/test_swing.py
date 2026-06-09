@@ -349,6 +349,81 @@ class TestQuantScoring(unittest.TestCase):
         self.assertTrue(any("Promoter Pledge" in f for f in flags_bad))
         self.assertTrue(any("Earnings" in f for f in flags_bad))
 
+    def test_detect_vsa_setup(self):
+        """Verifies correct classification of Wyckoff VSA setups."""
+        from backend.quant_scoring import detect_vsa_setup
+        
+        # 1. Selling Climax: vol_ratio >= 2.0, close < open, close_pos >= 0.4
+        climax = detect_vsa_setup(open_p=100.0, high_p=105.0, low_p=85.0, close_p=95.0, volume=2.5, avg_volume_20d=1.0)
+        self.assertIsNotNone(climax)
+        self.assertEqual(climax["pattern"], "Selling Climax / Bag Holding")
+        self.assertEqual(climax["type"], "bullish")
+
+        # 2. No Supply: vol_ratio <= 0.6, close < open, close_pos <= 0.6
+        no_supply = detect_vsa_setup(open_p=100.0, high_p=101.0, low_p=98.0, close_p=99.0, volume=0.4, avg_volume_20d=1.0)
+        self.assertIsNotNone(no_supply)
+        self.assertEqual(no_supply["pattern"], "No Supply Bar")
+        self.assertEqual(no_supply["type"], "bullish")
+
+        # 3. No Demand: vol_ratio <= 0.6, close > open, close_pos >= 0.4
+        no_demand = detect_vsa_setup(open_p=100.0, high_p=102.0, low_p=99.5, close_p=101.0, volume=0.4, avg_volume_20d=1.0)
+        self.assertIsNotNone(no_demand)
+        self.assertEqual(no_demand["pattern"], "No Demand Bar")
+        self.assertEqual(no_demand["type"], "bearish")
+
+    def test_calculate_delivery_zscore(self):
+        """Verifies delivery Z-score calculations from baseline data list."""
+        from backend.quant_scoring import calculate_delivery_zscore
+        
+        # Spikes relative to standard baseline with minor variations to prevent 0 stddev
+        hist = [98.0, 102.0, 99.0, 101.0] * 5 + [150.0] # 20 baseline points + 1 latest point (150)
+        z = calculate_delivery_zscore(hist)
+        self.assertGreater(z, 2.0)
+
+        # Test resilience: list containing None and strings
+        hist_none = [98.0, None, "102.0", 99.0, None, 101.0] * 5 + [150.0]
+        z_none = calculate_delivery_zscore(hist_none)
+        self.assertGreater(z_none, 2.0)
+
+        # Test resilience: empty or short lists
+        self.assertEqual(calculate_delivery_zscore([]), 0.0)
+        self.assertEqual(calculate_delivery_zscore([100.0, None, 102.0]), 0.0)
+
+    def test_composite_scoring_engine_vsa_booster(self):
+        """Verifies that calculate_composite_trade_score applies VSA & delivery boosts."""
+        from backend.quant_scoring import calculate_composite_trade_score
+        
+        # Base score run
+        base_score, base_flags, base_breakdown = calculate_composite_trade_score(
+            horizon="short",
+            setup_name="RSI Pullback",
+            volume_ratio=1.0,
+            rsi=30.0,
+            atr_pct_contracting=False,
+            nifty_bullish=True,
+            sector_leading=False,
+            delivery_zscore=0.0,
+            vsa_setup=None
+        )
+        
+        # Score run with boosted delivery Z-score & VSA setup
+        boosted_score, boosted_flags, boosted_breakdown = calculate_composite_trade_score(
+            horizon="short",
+            setup_name="RSI Pullback",
+            volume_ratio=1.0,
+            rsi=30.0,
+            atr_pct_contracting=False,
+            nifty_bullish=True,
+            sector_leading=False,
+            delivery_zscore=2.5,
+            vsa_setup={"type": "bullish", "pattern": "No Supply Bar"}
+        )
+        
+        self.assertEqual(boosted_score - base_score, 30.0) # +15 (Z-score) +15 (bullish VSA)
+        self.assertTrue(any("Institutional Block Buying" in f for f in boosted_flags))
+        self.assertTrue(any("Bullish VSA" in f for f in boosted_flags))
+        self.assertEqual(boosted_breakdown["VSA & Delivery Dynamics"], 30.0)
+
     @patch("backend.main.check_nifty_regime")
     @patch("backend.main.get_db")
     def test_scan_returns_sorted_trade_scores(self, mock_db, mock_nifty):
@@ -361,21 +436,29 @@ class TestQuantScoring(unittest.TestCase):
         mock_db.return_value.__enter__.return_value = mock_conn
         mock_conn.cursor.return_value = mock_cursor
         
-        # Mocking delivery percentages
+        # Mocking delivery percentages and history query
         mock_cursor.fetchall.side_effect = [
             [{"symbol": "INFY.NS", "delivery_percentage": 55.0}, 
              {"symbol": "TCS.NS", "delivery_percentage": 15.0}], # delivery stats query
             [{"sector": "IT"}], # leading sectors query
+            [{"symbol": "INFY.NS", "delivery_qty": 500000},
+             {"symbol": "TCS.NS", "delivery_qty": 200000}], # delivery history query
             [{"symbol": "INFY.NS", "company_name": "Infosys", "sector": "IT", "cap_type": "large"},
              {"symbol": "TCS.NS", "company_name": "TCS", "sector": "IT", "cap_type": "large"}], # screener universe query
             [{"symbol": "INFY.NS", "profile_json": json.dumps({
                 "fundamentals": {"current_price": 1500.0, "promoter_pledge_pct": 0.0},
-                "technicals": {"rsi": 58.0, "volume_vs_avg20": 2.8, "breakout_status": "BULLISH BREAKOUT", "atr_pct_contracting": True},
+                "technicals": {
+                    "rsi": 58.0, "volume_vs_avg20": 2.8, "breakout_status": "BULLISH BREAKOUT", "atr_pct_contracting": True,
+                    "daily_open": 1490.0, "daily_high": 1520.0, "daily_low": 1485.0, "daily_close": 1500.0
+                },
                 "shareholding": {"FIIs": 25.0, "DIIs": 15.0}
              })},
              {"symbol": "TCS.NS", "profile_json": json.dumps({
                 "fundamentals": {"current_price": 3800.0, "promoter_pledge_pct": 12.0}, # high pledge
-                "technicals": {"rsi": 75.0, "volume_vs_avg20": 1.2, "breakout_status": "BULLISH BREAKOUT", "atr_pct_contracting": False},
+                "technicals": {
+                    "rsi": 75.0, "volume_vs_avg20": 1.2, "breakout_status": "BULLISH BREAKOUT", "atr_pct_contracting": False,
+                    "daily_open": 3810.0, "daily_high": 3820.0, "daily_low": 3780.0, "daily_close": 3800.0
+                },
                 "shareholding": {"FIIs": 12.0, "DIIs": 5.0}
              })}] # cached profiles query
         ]

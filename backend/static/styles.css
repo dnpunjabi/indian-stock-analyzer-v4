@@ -6740,6 +6740,63 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     }
 }
 
+/* Swing Strategy Setup Guide Dynamic Panel */
+#swing-strategy-guide-panel {
+    background: rgba(18, 25, 41, 0.4) !important;
+    border: 1px dashed rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="light"] #swing-strategy-guide-panel {
+    background: rgba(0, 0, 0, 0.02) !important;
+    border: 1px dashed rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Swing Strategy Glossary Modal light-theme override */
+[data-theme="light"] #swing-strategy-glossary-modal {
+    background: rgba(15, 23, 42, 0.8) !important;
+}
+
+[data-theme="light"] #swing-strategy-glossary-modal .modal-card {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+
+[data-theme="light"] #swing-strategy-glossary-modal .modal-card-header {
+    background: #f8fafc !important;
+    border-bottom-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] #swing-strategy-glossary-modal .modal-card-header h3 {
+    color: #0f172a !important;
+}
+
+[data-theme="light"] #swing-strategy-glossary-modal .modal-card-body p {
+    color: #475569 !important;
+}
+
+[data-theme="light"] #swing-strategy-glossary-modal table {
+    background: #ffffff !important;
+}
+
+[data-theme="light"] #swing-strategy-glossary-modal tr {
+    border-bottom-color: #e2e8f0 !important;
+}
+
+[data-theme="light"] #swing-strategy-glossary-modal th {
+    background: #f1f5f9 !important;
+    color: #1e293b !important;
+    border-bottom-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] #swing-strategy-glossary-modal td {
+    color: #334155 !important;
+}
+
+[data-theme="light"] #swing-strategy-glossary-modal td:first-child {
+    color: #0f172a !important;
+}
+
 
 
 

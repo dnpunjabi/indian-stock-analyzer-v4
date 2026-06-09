@@ -281,6 +281,76 @@ def init_db():
  
 init_db()
 
+async def fetch_history_df(symbol: str, period: str = "6mo", interval: str = "1d") -> pd.DataFrame:
+    """
+    Robust history fetching for Yahoo Finance charts.
+    Tries yfinance first, then falls back to raw requests.get chart API with custom headers.
+    """
+    import yfinance as yf
+    import pandas as pd
+    import requests
+    from datetime import datetime
+    
+    symbol = symbol.strip().upper()
+    df = pd.DataFrame()
+    
+    # 1. Try yfinance Ticker history (most robust, bypasses cloud VM blocks)
+    try:
+        ticker_obj = yf.Ticker(symbol)
+        # Run in thread pool to prevent blocking event loop
+        df = await asyncio.to_thread(
+            ticker_obj.history, 
+            period=period, 
+            interval=interval, 
+            timeout=8
+        )
+        if not df.empty:
+            # Clean tz-aware index to naive naive datetime
+            if df.index.tz is not None:
+                df.index = df.index.tz_localize(None)
+            # Ensure index has name or standard datetime objects
+            df.index = pd.to_datetime(df.index)
+            # Verify columns exist
+            required_cols = ["Open", "High", "Low", "Close", "Volume"]
+            if all(col in df.columns for col in required_cols):
+                # Drop rows with NaN in Close
+                df = df.dropna(subset=["Close"])
+                return df
+    except Exception as yf_err:
+        print(f"yfinance robust history fetch failed for {symbol}: {yf_err}")
+        
+    # 2. Fallback: Raw request to query1.finance.yahoo.com
+    try:
+        # Map period/interval to Yahoo URL parameters
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range={period}&interval={interval}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json"
+        }
+        
+        # Run raw get in thread pool
+        res = await asyncio.to_thread(requests.get, url, headers=headers, timeout=8)
+        if res.status_code == 200:
+            chart_data = res.json()
+            result = chart_data.get("chart", {}).get("result", [None])[0]
+            if result and "timestamp" in result:
+                timestamps = result.get("timestamp", [])
+                indicators = result.get("indicators", {}).get("quote", [{}])[0]
+                
+                dates = [datetime.fromtimestamp(t) for t in timestamps]
+                raw_df = pd.DataFrame(index=dates)
+                raw_df["Open"] = pd.Series(indicators.get("open", [])).ffill().bfill().values
+                raw_df["High"] = pd.Series(indicators.get("high", [])).ffill().bfill().values
+                raw_df["Low"] = pd.Series(indicators.get("low", [])).ffill().bfill().values
+                raw_df["Close"] = pd.Series(indicators.get("close", [])).ffill().bfill().values
+                raw_df["Volume"] = pd.Series(indicators.get("volume", [])).ffill().bfill().values
+                raw_df = raw_df.ffill().bfill().dropna(subset=["Close"])
+                return raw_df
+    except Exception as req_err:
+        print(f"Raw chart request fallback failed for {symbol}: {req_err}")
+        
+    return pd.DataFrame()
+
 def compute_active_holdings(transactions: list) -> list:
     """
     Applies chronological First-In-First-Out (FIFO) netting on a list of raw transaction records.
@@ -856,7 +926,7 @@ def check_nifty_regime():
     import yfinance as yf
     try:
         nifty = yf.Ticker("^NSEI")
-        df = nifty.history(period="3mo", progress=False)
+        df = nifty.history(period="3mo")
         if not df.empty:
             df = df.dropna(subset=['Close'])
             if len(df) >= 20:
@@ -1327,37 +1397,9 @@ async def get_chart_data(ticker: str, period: str = "1y", interval: str = "1d"):
         elif interval == "1mo":
             fetch_range = "max"
             
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range={fetch_range}&interval={interval}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        res = requests.get(url, headers=headers, timeout=8)
-        if res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Yahoo Chart API returned status code {res.status_code}")
-            
-        chart_data = res.json()
-        result = chart_data.get("chart", {}).get("result", [None])[0]
-        if not result:
+        df = await fetch_history_df(ticker, fetch_range, interval)
+        if df.empty:
             raise HTTPException(status_code=404, detail="No price data returned from Yahoo Chart endpoint.")
-            
-        timestamps = result.get("timestamp", [])
-        indicators = result.get("indicators", {}).get("quote", [{}])[0]
-        
-        if not timestamps or not indicators:
-            raise HTTPException(status_code=404, detail="Missing timestamps or indicator quote data.")
-            
-        dates = [datetime.fromtimestamp(t) for t in timestamps]
-        df = pd.DataFrame(index=dates)
-        
-        # Clean and ffill/bfill to avoid None/NaN values in indicators quotes
-        df["Open"] = pd.Series(indicators.get("open", [])).ffill().bfill().values
-        df["High"] = pd.Series(indicators.get("high", [])).ffill().bfill().values
-        df["Low"] = pd.Series(indicators.get("low", [])).ffill().bfill().values
-        df["Close"] = pd.Series(indicators.get("close", [])).ffill().bfill().values
-        df["Volume"] = pd.Series(indicators.get("volume", [])).ffill().bfill().values
-        
-        # Double check if any NaNs remain (e.g. if the series was entirely empty) and fill
-        df = df.ffill().bfill()
         
         # Calculate moving averages dynamically on the loaded frequency
         df['SMA_50'] = df['Close'].rolling(window=50).mean()
@@ -1611,101 +1653,86 @@ async def get_synthesis(
             from backend.quant_scoring import detect_vsa_setup, calculate_delivery_zscore
             
             # Fetch Yahoo Finance (6mo) for chart analysis
-            chart_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range=6mo&interval=1d"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-            res = requests.get(chart_url, headers=headers, timeout=8)
-            if res.status_code == 200:
-                chart_data = res.json()
-                result = chart_data.get("chart", {}).get("result", [None])[0]
-                if result and "timestamp" in result:
-                    timestamps = result.get("timestamp", [])
-                    indicators = result.get("indicators", {}).get("quote", [{}])[0]
-                    dates = [datetime.fromtimestamp(t) for t in timestamps]
-                    df = pd.DataFrame(index=dates)
-                    df["Open"] = pd.Series(indicators.get("open", [])).ffill().bfill().values
-                    df["High"] = pd.Series(indicators.get("high", [])).ffill().bfill().values
-                    df["Low"] = pd.Series(indicators.get("low", [])).ffill().bfill().values
-                    df["Close"] = pd.Series(indicators.get("close", [])).ffill().bfill().values
-                    df["Volume"] = pd.Series(indicators.get("volume", [])).ffill().bfill().values
-                    df = df.ffill().bfill()
+            df = await fetch_history_df(ticker, "6mo", "1d")
+            if not df.empty:
+                display_bars = min(60, len(df))
+                df_display = df.iloc[-display_bars:]
+                
+                # Fetch SQLite delivery history
+                delivery_history = {}
+                try:
+                    with get_db() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            SELECT trade_date, delivery_qty, traded_qty, delivery_percentage 
+                            FROM daily_delivery_history 
+                            WHERE symbol = ? 
+                            ORDER BY trade_date ASC
+                        """, (ticker,))
+                        for r_row in cursor.fetchall():
+                            delivery_history[r_row["trade_date"]] = {
+                                "delivery_qty": r_row["delivery_qty"],
+                                "traded_qty": r_row["traded_qty"],
+                                "delivery_percentage": r_row["delivery_percentage"]
+                            }
+                except Exception as db_err:
+                    print(f"Error querying delivery history in synthesis: {db_err}")
                     
-                    display_bars = min(60, len(df))
-                    df_display = df.iloc[-display_bars:]
+                # Fetch corporate actions
+                corporate_actions = []
+                try:
+                    with get_db() as conn:
+                        cursor = conn.conn.cursor() if hasattr(conn, "conn") else conn.cursor()
+                        cursor.execute("""
+                            SELECT action_type, ex_date, ratio_multiplier 
+                            FROM corporate_actions 
+                            WHERE symbol = ?
+                        """, (ticker,))
+                        for ca_row in cursor.fetchall():
+                            corporate_actions.append({
+                                "action_type": ca_row["action_type"],
+                                "ex_date": ca_row["ex_date"],
+                                "ratio_multiplier": ca_row["ratio_multiplier"]
+                            })
+                except Exception as ca_err:
+                    print(f"Error querying corporate actions in synthesis: {ca_err}")
                     
-                    # Fetch SQLite delivery history
-                    delivery_history = {}
-                    try:
-                        with get_db() as conn:
-                            cursor = conn.cursor()
-                            cursor.execute("""
-                                SELECT trade_date, delivery_qty, traded_qty, delivery_percentage 
-                                FROM daily_delivery_history 
-                                WHERE symbol = ? 
-                                ORDER BY trade_date ASC
-                            """, (ticker,))
-                            for r_row in cursor.fetchall():
-                                delivery_history[r_row["trade_date"]] = {
-                                    "delivery_qty": r_row["delivery_qty"],
-                                    "traded_qty": r_row["traded_qty"],
-                                    "delivery_percentage": r_row["delivery_percentage"]
-                                }
-                    except Exception as db_err:
-                        print(f"Error querying delivery history in synthesis: {db_err}")
+                # Process delivery values
+                historical_delivery_values = []
+                
+                df["Vol_20MA"] = df["Volume"].rolling(window=20).mean().ffill().bfill()
+                df_display_with_ma = df.iloc[-display_bars:]
+                
+                for idx in range(len(df_display_with_ma)):
+                    bar_date = df_display_with_ma.index[idx].strftime("%Y-%m-%d")
+                    vol = float(df_display_with_ma["Volume"].iloc[idx])
+                    close_p = float(df_display_with_ma["Close"].iloc[idx])
+                    
+                    if bar_date in delivery_history:
+                        deliv_pct = delivery_history[bar_date]["delivery_percentage"]
+                        deliv_qty = delivery_history[bar_date]["delivery_qty"]
+                        traded_qty = delivery_history[bar_date]["traded_qty"]
                         
-                    # Fetch corporate actions
-                    corporate_actions = []
-                    try:
-                        with get_db() as conn:
-                            cursor = conn.cursor()
-                            cursor.execute("""
-                                SELECT action_type, ex_date, ratio_multiplier 
-                                FROM corporate_actions 
-                                WHERE symbol = ?
-                            """, (ticker,))
-                            for ca_row in cursor.fetchall():
-                                corporate_actions.append({
-                                    "action_type": ca_row["action_type"],
-                                    "ex_date": ca_row["ex_date"],
-                                    "ratio_multiplier": ca_row["ratio_multiplier"]
-                                })
-                    except Exception as ca_err:
-                        print(f"Error querying corporate actions in synthesis: {ca_err}")
-                        
-                    # Process delivery values
-                    historical_delivery_values = []
-                    import random
-                    
-                    df["Vol_20MA"] = df["Volume"].rolling(window=20).mean().ffill().bfill()
-                    df_display_with_ma = df.iloc[-display_bars:]
-                    
-                    for idx in range(len(df_display_with_ma)):
-                        bar_date = df_display_with_ma.index[idx].strftime("%Y-%m-%d")
-                        vol = float(df_display_with_ma["Volume"].iloc[idx])
-                        close_p = float(df_display_with_ma["Close"].iloc[idx])
-                        
-                        if bar_date in delivery_history:
-                            deliv_pct = delivery_history[bar_date]["delivery_percentage"]
-                            deliv_qty = delivery_history[bar_date]["delivery_qty"]
-                            traded_qty = delivery_history[bar_date]["traded_qty"]
-                        else:
-                            deliv_pct = round(random.uniform(25.0, 70.0), 2)
-                            is_green = close_p > float(df_display_with_ma["Open"].iloc[idx])
-                            vol_ratio = vol / float(df_display_with_ma["Vol_20MA"].iloc[idx]) if float(df_display_with_ma["Vol_20MA"].iloc[idx]) > 0 else 1.0
-                            if is_green and vol_ratio >= 1.5:
-                                deliv_pct = round(random.uniform(55.0, 85.0), 2)
-                            elif not is_green and vol_ratio >= 1.5:
-                                deliv_pct = round(random.uniform(20.0, 45.0), 2)
+                        # Clean None values from database
+                        if deliv_pct is None:
+                            deliv_pct = 0.0
+                        if traded_qty is None:
                             traded_qty = int(vol)
-                            deliv_qty = int(traded_qty * (deliv_pct / 100.0))
-                            
-                        for ca in corporate_actions:
-                            if bar_date < ca["ex_date"]:
+                        if deliv_qty is None:
+                            deliv_qty = 0
+                    else:
+                        deliv_pct = 0.0
+                        traded_qty = int(vol)
+                        deliv_qty = 0
+                        
+                    for ca in corporate_actions:
+                        if bar_date < ca["ex_date"]:
+                            if deliv_qty is not None:
                                 deliv_qty = int(deliv_qty * ca["ratio_multiplier"])
+                            if traded_qty is not None:
                                 traded_qty = int(traded_qty * ca["ratio_multiplier"])
-                                
-                        historical_delivery_values.append(deliv_qty * close_p)
+                            
+                    historical_delivery_values.append((deliv_qty or 0) * close_p)
                         
                     latest_row = df_display_with_ma.iloc[-1]
                     latest_vol_ma = df_display_with_ma["Vol_20MA"].iloc[-1]
@@ -3506,22 +3533,22 @@ async def get_swing_scan(strategy: str = "ALL", universe: str = "all", min_volum
             if not prof:
                 continue
                 
-            f = prof.get("fundamentals", {})
-            t = prof.get("technicals", {})
+            f = prof.get("fundamentals") or {}
+            t = prof.get("technicals") or {}
             
-            price = f.get("current_price", 0.0)
+            price = clean_float(f.get("current_price"), 0.0)
             if price <= 0.0:
                 continue
                 
-            rsi = t.get("rsi", 50.0)
-            macd_hist = t.get("macd_hist", 0.0)
-            macd = t.get("macd", 0.0)
-            macd_signal = t.get("macd_signal", 0.0)
-            breakout_status = t.get("breakout_status", "CONSOLIDATING")
-            sma_50 = t.get("sma_50", 0.0)
-            sma_200 = t.get("sma_200", 0.0)
-            atr = t.get("atr", price * 0.02)
-            vol_ratio = t.get("volume_vs_avg20", 1.0)
+            rsi = clean_float(t.get("rsi"), 50.0)
+            macd_hist = clean_float(t.get("macd_hist"), 0.0)
+            macd = clean_float(t.get("macd"), 0.0)
+            macd_signal = clean_float(t.get("macd_signal"), 0.0)
+            breakout_status = str(t.get("breakout_status") or "CONSOLIDATING")
+            sma_50 = clean_float(t.get("sma_50"), 0.0)
+            sma_200 = clean_float(t.get("sma_200"), 0.0)
+            atr = clean_float(t.get("atr"), price * 0.02)
+            vol_ratio = clean_float(t.get("volume_vs_avg20"), 1.0)
             
             if vol_ratio < min_volume_ratio:
                 continue
@@ -3535,10 +3562,10 @@ async def get_swing_scan(strategy: str = "ALL", universe: str = "all", min_volum
             from backend.quant_scoring import calculate_delivery_zscore, detect_vsa_setup
             delivery_zscore = calculate_delivery_zscore(hist_deliv) if hist_deliv else 0.0
 
-            open_p = t.get("daily_open", price)
-            high_p = t.get("daily_high", price)
-            low_p = t.get("daily_low", price)
-            close_p = t.get("daily_close", price)
+            open_p = clean_float(t.get("daily_open"), price)
+            high_p = clean_float(t.get("daily_high"), price)
+            low_p = clean_float(t.get("daily_low"), price)
+            close_p = clean_float(t.get("daily_close"), price)
             vsa_setup = detect_vsa_setup(open_p, high_p, low_p, close_p, vol_ratio, 1.0)
             
             # Setup evaluations based on horizon
@@ -3701,20 +3728,36 @@ async def get_swing_scan(strategy: str = "ALL", universe: str = "all", min_volum
                 rr = round((tp2 - price) / (price - sl) if (price - sl) > 0 else 1.5, 2)
                 
                 # Fetch detailed scoring attributes
-                delivery_pct = delivery_map.get(sym, 0.0)
+                delivery_pct = clean_float(delivery_map.get(sym, 0.0), 0.0)
                 sector_leading = s["sector"] in leading_sectors
                 
-                promoter_pledged = f.get("promoter_pledge_pct", 0.0)
-                shareholding = prof.get("shareholding", {})
-                fii_pct = shareholding.get("FIIs", 0.0)
-                dii_pct = shareholding.get("DIIs", 0.0)
+                promoter_pledged = clean_float(f.get("promoter_pledge_pct"), 0.0)
+                shareholding = prof.get("shareholding") or {}
+                fii_pct = clean_float(shareholding.get("FIIs"), 0.0)
+                dii_pct = clean_float(shareholding.get("DIIs"), 0.0)
                 fii_dii_increased = (fii_pct + dii_pct) >= 20.0
                 
-                eq = prof.get("earnings_quality", {})
+                eq = prof.get("earnings_quality") or {}
                 f_score = eq.get("piotroski_score")
                 z_score = eq.get("altman_z_score")
                 
-                atr_pct_contracting = t.get("atr_pct_contracting", False)
+                clean_f_score = None
+                if f_score is not None:
+                    try:
+                        clean_f_score = int(f_score)
+                    except (ValueError, TypeError):
+                        pass
+                        
+                clean_z_score = None
+                if z_score is not None:
+                    try:
+                        clean_z_score = float(z_score)
+                        if math.isnan(clean_z_score) or math.isinf(clean_z_score):
+                            clean_z_score = None
+                    except (ValueError, TypeError):
+                        pass
+                
+                atr_pct_contracting = bool(t.get("atr_pct_contracting", False))
                 
                 days_to_earnings = None
                 try:
@@ -3737,8 +3780,8 @@ async def get_swing_scan(strategy: str = "ALL", universe: str = "all", min_volum
                     atr_pct_contracting=atr_pct_contracting,
                     nifty_bullish=nifty_bullish,
                     sector_leading=sector_leading,
-                    f_score=f_score,
-                    z_score=z_score,
+                    f_score=clean_f_score,
+                    z_score=clean_z_score,
                     promoter_pledged_pct=promoter_pledged,
                     fii_dii_increased=fii_dii_increased,
                     delivery_pct=delivery_pct,
@@ -3765,8 +3808,8 @@ async def get_swing_scan(strategy: str = "ALL", universe: str = "all", min_volum
                     "trade_flags": trade_flags,
                     "trade_breakdown": trade_breakdown,
                     "delivery_pct": delivery_pct,
-                    "f_score": f_score if f_score is not None else "N/A",
-                    "z_score": z_score if z_score is not None else "N/A",
+                    "f_score": clean_f_score if clean_f_score is not None else "N/A",
+                    "z_score": clean_z_score if clean_z_score is not None else "N/A",
                     "nifty_bullish": nifty_bullish
                 })
                 
@@ -3774,6 +3817,8 @@ async def get_swing_scan(strategy: str = "ALL", universe: str = "all", min_volum
         candidates = sorted(candidates, key=lambda x: x["trade_score"], reverse=True)
         return candidates
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Swing scanner execution failed: {str(e)}")
 
 @app.get("/api/swing/candidate")
@@ -3790,32 +3835,9 @@ async def get_swing_candidate(symbol: str, timeframe: str = "1D", horizon: str =
             interval = "1h"
             fetch_range = "730d"
             
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range={fetch_range}&interval={interval}"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        res = requests.get(url, headers=headers, timeout=8)
-        if res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Yahoo Chart API returned status code {res.status_code}")
-            
-        chart_data = res.json()
-        result = chart_data.get("chart", {}).get("result", [None])[0]
-        if not result:
+        df = await fetch_history_df(symbol, fetch_range, interval)
+        if df.empty:
             raise HTTPException(status_code=404, detail="No price data returned from Yahoo Chart endpoint.")
-            
-        timestamps = result.get("timestamp", [])
-        indicators = result.get("indicators", {}).get("quote", [{}])[0]
-        if not timestamps or not indicators:
-            raise HTTPException(status_code=404, detail="Missing timestamps or indicator quote data.")
-            
-        dates = [datetime.fromtimestamp(t) for t in timestamps]
-        df = pd.DataFrame(index=dates)
-        df["Open"] = pd.Series(indicators.get("open", [])).ffill().bfill().values
-        df["High"] = pd.Series(indicators.get("high", [])).ffill().bfill().values
-        df["Low"] = pd.Series(indicators.get("low", [])).ffill().bfill().values
-        df["Close"] = pd.Series(indicators.get("close", [])).ffill().bfill().values
-        df["Volume"] = pd.Series(indicators.get("volume", [])).ffill().bfill().values
-        df = df.ffill().bfill()
         df_ind = calculate_swing_indicators(df)
         display_bars = min(60, len(df_ind))
         df_display = df_ind.iloc[-display_bars:]
@@ -3913,32 +3935,9 @@ async def get_swing_backtest(symbol: str, strategy: str = "ALL", horizon: str = 
         strategy = strategy.upper()
         
         # Load 2 years of daily history to support medium-term 150 SMA computations
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=2y&interval=1d"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        res = requests.get(url, headers=headers, timeout=8)
-        if res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Yahoo Chart API returned status code {res.status_code}")
-            
-        chart_data = res.json()
-        result = chart_data.get("chart", {}).get("result", [None])[0]
-        if not result:
+        df = await fetch_history_df(symbol, "2y", "1d")
+        if df.empty:
             raise HTTPException(status_code=404, detail="No price data returned from Yahoo Chart endpoint.")
-            
-        timestamps = result.get("timestamp", [])
-        indicators = result.get("indicators", {}).get("quote", [{}])[0]
-        if not timestamps or not indicators:
-            raise HTTPException(status_code=404, detail="Missing timestamps or indicator quote data.")
-            
-        dates = [datetime.fromtimestamp(t) for t in timestamps]
-        df = pd.DataFrame(index=dates)
-        df["Open"] = pd.Series(indicators.get("open", [])).ffill().bfill().values
-        df["High"] = pd.Series(indicators.get("high", [])).ffill().bfill().values
-        df["Low"] = pd.Series(indicators.get("low", [])).ffill().bfill().values
-        df["Close"] = pd.Series(indicators.get("close", [])).ffill().bfill().values
-        df["Volume"] = pd.Series(indicators.get("volume", [])).ffill().bfill().values
-        df = df.ffill().bfill()
         
         df = calculate_swing_indicators(df)
         
@@ -4169,31 +4168,10 @@ async def get_stock_volume_dynamics(symbol: str):
             symbol = symbol.strip().upper()
             
         # 1. Fetch historical price data from Yahoo Finance for the last 6 months to get enough bars
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=6mo&interval=1d"
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        }
-        res = requests.get(url, headers=headers, timeout=8)
-        if res.status_code != 200:
-            raise HTTPException(status_code=500, detail=f"Yahoo Chart API returned status code {res.status_code}")
-            
-        chart_data = res.json()
-        result = chart_data.get("chart", {}).get("result", [None])[0]
-        if not result or "timestamp" not in result:
+        df = await fetch_history_df(symbol, "6mo", "1d")
+        if df.empty:
             raise HTTPException(status_code=404, detail="No price data returned from Yahoo Chart endpoint.")
             
-        timestamps = result.get("timestamp", [])
-        indicators = result.get("indicators", {}).get("quote", [{}])[0]
-        
-        dates = [datetime.fromtimestamp(t) for t in timestamps]
-        df = pd.DataFrame(index=dates)
-        df["Open"] = pd.Series(indicators.get("open", [])).ffill().bfill().values
-        df["High"] = pd.Series(indicators.get("high", [])).ffill().bfill().values
-        df["Low"] = pd.Series(indicators.get("low", [])).ffill().bfill().values
-        df["Close"] = pd.Series(indicators.get("close", [])).ffill().bfill().values
-        df["Volume"] = pd.Series(indicators.get("volume", [])).ffill().bfill().values
-        df = df.ffill().bfill()
-        
         # Take the last 60 trading days
         display_bars = min(60, len(df))
         df_display = df.iloc[-display_bars:]
@@ -4239,7 +4217,6 @@ async def get_stock_volume_dynamics(symbol: str):
 
         # 4. Compile matching candlesticks array
         candlesticks = []
-        import random
         historical_delivery_values = []
         
         df["Vol_20MA"] = df["Volume"].rolling(window=20).mean().ffill().bfill()
@@ -4254,25 +4231,28 @@ async def get_stock_volume_dynamics(symbol: str):
                 deliv_pct = delivery_history[bar_date]["delivery_percentage"]
                 deliv_qty = delivery_history[bar_date]["delivery_qty"]
                 traded_qty = delivery_history[bar_date]["traded_qty"]
+                
+                # Sanitize None values from database
+                if deliv_pct is None:
+                    deliv_pct = 0.0
+                if traded_qty is None:
+                    traded_qty = int(vol)
+                if deliv_qty is None:
+                    deliv_qty = int(traded_qty * (deliv_pct / 100.0))
             else:
-                # Fallback to realistic generation if missing
-                deliv_pct = round(random.uniform(25.0, 70.0), 2)
-                is_green = close_p > float(df_display_with_ma["Open"].iloc[idx])
-                vol_ratio = vol / float(df_display_with_ma["Vol_20MA"].iloc[idx]) if float(df_display_with_ma["Vol_20MA"].iloc[idx]) > 0 else 1.0
-                if is_green and vol_ratio >= 1.5:
-                    deliv_pct = round(random.uniform(55.0, 85.0), 2)
-                elif not is_green and vol_ratio >= 1.5:
-                    deliv_pct = round(random.uniform(20.0, 45.0), 2)
+                deliv_pct = 0.0
                 traded_qty = int(vol)
-                deliv_qty = int(traded_qty * (deliv_pct / 100.0))
+                deliv_qty = 0
                 
             # Apply corporate action adjustments (CAF) to volume history
             for ca in corporate_actions:
                 if bar_date < ca["ex_date"]:
-                    deliv_qty = int(deliv_qty * ca["ratio_multiplier"])
-                    traded_qty = int(traded_qty * ca["ratio_multiplier"])
+                    if deliv_qty is not None:
+                        deliv_qty = int(deliv_qty * ca["ratio_multiplier"])
+                    if traded_qty is not None:
+                        traded_qty = int(traded_qty * ca["ratio_multiplier"])
                     
-            historical_delivery_values.append(deliv_qty * close_p)
+            historical_delivery_values.append((deliv_qty or 0) * close_p)
             
             candlesticks.append({
                 "time": bar_date,
@@ -4456,6 +4436,8 @@ async def get_stock_volume_dynamics(symbol: str):
             "ai_summary": ai_summary
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Volume dynamics compilation failed: {str(e)}")
 
 

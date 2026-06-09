@@ -13,7 +13,9 @@ def calculate_composite_trade_score(
     promoter_pledged_pct: float = 0.0,
     fii_dii_increased: bool = False,
     delivery_pct: float = 0.0,
-    days_to_earnings: int = None
+    days_to_earnings: int = None,
+    delivery_zscore: float = 0.0,
+    vsa_setup: dict = None
 ):
     """
     Calculates a composite trade win probability score from 0 to 100
@@ -27,6 +29,7 @@ def calculate_composite_trade_score(
     rsi = float(rsi or 50.0)
     promoter_pledged_pct = float(promoter_pledged_pct or 0.0)
     delivery_pct = float(delivery_pct or 0.0)
+    delivery_zscore = float(delivery_zscore or 0.0)
 
     # Breakdown components
     setup_pts = 0.0
@@ -39,6 +42,7 @@ def calculate_composite_trade_score(
     pledge_pts = 0.0
     inst_pts = 0.0
     earnings_pts = 0.0
+    vsa_delivery_pts = 0.0
 
     # 1. Horizon-specific scoring
     if horizon == "medium":
@@ -192,6 +196,34 @@ def calculate_composite_trade_score(
             earnings_pts -= 25.0
             flags.append(f"Earnings in {days_to_earnings} days")
 
+    # F. VSA and Delivery Z-Score dynamics
+    if delivery_zscore >= 2.0:
+        vsa_delivery_pts += 15.0
+        flags.append(f"★ Institutional Block Buying (Z: {delivery_zscore:+.2f})")
+    
+    if vsa_setup is not None:
+        vsa_type = vsa_setup.get("type")
+        vsa_pattern = vsa_setup.get("pattern")
+        if vsa_type == "bullish":
+            vsa_delivery_pts += 15.0
+            flags.append(f"Bullish VSA: {vsa_pattern}")
+        elif vsa_type == "bearish":
+            vsa_delivery_pts -= 15.0
+            flags.append(f"Bearish VSA: {vsa_pattern}")
+
+    # G. Specific VSA & Delivery Confluences
+    # High delivery breakout (+15 points)
+    is_breakout = setup_name in ["Stage 2 Breakout", "BB Breakout", "BB Squeeze Breakout", "Stage 2 Breakout"]
+    if is_breakout and (delivery_pct >= 45.0 or delivery_zscore >= 1.5):
+        vsa_delivery_pts += 15.0
+        flags.append("★ High Delivery Breakout Confirmation")
+
+    # Low volume pullback (+12 points)
+    is_pullback = setup_name in ["RSI Pullback", "50-Day EMA Bounce", "Fibonacci Support Bounce"]
+    if is_pullback and volume_ratio <= 0.8:
+        vsa_delivery_pts += 12.0
+        flags.append("★ Low Volume Pullback Confirmation")
+
     # Final score summation
     score = (
         setup_pts +
@@ -203,7 +235,8 @@ def calculate_composite_trade_score(
         sector_pts +
         pledge_pts +
         inst_pts +
-        earnings_pts
+        earnings_pts +
+        vsa_delivery_pts
     )
 
     # Clamp the final score between 0 and 100
@@ -219,7 +252,105 @@ def calculate_composite_trade_score(
         "Sector Strength": round(sector_pts, 1),
         "Promoter Pledge Penalty": round(pledge_pts, 1),
         "Institutional Accumulation": round(inst_pts, 1),
-        "Earnings Risk Penalty": round(earnings_pts, 1)
+        "Earnings Risk Penalty": round(earnings_pts, 1),
+        "VSA & Delivery Dynamics": round(vsa_delivery_pts, 1)
     }
     
     return round(final_score, 1), flags, breakdown
+
+
+def detect_vsa_setup(open_p, high_p, low_p, close_p, volume, avg_volume_20d):
+    """
+    Analyzes price spread, close location, and relative volume of a single candle.
+    Returns: {"pattern": str, "description": str, "type": "bullish"|"bearish"|"neutral"} or None
+    """
+    open_p = float(open_p or 0.0)
+    high_p = float(high_p or 0.0)
+    low_p = float(low_p or 0.0)
+    close_p = float(close_p or 0.0)
+    volume = float(volume or 0.0)
+    avg_volume_20d = float(avg_volume_20d or 1.0)
+    
+    if low_p == high_p or volume <= 0.0:
+        return None
+        
+    spread = high_p - low_p
+    close_pos = (close_p - low_p) / spread
+    vol_ratio = volume / avg_volume_20d if avg_volume_20d > 0 else 1.0
+
+    # 1. Selling Climax (extreme volume down bar closing high/middle - buying support absorption)
+    if vol_ratio >= 2.0 and close_p < open_p and close_pos >= 0.4:
+        return {
+            "pattern": "Selling Climax / Bag Holding",
+            "description": f"Wide range down-bar closing in upper/middle third on extreme volume ({vol_ratio:.1f}x). Indicates massive institutional absorption of public panic supply.",
+            "type": "bullish"
+        }
+
+    # 2. No Supply Bar (narrow range down-bar on very low volume, close in lower/middle - test for supply)
+    if vol_ratio <= 0.6 and close_p < open_p and close_pos <= 0.6:
+        return {
+            "pattern": "No Supply Bar",
+            "description": f"Narrow range down-bar closing in lower/middle third on very low volume ({vol_ratio:.1f}x). Confirms sellers are exhausted and supply is absorbed.",
+            "type": "bullish"
+        }
+
+    # 3. No Demand Bar (narrow range up-bar on very low volume, close in upper/middle)
+    if vol_ratio <= 0.6 and close_p > open_p and close_pos >= 0.4:
+        return {
+            "pattern": "No Demand Bar",
+            "description": f"Narrow range up-bar closing in upper/middle third on very low volume ({vol_ratio:.1f}x). Warns of lack of institutional buying interest.",
+            "type": "bearish"
+        }
+
+    # 4. Effort vs Result (high volume narrow range bar)
+    if vol_ratio >= 1.5 and close_pos >= 0.6:
+        return {
+            "pattern": "Effort vs Result (Accumulation)",
+            "description": f"Elevated volume ({vol_ratio:.1f}x) failed to drive wide price spread, but closed near highs. Indicates institutional absorption of overhead supply.",
+            "type": "bullish"
+        }
+        
+    if vol_ratio >= 1.5 and close_pos <= 0.4:
+        return {
+            "pattern": "Effort vs Result (Distribution)",
+            "description": f"Elevated volume ({vol_ratio:.1f}x) failed to drive wide price range, and closed near lows. Indicates institutional distribution meeting buying support.",
+            "type": "bearish"
+        }
+        
+    return None
+
+
+def calculate_delivery_zscore(historical_delivery_values: list) -> float:
+    """
+    Calculates the Z-score of the latest deliverable value relative to the past 20 days.
+    """
+    clean_values = []
+    for v in historical_delivery_values:
+        if v is not None:
+            try:
+                clean_values.append(float(v))
+            except (ValueError, TypeError):
+                continue
+                
+    if len(clean_values) < 5:
+        return 0.0
+    
+    # Take up to 20 historical records excluding the last one (for baseline)
+    baseline = clean_values[:-1]
+    if len(baseline) == 0:
+        return 0.0
+        
+    latest = clean_values[-1]
+    
+    # Calculate mean
+    mean = sum(baseline) / len(baseline)
+    
+    # Calculate variance & standard deviation
+    variance = sum((x - mean) ** 2 for x in baseline) / len(baseline)
+    std_dev = math.sqrt(variance)
+    
+    if std_dev == 0.0:
+        return 0.0
+        
+    z_score = (latest - mean) / std_dev
+    return round(z_score, 2)
