@@ -2219,7 +2219,7 @@ async def check_alerts():
             
             # Fetch history if required
             df = None
-            if alert["condition_type"] in ["DMA_CROSS", "EMA_CROSS", "VOL_BREAKOUT", "BB_CROSS", "MACD_CROSS", "52W_PROXIMITY", "SMA50", "FIB_LEVEL"]:
+            if alert["condition_type"] in ["DMA_CROSS", "EMA_CROSS", "VOL_BREAKOUT", "BB_CROSS", "MACD_CROSS", "52W_PROXIMITY", "SMA50", "FIB_LEVEL", "FIB_382", "FIB_500", "FIB_618"]:
                 df = await fetch_history_df(ticker, "1y", "1d")
                 if df.empty:
                     print(f"Skipping alert check #{alert['id']} for {ticker} as price history is empty.")
@@ -2388,7 +2388,7 @@ async def check_alerts():
                     elif alert["operator"] == "<" and pct_diff < threshold:
                         triggered = True
 
-            elif alert["condition_type"] == "FIB_LEVEL":
+            elif alert["condition_type"] in ["FIB_LEVEL", "FIB_382", "FIB_500", "FIB_618"]:
                 # Fibonacci Retracement Proximity
                 sub_df = df.iloc[-120:] if len(df) >= 120 else df
                 swing_high = float(sub_df["Close"].max())
@@ -2399,11 +2399,26 @@ async def check_alerts():
                 fib_618 = swing_high - 0.618 * swing_diff
                 if len(df) >= 1:
                     price_val = float(df["Close"].iloc[-1])
+                    try:
+                        proximity_pct = float(alert["value"])
+                    except Exception:
+                        proximity_pct = 1.5
+
+                    levels_to_check = []
+                    if alert["condition_type"] == "FIB_LEVEL":
+                        levels_to_check = [("38.2%", fib_382), ("50.0%", fib_500), ("61.8%", fib_618)]
+                    elif alert["condition_type"] == "FIB_382":
+                        levels_to_check = [("38.2%", fib_382)]
+                    elif alert["condition_type"] == "FIB_500":
+                        levels_to_check = [("50.0%", fib_500)]
+                    elif alert["condition_type"] == "FIB_618":
+                        levels_to_check = [("61.8%", fib_618)]
+
                     matched_level = None
                     matched_val = 0.0
-                    for level_name, level_val in [("38.2%", fib_382), ("50.0%", fib_500), ("61.8%", fib_618)]:
+                    for level_name, level_val in levels_to_check:
                         diff_pct = abs(price_val - level_val) / level_val * 100
-                        if diff_pct <= 1.5:
+                        if diff_pct <= proximity_pct:
                             matched_level = level_name
                             matched_val = level_val
                             triggered = True

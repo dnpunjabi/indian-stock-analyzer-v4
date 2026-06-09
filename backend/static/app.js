@@ -4784,15 +4784,15 @@ function updateAlertCheatsheet() {
     ];
 
     if (condition === "RSI") {
-        desc = "<strong>RSI-14 (Relative Strength):</strong> Tracks momentum speed/change. Triggers when RSI crosses boundaries (&lt; 30 oversold or &gt; 70 overbought).";
+        desc = "<strong>RSI-14 (Relative Strength):</strong> Tracks momentum speed/change. Triggers when RSI crosses boundaries (&lt; 30 oversold or &gt; 70 overbought).<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &lt;, Value 30 (oversold buy zone)</span>";
         defaultVal = "30";
         helper = "RSI values: oversold is &lt; 30; overbought is &gt; 70.";
     } else if (condition === "PE") {
-        desc = "<strong>Stock P/E Value:</strong> Evaluates earnings multiples. Triggers when P/E is above/below a set multiple or the stock's median P/E.";
+        desc = "<strong>Stock P/E Value:</strong> Evaluates earnings multiples. Triggers when P/E is above/below a set multiple or the stock's median P/E.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &lt;, Value MEDIAN (value-buy trigger) or Operator &lt;, Value 15</span>";
         defaultVal = "25";
         helper = "Enter target P/E ratio number, or type 'MEDIAN' to trigger relative to 10-year median P/E bands.";
     } else if (condition === "RATING") {
-        desc = "<strong>AI Analyst Rating:</strong> Evaluates advisor consensus recommendation. Triggers when rating equals 'Strong Buy', 'Buy', 'Hold', or 'Sell'.";
+        desc = "<strong>AI Analyst Rating:</strong> Evaluates advisor consensus recommendation. Triggers when rating equals 'Strong Buy', 'Buy', 'Hold', or 'Sell'.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator ==, Value Strong Buy (high-conviction entry)</span>";
         operatorsList = [
             { value: '==', text: '= Equals' }
         ];
@@ -4800,44 +4800,68 @@ function updateAlertCheatsheet() {
         defaultVal = "Strong Buy";
         helper = "Enter one of: 'Strong Buy', 'Buy', 'Hold', 'Sell'.";
     } else if (condition === "PRICE") {
-        desc = "<strong>Current Price (Rs.):</strong> Triggers when current stock close price crosses above or below target Rs. price.";
+        desc = "<strong>Current Price (Rs.):</strong> Triggers when current stock close price crosses above or below target Rs. price.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &lt;, Value 3500 (dip target)</span>";
         defaultVal = "1500";
         helper = "Enter target price limit in INR (e.g. 3500).";
     } else if (condition === "SMA") {
-        desc = "<strong>Price vs SMA-200 (% Diff):</strong> Measures percentage deviation from the long-term 200-day Simple Moving Average. Triggers when diff crosses threshold.";
+        desc = "<strong>Price vs SMA-200 (% Diff):</strong> Measures percentage deviation from the long-term 200-day Simple Moving Average. Triggers when diff crosses threshold.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 5 (5% above 200 SMA) or Operator &lt;, Value -3 (3% below 200 SMA)</span>";
         defaultVal = "5";
         helper = "Deviation percent (e.g. 5 for 5% above SMA-200, or -5 for 5% below).";
     } else if (condition === "DMA_CROSS") {
-        desc = "<strong>50 SMA vs 200 SMA Crossover:</strong> Classic golden/death cross momentum trigger. Triggers when 50 SMA crosses above (&gt; Golden Cross) or below (&lt; Death Cross) 200 SMA.";
+        desc = "<strong>50 SMA vs 200 SMA Crossover:</strong> Classic golden/death cross momentum trigger. Triggers when 50 SMA crosses above (&gt; Golden Cross) or below (&lt; Death Cross) 200 SMA.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 0 (Golden Cross momentum entry) or Operator &lt;, Value 0 (Death Cross exit)</span>";
         defaultVal = "0";
         helper = "Set to 0. Trigger evaluates daily crossover condition directly.";
     } else if (condition === "EMA_CROSS") {
-        desc = "<strong>50 EMA vs 200 EMA Crossover:</strong> Trend crossover using Exponential Moving Average, prioritizing recent price movements. Triggers on cross.";
+        desc = "<strong>50 EMA vs 200 EMA Crossover:</strong> Trend crossover using Exponential Moving Average, prioritizing recent price movements. Triggers on cross.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 0 (Golden Cross trend entry)</span>";
         defaultVal = "0";
         helper = "Set to 0. Trigger evaluates EMA crossover directly.";
     } else if (condition === "VOL_BREAKOUT") {
-        desc = "<strong>Volume vs 20d Avg Volume:</strong> Detects institutional smart-money breakouts. Triggers when current volume is X times greater than 20d average.";
+        desc = "<strong>Volume vs 20d Avg Volume:</strong> Detects institutional smart-money breakouts. Triggers when current volume is X times greater than 20d average.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 2.0 (volume double the 20-day average)</span>";
         defaultOp = ">";
         defaultVal = "2.0";
         helper = "Enter volume ratio multiplier (e.g. 2.0x for double the 20-day average volume).";
     } else if (condition === "BB_CROSS") {
-        desc = "<strong>Price vs Bollinger Bands:</strong> Standard volatility envelope. Triggers when price crosses above upper band (&gt;) or below lower band (&lt;).";
+        desc = "<strong>Price vs Bollinger Bands:</strong> Standard volatility envelope. Triggers when price crosses above upper band (&gt;) or below lower band (&lt;).<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &lt;, Value 0 (crosses below lower band - oversold buy)</span>";
         defaultVal = "0";
         helper = "Set to 0. Triggers immediately on band crossing.";
     } else if (condition === "MACD_CROSS") {
-        desc = "<strong>MACD vs Signal Line Cross:</strong> Moving Average Convergence Divergence trend-following oscillator. Triggers on bullish (&gt; cross above signal) or bearish (&lt; cross below signal) crossover.";
+        desc = "<strong>MACD vs Signal Line Cross:</strong> Moving Average Convergence Divergence trend-following oscillator. Triggers on bullish (&gt; cross above signal) or bearish (&lt; cross below signal) crossover.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 0 (bullish crossover entry) or Operator &lt;, Value 0 (bearish crossover exit)</span>";
         defaultVal = "0";
         helper = "Set to 0. Trigger checks MACD crosses signal line.";
     } else if (condition === "52W_PROXIMITY") {
-        desc = "<strong>Price vs 52-Week Range:</strong> Proximity to historical limits. Triggers when price is within X% of 52w High (&gt;) or 52w Low (&lt;).";
+        desc = "<strong>Price vs 52-Week Range:</strong> Proximity to historical limits. Triggers when price is within X% of 52w High (&gt;) or 52w Low (&lt;).<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &lt;, Value 3 (within 3% of 52w Low)</span>";
         defaultVal = "3";
         helper = "Enter percentage margin (e.g. 3 for within 3% of 52w range limits).";
     } else if (condition === "SMA50") {
-        desc = "<strong>Price vs SMA-50 (% Diff):</strong> Measures percentage distance from the medium-term 50-day Simple Moving Average. Triggers when diff exceeds target.";
+        desc = "<strong>Price vs SMA-50 (% Diff):</strong> Measures percentage distance from the medium-term 50-day Simple Moving Average. Triggers when diff exceeds target.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator &gt;, Value 2 (2% above 50 SMA)</span>";
         defaultVal = "2";
-        helper = "Deviation percent (e.g. 2 for 2% above SMA-50, or -2 for 2% below).";
+        helper = "Deviation percent (e.g. 2 for 2% above 50 SMA, or -2 for 2% below).";
+    } else if (condition === "FIB_382") {
+        desc = "<strong>Fibonacci 38.2% Retracement:</strong> Intermediate pullback level of the 6-month swing range. Commonly acts as support during strong uptrends.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator ==, Value 1.5 (within 1.5% of the 38.2% retracement level)</span>";
+        operatorsList = [
+            { value: '==', text: '= Near Support Proximity' }
+        ];
+        defaultOp = "==";
+        defaultVal = "1.5";
+        helper = "Set threshold proximity percentage (e.g. 1.5 for 1.5% limit proximity).";
+    } else if (condition === "FIB_500") {
+        desc = "<strong>Fibonacci 50.0% Retracement:</strong> Standard consolidation support level of the 6-month swing range. Serves as a key balance point.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator ==, Value 1.5 (within 1.5% of the 50.0% retracement level)</span>";
+        operatorsList = [
+            { value: '==', text: '= Near Support Proximity' }
+        ];
+        defaultOp = "==";
+        defaultVal = "1.5";
+        helper = "Set threshold proximity percentage (e.g. 1.5 for 1.5% limit proximity).";
+    } else if (condition === "FIB_618") {
+        desc = "<strong>Fibonacci 61.8% Retracement:</strong> Golden Ratio support level of the 6-month swing range. Key high-conviction buy zone for value entry.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator ==, Value 1.5 (within 1.5% of the 61.8% golden ratio support)</span>";
+        operatorsList = [
+            { value: '==', text: '= Near Support Proximity' }
+        ];
+        defaultOp = "==";
+        defaultVal = "1.5";
+        helper = "Set threshold proximity percentage (e.g. 1.5 for 1.5% limit proximity).";
     } else if (condition === "FIB_LEVEL") {
-        desc = "<strong>Fibonacci Support Proximity:</strong> Measures proximity to 6-month swing range retracements (38.2%, 50.0%, 61.8%). Triggers when within 1.5% of support.";
+        desc = "<strong>Fibonacci Proximity (All Major):</strong> Measures proximity to 6-month swing range retracements (38.2%, 50.0%, 61.8%). Triggers when within X% of any support level.<br><span style='color: var(--color-primary); font-weight: 700;'>Example: Operator ==, Value 1.5 (within 1.5% of any support level)</span>";
         operatorsList = [
             { value: '==', text: '= Near Support Proximity' }
         ];

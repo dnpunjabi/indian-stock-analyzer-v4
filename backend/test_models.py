@@ -1068,6 +1068,28 @@ class TestAlertsEnhancements(unittest.TestCase):
         self.assertEqual(set_res.status_code, 200)
         fib_alert_id = set_res.json()["id"]
 
+        # Set FIB_500 Alert (should trigger since price 151 is near 50% level of 150)
+        fib500_payload = {
+            "ticker": "TCS",
+            "condition_type": "FIB_500",
+            "operator": "==",
+            "value": "1.5"
+        }
+        set_res3 = self.client.post("/api/alerts/set", json=fib500_payload)
+        self.assertEqual(set_res3.status_code, 200)
+        fib500_alert_id = set_res3.json()["id"]
+
+        # Set FIB_382 Alert (should NOT trigger since price 151 is far from 38.2% level of 161.8)
+        fib382_payload = {
+            "ticker": "TCS",
+            "condition_type": "FIB_382",
+            "operator": "==",
+            "value": "1.5"
+        }
+        set_res4 = self.client.post("/api/alerts/set", json=fib382_payload)
+        self.assertEqual(set_res4.status_code, 200)
+        fib382_alert_id = set_res4.json()["id"]
+
         sma50_payload = {
             "ticker": "TCS",
             "condition_type": "SMA50",
@@ -1085,6 +1107,14 @@ class TestAlertsEnhancements(unittest.TestCase):
         fib_alert = next((a for a in check_data["alerts"] if a["id"] == fib_alert_id), None)
         self.assertIsNotNone(fib_alert)
         self.assertTrue(fib_alert["triggered"])
+
+        fib500_alert = next((a for a in check_data["alerts"] if a["id"] == fib500_alert_id), None)
+        self.assertIsNotNone(fib500_alert)
+        self.assertTrue(fib500_alert["triggered"])
+
+        fib382_alert = next((a for a in check_data["alerts"] if a["id"] == fib382_alert_id), None)
+        self.assertIsNotNone(fib382_alert)
+        self.assertFalse(fib382_alert["triggered"])
 
         sma_alert = next((a for a in check_data["alerts"] if a["id"] == sma_alert_id), None)
         self.assertIsNotNone(sma_alert)
