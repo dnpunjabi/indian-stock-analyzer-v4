@@ -1201,10 +1201,10 @@ class TestAlertsEnhancements(unittest.TestCase):
     @patch("backend.main.get_complete_financial_profile")
     @patch("backend.main.fetch_history_df")
     def test_crossover_triggers_with_nonzero_buffers(self, mock_fetch_history, mock_get_profile):
-        """Verifies DMA_CROSS, EMA_CROSS, and MACD_CROSS with non-zero threshold buffers."""
+        """Verifies DMA_CROSS, EMA_CROSS, MACD_CROSS, and SMA with non-zero threshold buffers."""
         mock_get_profile.return_value = {
             "fundamentals": {"current_price": 100.0},
-            "technicals": {"rsi": 50.0}
+            "technicals": {"rsi": 50.0, "sma_200": 90.0}
         }
 
         dates = pd.date_range(end="2026-06-09", periods=250, freq="D")
@@ -1244,6 +1244,8 @@ class TestAlertsEnhancements(unittest.TestCase):
             ("EMA_GOLD_NOTRIG", "EMA_CROSS", ">", "50.0", False),
             ("MACD_TRIG", "MACD_CROSS", ">", "1.0", True),
             ("MACD_NOTRIG", "MACD_CROSS", ">", "4.0", False),
+            ("SMA_TRIG", "SMA", ">", "5.0", True),
+            ("SMA_NOTRIG", "SMA", ">", "15.0", False),
         ]
 
         alert_ids = []

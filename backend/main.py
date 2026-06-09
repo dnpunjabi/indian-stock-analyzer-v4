@@ -2264,10 +2264,15 @@ async def check_alerts():
             elif alert["condition_type"] == "SMA":
                 price_val = t["fundamentals"]["current_price"]
                 sma_200 = t["technicals"]["sma_200"]
-                cur_val = f"Price: Rs. {price_val:.2f} vs SMA200: Rs. {sma_200:.2f}"
-                if alert["operator"] == ">" and price_val > sma_200:
+                pct_diff = ((price_val - sma_200) / sma_200) * 100 if sma_200 > 0 else 0.0
+                cur_val = f"Price: Rs. {price_val:.2f} vs SMA200: Rs. {sma_200:.2f} (Diff: {pct_diff:+.1f}%)"
+                try:
+                    threshold = float(alert["value"])
+                except Exception:
+                    threshold = 0.0
+                if alert["operator"] == ">" and pct_diff > threshold:
                     triggered = True
-                elif alert["operator"] == "<" and price_val < sma_200:
+                elif alert["operator"] == "<" and pct_diff < threshold:
                     triggered = True
                     
             elif alert["condition_type"] == "DMA_CROSS":
