@@ -62,6 +62,13 @@ let swingScanPageSize = 10;
 let swingScanSortCol = 'symbol';
 let swingScanSortAsc = true;
 
+// Active Alerts pagination/sorting state
+let lastAlertsList = [];
+let activeAlertsPage = 1;
+let alertsPageSize = 10;
+let alertsSortCol = 'id';
+let alertsSortAsc = true;
+
 
 // DOM Elements
 const tabs = {
@@ -4371,6 +4378,38 @@ function setupAlertCenter() {
     document.getElementById('save-alert-btn').addEventListener('click', setAlertRule);
     document.getElementById('scan-alerts-btn').addEventListener('click', checkAlertRules);
     
+    // Natural Language Builder submit listener
+    const nlSubmitBtn = document.getElementById('alert-nl-submit');
+    if (nlSubmitBtn) {
+        nlSubmitBtn.addEventListener('click', generateNLAlertRule);
+    }
+
+    // Hook Suggested Prompt Pills
+    document.querySelectorAll('.nl-template-pill').forEach(pill => {
+        pill.addEventListener('click', (e) => {
+            const templateText = e.currentTarget.getAttribute('data-template');
+            
+            // Resolve stock name dynamically:
+            // 1. Manual search input in Alert form
+            // 2. Active profile symbol in Workspace
+            // 3. Fallback to default
+            let targetStock = 'RELIANCE';
+            const alertInputVal = document.getElementById('alert-symbol')?.value.trim();
+            if (alertInputVal) {
+                targetStock = alertInputVal.toUpperCase();
+            } else if (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) {
+                targetStock = activeStockProfile.ticker.split('.')[0].toUpperCase();
+            }
+            
+            const promptText = templateText.replace(/{STOCK}/g, targetStock);
+            const txt = document.getElementById('alert-nl-prompt');
+            if (txt) {
+                txt.value = promptText;
+                txt.focus();
+            }
+        });
+    });
+    
     // Webhook settings save listener
     const saveWebhooksBtn = document.getElementById('save-webhooks-btn');
     if (saveWebhooksBtn) {
@@ -4394,9 +4433,48 @@ function setupAlertCenter() {
         ackBtn.addEventListener('click', dismissEmergencyHUD);
     }
     
+    setupAlertsTableSorting();
     fetchWebhooksSettings();
     fetchAlertsList();
     startRealTimeAlertScanner();
+}
+
+async function generateNLAlertRule() {
+    const promptInput = document.getElementById('alert-nl-prompt');
+    const submitBtn = document.getElementById('alert-nl-submit');
+    const loader = document.getElementById('alert-nl-loader');
+
+    if (!promptInput || !promptInput.value.trim()) {
+        showToast("Please enter an alert description prompt.", "error");
+        return;
+    }
+
+    const promptText = promptInput.value.trim();
+    submitBtn.disabled = true;
+    loader.style.display = 'flex';
+
+    try {
+        const response = await fetch('/api/alerts/parse-nl', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: promptText })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.detail || "Failed to parse rule.");
+        }
+
+        const data = await response.json();
+        showToast(`AI Alert successfully created: ${data.ticker} on ${data.condition_type}`, "success");
+        promptInput.value = '';
+        fetchAlertsList();
+    } catch (e) {
+        showToast("Failed to parse alert prompt: " + e.message, "error");
+    } finally {
+        submitBtn.disabled = false;
+        loader.style.display = 'none';
+    }
 }
 
 // Start Real-Time Alert Engine background scanner
@@ -4581,18 +4659,38 @@ async function setAlertRule() {
 }
 
 function renderAlertsList(list) {
-    const tbody = document.getElementById('alerts-table-body');
-    tbody.innerHTML = '';
+    lastAlertsList = list;
     
     // Also update cockpit radar scanner target plots!
     renderRadarTargets(list);
     
-    if (list.length === 0) {
+    // Sort and render the page (keeping current sorting but resetting page if bounds exceeded)
+    sortAlerts(alertsSortCol, false);
+}
+
+function renderAlertsPage(page) {
+    const tbody = document.getElementById('alerts-table-body');
+    const pagContainer = document.getElementById('alerts-log-pagination');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    if (lastAlertsList.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="center-text text-muted">No alert rules configured. Create one on the left.</td></tr>';
+        if (pagContainer) pagContainer.style.display = 'none';
         return;
     }
     
-    list.forEach(item => {
+    const totalPages = Math.ceil(lastAlertsList.length / alertsPageSize) || 1;
+    if (page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    activeAlertsPage = page;
+    
+    const startIndex = (page - 1) * alertsPageSize;
+    const endIndex = Math.min(startIndex + alertsPageSize, lastAlertsList.length);
+    const pageSlice = lastAlertsList.slice(startIndex, endIndex);
+    
+    pageSlice.forEach(item => {
         const tr = document.createElement('tr');
         
         let statusBadge = '';
@@ -4628,7 +4726,142 @@ function renderAlertsList(list) {
         });
         
         tbody.appendChild(tr);
+        
+        if (item.ai_context) {
+            const trWarning = document.createElement('tr');
+            trWarning.className = 'ai-warning-row';
+            trWarning.innerHTML = `
+                <td colspan="7" style="padding: 6px 12px; background: rgba(239, 68, 68, 0.04); border-top: none;">
+                    <div style="display: flex; align-items: flex-start; gap: 8px; font-size: 11px; line-height: 1.45; color: var(--text-primary);">
+                        <span style="color: #ef4444; font-size: 12px; margin-top: 1px;">🤖</span>
+                        <div>
+                            <strong style="color: #ef4444; text-transform: uppercase; font-size: 9px; letter-spacing: 0.05em; display: block; margin-bottom: 2px;">AI Copilot Analysis</strong>
+                            ${item.ai_context}
+                        </div>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(trWarning);
+        }
     });
+    
+    if (pagContainer) {
+        document.getElementById('alerts-log-page-info').innerText = `Page ${page} of ${totalPages}`;
+        document.getElementById('alerts-log-prev-btn').disabled = (page === 1);
+        document.getElementById('alerts-log-next-btn').disabled = (page === totalPages);
+        pagContainer.style.display = 'flex';
+    }
+}
+
+function sortAlerts(col, toggle = true) {
+    if (toggle) {
+        if (alertsSortCol === col) {
+            alertsSortAsc = !alertsSortAsc;
+        } else {
+            alertsSortCol = col;
+            alertsSortAsc = true;
+        }
+    }
+    
+    lastAlertsList.sort((a, b) => {
+        let valA = a[col];
+        let valB = b[col];
+        
+        if (col === 'id') {
+            valA = parseInt(valA) || 0;
+            valB = parseInt(valB) || 0;
+        } else if (col === 'value') {
+            valA = parseFloat(valA) || 0;
+            valB = parseFloat(valB) || 0;
+        } else {
+            valA = (valA || '').toString().toLowerCase();
+            valB = (valB || '').toString().toLowerCase();
+        }
+        
+        if (valA < valB) return alertsSortAsc ? -1 : 1;
+        if (valA > valB) return alertsSortAsc ? 1 : -1;
+        return 0;
+    });
+    
+    updateAlertsHeaderIndicators();
+    
+    const totalPages = Math.ceil(lastAlertsList.length / alertsPageSize) || 1;
+    if (activeAlertsPage > totalPages) {
+        activeAlertsPage = totalPages;
+    }
+    renderAlertsPage(activeAlertsPage);
+}
+
+function updateAlertsHeaderIndicators() {
+    const sortMappings = {
+        'alerts-th-id': 'id',
+        'alerts-th-symbol': 'ticker',
+        'alerts-th-condition': 'condition_type',
+        'alerts-th-value': 'value',
+        'alerts-th-status': 'status',
+        'alerts-th-triggered': 'trigger_date'
+    };
+    
+    Object.keys(sortMappings).forEach(thId => {
+        const th = document.getElementById(thId);
+        if (th) {
+            const indicator = th.querySelector('.sort-indicator');
+            if (indicator) {
+                if (sortMappings[thId] === alertsSortCol) {
+                    indicator.innerText = alertsSortAsc ? ' ▲' : ' ▼';
+                    indicator.style.opacity = '1';
+                } else {
+                    indicator.innerText = '';
+                    indicator.style.opacity = '0.3';
+                }
+            }
+        }
+    });
+}
+
+function setupAlertsTableSorting() {
+    const sortMappings = {
+        'alerts-th-id': 'id',
+        'alerts-th-symbol': 'ticker',
+        'alerts-th-condition': 'condition_type',
+        'alerts-th-value': 'value',
+        'alerts-th-status': 'status',
+        'alerts-th-triggered': 'trigger_date'
+    };
+    
+    Object.keys(sortMappings).forEach(thId => {
+        const th = document.getElementById(thId);
+        if (th) {
+            th.addEventListener('click', () => {
+                sortAlerts(sortMappings[thId]);
+            });
+        }
+    });
+    
+    const prevBtn = document.getElementById('alerts-log-prev-btn');
+    const nextBtn = document.getElementById('alerts-log-next-btn');
+    if (prevBtn && nextBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (activeAlertsPage > 1) {
+                renderAlertsPage(activeAlertsPage - 1);
+            }
+        });
+        nextBtn.addEventListener('click', () => {
+            const totalPages = Math.ceil(lastAlertsList.length / alertsPageSize) || 1;
+            if (activeAlertsPage < totalPages) {
+                renderAlertsPage(activeAlertsPage + 1);
+            }
+        });
+    }
+    
+    const pageSizeSelect = document.getElementById('alerts-log-pagesize-select');
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', (e) => {
+            alertsPageSize = parseInt(e.target.value) || 10;
+            activeAlertsPage = 1;
+            renderAlertsPage(1);
+        });
+    }
 }
 
 async function checkAlertRules() {
@@ -4918,8 +5151,8 @@ function renderRadarTargets(list) {
         if (item.status === 'Triggered') {
             dot.className += ' triggered';
         }
-        dot.style.left = `${coords.x}px`;
-        dot.style.top = `${coords.y}px`;
+        dot.style.left = `${(coords.x / 220) * 100}%`;
+        dot.style.top = `${(coords.y / 220) * 100}%`;
         dot.setAttribute('data-symbol', item.ticker);
         dot.title = `${item.ticker}: ${item.condition_type} ${item.operator} ${item.value} (${item.status})`;
         

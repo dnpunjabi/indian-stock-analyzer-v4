@@ -1269,6 +1269,54 @@ class TestAlertsEnhancements(unittest.TestCase):
             self.assertEqual(alert["triggered"], 1 if expected_trigger else 0,
                              f"Alert {cond} with value {val} trigger state mismatch: expected {expected_trigger}, got {alert['triggered']}")
 
+    @patch("backend.agent.call_groq_llm")
+    def test_parse_natural_language_prompt(self, mock_call_llm):
+        """Verifies parsing of plain English alert builder request."""
+        mock_call_llm.return_value = '{"ticker_query": "RELIANCE", "condition_type": "PRICE", "operator": ">", "value": "3500"}'
+        
+        response = self.client.post("/api/alerts/parse-nl", json={
+            "prompt": "Alert me if Reliance Industries goes above Rs. 3500"
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["ticker"], "RELIANCE.NS")
+        self.assertEqual(data["condition_type"], "PRICE")
+        self.assertEqual(data["operator"], ">")
+        self.assertEqual(data["value"], "3500")
+
+    @patch("backend.agent.call_groq_llm")
+    @patch("backend.main.get_complete_financial_profile")
+    @patch("backend.main.fetch_history_df")
+    def test_alerts_contextual_warning_generation(self, mock_fetch_history, mock_get_profile, mock_call_llm):
+        """Verifies that triggered alerts generate an AI contextual warning."""
+        mock_get_profile.return_value = {
+            "fundamentals": {"current_price": 350.0},
+            "technicals": {"rsi": 82.0, "sma_200": 300.0}
+        }
+        mock_fetch_history.return_value = pd.DataFrame({"Close": [300, 310, 320, 330, 350]})
+        mock_call_llm.return_value = "ALERT: INFY.NS crossed RSI > 80. Extremely overbought, watch key consolidation support."
+
+        # Setup standard alert
+        res = self.client.post("/api/alerts/set", json={
+            "ticker": "INFY.NS",
+            "condition_type": "RSI",
+            "operator": ">",
+            "value": "80.0"
+        })
+        self.assertEqual(res.status_code, 200)
+        alert_id = res.json()["id"]
+
+        # Run alert check sweep
+        check_res = self.client.get("/api/alerts/check")
+        self.assertEqual(check_res.status_code, 200)
+        check_data = check_res.json()
+
+        # Find the triggered alert and assert context warning is filled
+        alert = next((a for a in check_data["alerts"] if a["id"] == alert_id), None)
+        self.assertIsNotNone(alert)
+        self.assertEqual(alert["triggered"], 1)
+        self.assertEqual(alert["ai_context"], "ALERT: INFY.NS crossed RSI > 80. Extremely overbought, watch key consolidation support.")
+
 
 if __name__ == "__main__":
     unittest.main()

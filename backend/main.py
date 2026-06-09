@@ -113,7 +113,8 @@ def init_db():
             value TEXT NOT NULL,
             status TEXT DEFAULT 'Active',
             triggered INTEGER DEFAULT 0,
-            trigger_date TEXT DEFAULT ''
+            trigger_date TEXT DEFAULT '',
+            ai_context TEXT DEFAULT ''
         )
         """)
         # Persistent alert settings table
@@ -189,6 +190,10 @@ def init_db():
         # Backward compatibility column migration
         try:
             cursor.execute("ALTER TABLE bulk_block_deals ADD COLUMN is_mock INTEGER DEFAULT 0")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE alerts ADD COLUMN ai_context TEXT DEFAULT ''")
         except Exception:
             pass
         # Persistent daily delivery history table
@@ -1043,6 +1048,9 @@ class AlertRequest(BaseModel):
 class AlertSettingsRequest(BaseModel):
     slack_webhook: str = ""
     discord_webhook: str = ""
+
+class ParseNLAlertRequest(BaseModel):
+    prompt: str
 
 class WatchlistCreate(BaseModel):
     name: str
@@ -2123,17 +2131,103 @@ async def set_alert(data: AlertRequest):
             "value": data.value,
             "status": "Active",
             "triggered": False,
-            "trigger_date": ""
+            "trigger_date": "",
+            "ai_context": ""
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to set alert: {str(e)}")
+
+@app.post("/api/alerts/parse-nl")
+async def parse_nl_alert(data: ParseNLAlertRequest):
+    """Parses a plain English prompt into a structured SQLite alert rule using Groq LLM."""
+    try:
+        from backend.agent import call_groq_llm
+        from backend.financial_utils import resolve_company_ticker
+
+        sys_prompt = (
+            "You are an expert financial system developer parsing plain English alert setup requests into structured JSON rules.\n"
+            "Analyze the user prompt and output a single JSON object. DO NOT output any markdown tags (like ```json), and DO NOT output any conversational text or preambles. Only output the raw JSON string.\n"
+            "Allowed condition types:\n"
+            "- RSI (Relative Strength Index limit)\n"
+            "- PE (Price-to-Earnings, value is median check 'MEDIAN' or multiple number)\n"
+            "- RATING (analyst recommendation, e.g., 'Strong Buy', 'Buy', 'Hold', 'Sell')\n"
+            "- PRICE (absolute price floor/ceiling in Rs.)\n"
+            "- SMA (price deviation from 200 SMA in %, e.g., 5.0 for 5% above, -3.0 for 3% below)\n"
+            "- DMA_CROSS (50 SMA vs 200 SMA crossover, value represents percentage separation filter, e.g. 0.0 or 1.5)\n"
+            "- EMA_CROSS (50 EMA vs 200 EMA crossover, value represents percentage separation filter, e.g. 0.0 or 1.0)\n"
+            "- VOL_BREAKOUT (volume ratio vs 20d average, e.g., 2.0)\n"
+            "- BB_CROSS (price vs Bollinger Bands, value is 0)\n"
+            "- MACD_CROSS (MACD vs Signal line crossover, value is absolute point difference filter, e.g. 0.0 or 0.5)\n"
+            "- 52W_PROXIMITY (proximity margin % to 52w limits, e.g. 3.0)\n"
+            "- SMA50 (price deviation from 50 SMA in %, e.g. 2.0 or -2.0)\n"
+            "- FIB_LEVEL (proximity to any Fib level in %, e.g. 1.5)\n"
+            "- FIB_382 (proximity to Fib 38.2% in %, e.g. 1.5)\n"
+            "- FIB_500 (proximity to Fib 50.0% in %, e.g. 1.5)\n"
+            "- FIB_618 (proximity to Fib 61.8% in %, e.g. 1.5)\n\n"
+            "Operators:\n"
+            "- '>' (Greater Than / Crosses Above)\n"
+            "- '<' (Less Than / Crosses Below)\n"
+            "- '==' (Equals / Near Proximity - mandatory for FIB and RATING conditions)\n\n"
+            "Output format example:\n"
+            "{\n"
+            "  \"ticker_query\": \"TCS\",\n"
+            "  \"condition_type\": \"EMA_CROSS\",\n"
+            "  \"operator\": \">\",\n"
+            "  \"value\": \"0.0\"\n"
+            "}"
+        )
+
+        response = await asyncio.to_thread(call_groq_llm, sys_prompt, data.prompt)
+        response = response.strip()
+        if response.startswith("```json"):
+            response = response[7:]
+        if response.endswith("```"):
+            response = response[:-3]
+        response = response.strip()
+
+        parsed = json.loads(response)
+        ticker_query = parsed.get("ticker_query", "TCS")
+        cond_type = parsed.get("condition_type", "PRICE").upper()
+        op = parsed.get("operator", ">")
+        val = parsed.get("value", "0.0")
+
+        try:
+            res = resolve_company_ticker(ticker_query)
+            ticker = res["yf_ticker"]
+        except Exception:
+            ticker = ticker_query.strip().upper()
+            if not ticker.endswith(".NS") and not ticker.endswith(".BO"):
+                ticker += ".NS"
+
+        alert_id = str(uuid.uuid4())[:8]
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO alerts (id, ticker, condition_type, operator, value) VALUES (?, ?, ?, ?, ?)",
+                (alert_id, ticker, cond_type, op, val)
+            )
+            conn.commit()
+
+        return {
+            "id": alert_id,
+            "ticker": ticker,
+            "condition_type": cond_type,
+            "operator": op,
+            "value": val,
+            "status": "Active",
+            "triggered": False,
+            "trigger_date": "",
+            "ai_context": ""
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse and configure alert: {str(e)}")
 
 @app.get("/api/alerts/list")
 async def list_alerts():
     """Returns all alerts from SQLite."""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, ticker, condition_type, operator, value, status, triggered, trigger_date FROM alerts")
+        cursor.execute("SELECT id, ticker, condition_type, operator, value, status, triggered, trigger_date, ai_context FROM alerts")
         rows = cursor.fetchall()
         return [
             {
@@ -2144,7 +2238,8 @@ async def list_alerts():
                 "value": row["value"],
                 "status": row["status"],
                 "triggered": bool(row["triggered"]),
-                "trigger_date": row["trigger_date"]
+                "trigger_date": row["trigger_date"],
+                "ai_context": row["ai_context"]
             }
             for row in rows
         ]
@@ -2459,11 +2554,40 @@ async def check_alerts():
                     
             if triggered:
                 trigger_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+                
+                # Generate AI Contextual Warning
+                ai_context = ""
+                try:
+                    from backend.agent import call_groq_llm
+                    price_info = f"Current Price: Rs. {price_val:.2f}" if 'price_val' in locals() else ""
+                    rsi_info = f"RSI: {t['technicals']['rsi']:.1f}" if 't' in locals() and 'rsi' in t['technicals'] else ""
+                    sma_info = f"SMA200: Rs. {t['technicals']['sma_200']:.2f}" if 't' in locals() and 'sma_200' in t['technicals'] else ""
+                    
+                    sys_prompt = (
+                        "You are an institutional trading cockpit assistant. "
+                        "Write a concise, 1-sentence analytical warning (max 30 words) describing why this alert triggered and what it implies about the stock's momentum, volume absorption, or range boundaries."
+                    )
+                    user_prompt = (
+                        f"ALERT TRIGGERED:\n"
+                        f"Ticker: {alert['ticker']}\n"
+                        f"Trigger condition: {alert['condition_type']} {alert['operator']} {alert['value']}\n"
+                        f"Triggered value description: {cur_val}\n"
+                        f"Context: {price_info} | {rsi_info} | {sma_info}\n"
+                        f"Output ONLY the single-sentence contextual warning/analysis. Do not add headers, quotes, or conversational preamble."
+                    )
+                    
+                    # Call LLM
+                    ai_context = await asyncio.to_thread(call_groq_llm, sys_prompt, user_prompt)
+                    ai_context = ai_context.strip().strip('"').strip("'").strip()
+                except Exception as ai_err:
+                    print(f"Failed to generate AI alert warning context: {ai_err}")
+                    ai_context = f"Alert triggered on {alert['condition_type']} validation."
+
                 with get_db() as conn:
                     cursor = conn.cursor()
                     cursor.execute(
-                        "UPDATE alerts SET triggered = 1, status = 'Triggered', trigger_date = ? WHERE id = ?",
-                        (trigger_date, alert["id"])
+                        "UPDATE alerts SET triggered = 1, status = 'Triggered', trigger_date = ?, ai_context = ? WHERE id = ?",
+                        (trigger_date, ai_context, alert["id"])
                     )
                     conn.commit()
                 triggers.append(f"ALERT TRIGGERED: {alert['ticker']} reached {cur_val} (Target: {alert['operator']} {alert['value']})")
@@ -2481,21 +2605,26 @@ async def check_alerts():
                     f"• **Stock**: {alert['ticker']}\n"
                     f"• **Condition**: {alert['condition_type']} {alert['operator']} {alert['value']}\n"
                     f"• **Triggered Value**: {cur_val}\n"
-                    f"• **Triggered At**: {trigger_date}"
+                    f"• **Triggered At**: {trigger_date}\n"
                 )
+                if ai_context:
+                    text_msg += f"• **AI Copilot Analysis**: {ai_context}\n"
 
                 if discord_webhook:
+                    fields = [
+                        {"name": "Stock", "value": f"**{alert['ticker']}**", "inline": True},
+                        {"name": "Condition", "value": f"`{alert['condition_type']} {alert['operator']} {alert['value']}`", "inline": True},
+                        {"name": "Triggered Value", "value": f"{cur_val}", "inline": False},
+                        {"name": "Timestamp", "value": f"{trigger_date}", "inline": True}
+                    ]
+                    if ai_context:
+                        fields.append({"name": "AI Copilot Analysis", "value": f"{ai_context}", "inline": False})
                     discord_payload = {
                         "content": None,
                         "embeds": [{
                             "title": "🚨 Institutional Alert Triggered",
                             "color": 15548997,  # Red
-                            "fields": [
-                                {"name": "Stock", "value": f"**{alert['ticker']}**", "inline": True},
-                                {"name": "Condition", "value": f"`{alert['condition_type']} {alert['operator']} {alert['value']}`", "inline": True},
-                                {"name": "Triggered Value", "value": f"{cur_val}", "inline": False},
-                                {"name": "Timestamp", "value": f"{trigger_date}", "inline": True}
-                            ],
+                            "fields": fields,
                             "footer": {
                                 "text": "APEX Agentic Equities AI Workstation"
                             }
@@ -2515,7 +2644,7 @@ async def check_alerts():
     # Re-fetch all alerts after updates
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, ticker, condition_type, operator, value, status, triggered, trigger_date FROM alerts")
+        cursor.execute("SELECT id, ticker, condition_type, operator, value, status, triggered, trigger_date, ai_context FROM alerts")
         all_alerts = [
             {
                 "id": row["id"],
@@ -2525,7 +2654,8 @@ async def check_alerts():
                 "value": row["value"],
                 "status": row["status"],
                 "triggered": bool(row["triggered"]),
-                "trigger_date": row["trigger_date"]
+                "trigger_date": row["trigger_date"],
+                "ai_context": row["ai_context"]
             }
             for row in cursor.fetchall()
         ]
