@@ -209,6 +209,29 @@ def init_db():
         )
         """)
         
+        # Custom saved screens table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS custom_screens (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            rules_json TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        
+        # Cached timeframe indicators table for daily, weekly, monthly indicators
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cached_timeframe_indicators (
+            symbol TEXT,
+            timeframe TEXT,
+            indicators_json TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (symbol, timeframe)
+        )
+        """)
+
+        
         # Mock loader for history, block deals, and corporate actions if empty
         cursor.execute("SELECT COUNT(*) as cnt FROM daily_delivery_history")
         hist_count = cursor.fetchone()["cnt"]
@@ -1059,6 +1082,26 @@ class ParseNLScanRequest(BaseModel):
 class ScanSynthesisRequest(BaseModel):
     results: List[dict]
     condition_desc: str
+
+class CustomScanRule(BaseModel):
+    timeframe: str
+    indicator: str
+    operator: str
+    value: str
+
+class CustomScanRequest(BaseModel):
+    universe: str = "all"
+    logic_gate: str = "AND"
+    historical_range: int = 90
+    rules: List[CustomScanRule]
+
+class SavedScreenCreate(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    rules: List[dict]
+    logic_gate: str = "AND"
+    universe: str = "all"
+
 
 class WatchlistCreate(BaseModel):
     name: str
@@ -5466,6 +5509,459 @@ async def scan_synthesis(data: ScanSynthesisRequest):
         return {"status": "success", "synthesis": summary.strip()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Synthesis generation failed: {str(e)}")
+
+
+# ─── CHARTINK-STYLE CUSTOM SCREENER ENGINE ─────────────────────────────────────
+
+def compute_dataframe_indicators(df: pd.DataFrame, timeframe: str) -> List[dict]:
+    import numpy as np
+    import pandas as pd
+    
+    if df.empty or len(df) < 5:
+        return []
+        
+    df = df.copy()
+    
+    df['Close'] = df['Close'].ffill().bfill()
+    df['Volume'] = df['Volume'].ffill().bfill()
+    
+    df['SMA_50'] = df['Close'].rolling(window=50).mean()
+    df['SMA_200'] = df['Close'].rolling(window=200).mean()
+    df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+    df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
+    
+    # RSI 14
+    delta = df['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / (loss + 1e-9)
+    df['RSI_14'] = 100 - (100 / (1 + rs))
+    
+    # Volume Ratio vs 20d Average
+    df['Vol_20MA'] = df['Volume'].rolling(window=20).mean()
+    df['Vol_Ratio'] = df['Volume'] / (df['Vol_20MA'] + 1e-9)
+    
+    # Bollinger Bands
+    df['SMA_20'] = df['Close'].rolling(window=20).mean()
+    df['STD_20'] = df['Close'].rolling(window=20).std()
+    df['BB_Upper'] = df['SMA_20'] + 2 * df['STD_20']
+    df['BB_Lower'] = df['SMA_20'] - 2 * df['STD_20']
+    
+    # MACD & Signal
+    df['EMA_12'] = df['Close'].ewm(span=12, adjust=False).mean()
+    df['EMA_26'] = df['Close'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = df['EMA_12'] - df['EMA_26']
+    df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+    
+    # Trailing High/Low lookbacks (250 bars for daily, 52 for weekly, 12 for monthly)
+    lookback = 250 if timeframe == '1d' else (52 if timeframe == '1wk' else 12)
+    df['year_high'] = df['Close'].rolling(window=lookback, min_periods=1).max()
+    df['year_low'] = df['Close'].rolling(window=lookback, min_periods=1).min()
+    
+    cols = ['SMA_50', 'SMA_200', 'EMA_50', 'EMA_200', 'RSI_14', 'Vol_Ratio', 'BB_Upper', 'BB_Lower', 'MACD', 'MACD_Signal', 'year_high', 'year_low']
+    for col in cols:
+        if col in df.columns:
+            df[col] = df[col].bfill().ffill().fillna(0.0)
+            
+    df = df.reset_index()
+    date_col = 'Date' if 'Date' in df.columns else df.columns[0]
+    
+    results = []
+    for _, row in df.iterrows():
+        try:
+            dt_val = row[date_col]
+            if isinstance(dt_val, str):
+                date_str = dt_val[:10]
+            else:
+                date_str = dt_val.strftime("%Y-%m-%d")
+        except Exception:
+            date_str = str(dt_val)[:10]
+            
+        results.append({
+            "date": date_str,
+            "Close": float(row["Close"]),
+            "Volume": float(row["Volume"]),
+            "Vol_Ratio": float(row["Vol_Ratio"]),
+            "RSI_14": float(row["RSI_14"]),
+            "SMA_50": float(row["SMA_50"]),
+            "SMA_200": float(row["SMA_200"]),
+            "EMA_50": float(row["EMA_50"]),
+            "EMA_200": float(row["EMA_200"]),
+            "BB_Upper": float(row["BB_Upper"]),
+            "BB_Lower": float(row["BB_Lower"]),
+            "MACD": float(row["MACD"]),
+            "MACD_Signal": float(row["MACD_Signal"]),
+            "year_high": float(row["year_high"]),
+            "year_low": float(row["year_low"])
+        })
+        
+    return results
+
+async def get_timeframe_indicators(symbol: str, timeframe: str) -> List[dict]:
+    if timeframe not in ['1d', '1wk', '1mo']:
+        timeframe = '1d'
+        
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT indicators_json, updated_at 
+                FROM cached_timeframe_indicators 
+                WHERE symbol = ? AND timeframe = ?
+            """, (symbol, timeframe))
+            row = cursor.fetchone()
+            
+        if row:
+            try:
+                cache_time = datetime.strptime(row["updated_at"], "%Y-%m-%d %H:%M:%S")
+                age = datetime.now() - cache_time
+                if age.total_seconds() < 14400:  # 4 hours
+                    return json.loads(row["indicators_json"])
+            except Exception:
+                pass
+    except Exception as db_err:
+        print(f"Error reading timeframe indicator cache: {db_err}")
+        
+    period = "2y" if timeframe == '1d' else ("5y" if timeframe == '1wk' else "max")
+    df = await fetch_history_df(symbol, period=period, interval=timeframe)
+    
+    if df.empty:
+        try:
+            ticker_obj = yf.Ticker(symbol)
+            df = await asyncio.to_thread(ticker_obj.history, period=period, interval=timeframe)
+        except Exception:
+            pass
+            
+    indicators = []
+    if not df.empty:
+        indicators = compute_dataframe_indicators(df, timeframe)
+        
+    if indicators:
+        try:
+            with get_db() as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO cached_timeframe_indicators 
+                    (symbol, timeframe, indicators_json, updated_at) 
+                    VALUES (?, ?, ?, ?)
+                """, (symbol, timeframe, json.dumps(indicators), datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                conn.commit()
+        except Exception as db_err:
+            print(f"Error writing timeframe indicator cache: {db_err}")
+            
+    return indicators
+
+def find_latest_row_before_or_equal(rows: List[dict], target_date_str: str) -> Optional[dict]:
+    best_row = None
+    for row in rows:
+        if row["date"] <= target_date_str:
+            best_row = row
+        else:
+            break
+    return best_row
+
+def get_indicator_value(ind_row: dict, fund: dict, tech_full: dict, key: str):
+    if not ind_row:
+        return 0.0
+        
+    key_upper = str(key).upper().strip()
+    if key_upper == "PRICE":
+        return ind_row.get("Close", 0.0)
+    elif key_upper == "VOLUME":
+        return ind_row.get("Volume", 0.0)
+    elif key_upper == "VOL_BREAKOUT":
+        return ind_row.get("Vol_Ratio", 0.0)
+    elif key_upper == "RSI":
+        return ind_row.get("RSI_14", 50.0)
+    elif key_upper == "SMA50":
+        return ind_row.get("SMA_50", 0.0)
+    elif key_upper == "SMA200":
+        return ind_row.get("SMA_200", 0.0)
+    elif key_upper == "EMA50":
+        return ind_row.get("EMA_50", 0.0)
+    elif key_upper == "EMA200":
+        return ind_row.get("EMA_200", 0.0)
+    elif key_upper == "BB_UPPER":
+        return ind_row.get("BB_Upper", 0.0)
+    elif key_upper == "BB_LOWER":
+        return ind_row.get("BB_Lower", 0.0)
+    elif key_upper == "MACD":
+        return ind_row.get("MACD", 0.0)
+    elif key_upper == "MACD_SIGNAL":
+        return ind_row.get("MACD_Signal", 0.0)
+    elif key_upper == "PE":
+        from backend.swing_utils import clean_float
+        return clean_float(fund.get("pe_ratio"), 0.0)
+    elif key_upper == "DE_RATIO":
+        from backend.swing_utils import clean_float
+        return clean_float(fund.get("debt_to_equity"), 0.0)
+    elif key_upper == "RATING":
+        analysis = tech_full.get("analysis") or {}
+        return (analysis.get("recommendation") or tech_full.get("recommendation") or "HOLD").upper()
+    elif key_upper == "SCORE":
+        from backend.swing_utils import clean_float
+        analysis = tech_full.get("analysis") or {}
+        return clean_float(tech_full.get("final_score") or tech_full.get("score_metrics", {}).get("final_score") or analysis.get("score", analysis.get("composite_score")), 0.0)
+    else:
+        try:
+            return float(key)
+        except ValueError:
+            return key.upper()
+
+def compare_rule_values(left, op, right) -> bool:
+    try:
+        if left is None:
+            left = 0.0
+        if right is None:
+            right = 0.0
+            
+        if isinstance(left, str) or isinstance(right, str):
+            left_str = str(left).upper().strip()
+            right_str = str(right).upper().strip()
+            if op == "==":
+                return left_str == right_str
+            elif op == "!=":
+                return left_str != right_str
+            return False
+            
+        l_num = float(left)
+        r_num = float(right)
+        
+        if op == "<":
+            return l_num < r_num
+        elif op == ">":
+            return l_num > r_num
+        elif op == "==":
+            return abs(l_num - r_num) < 1e-5
+        elif op == "<=":
+            return l_num <= r_num
+        elif op == ">=":
+            return l_num >= r_num
+    except Exception:
+        pass
+    return False
+
+@app.post("/api/screener/custom-scan")
+async def execute_custom_screener_scan(data: CustomScanRequest):
+    try:
+        from backend.swing_utils import clean_float
+        
+        # 1. Fetch universe stocks
+        with get_db() as conn:
+            cursor = conn.cursor()
+            if data.universe == "all":
+                cursor.execute("SELECT symbol, company_name, sector, cap_type FROM screener_universe WHERE symbol NOT LIKE '%DUMMY%'")
+            else:
+                cursor.execute("SELECT symbol, company_name, sector, cap_type FROM screener_universe WHERE cap_type = ? AND symbol NOT LIKE '%DUMMY%'", (data.universe,))
+            stocks = [dict(row) for row in cursor.fetchall()]
+            
+            # Load cached daily profiles to get fundamentals
+            cursor.execute("SELECT symbol, profile_json FROM cached_profiles")
+            cached_rows = cursor.fetchall()
+            cached_profiles = {}
+            for r in cached_rows:
+                try:
+                    cached_profiles[r["symbol"]] = json.loads(r["profile_json"])
+                except Exception:
+                    continue
+                    
+        # 2. Get last N trading dates for historical match count chart
+        benchmark_dates = []
+        benchmark_history = await get_timeframe_indicators("TCS.NS", "1d")
+        if not benchmark_history:
+            benchmark_history = await get_timeframe_indicators("RELIANCE.NS", "1d")
+            
+        if benchmark_history:
+            benchmark_history.sort(key=lambda x: x["date"])
+            n_range = data.historical_range
+            sliced_bench = benchmark_history[-n_range:] if len(benchmark_history) >= n_range else benchmark_history
+            benchmark_dates = [row["date"] for row in sliced_bench]
+            
+        if not benchmark_dates:
+            from datetime import datetime, timedelta
+            benchmark_dates = [(datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(data.historical_range - 1, -1, -1)]
+            benchmark_dates.sort()
+            
+        historical_counts = {dt: 0 for dt in benchmark_dates}
+        
+        # 3. Evaluate rules
+        matched_results = []
+        scanned_count = 0
+        
+        for stock in stocks:
+            sym = stock["symbol"]
+            profile = cached_profiles.get(sym)
+            if not profile:
+                continue
+                
+            fund = profile.get("fundamentals") or {}
+            
+            required_timeframes = set(rule.timeframe for rule in data.rules)
+            if not required_timeframes:
+                required_timeframes.add("1d")
+                
+            timeseries_cache = {}
+            has_all_data = True
+            for tf in required_timeframes:
+                ts = await get_timeframe_indicators(sym, tf)
+                if not ts:
+                    has_all_data = False
+                    break
+                ts.sort(key=lambda x: x["date"])
+                timeseries_cache[tf] = ts
+                
+            if not has_all_data:
+                continue
+                
+            scanned_count += 1
+            
+            # Current scan match evaluation
+            current_match = True
+            if not data.rules:
+                current_match = False
+                
+            rule_evals = []
+            for rule in data.rules:
+                ts = timeseries_cache.get(rule.timeframe)
+                if ts:
+                    latest_row = ts[-1]
+                    left_val = get_indicator_value(latest_row, fund, profile, rule.indicator)
+                    right_val = get_indicator_value(latest_row, fund, profile, rule.value)
+                    passed = compare_rule_values(left_val, rule.operator, right_val)
+                    rule_evals.append(passed)
+                else:
+                    rule_evals.append(False)
+                    
+            if data.logic_gate == "AND":
+                current_match = all(rule_evals) if rule_evals else False
+            else:
+                current_match = any(rule_evals) if rule_evals else False
+                
+            if current_match:
+                latest_d_row = timeseries_cache.get("1d")[-1] if "1d" in timeseries_cache else list(timeseries_cache.values())[0][-1]
+                price = float(latest_d_row.get("Close", 0.0))
+                
+                rsi = clean_float(profile.get("technicals", {}).get("rsi"), 50.0)
+                pe = clean_float(fund.get("pe_ratio"), 0.0)
+                score = clean_float(profile.get("final_score") or profile.get("score_metrics", {}).get("final_score") or profile.get("analysis", {}).get("score", profile.get("analysis", {}).get("composite_score")), 0.0)
+                de_ratio = clean_float(fund.get("debt_to_equity"), 0.0)
+                analysis = profile.get("analysis") or {}
+                rating = (analysis.get("recommendation") or profile.get("recommendation") or "N/A").upper()
+                
+                trigger_desc = []
+                for rule in data.rules:
+                    trigger_desc.append(f"{rule.timeframe.upper()} {rule.indicator} {rule.operator} {rule.value}")
+                trigger_str = ", ".join(trigger_desc[:3])
+                if len(trigger_desc) > 3:
+                    trigger_str += "..."
+                    
+                matched_results.append({
+                    "symbol": sym,
+                    "company_name": stock.get("company_name", sym),
+                    "sector": stock.get("sector", "N/A"),
+                    "cap_type": stock.get("cap_type", "N/A"),
+                    "price": round(price, 2),
+                    "pe": round(pe, 1),
+                    "rsi": round(rsi, 1),
+                    "trigger_value": trigger_str,
+                    "rating": rating,
+                    "score": round(score, 1),
+                    "de_ratio": round(de_ratio, 2)
+                })
+                
+            # Historical matches counts timeline builder
+            for dt in benchmark_dates:
+                rows_at_dt = {}
+                tf_valid = True
+                for tf in required_timeframes:
+                    row = find_latest_row_before_or_equal(timeseries_cache[tf], dt)
+                    if not row:
+                        tf_valid = False
+                        break
+                    rows_at_dt[tf] = row
+                    
+                if not tf_valid:
+                    continue
+                    
+                rule_evals_dt = []
+                for rule in data.rules:
+                    row = rows_at_dt.get(rule.timeframe)
+                    left_val = get_indicator_value(row, fund, profile, rule.indicator)
+                    right_val = get_indicator_value(row, fund, profile, rule.value)
+                    passed = compare_rule_values(left_val, rule.operator, right_val)
+                    rule_evals_dt.append(passed)
+                    
+                dt_matched = False
+                if data.logic_gate == "AND":
+                    dt_matched = all(rule_evals_dt) if rule_evals_dt else False
+                else:
+                    dt_matched = any(rule_evals_dt) if rule_evals_dt else False
+                    
+                if dt_matched:
+                    historical_counts[dt] += 1
+                    
+        formatted_historical = [{"time": dt, "value": count} for dt, count in sorted(historical_counts.items())]
+        
+        cond_desc = f"Custom Screener ({data.logic_gate})"
+        if data.rules:
+            cond_desc += f": {len(data.rules)} Rules"
+            
+        return {
+            "status": "success",
+            "scanned": scanned_count,
+            "matched": len(matched_results),
+            "universe": data.universe,
+            "condition": cond_desc,
+            "results": matched_results,
+            "historical_matches": formatted_historical
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Custom scan failed: {str(e)}")
+
+@app.get("/api/screener/screens")
+async def get_saved_screens():
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name, description, rules_json, created_at FROM custom_screens ORDER BY name ASC")
+            rows = [dict(row) for row in cursor.fetchall()]
+            
+        for row in rows:
+            try:
+                row["rules"] = json.loads(row["rules_json"])
+            except Exception:
+                row["rules"] = []
+        return rows
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch saved screens: {str(e)}")
+
+@app.post("/api/screener/screens")
+async def save_custom_screen(data: SavedScreenCreate):
+    try:
+        screen_id = str(uuid.uuid4())
+        rules_str = json.dumps(data.rules)
+        
+        with get_db() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO custom_screens (id, name, description, rules_json, created_at) 
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (screen_id, data.name, data.description, rules_str))
+            conn.commit()
+        return {"status": "success", "id": screen_id, "name": data.name}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save screen: {str(e)}")
+
+@app.delete("/api/screener/screens/{screen_id}")
+async def delete_custom_screen(screen_id: str):
+    try:
+        with get_db() as conn:
+            conn.execute("DELETE FROM custom_screens WHERE id = ?", (screen_id,))
+            conn.commit()
+        return {"status": "success", "message": "Screen deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete screen: {str(e)}")
+
 
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")

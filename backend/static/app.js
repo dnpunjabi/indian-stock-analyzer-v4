@@ -14885,6 +14885,9 @@ const RULE_SCANNER_COND_LABELS = {
 
 
 function setupRuleScanner() {
+    // Sub-tab toggling
+    setupRuleScannerSubtabs();
+
     // Strategy guide cheatsheet
     const conditionSelect = document.getElementById('rule-scanner-condition');
     if (conditionSelect) {
@@ -14908,7 +14911,34 @@ function setupRuleScanner() {
 
     // Parametric Execute
     const execBtn = document.getElementById('rule-scanner-execute-btn');
-    if (execBtn) execBtn.addEventListener('click', executeRuleScan);
+    if (execBtn) execBtn.addEventListener('click', () => executeRuleScan());
+
+    // Custom Screen Builder UI Actions
+    const addRowBtn = document.getElementById('custom-screener-add-row-btn');
+    if (addRowBtn) addRowBtn.addEventListener('click', () => addCustomScreenerRow());
+
+    const execCustomBtn = document.getElementById('custom-screener-execute-btn');
+    if (execCustomBtn) execCustomBtn.addEventListener('click', executeCustomScreenerScan);
+
+    const saveBtn = document.getElementById('custom-screener-save-btn');
+    if (saveBtn) saveBtn.addEventListener('click', saveCurrentScreen);
+
+    const rangeSelect = document.getElementById('rule-scanner-historical-range');
+    if (rangeSelect) {
+        rangeSelect.addEventListener('change', () => {
+            const activeCondEl = document.getElementById('rule-scanner-active-condition');
+            if (activeCondEl && activeCondEl.textContent.includes('Custom Screen')) {
+                executeCustomScreenerScan();
+            }
+        });
+    }
+
+    // Load initial screens registry & add first empty row
+    loadSavedScreens();
+    const rulesList = document.getElementById('custom-screener-rules-list');
+    if (rulesList && rulesList.children.length === 0) {
+        addCustomScreenerRow();
+    }
 
     // Sorting
     document.querySelectorAll('.rs-sortable').forEach(th => {
@@ -14938,13 +14968,15 @@ function setupRuleScanner() {
     const deSlider = document.getElementById('rule-scanner-filter-de');
     if (scoreSlider) scoreSlider.addEventListener('input', () => {
         ruleScanFilterMinScore = parseInt(scoreSlider.value);
-        document.getElementById('rule-scanner-filter-score-val').textContent = ruleScanFilterMinScore;
+        const scoreVal = document.getElementById('rule-scanner-filter-score-val');
+        if (scoreVal) scoreVal.textContent = ruleScanFilterMinScore;
         ruleScanPage = 1;
         renderRuleScanResults();
     });
     if (deSlider) deSlider.addEventListener('input', () => {
         ruleScanFilterMaxDE = parseInt(deSlider.value);
-        document.getElementById('rule-scanner-filter-de-val').textContent = (ruleScanFilterMaxDE / 100).toFixed(1);
+        const deVal = document.getElementById('rule-scanner-filter-de-val');
+        if (deVal) deVal.textContent = (ruleScanFilterMaxDE / 100).toFixed(1);
         ruleScanPage = 1;
         renderRuleScanResults();
     });
@@ -15023,7 +15055,8 @@ async function executeRuleScan(cond, op, val, uni) {
         const opSymbol = operator === "==" ? "=" : operator;
         detailText = `${readableCond} ${opSymbol} ${value} (Universe: ${universe.toUpperCase()})`;
     }
-    document.getElementById('rule-scanner-active-condition').textContent = detailText;
+    const activeCond = document.getElementById('rule-scanner-active-condition');
+    if (activeCond) activeCond.textContent = detailText;
 
 
     try {
@@ -15037,13 +15070,17 @@ async function executeRuleScan(cond, op, val, uni) {
             ruleScanPage = 1;
 
             // Update telemetry
-            document.getElementById('rule-scanner-scanned-count').textContent = data.scanned || 0;
-            document.getElementById('rule-scanner-matched-count').textContent = data.matched || 0;
+            const scannedCount = document.getElementById('rule-scanner-scanned-count');
+            if (scannedCount) scannedCount.textContent = data.scanned || 0;
+            const matchedCount = document.getElementById('rule-scanner-matched-count');
+            if (matchedCount) matchedCount.textContent = data.matched || 0;
             if (engineStatus) { engineStatus.textContent = 'COMPLETE'; engineStatus.style.color = '#10b981'; }
 
-            // Show results card
+            // Show results card and telemetry row
             const card = document.getElementById('rule-scanner-results-card');
             if (card) card.style.display = 'flex';
+            const telRow = document.getElementById('rule-scanner-results-telemetry-row');
+            if (telRow) telRow.style.display = 'grid';
 
             // Update subtitle
             const subtitle = document.getElementById('rule-scanner-results-subtitle');
@@ -15347,6 +15384,536 @@ async function saveRuleScanAsWatchlist() {
     } catch (err) {
         showToast('Failed to save watchlist: ' + err.message, 'error');
     }
+}
+
+function setupRuleScannerSubtabs() {
+    const aiBtn = document.getElementById('rule-scanner-tab-ai-btn');
+    const parametricBtn = document.getElementById('rule-scanner-tab-parametric-btn');
+    const customBtn = document.getElementById('rule-scanner-tab-custom-btn');
+
+    const aiPanel = document.getElementById('rule-scanner-panel-ai');
+    const parametricPanel = document.getElementById('rule-scanner-panel-parametric');
+    const customPanel = document.getElementById('rule-scanner-panel-custom');
+
+    const btns = [aiBtn, parametricBtn, customBtn];
+    const panels = [aiPanel, parametricPanel, customPanel];
+
+    btns.forEach((btn, idx) => {
+        if (btn) {
+            btn.addEventListener('click', () => {
+                btns.forEach(b => {
+                    if (b) {
+                        b.classList.remove('active');
+                        b.style.border = '1px solid transparent';
+                        b.style.background = 'transparent';
+                        b.style.color = 'var(--text-muted)';
+                    }
+                });
+                panels.forEach(p => {
+                    if (p) p.style.display = 'none';
+                });
+
+                btn.classList.add('active');
+                btn.style.border = '1px solid var(--border-glass)';
+                btn.style.background = 'rgba(255,255,255,0.03)';
+                btn.style.color = 'var(--text-primary)';
+                if (panels[idx]) panels[idx].style.display = 'block';
+
+                // Hide old results card, telemetry cards row, and historical chart card when switching sub-tabs
+                const resultsCard = document.getElementById('rule-scanner-results-card');
+                if (resultsCard) resultsCard.style.display = 'none';
+                const telemetryRow = document.getElementById('rule-scanner-results-telemetry-row');
+                if (telemetryRow) telemetryRow.style.display = 'none';
+                const chartCard = document.getElementById('rule-scanner-historical-chart-card');
+                if (chartCard) chartCard.style.display = 'none';
+            });
+        }
+    });
+}
+
+function addCustomScreenerRow(data = null) {
+    const list = document.getElementById('custom-screener-rules-list');
+    if (!list) return;
+
+    const row = document.createElement('div');
+    row.className = 'custom-screener-rule-row';
+
+    // 1. Timeframe
+    const tfSelect = document.createElement('select');
+    tfSelect.className = 'rule-timeframe';
+    tfSelect.innerHTML = `
+        <option value="1d">Daily</option>
+        <option value="1wk">Weekly</option>
+        <option value="1mo">Monthly</option>
+    `;
+    if (data && data.timeframe) tfSelect.value = data.timeframe;
+
+    // 2. Left Indicator
+    const indSelect = document.createElement('select');
+    indSelect.className = 'rule-indicator';
+    indSelect.innerHTML = `
+        <option value="PRICE">Price</option>
+        <option value="VOLUME">Volume</option>
+        <option value="VOL_BREAKOUT">Volume Ratio</option>
+        <option value="RSI">RSI-14</option>
+        <option value="SMA50">SMA-50</option>
+        <option value="SMA200">SMA-200</option>
+        <option value="EMA50">EMA-50</option>
+        <option value="EMA200">EMA-200</option>
+        <option value="BB_UPPER">Bollinger Upper</option>
+        <option value="BB_LOWER">Bollinger Lower</option>
+        <option value="MACD">MACD</option>
+        <option value="MACD_SIGNAL">MACD Signal</option>
+        <option value="PE">P/E Ratio</option>
+        <option value="DE_RATIO">Debt-to-Equity</option>
+        <option value="SCORE">AI Score</option>
+        <option value="RATING">AI Rating</option>
+    `;
+    if (data && data.indicator) indSelect.value = data.indicator;
+
+    // 3. Operator
+    const opSelect = document.createElement('select');
+    opSelect.className = 'rule-operator';
+    opSelect.innerHTML = `
+        <option value="<">&lt; Less Than</option>
+        <option value=">">&gt; Greater Than</option>
+        <option value="==">= Equals</option>
+        <option value="<=">&lt;= Less Or Equal</option>
+        <option value=">=">&gt;= Greater Or Equal</option>
+        <option value="!=">!= Not Equal</option>
+    `;
+    if (data && data.operator) opSelect.value = data.operator;
+
+    // 4. Value Type (Constant vs Indicator)
+    const valTypeSelect = document.createElement('select');
+    valTypeSelect.className = 'rule-val-type';
+    valTypeSelect.innerHTML = `
+        <option value="constant">Constant</option>
+        <option value="indicator">Indicator</option>
+    `;
+
+    // 5. Value Container
+    const valContainer = document.createElement('div');
+    valContainer.className = 'rule-val-container';
+    
+    // Determine initial state based on data.value
+    let isInd = false;
+    const indicatorList = ["PRICE", "VOLUME", "VOL_BREAKOUT", "RSI", "SMA50", "SMA200", "EMA50", "EMA200", "BB_UPPER", "BB_LOWER", "MACD", "MACD_SIGNAL", "PE", "DE_RATIO", "SCORE", "RATING"];
+    if (data && indicatorList.includes(String(data.value).toUpperCase().trim())) {
+        isInd = true;
+    }
+
+    if (isInd) {
+        valTypeSelect.value = 'indicator';
+        valContainer.innerHTML = createIndicatorSelector(data.value);
+    } else {
+        valTypeSelect.value = 'constant';
+        const initialVal = data ? data.value : '30';
+        valContainer.innerHTML = `<input type="text" class="rule-val-input" value="${initialVal}" placeholder="e.g. 30">`;
+    }
+
+    // Toggle logic for valTypeSelect
+    valTypeSelect.addEventListener('change', () => {
+        if (valTypeSelect.value === 'indicator') {
+            valContainer.innerHTML = createIndicatorSelector();
+        } else {
+            valContainer.innerHTML = `<input type="text" class="rule-val-input" value="30" placeholder="e.g. 30">`;
+        }
+    });
+
+    // 6. Delete Button
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'delete-rule-btn';
+    delBtn.innerHTML = '🗑️';
+    delBtn.addEventListener('click', () => {
+        row.remove();
+    });
+
+    // Append child nodes
+    row.appendChild(tfSelect);
+    row.appendChild(indSelect);
+    row.appendChild(opSelect);
+    row.appendChild(valTypeSelect);
+    row.appendChild(valContainer);
+    row.appendChild(delBtn);
+
+    list.appendChild(row);
+}
+
+function createIndicatorSelector(selectedValue = 'SMA200') {
+    const options = [
+        { val: "PRICE", text: "Price" },
+        { val: "VOLUME", text: "Volume" },
+        { val: "VOL_BREAKOUT", text: "Volume Ratio" },
+        { val: "RSI", text: "RSI-14" },
+        { val: "SMA50", text: "SMA-50" },
+        { val: "SMA200", text: "SMA-200" },
+        { val: "EMA50", text: "EMA-50" },
+        { val: "EMA200", text: "EMA-200" },
+        { val: "BB_UPPER", text: "Bollinger Upper" },
+        { val: "BB_LOWER", text: "Bollinger Lower" },
+        { val: "MACD", text: "MACD" },
+        { val: "MACD_SIGNAL", text: "MACD Signal" },
+        { val: "PE", text: "P/E Ratio" },
+        { val: "DE_RATIO", text: "Debt-to-Equity" },
+        { val: "SCORE", text: "AI Score" },
+        { val: "RATING", text: "AI Rating" }
+    ];
+
+    let selectHtml = `<select class="rule-val-select">`;
+    options.forEach(opt => {
+        const sel = opt.val === selectedValue ? 'selected' : '';
+        selectHtml += `<option value="${opt.val}" ${sel}>${opt.text}</option>`;
+    });
+    selectHtml += `</select>`;
+    return selectHtml;
+}
+
+async function executeCustomScreenerScan() {
+    const universe = document.getElementById('custom-screener-universe')?.value || 'all';
+    const logicGate = document.getElementById('custom-screener-logic')?.value || 'AND';
+    const rangeSelect = document.getElementById('rule-scanner-historical-range');
+    const range = rangeSelect ? parseInt(rangeSelect.value) : 90;
+
+    const rowEls = document.querySelectorAll('.custom-screener-rule-row');
+    if (rowEls.length === 0) {
+        showToast('Please add at least one condition line.', 'warning');
+        return;
+    }
+
+    const rules = [];
+    rowEls.forEach(row => {
+        const timeframe = row.querySelector('.rule-timeframe').value;
+        const indicator = row.querySelector('.rule-indicator').value;
+        const operator = row.querySelector('.rule-operator').value;
+        const valType = row.querySelector('.rule-val-type').value;
+        
+        let value = '';
+        if (valType === 'indicator') {
+            value = row.querySelector('.rule-val-select').value;
+        } else {
+            value = row.querySelector('.rule-val-input').value.trim();
+        }
+
+        rules.push({ timeframe, indicator, operator, value });
+    });
+
+    // Reset Min Score and Max D/E filters for new scan
+    ruleScanFilterMinScore = 0;
+    ruleScanFilterMaxDE = 500;
+    const scoreSlider = document.getElementById('rule-scanner-filter-score');
+    if (scoreSlider) scoreSlider.value = 0;
+    const deSlider = document.getElementById('rule-scanner-filter-de');
+    if (deSlider) deSlider.value = 500;
+    const scoreVal = document.getElementById('rule-scanner-filter-score-val');
+    if (scoreVal) scoreVal.textContent = 0;
+    const deVal = document.getElementById('rule-scanner-filter-de-val');
+    if (deVal) deVal.textContent = "5.0";
+
+    // Reset AI Scan Analyst Synthesis
+    const synthesisPanel = document.getElementById('rule-scanner-synthesis-panel');
+    const synthesisText = document.getElementById('rule-scanner-synthesis-text');
+    if (synthesisPanel) synthesisPanel.style.display = 'none';
+    if (synthesisText) synthesisText.innerHTML = '';
+
+    // Update telemetry status
+    const engineStatus = document.getElementById('rule-scanner-engine-status');
+    if (engineStatus) { engineStatus.textContent = 'SCANNING...'; engineStatus.style.color = '#f59e0b'; }
+
+    const activeCondEl = document.getElementById('rule-scanner-active-condition');
+    if (activeCondEl) activeCondEl.textContent = `Custom Screen (${logicGate}) with ${rules.length} Rules`;
+
+    try {
+        const payload = {
+            universe: universe,
+            logic_gate: logicGate,
+            historical_range: range,
+            rules: rules
+        };
+
+        const res = await fetch('/api/screener/custom-scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            ruleScanAllResults = data.results || [];
+            lastRuleScanResults = [...ruleScanAllResults];
+            ruleScanPage = 1;
+
+            // Update telemetry
+            const scannedCount = document.getElementById('rule-scanner-scanned-count');
+            if (scannedCount) scannedCount.textContent = data.scanned || 0;
+            const matchedCount = document.getElementById('rule-scanner-matched-count');
+            if (matchedCount) matchedCount.textContent = data.matched || 0;
+            if (engineStatus) { engineStatus.textContent = 'COMPLETE'; engineStatus.style.color = '#10b981'; }
+
+            // Show results card and telemetry row
+            const card = document.getElementById('rule-scanner-results-card');
+            if (card) card.style.display = 'flex';
+            const telRow = document.getElementById('rule-scanner-results-telemetry-row');
+            if (telRow) telRow.style.display = 'grid';
+
+            // Update subtitle
+            const subtitle = document.getElementById('rule-scanner-results-subtitle');
+            if (subtitle) subtitle.textContent = `${data.matched} matches from ${data.scanned} scanned • ${data.condition}`;
+
+            renderRuleScanResults();
+            renderRuleScanSectorConcentration(ruleScanAllResults);
+
+            // Display Historical matches trend chart
+            const chartCard = document.getElementById('rule-scanner-historical-chart-card');
+            if (chartCard) {
+                chartCard.style.display = 'block';
+                // Delay render slightly so DOM is sized
+                setTimeout(() => {
+                    renderRuleScannerHistoricalChart(data.historical_matches || []);
+                }, 50);
+            }
+
+            // Trigger AI synthesis
+            if (ruleScanAllResults.length > 0) {
+                requestRuleScanSynthesis(ruleScanAllResults, `Custom Stacked Scan (${logicGate})`);
+            }
+        } else {
+            showToast('Scan failed: ' + (data.detail || 'Unknown error'), 'error');
+            if (engineStatus) { engineStatus.textContent = 'ERROR'; engineStatus.style.color = '#ef4444'; }
+        }
+    } catch (err) {
+        showToast('Custom scan failed: ' + err.message, 'error');
+        if (engineStatus) { engineStatus.textContent = 'ERROR'; engineStatus.style.color = '#ef4444'; }
+    }
+}
+
+async function loadSavedScreens() {
+    const listEl = document.getElementById('custom-screener-saved-list');
+    if (!listEl) return;
+
+    try {
+        const res = await fetch('/api/screener/screens');
+        const screens = await res.json();
+
+        if (screens.length === 0) {
+            listEl.innerHTML = '<p class="text-muted center-text" style="font-size: 11px; padding: 20px 0;">No saved screens found. Build rules and save them above!</p>';
+            return;
+        }
+
+        listEl.innerHTML = '';
+        screens.forEach(screen => {
+            const item = document.createElement('div');
+            item.className = 'custom-screen-list-item';
+            
+            const info = document.createElement('div');
+            info.style.display = 'flex';
+            info.style.flexDirection = 'column';
+            info.style.gap = '2px';
+            info.style.flex = '1';
+            info.innerHTML = `
+                <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${screen.name}</span>
+                <span style="font-size: 9px; color: var(--text-muted);">${screen.rules ? screen.rules.length : 0} conditions</span>
+            `;
+
+            // Clicking loads the screen
+            info.addEventListener('click', () => {
+                loadScreenIntoBuilder(screen);
+            });
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'delete-screen-btn';
+            delBtn.innerHTML = '🗑️';
+            delBtn.title = 'Delete saved screen';
+            delBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm(`Are you sure you want to delete the screen "${screen.name}"?`)) {
+                    await deleteSavedScreen(screen.id);
+                }
+            });
+
+            item.appendChild(info);
+            item.appendChild(delBtn);
+            listEl.appendChild(item);
+        });
+    } catch (err) {
+        console.error('Failed to load saved screens:', err);
+    }
+}
+
+async function saveCurrentScreen() {
+    const nameEl = document.getElementById('custom-screener-name');
+    const name = nameEl?.value?.trim();
+    if (!name) {
+        showToast('Please enter a screen name.', 'warning');
+        return;
+    }
+
+    const rowEls = document.querySelectorAll('.custom-screener-rule-row');
+    if (rowEls.length === 0) {
+        showToast('Please add at least one condition line to save.', 'warning');
+        return;
+    }
+
+    const rules = [];
+    rowEls.forEach(row => {
+        const timeframe = row.querySelector('.rule-timeframe').value;
+        const indicator = row.querySelector('.rule-indicator').value;
+        const operator = row.querySelector('.rule-operator').value;
+        const valType = row.querySelector('.rule-val-type').value;
+        
+        let value = '';
+        if (valType === 'indicator') {
+            value = row.querySelector('.rule-val-select').value;
+        } else {
+            value = row.querySelector('.rule-val-input').value.trim();
+        }
+
+        rules.push({ timeframe, indicator, operator, value });
+    });
+
+    try {
+        const payload = {
+            name: name,
+            description: `Saved screen with ${rules.length} conditions`,
+            rules: rules
+        };
+
+        const res = await fetch('/api/screener/screens', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            showToast(`Screen "${name}" saved successfully!`, 'success');
+            if (nameEl) nameEl.value = '';
+            await loadSavedScreens();
+        } else {
+            showToast('Failed to save screen: ' + (data.detail || 'Unknown error'), 'error');
+        }
+    } catch (err) {
+        showToast('Failed to save screen: ' + err.message, 'error');
+    }
+}
+
+async function deleteSavedScreen(screenId) {
+    try {
+        const res = await fetch(`/api/screener/screens/${screenId}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            showToast('Screen deleted successfully.', 'success');
+            await loadSavedScreens();
+        } else {
+            showToast('Failed to delete: ' + (data.detail || 'Unknown error'), 'error');
+        }
+    } catch (err) {
+        showToast('Failed to delete screen: ' + err.message, 'error');
+    }
+}
+
+function loadScreenIntoBuilder(screen) {
+    // Clear list
+    const list = document.getElementById('custom-screener-rules-list');
+    if (list) list.innerHTML = '';
+
+    // Populate rows
+    if (screen.rules && screen.rules.length > 0) {
+        screen.rules.forEach(rule => {
+            addCustomScreenerRow(rule);
+        });
+    } else {
+        // Fallback default row
+        addCustomScreenerRow();
+    }
+
+    // Set screen name input to name
+    const nameEl = document.getElementById('custom-screener-name');
+    if (nameEl) nameEl.value = screen.name;
+
+    showToast(`Loaded screen "${screen.name}"`, 'success');
+}
+
+let activeRuleScannerHistoricalChart = null;
+
+function renderRuleScannerHistoricalChart(matchesData) {
+    const container = document.getElementById('rule-scanner-historical-canvas-container');
+    if (!container || typeof LightweightCharts === 'undefined') return;
+
+    // Clear existing chart
+    container.innerHTML = '';
+    if (activeRuleScannerHistoricalChart) {
+        try {
+            activeRuleScannerHistoricalChart.remove();
+        } catch (e) {
+            console.error(e);
+        }
+        activeRuleScannerHistoricalChart = null;
+    }
+
+    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+
+    // Create Chart
+    const chart = LightweightCharts.createChart(container, {
+        width: container.clientWidth || 800,
+        height: 250,
+        layout: {
+            background: { type: 'solid', color: 'transparent' },
+            textColor: isDarkTheme ? '#94a3b8' : '#334155',
+            fontFamily: 'Inter, sans-serif',
+        },
+        grid: {
+            vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+        },
+        rightPriceScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+        },
+        timeScale: {
+            borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            timeVisible: true,
+        },
+        handleScale: {
+            mouseWheel: true,
+            pinch: true,
+        },
+        handleScroll: {
+            mouseWheel: true,
+            pressedMouseMove: true,
+        }
+    });
+    activeRuleScannerHistoricalChart = chart;
+
+    // Add Area Series
+    const areaSeries = chart.addAreaSeries({
+        lineColor: '#10b981',
+        topColor: 'rgba(16, 185, 129, 0.4)',
+        bottomColor: 'rgba(16, 185, 129, 0.0)',
+        lineWidth: 2,
+        priceFormat: {
+            type: 'price',
+            precision: 0,
+            minMove: 1,
+        }
+    });
+
+    // Populate data
+    const sortedData = [...matchesData].sort((a, b) => a.time.localeCompare(b.time));
+    areaSeries.setData(sortedData);
+
+    // Fit content
+    chart.timeScale().fitContent();
+
+    // Resize listener
+    const resizeObserver = new ResizeObserver(entries => {
+        if (entries.length === 0 || !entries[0].contentRect) return;
+        const { width, height } = entries[0].contentRect;
+        chart.resize(width, height);
+    });
+    resizeObserver.observe(container);
 }
 
 // Initialize on DOMContentLoaded
