@@ -632,6 +632,7 @@ def calculate_technical_indicators(ticker_symbol: str, stock_obj=None) -> dict:
         df['SMA_200'] = df['Close'].rolling(window=200).mean()
         df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+        df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
         df['SMA_150'] = df['Close'].rolling(window=150).mean()
         
         result["sma_50"] = float(info_sma_50) if info_sma_50 else (float(df['SMA_50'].iloc[-1]) if not pd.isna(df['SMA_50'].iloc[-1]) else current_price)
@@ -639,6 +640,7 @@ def calculate_technical_indicators(ticker_symbol: str, stock_obj=None) -> dict:
         result["ema_5"] = float(df['EMA_5'].iloc[-1]) if not pd.isna(df['EMA_5'].iloc[-1]) else current_price
         result["ema_20"] = float(df['EMA_20'].iloc[-1]) if not pd.isna(df['EMA_20'].iloc[-1]) else current_price
         result["ema_50"] = float(df['EMA_50'].iloc[-1]) if not pd.isna(df['EMA_50'].iloc[-1]) else current_price
+        result["ema_200"] = float(df['EMA_200'].iloc[-1]) if not pd.isna(df['EMA_200'].iloc[-1]) else current_price
         result["sma_150"] = float(df['SMA_150'].iloc[-1]) if not pd.isna(df['SMA_150'].iloc[-1]) or len(df) < 150 else float(df['Close'].rolling(window=min(len(df), 150)).mean().iloc[-1])
         
         if result["sma_50"] > result["sma_200"]:

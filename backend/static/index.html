@@ -89,6 +89,9 @@
                 <button class="nav-btn" id="tab-alerts-btn" data-title="Institutional Alert Center">
                     <span class="btn-icon">🚨</span> <span class="btn-text">Institutional Alert Center</span>
                 </button>
+                <button class="nav-btn" id="tab-rule-scanner-btn" data-title="Rule Scanner">
+                    <span class="btn-icon">📡</span> <span class="btn-text">Rule Scanner</span>
+                </button>
             </nav>
 
             <!-- Global Investor Profiling Card -->
@@ -2182,6 +2185,264 @@
                             </div>
 
                             <button class="btn-secondary" id="alerts-log-next-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>Next ▶</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: RULE SCANNER -->
+            <section class="workspace-tab" id="tab-rule-scanner" style="display: none; font-family: 'Inter', sans-serif;">
+                <div class="section-header">
+                    <h2>📡 Rule Scanner</h2>
+                    <p>Scan the entire stock universe against custom valuation and technical trigger conditions. Use AI natural language or configure parametric rules manually.</p>
+                </div>
+
+                <!-- Sentinel Radar Banner -->
+                <div class="alerts-radar-sentinel-card" style="margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                        <h4 style="font-size: 13px; color: var(--color-primary); border-left: 3px solid var(--color-primary); padding-left: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">📡 AI Quantitative Rule Scanner</h4>
+                        <div class="sonar-pulse-widget">
+                            <span class="sonar-pulse-indicator"></span>
+                            <span>Scanner Engine: Ready</span>
+                        </div>
+                    </div>
+                    <p class="prescription-analogy-text" style="margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-secondary); font-style: italic;">
+                        Unlike single-stock alerts, the Rule Scanner sweeps the entire equity universe in one pass. Define a trigger condition (RSI oversold, golden cross, Fibonacci proximity, volume breakout, etc.) and the scanner will audit every stock in the selected segment against that rule, returning a ranked list of matching candidates with sector concentration analytics and AI synthesis.
+                    </p>
+                </div>
+
+                <div class="alerts-grid">
+                    <!-- COLUMN 1: AI COMMAND STATION -->
+                    <div class="cockpit-column">
+                        <div class="card" style="position: relative; border: 1px solid rgba(168, 85, 247, 0.2); background: rgba(168, 85, 247, 0.01);">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                                <h3 style="margin: 0; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                                    <span>🔮</span> AI SCAN COMMAND STATION
+                                </h3>
+                                <span style="font-size: 8px; padding: 2px 6px; border-radius: 4px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #d8b4fe; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">Groq Copilot</span>
+                            </div>
+                            <p style="font-size: 11px; line-height: 1.45; color: var(--text-secondary); margin-bottom: 12px; margin-top: 0;">
+                                Describe your scanning criteria in plain English. The AI Copilot will parse conditions, resolve parameters, and configure the scanner automatically.
+                            </p>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div class="form-group" style="margin: 0;">
+                                    <textarea id="rule-scanner-nl-prompt" rows="3" placeholder='e.g. "Scan for mid-cap stocks with RSI below 35" or "Find large cap stocks near their 52-week low"' style="width: 100%; min-height: 60px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-family: inherit; font-size: 11.5px; line-height: 1.4; resize: vertical; outline: none; transition: border-color 0.2s; box-sizing: border-box;"></textarea>
+                                </div>
+                                <div style="margin-top: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
+                                    <span style="font-size: 11px; color: var(--color-primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">💡 AI Scan Preset Dictionary</span>
+                                    
+                                    <!-- Group 1: Momentum & Oscillators -->
+                                    <div style="margin-bottom: 8px;">
+                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">🎯 Momentum & Oscillators</span>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with RSI below 30 across all segments" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🎯 RSI Oversold Universe</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with RSI above 70 across all segments" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🎯 RSI Overbought Universe</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks where MACD crosses above Signal line" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💥 MACD Bullish Cross</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Group 2: Moving Averages -->
+                                    <div style="margin-bottom: 8px;">
+                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">📈 Moving Averages & Crossovers</span>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with 50 SMA above 200 SMA golden cross" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📈 Golden Cross Stocks</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks trading below their 200 SMA by more than 5%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📉 Below SMA-200 Pullback</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for mid cap stocks below Bollinger Lower Band" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ BB Lower Band Touch</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Group 3: Fibonacci & Valuation -->
+                                    <div>
+                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">📐 Fibonacci, Valuation & Volume</span>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks within 2% of any Fibonacci retracement level" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 Fibonacci Proximity</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for large cap stocks with P/E less than 15" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💰 Deep Value P/E</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with volume 3x higher than 20-day average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚀 Volume Spurt</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks within 3% of their 52-week low" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ 52W Low Proximity</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button class="btn-primary" id="rule-scanner-nl-submit" style="width: 100%; border: 1px solid rgba(168, 85, 247, 0.4); background: linear-gradient(135deg, rgba(147, 51, 234, 0.12) 0%, rgba(79, 70, 229, 0.12) 100%); transition: all 0.3s ease;">
+                                    🔮 Parse & Execute AI Scan
+                                </button>
+                                <div id="rule-scanner-nl-loader" style="display: none; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: #a855f7; margin-top: 5px;">
+                                    <span class="spinner-mini" style="width: 12px; height: 12px; border: 2px solid rgba(168, 85, 247, 0.3); border-top-color: #a855f7; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite;"></span>
+                                    <span>AI Copilot parsing scan request...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLUMN 2: PARAMETRIC SETUP -->
+                    <div class="cockpit-column">
+                        <div class="card">
+                            <h3>PARAMETRIC SCAN CONFIGURATION</h3>
+                            <div class="alert-form">
+                                <div class="form-group">
+                                    <label for="rule-scanner-universe">Universe Scope</label>
+                                    <select id="rule-scanner-universe">
+                                        <option value="all" selected>All Segments (Large + Mid + Small)</option>
+                                        <option value="large">Large Cap (Nifty 50)</option>
+                                        <option value="mid">Mid Cap (Nifty Midcap)</option>
+                                        <option value="small">Small Cap (Smallcap 250)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="rule-scanner-condition">Trigger Condition</label>
+                                    <select id="rule-scanner-condition">
+                                        <option value="RSI">RSI-14 (Relative Strength)</option>
+                                        <option value="PE">Stock P/E Value</option>
+                                        <option value="RATING">AI Analyst Rating</option>
+                                        <option value="PRICE">Current Price (Rs.)</option>
+                                        <option value="SMA">Price vs SMA-200 (% Diff)</option>
+                                        <option value="DMA_CROSS">50 SMA vs 200 SMA Crossover</option>
+                                        <option value="EMA_CROSS">50 EMA vs 200 EMA Crossover</option>
+                                        <option value="VOL_BREAKOUT">Volume vs 20d Avg Volume</option>
+                                        <option value="BB_CROSS">Price vs Bollinger Bands</option>
+                                        <option value="MACD_CROSS">MACD vs Signal Line Cross</option>
+                                        <option value="52W_PROXIMITY">Price vs 52-Week Range</option>
+                                        <option value="SMA50">Price vs SMA-50 (% Diff)</option>
+                                        <option value="FIB_382">Fibonacci 38.2% Retracement</option>
+                                        <option value="FIB_500">Fibonacci 50.0% Retracement</option>
+                                        <option value="FIB_618">Fibonacci 61.8% Retracement</option>
+                                        <option value="FIB_LEVEL">Fibonacci Proximity (All Levels)</option>
+                                    </select>
+                                    <div id="rule-scanner-strategy-guide" style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.35; margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--border-glass); box-sizing: border-box; transition: all 0.2s ease;">
+                                        <span id="rule-scanner-strategy-text"><strong>RSI-14:</strong> Scans the universe for stocks crossing momentum boundaries. RSI &lt; 30 captures oversold candidates with potential reversal setups.</span>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="rule-scanner-operator">Operator</label>
+                                    <select id="rule-scanner-operator">
+                                        <option value="<">&lt; Less Than / Crosses Below</option>
+                                        <option value=">">&gt; Greater Than / Crosses Above</option>
+                                        <option value="==">= Equals</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="rule-scanner-value">Threshold Value</label>
+                                    <input type="text" id="rule-scanner-value" placeholder="e.g. 30" value="30">
+                                    <span class="helper-text" id="rule-scanner-value-helper">Enter target threshold (numeric or text for ratings).</span>
+                                </div>
+                                <button class="btn-primary" id="rule-scanner-execute-btn" style="width: 100%;">⚡ Execute Universe Scan</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- COLUMN 3: SCANNING TELEMETRY -->
+                    <div class="cockpit-column">
+                        <!-- Scan Status Card -->
+                        <div class="card" id="rule-scanner-status-card">
+                            <h3 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <span>📊 SCANNING TELEMETRY</span>
+                                <span class="radar-scan-status" style="font-size: 9px; color: var(--color-primary); background: rgba(59, 130, 246, 0.1); padding: 2px 6px; border-radius: 4px; font-weight: 700;" id="rule-scanner-engine-status">IDLE</span>
+                            </h3>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                                <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-glass); text-align: center;">
+                                    <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px;">Scanned</span>
+                                    <span style="font-size: 20px; font-weight: 800; color: var(--color-primary); font-family: 'Outfit', sans-serif;" id="rule-scanner-scanned-count">—</span>
+                                </div>
+                                <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-glass); text-align: center;">
+                                    <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px;">Matches</span>
+                                    <span style="font-size: 20px; font-weight: 800; color: var(--neon-green); font-family: 'Outfit', sans-serif;" id="rule-scanner-matched-count">—</span>
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px;">Active Condition</span>
+                                <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; border: 1px solid var(--border-glass); font-size: 11px; color: var(--text-primary); font-weight: 600;" id="rule-scanner-active-condition">No scan executed</div>
+                            </div>
+                        </div>
+
+                        <!-- Sector Concentration -->
+                        <div class="card" id="rule-scanner-sector-card">
+                            <h3 style="margin-bottom: 12px;">📊 SECTOR CONCENTRATION</h3>
+                            <div id="rule-scanner-sector-bars" style="display: flex; flex-direction: column; gap: 8px;">
+                                <p class="helper-text" style="margin: 0; font-size: 11px;">Execute a scan to view sector distribution of matched stocks.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- Closes alerts-grid -->
+
+                <!-- FULL WIDTH: SCAN RESULTS -->
+                <div style="margin-top: 25px; width: 100%;">
+                    <div class="card" id="rule-scanner-results-card" style="display: none; flex-direction: column; width: 100%; box-sizing: border-box;">
+                        <div class="card-header screener-card-header" style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.03em;">📡 RULE SCANNER RESULTS</h3>
+                                <span style="font-size: 9.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;" id="rule-scanner-results-subtitle">Matching Candidates</span>
+                            </div>
+                            <div class="screener-actions-cluster" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                <button class="btn-primary" id="rule-scanner-save-watchlist-btn" style="font-size: 11px; padding: 6px 12px; height: 32px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">⭐ Save as Watchlist</button>
+                                <button class="btn-secondary" id="rule-scanner-copy-btn" style="font-size: 11px; padding: 6px 12px; height: 32px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">📋 Copy Table</button>
+                                <button class="btn-secondary" id="rule-scanner-print-btn" style="font-size: 11px; padding: 6px 12px; height: 32px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">🖨️ Print Report</button>
+                                <button class="btn-secondary" id="rule-scanner-export-csv-btn" style="font-size: 11px; padding: 6px 12px; height: 32px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">📥 Export CSV</button>
+                            </div>
+                        </div>
+
+                        <!-- AI Synthesis Panel -->
+                        <div id="rule-scanner-synthesis-panel" style="display: none; margin-bottom: 20px; border-left: 4px solid var(--color-primary); border-radius: 8px; padding: 18px; text-align: left; width: 100%; box-sizing: border-box;">
+                            <h4 style="font-size: 13px; color: var(--neon-green); margin-top: 0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px dashed var(--border-glass); padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between; font-family: 'Outfit', sans-serif;">
+                                <span>🔬 AI Scan Analyst Synthesis</span>
+                                <span style="font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Rule Scanner Intelligence</span>
+                            </h4>
+                            <div id="rule-scanner-synthesis-text" style="font-size: 12px; line-height: 1.65; font-family: 'Inter', sans-serif; color: var(--text-secondary);"></div>
+                        </div>
+
+                        <!-- Real-time Refinement Bar -->
+                        <div class="no-print" style="display: flex; gap: 20px; align-items: center; margin-bottom: 15px; padding: 10px 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 10px; color: var(--text-secondary); font-weight: 600; white-space: nowrap;">Min Score:</span>
+                                <input type="range" id="rule-scanner-filter-score" min="0" max="100" value="0" style="width: 100px; cursor: pointer;">
+                                <span id="rule-scanner-filter-score-val" style="font-size: 10px; color: var(--text-primary); font-weight: 700; min-width: 24px;">0</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 10px; color: var(--text-secondary); font-weight: 600; white-space: nowrap;">Max D/E:</span>
+                                <input type="range" id="rule-scanner-filter-de" min="0" max="500" value="500" step="10" style="width: 100px; cursor: pointer;">
+                                <span id="rule-scanner-filter-de-val" style="font-size: 10px; color: var(--text-primary); font-weight: 700; min-width: 30px;">5.0</span>
+                            </div>
+                        </div>
+
+                        <!-- Results Table -->
+                        <div class="table-scroll" style="overflow-x: auto; width: 100%;">
+                            <table class="data-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                                        <th class="rs-sortable" data-sort="symbol" style="cursor: pointer; user-select: none; font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); padding: 12px 8px; letter-spacing: 0.04em;">📁 Stock ↕</th>
+                                        <th class="rs-sortable rs-hide-mobile" data-sort="cap_type" style="cursor: pointer; user-select: none; font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); padding: 12px 8px; letter-spacing: 0.04em;">Segment ↕</th>
+                                        <th class="rs-sortable" data-sort="price" style="cursor: pointer; user-select: none; font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); padding: 12px 8px; letter-spacing: 0.04em;">Price ↕</th>
+                                        <th class="rs-sortable rs-hide-mobile" data-sort="pe" style="cursor: pointer; user-select: none; font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); padding: 12px 8px; letter-spacing: 0.04em;">P/E ↕</th>
+                                        <th style="font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); padding: 12px 8px; letter-spacing: 0.04em;">📊 Sparkline</th>
+                                        <th class="rs-sortable" data-sort="trigger_value" style="cursor: pointer; user-select: none; font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); padding: 12px 8px; letter-spacing: 0.04em;">🎯 Trigger ↕</th>
+                                        <th class="rs-sortable" data-sort="rating" style="cursor: pointer; user-select: none; font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); padding: 12px 8px; letter-spacing: 0.04em;">Rating ↕</th>
+                                        <th class="rs-sortable rs-hide-mobile" data-sort="sector" style="cursor: pointer; user-select: none; font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); padding: 12px 8px; letter-spacing: 0.04em;">Sector ↕</th>
+                                        <th style="font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); padding: 12px 8px; letter-spacing: 0.04em;">⚡ Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rule-scanner-results-body">
+                                    <tr>
+                                        <td colspan="9" class="center-text text-muted">Execute a scan to view matching candidates.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        <div id="rule-scanner-pagination" class="no-print" style="display: none; justify-content: space-between; align-items: center; margin-top: 15px; padding: 10px 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px;">
+                            <button class="btn-secondary" id="rule-scanner-prev-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>◀ Prev</button>
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <span id="rule-scanner-page-info" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Page 1 of 1</span>
+                                <div style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-glass); padding-left: 15px;">
+                                    <span style="font-size: 10px; color: var(--text-secondary);">Records per page:</span>
+                                    <select id="rule-scanner-pagesize-select" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer; outline: none; height: 24px;">
+                                        <option value="5">5</option>
+                                        <option value="10" selected>10</option>
+                                        <option value="20">20</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button class="btn-secondary" id="rule-scanner-next-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>Next ▶</button>
                         </div>
                     </div>
                 </div>

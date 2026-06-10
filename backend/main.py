@@ -1052,6 +1052,13 @@ class AlertSettingsRequest(BaseModel):
 class ParseNLAlertRequest(BaseModel):
     prompt: str
 
+class ParseNLScanRequest(BaseModel):
+    prompt: str
+
+class ScanSynthesisRequest(BaseModel):
+    results: List[dict]
+    condition_desc: str
+
 class WatchlistCreate(BaseModel):
     name: str
 
@@ -4859,6 +4866,338 @@ async def get_stock_volume_dynamics(symbol: str):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Volume dynamics compilation failed: {str(e)}")
+
+
+# ─── RULE SCANNER ENDPOINTS ────────────────────────────────────────────────────
+
+@app.post("/api/screener/parse-nl-scan")
+async def parse_nl_scan(data: ParseNLScanRequest):
+    """Parses a plain English scanning prompt into structured scanner parameters using Groq LLM."""
+    try:
+        from backend.agent import call_groq_llm
+
+        sys_prompt = (
+            "You are an expert financial system developer parsing plain English stock scanning requests into structured JSON rules.\n"
+            "The user wants to SCAN MULTIPLE STOCKS in a market universe (not set an alert for a single stock).\n"
+            "Analyze the user prompt and output a single JSON object. DO NOT output any markdown tags (like ```json), and DO NOT output any conversational text or preambles. Only output the raw JSON string.\n"
+            "Allowed condition types:\n"
+            "- RSI (Relative Strength Index limit)\n"
+            "- PE (Price-to-Earnings ratio)\n"
+            "- RATING (analyst recommendation: 'Strong Buy', 'Buy', 'Hold', 'Sell')\n"
+            "- PRICE (absolute price floor/ceiling in Rs.)\n"
+            "- SMA (price deviation from 200 SMA in %)\n"
+            "- DMA_CROSS (50 SMA vs 200 SMA crossover, value = % separation filter)\n"
+            "- EMA_CROSS (50 EMA vs 200 EMA crossover, value = % separation filter)\n"
+            "- VOL_BREAKOUT (volume ratio vs 20d average, e.g. 2.0)\n"
+            "- BB_CROSS (price vs Bollinger Bands, value = 0)\n"
+            "- MACD_CROSS (MACD vs Signal line crossover, value = point diff filter)\n"
+            "- 52W_PROXIMITY (proximity margin % to 52w limits)\n"
+            "- SMA50 (price deviation from 50 SMA in %)\n"
+            "- FIB_LEVEL (proximity to any Fibonacci level in %)\n"
+            "- FIB_382 (proximity to Fib 38.2% in %)\n"
+            "- FIB_500 (proximity to Fib 50.0% in %)\n"
+            "- FIB_618 (proximity to Fib 61.8% in %)\n\n"
+            "Operators:\n"
+            "- '>' (Greater Than / Crosses Above)\n"
+            "- '<' (Less Than / Crosses Below)\n"
+            "- '==' (Equals / Near Proximity)\n\n"
+            "Universe options: 'all', 'large', 'mid', 'small'\n\n"
+            "Output format example:\n"
+            "{\n"
+            "  \"condition_type\": \"RSI\",\n"
+            "  \"operator\": \"<\",\n"
+            "  \"value\": \"35\",\n"
+            "  \"universe\": \"mid\"\n"
+            "}"
+        )
+
+        response = await asyncio.to_thread(call_groq_llm, sys_prompt, data.prompt)
+        response = response.strip()
+        if response.startswith("```json"):
+            response = response[7:]
+        if response.endswith("```"):
+            response = response[:-3]
+        response = response.strip()
+
+        parsed = json.loads(response)
+        return {
+            "status": "success",
+            "condition_type": parsed.get("condition_type", "RSI").upper(),
+            "operator": parsed.get("operator", "<"),
+            "value": str(parsed.get("value", "30")),
+            "universe": parsed.get("universe", "all").lower()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse scan prompt: {str(e)}")
+
+
+@app.get("/api/screener/scan-trigger")
+async def scan_trigger(condition_type: str, operator: str, value: str, universe: str = "all"):
+    """Scans the stock universe for matches against a given condition/trigger rule."""
+    try:
+        from backend.swing_utils import clean_float
+
+        matched = []
+        with get_db() as conn:
+            cursor = conn.cursor()
+            if universe == "all":
+                cursor.execute("SELECT symbol, company_name, sector, cap_type FROM screener_universe WHERE symbol NOT LIKE '%DUMMY%'")
+            else:
+                cursor.execute("SELECT symbol, company_name, sector, cap_type FROM screener_universe WHERE cap_type = ? AND symbol NOT LIKE '%DUMMY%'", (universe,))
+            stocks = [dict(row) for row in cursor.fetchall()]
+
+            cursor.execute("SELECT symbol, profile_json FROM cached_profiles")
+            cached_rows = cursor.fetchall()
+            cached_profiles = {}
+            for r in cached_rows:
+                try:
+                    cached_profiles[r["symbol"]] = json.loads(r["profile_json"])
+                except Exception:
+                    continue
+
+        scanned_count = 0
+        for s in stocks:
+            sym = s["symbol"]
+            prof = cached_profiles.get(sym)
+            if not prof:
+                continue
+
+            f = prof.get("fundamentals") or {}
+            t = prof.get("technicals") or {}
+
+            price = clean_float(f.get("current_price"), 0.0)
+            if price <= 0.0:
+                continue
+
+            scanned_count += 1
+            triggered = False
+            cur_val = ""
+
+            try:
+                if condition_type == "RSI":
+                    rsi_val = clean_float(t.get("rsi"), 50.0)
+                    cur_val = f"RSI: {rsi_val:.1f}"
+                    if operator == "<" and rsi_val < float(value):
+                        triggered = True
+                    elif operator == ">" and rsi_val > float(value):
+                        triggered = True
+
+                elif condition_type == "PE":
+                    pe_val = clean_float(f.get("pe_ratio"), 0.0)
+                    if pe_val <= 0.0:
+                        continue
+                    cur_val = f"P/E: {pe_val:.1f}"
+                    threshold = float(value)
+                    if operator == "<" and pe_val < threshold:
+                        triggered = True
+                    elif operator == ">" and pe_val > threshold:
+                        triggered = True
+
+                elif condition_type == "RATING":
+                    analysis = prof.get("analysis") or {}
+                    rating_val = (analysis.get("recommendation") or "HOLD").upper()
+                    cur_val = f"Rating: {rating_val}"
+                    if operator == "==" and rating_val == value.upper():
+                        triggered = True
+
+                elif condition_type == "PRICE":
+                    cur_val = f"Price: Rs. {price:.2f}"
+                    threshold = float(value)
+                    if operator == "<" and price < threshold:
+                        triggered = True
+                    elif operator == ">" and price > threshold:
+                        triggered = True
+
+                elif condition_type == "SMA":
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    if sma_200 <= 0.0:
+                        continue
+                    pct_diff = ((price - sma_200) / sma_200) * 100
+                    cur_val = f"Price vs SMA200: {pct_diff:+.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and pct_diff > threshold:
+                        triggered = True
+                    elif operator == "<" and pct_diff < threshold:
+                        triggered = True
+
+                elif condition_type == "SMA50":
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    if sma_50 <= 0.0:
+                        continue
+                    pct_diff = ((price - sma_50) / sma_50) * 100
+                    cur_val = f"Price vs SMA50: {pct_diff:+.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and pct_diff > threshold:
+                        triggered = True
+                    elif operator == "<" and pct_diff < threshold:
+                        triggered = True
+
+                elif condition_type in ["DMA_CROSS", "EMA_CROSS"]:
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    if condition_type == "EMA_CROSS":
+                        sma_50 = clean_float(t.get("ema_50", t.get("sma_50")), 0.0)
+                        sma_200 = clean_float(t.get("ema_200", t.get("sma_200")), 0.0)
+                    if sma_200 <= 0.0 or sma_50 <= 0.0:
+                        continue
+                    diff_pct = ((sma_50 - sma_200) / sma_200) * 100
+                    label = "SMA" if condition_type == "DMA_CROSS" else "EMA"
+                    cur_val = f"50d {label}: Rs.{sma_50:.0f} vs 200d: Rs.{sma_200:.0f} ({diff_pct:+.1f}%)"
+                    threshold = float(value)
+                    if operator == ">" and diff_pct > threshold:
+                        triggered = True
+                    elif operator == "<" and diff_pct < -abs(threshold):
+                        triggered = True
+
+                elif condition_type == "VOL_BREAKOUT":
+                    vol_ratio = clean_float(t.get("volume_ratio", t.get("vol_breakout_ratio")), 1.0)
+                    cur_val = f"Vol Ratio: {vol_ratio:.2f}x"
+                    threshold = float(value)
+                    if operator == ">" and vol_ratio > threshold:
+                        triggered = True
+                    elif operator == "<" and vol_ratio < threshold:
+                        triggered = True
+
+                elif condition_type == "BB_CROSS":
+                    bb_lower = clean_float(t.get("bb_lower"), 0.0)
+                    bb_upper = clean_float(t.get("bb_upper"), 0.0)
+                    if operator == "<":
+                        cur_val = f"Price: Rs.{price:.0f} vs BB Lower: Rs.{bb_lower:.0f}"
+                        if bb_lower > 0 and price <= bb_lower:
+                            triggered = True
+                    elif operator == ">":
+                        cur_val = f"Price: Rs.{price:.0f} vs BB Upper: Rs.{bb_upper:.0f}"
+                        if bb_upper > 0 and price >= bb_upper:
+                            triggered = True
+
+                elif condition_type == "MACD_CROSS":
+                    macd_val = clean_float(t.get("macd"), 0.0)
+                    signal_val = clean_float(t.get("signal"), 0.0)
+                    diff = macd_val - signal_val
+                    cur_val = f"MACD: {macd_val:.3f} vs Signal: {signal_val:.3f}"
+                    threshold = float(value)
+                    if operator == ">" and diff > threshold:
+                        triggered = True
+                    elif operator == "<" and diff < -abs(threshold):
+                        triggered = True
+
+                elif condition_type == "52W_PROXIMITY":
+                    high_52w = clean_float(f.get("year_high", f.get("52w_high")), 0.0)
+                    low_52w = clean_float(f.get("year_low", f.get("52w_low")), 0.0)
+                    proximity_pct = float(value)
+                    if operator == ">":
+                        if high_52w > 0:
+                            diff_pct = ((high_52w - price) / high_52w) * 100
+                            cur_val = f"Price: Rs.{price:.0f} (52wH: Rs.{high_52w:.0f}, Diff: {diff_pct:.1f}%)"
+                            if diff_pct <= proximity_pct:
+                                triggered = True
+                    elif operator == "<":
+                        if low_52w > 0:
+                            diff_pct = ((price - low_52w) / low_52w) * 100
+                            cur_val = f"Price: Rs.{price:.0f} (52wL: Rs.{low_52w:.0f}, Diff: {diff_pct:.1f}%)"
+                            if diff_pct <= proximity_pct:
+                                triggered = True
+
+                elif condition_type in ["FIB_LEVEL", "FIB_382", "FIB_500", "FIB_618"]:
+                    high_52w = clean_float(f.get("year_high", f.get("52w_high")), 0.0)
+                    low_52w = clean_float(f.get("year_low", f.get("52w_low")), 0.0)
+                    if high_52w <= 0 or low_52w <= 0:
+                        continue
+                    swing_diff = high_52w - low_52w
+                    fib_382 = high_52w - 0.382 * swing_diff
+                    fib_500 = high_52w - 0.500 * swing_diff
+                    fib_618 = high_52w - 0.618 * swing_diff
+                    proximity_pct = float(value) if value else 1.5
+
+                    levels_to_check = []
+                    if condition_type == "FIB_LEVEL":
+                        levels_to_check = [("38.2%", fib_382), ("50.0%", fib_500), ("61.8%", fib_618)]
+                    elif condition_type == "FIB_382":
+                        levels_to_check = [("38.2%", fib_382)]
+                    elif condition_type == "FIB_500":
+                        levels_to_check = [("50.0%", fib_500)]
+                    elif condition_type == "FIB_618":
+                        levels_to_check = [("61.8%", fib_618)]
+
+                    for lbl, lvl in levels_to_check:
+                        if lvl > 0:
+                            diff_pct = abs(((price - lvl) / lvl) * 100)
+                            if diff_pct <= proximity_pct:
+                                cur_val = f"Price: Rs.{price:.0f} near Fib {lbl} (Rs.{lvl:.0f}, Diff: {diff_pct:.1f}%)"
+                                triggered = True
+                                break
+
+            except Exception as eval_err:
+                print(f"Rule Scanner: Error evaluating {sym}: {eval_err}")
+                continue
+
+            if triggered:
+                rsi = clean_float(t.get("rsi"), 0.0)
+                pe = clean_float(f.get("pe_ratio"), 0.0)
+                sector = s.get("sector", "N/A")
+                cap_type = s.get("cap_type", "N/A")
+                analysis = prof.get("analysis") or {}
+                rating = (analysis.get("recommendation") or "N/A").upper()
+                score = clean_float(analysis.get("score", analysis.get("composite_score")), 0.0)
+                de_ratio = clean_float(f.get("debt_to_equity", f.get("de_ratio")), 0.0)
+
+                matched.append({
+                    "symbol": sym,
+                    "company_name": s.get("company_name", sym),
+                    "sector": sector,
+                    "cap_type": cap_type,
+                    "price": round(price, 2),
+                    "pe": round(pe, 1),
+                    "rsi": round(rsi, 1),
+                    "trigger_value": cur_val,
+                    "rating": rating,
+                    "score": round(score, 1),
+                    "de_ratio": round(de_ratio, 2)
+                })
+
+        return {
+            "status": "success",
+            "scanned": scanned_count,
+            "matched": len(matched),
+            "universe": universe,
+            "condition": f"{condition_type} {operator} {value}",
+            "results": matched
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Rule scan failed: {str(e)}")
+
+
+@app.post("/api/screener/scan-synthesis")
+async def scan_synthesis(data: ScanSynthesisRequest):
+    """Generates an AI analyst synthesis summary for rule scanner results using Groq."""
+    try:
+        from backend.agent import call_groq_llm
+
+        top_results = data.results[:20]
+        results_text = "\n".join([
+            f"- {r.get('symbol','?')}: {r.get('trigger_value','N/A')} | Sector: {r.get('sector','N/A')} | Cap: {r.get('cap_type','N/A')} | P/E: {r.get('pe','N/A')} | RSI: {r.get('rsi','N/A')} | Rating: {r.get('rating','N/A')}"
+            for r in top_results
+        ])
+
+        sys_prompt = (
+            "You are a senior institutional equity analyst. Analyze the following scan results and provide a concise 2-3 sentence synthesis.\n"
+            "Focus on: sector concentration patterns, valuation clusters, technical positioning, and actionable observations.\n"
+            "Be professional and quantitative. Reference specific sectors and metrics where relevant.\n"
+            "Do NOT use bullet points or headers. Write in flowing paragraph form."
+        )
+
+        user_prompt = (
+            f"Scan Condition: {data.condition_desc}\n"
+            f"Total Matches: {len(data.results)}\n\n"
+            f"Top matching stocks:\n{results_text}"
+        )
+
+        summary = await asyncio.to_thread(call_groq_llm, sys_prompt, user_prompt)
+        return {"status": "success", "synthesis": summary.strip()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Synthesis generation failed: {str(e)}")
 
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")

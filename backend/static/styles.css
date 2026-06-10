@@ -7145,7 +7145,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     }
 }
 
-@media (max-width: 768px) {
     .alerts-grid {
         grid-template-columns: 1fr !important;
     }
@@ -7155,6 +7154,199 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 
+/* ========================================================
+   RULE SCANNER STYLES
+   ======================================================== */
 
+/* NL Template Pills */
+.rs-nl-template-pill:hover {
+    background: rgba(168, 85, 247, 0.15) !important;
+    border-color: rgba(168, 85, 247, 0.4) !important;
+    color: #d8b4fe !important;
+    transform: translateY(-1px);
+}
 
+[data-theme="light"] .rs-nl-template-pill:hover {
+    background: rgba(147, 51, 234, 0.1) !important;
+    border-color: rgba(147, 51, 234, 0.3) !important;
+    color: #7c3aed !important;
+}
+
+/* Rule Scanner NL Prompt textarea focus */
+#rule-scanner-nl-prompt:focus {
+    border-color: rgba(168, 85, 247, 0.5) !important;
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.12) !important;
+}
+
+/* Rule Scanner Results Table */
+#tab-rule-scanner .data-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+#tab-rule-scanner .data-table tbody tr {
+    transition: background 0.15s ease;
+}
+
+#tab-rule-scanner .data-table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.06) !important;
+}
+
+[data-theme="light"] #tab-rule-scanner .data-table tbody tr:hover {
+    background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* Sector concentration bar animation */
+#rule-scanner-sector-bars > div {
+    animation: rs-bar-slide-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+#rule-scanner-sector-bars > div:nth-child(1) { animation-delay: 0.05s; }
+#rule-scanner-sector-bars > div:nth-child(2) { animation-delay: 0.1s; }
+#rule-scanner-sector-bars > div:nth-child(3) { animation-delay: 0.15s; }
+#rule-scanner-sector-bars > div:nth-child(4) { animation-delay: 0.2s; }
+#rule-scanner-sector-bars > div:nth-child(5) { animation-delay: 0.25s; }
+#rule-scanner-sector-bars > div:nth-child(6) { animation-delay: 0.3s; }
+#rule-scanner-sector-bars > div:nth-child(7) { animation-delay: 0.35s; }
+#rule-scanner-sector-bars > div:nth-child(8) { animation-delay: 0.4s; }
+#rule-scanner-sector-bars > div:nth-child(9) { animation-delay: 0.45s; }
+#rule-scanner-sector-bars > div:nth-child(10) { animation-delay: 0.5s; }
+
+@keyframes rs-bar-slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(-12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Telemetry count pulse animation */
+#rule-scanner-scanned-count,
+#rule-scanner-matched-count {
+    transition: all 0.3s ease;
+}
+
+/* Mobile: Hide non-critical columns */
+@media (max-width: 768px) {
+    .rs-hide-mobile {
+        display: none !important;
+    }
+    
+    #tab-rule-scanner .screener-actions-cluster {
+        flex-direction: column !important;
+        width: 100% !important;
+    }
+    
+    #tab-rule-scanner .screener-actions-cluster button {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+    
+    #tab-rule-scanner .card-header.screener-card-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+}
+
+/* Rule Scanner Sparkline canvas responsiveness */
+#tab-rule-scanner canvas {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Print mode for Rule Scanner reports */
+@media print {
+    body.is-printing-rule-scan .app-container {
+        display: block !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    body.is-printing-rule-scan .sidebar,
+    body.is-printing-rule-scan .main-header,
+    body.is-printing-rule-scan .no-print,
+    body.is-printing-rule-scan .chat-drawer-container,
+    body.is-printing-rule-scan #toast-container,
+    body.is-printing-rule-scan .main-footer,
+    body.is-printing-rule-scan .mobile-header {
+        display: none !important;
+    }
+    
+    body.is-printing-rule-scan .workspace-tab {
+        display: none !important;
+    }
+    
+    body.is-printing-rule-scan #tab-rule-scanner {
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+    }
+    
+    body.is-printing-rule-scan #rule-scanner-results-card {
+        display: flex !important;
+        border: 1px solid #e5e7eb !important;
+        background: #ffffff !important;
+        color: #111827 !important;
+        box-shadow: none !important;
+    }
+    
+    body.is-printing-rule-scan .alerts-grid {
+        display: none !important;
+    }
+    
+    body.is-printing-rule-scan .alerts-radar-sentinel-card {
+        display: none !important;
+    }
+    
+    body.is-printing-rule-scan .data-table th {
+        background: #f3f4f6 !important;
+        color: #111827 !important;
+        border-bottom: 2px solid #d1d5db !important;
+    }
+    
+    body.is-printing-rule-scan .data-table td {
+        color: #374151 !important;
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+    
+    body.is-printing-rule-scan canvas {
+        display: none !important;
+    }
+    
+    body.is-printing-rule-scan .rs-hide-mobile {
+        display: table-cell !important;
+    }
+}
+
+/* Light theme overrides for Rule Scanner */
+[data-theme="light"] #tab-rule-scanner .card {
+    background: rgba(255, 255, 255, 0.6) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] #rule-scanner-nl-prompt {
+    background: rgba(0, 0, 0, 0.03) !important;
+    color: var(--text-primary) !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+}
+
+[data-theme="light"] #tab-rule-scanner .alerts-radar-sentinel-card {
+    background: rgba(255, 255, 255, 0.5) !important;
+    border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+[data-theme="light"] #rule-scanner-synthesis-panel {
+    border-left-color: var(--color-primary) !important;
+    background: rgba(59, 130, 246, 0.03) !important;
+}
+
+[data-theme="light"] #rule-scanner-strategy-guide {
+    background: rgba(0, 0, 0, 0.02) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
 

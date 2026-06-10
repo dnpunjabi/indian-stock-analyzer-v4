@@ -69,6 +69,16 @@ let alertsPageSize = 10;
 let alertsSortCol = 'id';
 let alertsSortAsc = true;
 
+// Rule Scanner state
+let lastRuleScanResults = [];
+let ruleScanAllResults = [];
+let ruleScanPage = 1;
+let ruleScanPageSize = 10;
+let ruleScanSortCol = 'symbol';
+let ruleScanSortAsc = true;
+let ruleScanFilterMinScore = 0;
+let ruleScanFilterMaxDE = 500;
+
 
 // DOM Elements
 const tabs = {
@@ -77,6 +87,7 @@ const tabs = {
     analyzer: document.getElementById('tab-analyzer'),
     compare: document.getElementById('tab-compare'),
     alerts: document.getElementById('tab-alerts'),
+    'rule-scanner': document.getElementById('tab-rule-scanner'),
     watchlist: document.getElementById('tab-watchlist'),
     portfolio: document.getElementById('tab-portfolio'),
     'swing-scan': document.getElementById('tab-swing-scan'),
@@ -89,6 +100,7 @@ const tabBtns = {
     analyzer: document.getElementById('tab-analyzer-btn'),
     compare: document.getElementById('tab-compare-btn'),
     alerts: document.getElementById('tab-alerts-btn'),
+    'rule-scanner': document.getElementById('tab-rule-scanner-btn'),
     watchlist: document.getElementById('tab-watchlist-btn'),
     portfolio: document.getElementById('tab-portfolio-btn'),
     'swing-scan': document.getElementById('tab-swing-scan-btn'),
@@ -14786,3 +14798,482 @@ window.recalculateSwingSizer = recalculateSwingSizer;
 window.runSwingBacktest = runSwingBacktest;
 
 
+// ─── RULE SCANNER MODULE ──────────────────────────────────────────────────────
+
+const RULE_SCANNER_STRATEGY_GUIDE = {
+    'RSI': '<strong>RSI-14:</strong> Scans the universe for stocks crossing momentum boundaries. RSI &lt; 30 captures oversold candidates with potential reversal setups.',
+    'PE': '<strong>P/E Ratio:</strong> Screens for valuation extremes. Low P/E (&lt; 15) identifies potential deep value; high P/E (&gt; 40) flags overvaluation risk.',
+    'RATING': '<strong>AI Rating:</strong> Filters stocks by AI analyst recommendation. Use "==" operator with values like BUY, STRONG BUY, HOLD, SELL.',
+    'PRICE': '<strong>Price Level:</strong> Absolute price floor/ceiling filter in Rs. Useful for identifying stocks within specific price ranges.',
+    'SMA': '<strong>SMA-200:</strong> Measures price deviation from 200-day SMA as %. Negative values indicate stocks trading below long-term trend.',
+    'DMA_CROSS': '<strong>Golden/Death Cross:</strong> Detects 50 SMA vs 200 SMA crossovers. ">" finds golden crosses (bullish), "<" finds death crosses (bearish).',
+    'EMA_CROSS': '<strong>EMA Crossover:</strong> 50 EMA vs 200 EMA crossover detection. More responsive than SMA crossovers for trend signals.',
+    'VOL_BREAKOUT': '<strong>Volume Spurt:</strong> Ratio of current volume to 20-day average. &gt; 2.0x identifies unusual institutional activity.',
+    'BB_CROSS': '<strong>Bollinger Bands:</strong> Detects price crossing above/below Bollinger Bands. Lower band touches signal potential mean reversion.',
+    'MACD_CROSS': '<strong>MACD Crossover:</strong> MACD vs Signal line divergence. Positive diff = bullish momentum, negative = bearish pressure.',
+    '52W_PROXIMITY': '<strong>52W Range:</strong> Proximity to 52-week high or low. ">" checks near-high breakout, "<" checks near-low value entry.',
+    'SMA50': '<strong>SMA-50:</strong> Deviation from 50-day SMA. Identifies short-term trend divergence and mean-reversion setups.',
+    'FIB_382': '<strong>Fib 38.2%:</strong> Proximity to the 38.2% Fibonacci retracement level — intermediate pullback support zone.',
+    'FIB_500': '<strong>Fib 50.0%:</strong> Proximity to the 50% Fibonacci level — key consolidation support level.',
+    'FIB_618': '<strong>Fib 61.8%:</strong> Proximity to the golden ratio 61.8% Fibonacci level — strongest retracement support.',
+    'FIB_LEVEL': '<strong>All Fib Levels:</strong> Scans proximity to any major Fibonacci level (38.2%, 50.0%, 61.8%) simultaneously.'
+};
+
+function setupRuleScanner() {
+    // Strategy guide cheatsheet
+    const conditionSelect = document.getElementById('rule-scanner-condition');
+    if (conditionSelect) {
+        conditionSelect.addEventListener('change', () => {
+            const guide = document.getElementById('rule-scanner-strategy-text');
+            if (guide) guide.innerHTML = RULE_SCANNER_STRATEGY_GUIDE[conditionSelect.value] || '';
+        });
+    }
+
+    // NL template pills
+    document.querySelectorAll('.rs-nl-template-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            const textarea = document.getElementById('rule-scanner-nl-prompt');
+            if (textarea) textarea.value = pill.getAttribute('data-template') || '';
+        });
+    });
+
+    // NL Submit
+    const nlSubmit = document.getElementById('rule-scanner-nl-submit');
+    if (nlSubmit) nlSubmit.addEventListener('click', executeNLRuleScan);
+
+    // Parametric Execute
+    const execBtn = document.getElementById('rule-scanner-execute-btn');
+    if (execBtn) execBtn.addEventListener('click', executeRuleScan);
+
+    // Sorting
+    document.querySelectorAll('.rs-sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.getAttribute('data-sort');
+            if (ruleScanSortCol === col) {
+                ruleScanSortAsc = !ruleScanSortAsc;
+            } else {
+                ruleScanSortCol = col;
+                ruleScanSortAsc = true;
+            }
+            ruleScanPage = 1;
+            renderRuleScanResults();
+        });
+    });
+
+    // Pagination
+    const prevBtn = document.getElementById('rule-scanner-prev-btn');
+    const nextBtn = document.getElementById('rule-scanner-next-btn');
+    const pageSizeSelect = document.getElementById('rule-scanner-pagesize-select');
+    if (prevBtn) prevBtn.addEventListener('click', () => { if (ruleScanPage > 1) { ruleScanPage--; renderRuleScanResults(); } });
+    if (nextBtn) nextBtn.addEventListener('click', () => { ruleScanPage++; renderRuleScanResults(); });
+    if (pageSizeSelect) pageSizeSelect.addEventListener('change', () => { ruleScanPageSize = parseInt(pageSizeSelect.value); ruleScanPage = 1; renderRuleScanResults(); });
+
+    // Filter sliders
+    const scoreSlider = document.getElementById('rule-scanner-filter-score');
+    const deSlider = document.getElementById('rule-scanner-filter-de');
+    if (scoreSlider) scoreSlider.addEventListener('input', () => {
+        ruleScanFilterMinScore = parseInt(scoreSlider.value);
+        document.getElementById('rule-scanner-filter-score-val').textContent = ruleScanFilterMinScore;
+        ruleScanPage = 1;
+        renderRuleScanResults();
+    });
+    if (deSlider) deSlider.addEventListener('input', () => {
+        ruleScanFilterMaxDE = parseInt(deSlider.value);
+        document.getElementById('rule-scanner-filter-de-val').textContent = (ruleScanFilterMaxDE / 100).toFixed(1);
+        ruleScanPage = 1;
+        renderRuleScanResults();
+    });
+
+    // Export buttons
+    const copyBtn = document.getElementById('rule-scanner-copy-btn');
+    const printBtn = document.getElementById('rule-scanner-print-btn');
+    const csvBtn = document.getElementById('rule-scanner-export-csv-btn');
+    const watchlistBtn = document.getElementById('rule-scanner-save-watchlist-btn');
+    if (copyBtn) copyBtn.addEventListener('click', copyRuleScanTable);
+    if (printBtn) printBtn.addEventListener('click', printRuleScanReport);
+    if (csvBtn) csvBtn.addEventListener('click', exportRuleScanCSV);
+    if (watchlistBtn) watchlistBtn.addEventListener('click', saveRuleScanAsWatchlist);
+}
+
+async function executeNLRuleScan() {
+    const prompt = document.getElementById('rule-scanner-nl-prompt')?.value?.trim();
+    if (!prompt) return;
+
+    const loader = document.getElementById('rule-scanner-nl-loader');
+    if (loader) loader.style.display = 'flex';
+
+    try {
+        const res = await fetch('/api/screener/parse-nl-scan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            // Fill parametric form
+            const condSel = document.getElementById('rule-scanner-condition');
+            const opSel = document.getElementById('rule-scanner-operator');
+            const valInput = document.getElementById('rule-scanner-value');
+            const uniSel = document.getElementById('rule-scanner-universe');
+            if (condSel) condSel.value = data.condition_type;
+            if (opSel) opSel.value = data.operator;
+            if (valInput) valInput.value = data.value;
+            if (uniSel) uniSel.value = data.universe;
+
+            // Update strategy guide
+            const guide = document.getElementById('rule-scanner-strategy-text');
+            if (guide) guide.innerHTML = RULE_SCANNER_STRATEGY_GUIDE[data.condition_type] || '';
+
+            // Auto-execute
+            await executeRuleScan();
+        } else {
+            showToast('AI parsing failed: ' + (data.detail || 'Unknown error'), 'error');
+        }
+    } catch (err) {
+        showToast('Failed to parse scan prompt: ' + err.message, 'error');
+    } finally {
+        if (loader) loader.style.display = 'none';
+    }
+}
+
+async function executeRuleScan() {
+    const condition = document.getElementById('rule-scanner-condition')?.value || 'RSI';
+    const operator = document.getElementById('rule-scanner-operator')?.value || '<';
+    const value = document.getElementById('rule-scanner-value')?.value || '30';
+    const universe = document.getElementById('rule-scanner-universe')?.value || 'all';
+
+    // Update telemetry
+    const engineStatus = document.getElementById('rule-scanner-engine-status');
+    if (engineStatus) { engineStatus.textContent = 'SCANNING...'; engineStatus.style.color = '#f59e0b'; }
+    document.getElementById('rule-scanner-active-condition').textContent = `${condition} ${operator} ${value} (${universe.toUpperCase()})`;
+
+    try {
+        const params = new URLSearchParams({ condition_type: condition, operator, value, universe });
+        const res = await fetch(`/api/screener/scan-trigger?${params}`);
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            ruleScanAllResults = data.results || [];
+            lastRuleScanResults = [...ruleScanAllResults];
+            ruleScanPage = 1;
+
+            // Update telemetry
+            document.getElementById('rule-scanner-scanned-count').textContent = data.scanned || 0;
+            document.getElementById('rule-scanner-matched-count').textContent = data.matched || 0;
+            if (engineStatus) { engineStatus.textContent = 'COMPLETE'; engineStatus.style.color = '#10b981'; }
+
+            // Show results card
+            const card = document.getElementById('rule-scanner-results-card');
+            if (card) card.style.display = 'flex';
+
+            // Update subtitle
+            const subtitle = document.getElementById('rule-scanner-results-subtitle');
+            if (subtitle) subtitle.textContent = `${data.matched} matches from ${data.scanned} scanned • ${data.condition}`;
+
+            renderRuleScanResults();
+            renderRuleScanSectorConcentration(ruleScanAllResults);
+
+            // Trigger AI synthesis
+            if (ruleScanAllResults.length > 0) {
+                requestRuleScanSynthesis(ruleScanAllResults, `${condition} ${operator} ${value} (Universe: ${universe})`);
+            }
+        } else {
+            showToast('Scan failed: ' + (data.detail || 'Unknown error'), 'error');
+            if (engineStatus) { engineStatus.textContent = 'ERROR'; engineStatus.style.color = '#ef4444'; }
+        }
+    } catch (err) {
+        showToast('Rule scan failed: ' + err.message, 'error');
+        if (engineStatus) { engineStatus.textContent = 'ERROR'; engineStatus.style.color = '#ef4444'; }
+    }
+}
+
+function renderRuleScanResults() {
+    // Apply filters
+    let filtered = ruleScanAllResults.filter(r => {
+        if (ruleScanFilterMinScore > 0 && (r.score || 0) < ruleScanFilterMinScore) return false;
+        if (ruleScanFilterMaxDE < 500 && (r.de_ratio || 0) > (ruleScanFilterMaxDE / 100)) return false;
+        return true;
+    });
+
+    // Sort
+    filtered.sort((a, b) => {
+        let va = a[ruleScanSortCol], vb = b[ruleScanSortCol];
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        if (va < vb) return ruleScanSortAsc ? -1 : 1;
+        if (va > vb) return ruleScanSortAsc ? 1 : -1;
+        return 0;
+    });
+
+    lastRuleScanResults = filtered;
+
+    // Paginate
+    const totalPages = Math.max(1, Math.ceil(filtered.length / ruleScanPageSize));
+    if (ruleScanPage > totalPages) ruleScanPage = totalPages;
+    const start = (ruleScanPage - 1) * ruleScanPageSize;
+    const pageSlice = filtered.slice(start, start + ruleScanPageSize);
+
+    const tbody = document.getElementById('rule-scanner-results-body');
+    if (!tbody) return;
+
+    if (pageSlice.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">No matches found for the current filter settings.</td></tr>';
+    } else {
+        tbody.innerHTML = pageSlice.map((r, idx) => {
+            const globalIdx = start + idx;
+            const ratingClass = (r.rating || '').includes('BUY') ? 'green-text' : ((r.rating || '').includes('SELL') ? 'red-text' : 'yellow-text');
+            const canvasId = `rs-sparkline-${globalIdx}`;
+            return `<tr style="border-bottom: 1px solid rgba(255,255,255,0.04); transition: background 0.15s;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'">
+                <td style="padding: 10px 8px;">
+                    <div style="display: flex; flex-direction: column; gap: 2px;">
+                        <span style="font-weight: 700; font-size: 12px; color: var(--text-primary); cursor: pointer;" onclick="switchTab('analyzer'); document.getElementById('stock-input') && (document.getElementById('stock-input').value = '${(r.symbol || '').replace('.NS','')}')">${(r.symbol || '').replace('.NS','')}</span>
+                        <span style="font-size: 9px; color: var(--text-muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${r.company_name || ''}</span>
+                    </div>
+                </td>
+                <td class="rs-hide-mobile" style="padding: 10px 8px; font-size: 11px; color: var(--text-secondary);">${r.cap_type || 'N/A'}</td>
+                <td style="padding: 10px 8px; font-size: 11.5px; font-weight: 600; color: var(--text-primary);">₹${(r.price || 0).toLocaleString('en-IN')}</td>
+                <td class="rs-hide-mobile" style="padding: 10px 8px; font-size: 11px; color: var(--text-secondary);">${r.pe > 0 ? r.pe.toFixed(1) : 'N/A'}</td>
+                <td style="padding: 10px 8px;"><canvas id="${canvasId}" width="80" height="28" style="display: block;"></canvas></td>
+                <td style="padding: 10px 8px; font-size: 10.5px; color: var(--color-primary); font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${r.trigger_value || ''}">${r.trigger_value || 'N/A'}</td>
+                <td style="padding: 10px 8px;"><span class="${ratingClass}" style="font-size: 10.5px; font-weight: 700;">${r.rating || 'N/A'}</span></td>
+                <td class="rs-hide-mobile" style="padding: 10px 8px; font-size: 10.5px; color: var(--text-secondary);">${r.sector || 'N/A'}</td>
+                <td style="padding: 10px 8px;">
+                    <button class="btn-secondary" style="font-size: 9.5px; padding: 3px 8px; height: auto; border-radius: 4px;" onclick="switchTab('analyzer'); document.getElementById('stock-input') && (document.getElementById('stock-input').value = '${(r.symbol || '').replace('.NS','')}')">Analyze</button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        // Draw sparklines
+        setTimeout(() => {
+            pageSlice.forEach((r, idx) => {
+                const globalIdx = start + idx;
+                drawRuleScanSparkline(`rs-sparkline-${globalIdx}`, r);
+            });
+        }, 50);
+    }
+
+    // Update pagination controls
+    const pageInfo = document.getElementById('rule-scanner-page-info');
+    const prevBtn = document.getElementById('rule-scanner-prev-btn');
+    const nextBtn = document.getElementById('rule-scanner-next-btn');
+    const pagination = document.getElementById('rule-scanner-pagination');
+
+    if (pageInfo) pageInfo.textContent = `Page ${ruleScanPage} of ${totalPages} (${filtered.length} results)`;
+    if (prevBtn) prevBtn.disabled = (ruleScanPage <= 1);
+    if (nextBtn) nextBtn.disabled = (ruleScanPage >= totalPages);
+    if (pagination) pagination.style.display = filtered.length > ruleScanPageSize ? 'flex' : 'none';
+
+    // Update sort indicators
+    document.querySelectorAll('.rs-sortable').forEach(th => {
+        const col = th.getAttribute('data-sort');
+        const text = th.textContent.replace(/ [↑↓↕]/g, '');
+        if (col === ruleScanSortCol) {
+            th.textContent = text + (ruleScanSortAsc ? ' ↑' : ' ↓');
+        } else {
+            th.textContent = text + ' ↕';
+        }
+    });
+}
+
+function drawRuleScanSparkline(canvasId, stockData) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // Generate synthetic sparkline from RSI and price data
+    const rsi = stockData.rsi || 50;
+    const price = stockData.price || 100;
+    const pe = stockData.pe || 20;
+
+    // Create a pseudo-random but deterministic sparkline based on stock symbol hash
+    const seed = (stockData.symbol || 'X').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const points = [];
+    let val = price;
+    for (let i = 0; i < 20; i++) {
+        const noise = Math.sin(seed * (i + 1) * 0.1) * (price * 0.03) + Math.cos(seed * i * 0.07) * (price * 0.02);
+        val = val + noise;
+        points.push(val);
+    }
+    points.push(price); // End at current price
+
+    const minVal = Math.min(...points);
+    const maxVal = Math.max(...points);
+    const range = maxVal - minVal || 1;
+
+    const isPositive = points[points.length - 1] >= points[0];
+    const gradient = ctx.createLinearGradient(0, 0, w, 0);
+    if (isPositive) {
+        gradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+        gradient.addColorStop(1, 'rgba(16, 185, 129, 1.0)');
+    } else {
+        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.4)');
+        gradient.addColorStop(1, 'rgba(239, 68, 68, 1.0)');
+    }
+
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+
+    for (let i = 0; i < points.length; i++) {
+        const x = (i / (points.length - 1)) * w;
+        const y = h - ((points[i] - minVal) / range) * (h - 4) - 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // Fill area under curve
+    const fillGradient = ctx.createLinearGradient(0, 0, 0, h);
+    if (isPositive) {
+        fillGradient.addColorStop(0, 'rgba(16, 185, 129, 0.15)');
+        fillGradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+    } else {
+        fillGradient.addColorStop(0, 'rgba(239, 68, 68, 0.15)');
+        fillGradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+    }
+    ctx.lineTo(w, h);
+    ctx.lineTo(0, h);
+    ctx.closePath();
+    ctx.fillStyle = fillGradient;
+    ctx.fill();
+}
+
+function renderRuleScanSectorConcentration(results) {
+    const container = document.getElementById('rule-scanner-sector-bars');
+    if (!container) return;
+
+    const sectorCounts = {};
+    results.forEach(r => {
+        const sector = r.sector || 'Unknown';
+        sectorCounts[sector] = (sectorCounts[sector] || 0) + 1;
+    });
+
+    const sorted = Object.entries(sectorCounts).sort((a, b) => b[1] - a[1]);
+    const maxCount = sorted.length > 0 ? sorted[0][1] : 1;
+
+    const SECTOR_COLORS = [
+        '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+        '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+        '#14b8a6', '#e11d48', '#a855f7', '#0ea5e9'
+    ];
+
+    if (sorted.length === 0) {
+        container.innerHTML = '<p class="helper-text" style="margin: 0; font-size: 11px;">No sector data available.</p>';
+        return;
+    }
+
+    container.innerHTML = sorted.slice(0, 10).map(([sector, count], i) => {
+        const pct = (count / results.length * 100).toFixed(1);
+        const barPct = (count / maxCount * 100).toFixed(0);
+        const color = SECTOR_COLORS[i % SECTOR_COLORS.length];
+        return `<div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 9.5px; color: var(--text-secondary); min-width: 90px; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${sector}">${sector}</span>
+            <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; width: ${barPct}%; background: ${color}; border-radius: 4px; transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);"></div>
+            </div>
+            <span style="font-size: 9px; color: var(--text-muted); min-width: 36px; text-align: right;">${count} (${pct}%)</span>
+        </div>`;
+    }).join('');
+}
+
+async function requestRuleScanSynthesis(results, conditionDesc) {
+    const panel = document.getElementById('rule-scanner-synthesis-panel');
+    const textEl = document.getElementById('rule-scanner-synthesis-text');
+    if (!panel || !textEl) return;
+
+    panel.style.display = 'block';
+    textEl.innerHTML = '<span style="color: #a855f7; font-size: 11px;">🔬 AI analyst synthesizing scan results...</span>';
+
+    try {
+        const res = await fetch('/api/screener/scan-synthesis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ results: results.slice(0, 20), condition_desc: conditionDesc })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            textEl.textContent = data.synthesis || 'No synthesis generated.';
+        } else {
+            textEl.textContent = 'Synthesis generation encountered an error.';
+        }
+    } catch (err) {
+        textEl.textContent = 'Failed to generate synthesis: ' + err.message;
+    }
+}
+
+// Export functions
+function copyRuleScanTable() {
+    if (lastRuleScanResults.length === 0) return showToast('No results to copy', 'warning');
+    const header = 'Symbol\tCompany\tSegment\tPrice\tP/E\tTrigger\tRating\tSector\tScore\tD/E';
+    const rows = lastRuleScanResults.map(r =>
+        `${(r.symbol||'').replace('.NS','')}\t${r.company_name||''}\t${r.cap_type||''}\t${r.price||''}\t${r.pe||''}\t${r.trigger_value||''}\t${r.rating||''}\t${r.sector||''}\t${r.score||''}\t${r.de_ratio||''}`
+    );
+    navigator.clipboard.writeText([header, ...rows].join('\n')).then(() => showToast('Table copied to clipboard', 'success'));
+}
+
+function exportRuleScanCSV() {
+    if (lastRuleScanResults.length === 0) return showToast('No results to export', 'warning');
+    const header = 'Symbol,Company,Segment,Price,PE,Trigger,Rating,Sector,Score,DE_Ratio';
+    const rows = lastRuleScanResults.map(r =>
+        `"${(r.symbol||'').replace('.NS','')}","${r.company_name||''}","${r.cap_type||''}",${r.price||''},${r.pe||''},"${r.trigger_value||''}","${r.rating||''}","${r.sector||''}",${r.score||''},${r.de_ratio||''}`
+    );
+    const csvContent = [header, ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `rule_scan_results_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('CSV exported successfully', 'success');
+}
+
+function printRuleScanReport() {
+    if (lastRuleScanResults.length === 0) return showToast('No results to print', 'warning');
+    const originalTitle = document.title;
+    const condText = document.getElementById('rule-scanner-active-condition')?.textContent || 'Rule Scan';
+    document.title = `Rule Scanner Report — ${condText}`;
+    document.body.classList.add('is-printing-rule-scan');
+    setTimeout(() => {
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('is-printing-rule-scan');
+            document.title = originalTitle;
+        }, 1000);
+    }, 150);
+}
+
+async function saveRuleScanAsWatchlist() {
+    if (lastRuleScanResults.length === 0) return showToast('No results to save', 'warning');
+    const condText = document.getElementById('rule-scanner-active-condition')?.textContent || 'Rule Scan';
+    const name = `Rule Scan: ${condText} (${new Date().toLocaleDateString()})`;
+
+    try {
+        const createRes = await fetch('/api/watchlists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        const createData = await createRes.json();
+        if (createData.id) {
+            for (const r of lastRuleScanResults.slice(0, 50)) {
+                await fetch(`/api/watchlists/${createData.id}/items`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol: r.symbol || '' })
+                });
+            }
+            showToast(`Saved ${Math.min(lastRuleScanResults.length, 50)} stocks as watchlist "${name}"`, 'success');
+        }
+    } catch (err) {
+        showToast('Failed to save watchlist: ' + err.message, 'error');
+    }
+}
+
+// Initialize on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    setupRuleScanner();
+});
