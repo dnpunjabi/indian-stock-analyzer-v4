@@ -7419,3 +7419,190 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background: rgba(0, 0, 0, 0.02) !important;
     border-color: rgba(147, 51, 234, 0.15) !important;
 }
+
+/* ==========================================
+   ALERT PRESET DICTIONARY - COLLAPSIBLE GROUPS
+   ========================================== */
+.alert-preset-group {
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    background: rgba(255, 255, 255, 0.01);
+    transition: all 0.25s ease;
+    overflow: hidden;
+}
+
+.alert-preset-group:last-child {
+    margin-bottom: 0;
+}
+
+.alert-preset-group[open] {
+    background: rgba(168, 85, 247, 0.03);
+    border-color: rgba(168, 85, 247, 0.15);
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.06);
+}
+
+.alert-preset-group > summary {
+    font-size: 9px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    padding: 7px 10px;
+    list-style: none;
+    user-select: none;
+    transition: all 0.2s ease;
+    border-radius: 6px;
+}
+
+.alert-preset-group > summary::-webkit-details-marker {
+    display: none;
+}
+
+.alert-preset-group > summary::before {
+    content: '▸';
+    font-size: 10px;
+    color: var(--text-secondary);
+    transition: transform 0.25s ease;
+    flex-shrink: 0;
+    opacity: 0.5;
+}
+
+.alert-preset-group[open] > summary::before {
+    transform: rotate(90deg);
+    color: #a855f7;
+    opacity: 1;
+}
+
+.alert-preset-group > summary:hover {
+    color: #d8b4fe;
+    background: rgba(168, 85, 247, 0.05);
+}
+
+.alert-preset-group > .alert-preset-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 10px 8px 10px;
+    animation: alertPresetSlideDown 0.2s ease-out;
+}
+
+@keyframes alertPresetSlideDown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Light theme overrides for alert presets */
+[data-theme="light"] .alert-preset-group {
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    background: rgba(0, 0, 0, 0.01) !important;
+}
+
+[data-theme="light"] .alert-preset-group[open] {
+    background: rgba(168, 85, 247, 0.04) !important;
+    border-color: rgba(168, 85, 247, 0.15) !important;
+}
+
+/* ==========================================
+   WHATSAPP INTEGRATION CARD
+   ========================================== */
+.whatsapp-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 8.5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.whatsapp-status-badge.connected {
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    color: #4ade80;
+}
+
+.whatsapp-status-badge.disconnected {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #f87171;
+}
+
+.whatsapp-status-badge .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    animation: whatsappPulse 2s ease-in-out infinite;
+}
+
+.whatsapp-status-badge.connected .status-dot {
+    background: #4ade80;
+}
+
+.whatsapp-status-badge.disconnected .status-dot {
+    background: #f87171;
+    animation: none;
+}
+
+@keyframes whatsappPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.whatsapp-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.whatsapp-card-header h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+}
+
+.whatsapp-btn-group {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.whatsapp-btn-group button {
+    flex: 1;
+    font-size: 10.5px;
+    padding: 7px 12px;
+}
+
+.btn-whatsapp-test {
+    background: rgba(37, 211, 102, 0.1) !important;
+    border: 1px solid rgba(37, 211, 102, 0.3) !important;
+    color: #25d366 !important;
+    transition: all 0.3s ease !important;
+}
+
+.btn-whatsapp-test:hover {
+    background: rgba(37, 211, 102, 0.2) !important;
+    border-color: rgba(37, 211, 102, 0.5) !important;
+    box-shadow: 0 0 15px rgba(37, 211, 102, 0.15) !important;
+}
+
+.whatsapp-env-indicator {
+    font-size: 8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}

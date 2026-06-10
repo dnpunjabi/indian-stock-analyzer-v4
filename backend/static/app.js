@@ -4422,11 +4422,6 @@ function setupAlertCenter() {
         });
     });
     
-    // Webhook settings save listener
-    const saveWebhooksBtn = document.getElementById('save-webhooks-btn');
-    if (saveWebhooksBtn) {
-        saveWebhooksBtn.addEventListener('click', saveWebhooksSettings);
-    }
     
     // Autocomplete on stock input
     setupAlertSymbolAutocomplete();
@@ -4446,7 +4441,7 @@ function setupAlertCenter() {
     }
     
     setupAlertsTableSorting();
-    fetchWebhooksSettings();
+    fetchWhatsAppSettings();
     fetchAlertsList();
     startRealTimeAlertScanner();
 }
@@ -4688,7 +4683,7 @@ function renderAlertsPage(page) {
     tbody.innerHTML = '';
     
     if (lastAlertsList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="center-text text-muted">No alert rules configured. Create one on the left.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="center-text text-muted">No alert rules configured. Create one on the left.</td></tr>';
         if (pagContainer) pagContainer.style.display = 'none';
         return;
     }
@@ -4713,9 +4708,8 @@ function renderAlertsPage(page) {
         }
         
         tr.innerHTML = `
-            <td style="font-weight:600;">#${item.id}</td>
-            <td><strong>${item.ticker}</strong></td>
-            <td><span class="badge-ticker" style="font-size:10px;">${item.condition_type}</span></td>
+            <td><a href="#" class="alert-stock-link" data-ticker="${item.ticker}" title="Open in Equity Research Terminal" style="color: var(--color-primary-light); text-decoration: none; font-weight: 700; cursor: pointer; border-bottom: 1px dashed rgba(59,130,246,0.3); transition: all 0.2s ease;">${item.ticker}</a></td>
+            <td><span class="badge-ticker alert-condition-badge" style="font-size:10px; cursor: default; position: relative;" title="${item.condition_type} ${item.operator} ${item.value}">${item.condition_type}</span></td>
             <td style="font-family: monospace; font-size:12px; font-weight:600;">${item.operator} ${item.value}</td>
             <td>${statusBadge}</td>
             <td><span class="text-muted" style="font-size:11px;">${item.trigger_date || 'Active scan...'}</span></td>
@@ -4723,6 +4717,24 @@ function renderAlertsPage(page) {
                 <button class="btn-translucent-delete" data-id="${item.id}">Delete 🗑️</button>
             </td>
         `;
+        
+        // Make stock ticker clickable → navigate to Equity Research Terminal
+        const stockLink = tr.querySelector('.alert-stock-link');
+        if (stockLink) {
+            stockLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                const ticker = stockLink.getAttribute('data-ticker');
+                loadStockAnalyzer(ticker);
+            });
+            stockLink.addEventListener('mouseenter', () => {
+                stockLink.style.color = '#60a5fa';
+                stockLink.style.borderBottomColor = 'rgba(96,165,250,0.6)';
+            });
+            stockLink.addEventListener('mouseleave', () => {
+                stockLink.style.color = 'var(--color-primary-light)';
+                stockLink.style.borderBottomColor = 'rgba(59,130,246,0.3)';
+            });
+        }
         
         tr.querySelector('.btn-translucent-delete').addEventListener('click', async () => {
             if (confirm(`Are you sure you want to delete alert #${item.id}?`)) {
@@ -4743,7 +4755,7 @@ function renderAlertsPage(page) {
             const trWarning = document.createElement('tr');
             trWarning.className = 'ai-warning-row';
             trWarning.innerHTML = `
-                <td colspan="7" style="padding: 6px 12px; background: rgba(239, 68, 68, 0.04); border-top: none;">
+                <td colspan="6" style="padding: 6px 12px; background: rgba(239, 68, 68, 0.04); border-top: none;">
                     <div style="display: flex; align-items: flex-start; gap: 8px; font-size: 11px; line-height: 1.45; color: var(--text-primary);">
                         <span style="color: #ef4444; font-size: 12px; margin-top: 1px;">🤖</span>
                         <div>
@@ -4806,7 +4818,6 @@ function sortAlerts(col, toggle = true) {
 
 function updateAlertsHeaderIndicators() {
     const sortMappings = {
-        'alerts-th-id': 'id',
         'alerts-th-symbol': 'ticker',
         'alerts-th-condition': 'condition_type',
         'alerts-th-value': 'value',
@@ -4905,7 +4916,7 @@ async function checkAlertRules() {
     }
 }
 
-// --- HUD & Webhook Integration Helpers ---
+// --- HUD & WhatsApp Integration Helpers ---
 function showEmergencyHUD(message) {
     const hud = document.getElementById('emergency-warning-hud');
     const msgEl = document.getElementById('hud-warning-message');
@@ -4920,37 +4931,30 @@ function dismissEmergencyHUD() {
     if (hud) hud.style.display = 'none';
 }
 
-async function fetchWebhooksSettings() {
+async function fetchWhatsAppSettings() {
     try {
         const response = await fetch('/api/alerts/settings');
         if (!response.ok) return;
         const data = await response.json();
         
-        const slackInput = document.getElementById('webhook-slack');
-        const discordInput = document.getElementById('webhook-discord');
-        if (slackInput) slackInput.value = data.slack_webhook || '';
-        if (discordInput) discordInput.value = data.discord_webhook || '';
-    } catch (err) {
-        console.error("Failed to fetch webhook settings:", err);
-    }
-}
-
-async function saveWebhooksSettings() {
-    const slack = document.getElementById('webhook-slack').value.trim();
-    const discord = document.getElementById('webhook-discord').value.trim();
-    
-    try {
-        const response = await fetch('/api/alerts/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slack_webhook: slack, discord_webhook: discord })
-        });
+        const statusBadge = document.getElementById('whatsapp-status-badge');
+        const statusText = document.getElementById('whatsapp-status-text');
         
-        if (!response.ok) throw new Error("Failed to save settings.");
-        
-        showToast("Webhook configurations successfully saved.", "success");
+        if (statusBadge && statusText) {
+            if (data.whatsapp_configured) {
+                statusBadge.className = 'whatsapp-status-badge connected';
+                statusText.textContent = 'Connected';
+            } else {
+                statusBadge.className = 'whatsapp-status-badge disconnected';
+                statusText.textContent = 'Not Configured';
+            }
+        }
     } catch (err) {
-        showToast("Failed to save webhook settings: " + err.message, "error");
+        console.error("Failed to fetch WhatsApp settings:", err);
+        const statusBadge = document.getElementById('whatsapp-status-badge');
+        const statusText = document.getElementById('whatsapp-status-text');
+        if (statusBadge) statusBadge.className = 'whatsapp-status-badge disconnected';
+        if (statusText) statusText.textContent = 'Error';
     }
 }
 

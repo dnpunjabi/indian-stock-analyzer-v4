@@ -1046,8 +1046,9 @@ class AlertRequest(BaseModel):
     value: str
 
 class AlertSettingsRequest(BaseModel):
-    slack_webhook: str = ""
-    discord_webhook: str = ""
+    whatsapp_token: str = ""
+    whatsapp_phone_id: str = ""
+    whatsapp_recipient: str = ""
 
 class ParseNLAlertRequest(BaseModel):
     prompt: str
@@ -2253,31 +2254,56 @@ async def list_alerts():
 
 @app.get("/api/alerts/settings")
 async def get_alert_settings():
-    """Returns the Slack/Discord webhook settings from database."""
-    slack_webhook = ""
-    discord_webhook = ""
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT key, value FROM alert_settings WHERE key IN ('slack_webhook', 'discord_webhook')")
-        for row in cursor.fetchall():
-            if row["key"] == "slack_webhook":
-                slack_webhook = row["value"]
-            elif row["key"] == "discord_webhook":
-                discord_webhook = row["value"]
-    return {"slack_webhook": slack_webhook, "discord_webhook": discord_webhook}
+    """Returns the WhatsApp Business API settings from .env file."""
+    wa_token = os.environ.get("WHATSAPP_TOKEN", "")
+    wa_phone_id = os.environ.get("WHATSAPP_PHONE_ID", "")
+    wa_recipient = os.environ.get("WHATSAPP_RECIPIENT", "")
+    # Mask the token for frontend display (show only last 8 chars)
+    masked_token = ""
+    if wa_token:
+        masked_token = "*" * 20 + wa_token[-8:] if len(wa_token) > 8 else wa_token
+    return {
+        "whatsapp_configured": bool(wa_token and wa_phone_id and wa_recipient),
+        "whatsapp_token_masked": masked_token,
+        "whatsapp_phone_id": wa_phone_id,
+        "whatsapp_recipient": wa_recipient
+    }
 
-@app.post("/api/alerts/settings")
-async def save_alert_settings(data: AlertSettingsRequest):
-    """Saves or updates the Slack/Discord webhook settings in database."""
+@app.post("/api/alerts/whatsapp/test")
+async def test_whatsapp():
+    """Sends a test WhatsApp message to verify the Cloud API connection."""
+    wa_token = os.environ.get("WHATSAPP_TOKEN", "")
+    wa_phone_id = os.environ.get("WHATSAPP_PHONE_ID", "")
+    wa_recipient = os.environ.get("WHATSAPP_RECIPIENT", "")
+    
+    if not wa_token or not wa_phone_id or not wa_recipient:
+        raise HTTPException(status_code=400, detail="WhatsApp credentials not configured in .env file.")
+    
+    url = f"https://graph.facebook.com/v21.0/{wa_phone_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {wa_token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": wa_recipient,
+        "type": "text",
+        "text": {
+            "preview_url": False,
+            "body": "*APEX AI Workstation*\n\n_WhatsApp Alert Dispatch Test_\n\nConnection verified successfully. Alert notifications will be dispatched to this number when institutional triggers fire.\n\nTimestamp: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")
+        }
+    }
+    
     try:
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('slack_webhook', ?)", (data.slack_webhook,))
-            cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('discord_webhook', ?)", (data.discord_webhook,))
-            conn.commit()
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save settings: {str(e)}")
+        resp = await asyncio.to_thread(requests.post, url, headers=headers, json=payload, timeout=10)
+        resp_data = resp.json()
+        if resp.status_code == 200 and "messages" in resp_data:
+            return {"status": "success", "message_id": resp_data["messages"][0].get("id", "")}
+        else:
+            error_msg = resp_data.get("error", {}).get("message", "Unknown error")
+            raise HTTPException(status_code=resp.status_code, detail=f"WhatsApp API error: {error_msg}")
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Network error sending WhatsApp test: {str(e)}")
 
 @app.delete("/api/alerts/{alert_id}")
 async def delete_alert(alert_id: str):
@@ -2291,20 +2317,11 @@ async def delete_alert(alert_id: str):
 @app.get("/api/alerts/check")
 async def check_alerts():
     """Background-triggered active alert scanning sweep."""
-    # Fetch webhook settings once
-    slack_webhook = ""
-    discord_webhook = ""
-    try:
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT key, value FROM alert_settings WHERE key IN ('slack_webhook', 'discord_webhook')")
-            for row in cursor.fetchall():
-                if row["key"] == "slack_webhook":
-                    slack_webhook = row["value"]
-                elif row["key"] == "discord_webhook":
-                    discord_webhook = row["value"]
-    except Exception as db_err:
-        print(f"Error reading alert settings for webhook: {db_err}")
+    # Read WhatsApp settings from environment
+    wa_token = os.environ.get("WHATSAPP_TOKEN", "")
+    wa_phone_id = os.environ.get("WHATSAPP_PHONE_ID", "")
+    wa_recipient = os.environ.get("WHATSAPP_RECIPIENT", "")
+    whatsapp_configured = bool(wa_token and wa_phone_id and wa_recipient)
 
     triggers = []
     with get_db() as conn:
@@ -2599,6 +2616,41 @@ async def check_alerts():
                     conn.commit()
                 triggers.append(f"ALERT TRIGGERED: {alert['ticker']} reached {cur_val} (Target: {alert['operator']} {alert['value']})")
                 
+                # Dispatch WhatsApp alert notification
+                if whatsapp_configured:
+                    wa_msg = (
+                        f"\U0001f6a8 *INSTITUTIONAL ALERT TRIGGERED* \U0001f6a8\n\n"
+                        f"\u2022 *Stock:* {alert['ticker']}\n"
+                        f"\u2022 *Condition:* {alert['condition_type']} {alert['operator']} {alert['value']}\n"
+                        f"\u2022 *Triggered Value:* {cur_val}\n"
+                        f"\u2022 *Triggered At:* {trigger_date}\n"
+                    )
+                    if ai_context:
+                        wa_msg += f"\n\U0001f916 *AI Copilot Analysis:*\n_{ai_context}_\n"
+                    wa_msg += f"\n_APEX Agentic Equities AI Workstation_"
+
+                    async def send_whatsapp_async(msg_body):
+                        try:
+                            wa_url = f"https://graph.facebook.com/v21.0/{wa_phone_id}/messages"
+                            wa_headers = {
+                                "Authorization": f"Bearer {wa_token}",
+                                "Content-Type": "application/json"
+                            }
+                            wa_payload = {
+                                "messaging_product": "whatsapp",
+                                "to": wa_recipient,
+                                "type": "text",
+                                "text": {
+                                    "preview_url": False,
+                                    "body": msg_body
+                                }
+                            }
+                            await asyncio.to_thread(requests.post, wa_url, headers=wa_headers, json=wa_payload, timeout=10)
+                        except Exception as wa_err:
+                            print(f"Failed to deliver WhatsApp alert: {wa_err}")
+
+                    asyncio.create_task(send_whatsapp_async(wa_msg))
+
                 # Asynchronously dispatch webhook alerts
                 async def send_webhook_async(url, payload):
                     import requests

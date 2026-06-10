@@ -1977,43 +1977,43 @@
                                     <span style="font-size: 11px; color: var(--color-primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">💡 AI Alert Dictionary & Presets</span>
                                     
                                     <!-- Group 1: Price Levels & Breakouts -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">💵 Price Targets & Absolute Levels</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="alert-preset-group" open>
+                                        <summary>💵 Price Targets & Absolute Levels</summary>
+                                        <div class="alert-preset-pills">
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} price goes above Rs. 2500" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💵 Price Breakout (Above)</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} price drops below Rs. 1400" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💵 Price Support (Below)</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} drops below its analyst price target by 10.0%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🎯 Consensus Target Discount</span>
                                         </div>
-                                    </div>
+                                    </details>
 
                                     <!-- Group 2: Fibonacci & Support -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">📐 Fibonacci Retracements & Ranges</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="alert-preset-group">
+                                        <summary>📐 Fibonacci Retracements & Ranges</summary>
+                                        <div class="alert-preset-pills">
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} drops within 1.0% of its 38.2% Fibonacci retracement level" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 38.2% Retracement</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} drops within 1.5% of its 50.0% Fibonacci retracement level" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 50.0% Retracement</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} drops within 2.0% of its 61.8% Fibonacci retracement level" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 61.8% Golden Retracement</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} is within 3.0% of its 52-week low" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ 52W Low Proximity</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} is within 1.5% of its 52-week high" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚀 52W High Breakout</span>
                                         </div>
-                                    </div>
+                                    </details>
                                     
                                     <!-- Group 3: Moving Averages -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">📈 Moving Averages & Crossovers</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="alert-preset-group">
+                                        <summary>📈 Moving Averages & Crossovers</summary>
+                                        <div class="alert-preset-pills">
                                             <span class="nl-template-pill" data-template="Alert me when {STOCK} 50 SMA crosses above its 200 SMA by 1.0%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📈 50/200 SMA Golden Cross</span>
                                             <span class="nl-template-pill" data-template="Alert me when {STOCK} 50 SMA crosses below its 200 SMA by 0.5%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📉 50/200 SMA Death Cross</span>
                                             <span class="nl-template-pill" data-template="Alert me when {STOCK} 50 EMA crosses above its 200 EMA by 1.5%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">⚡ 50/200 EMA Cross</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} drops below its 50-day moving average by 2.0%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🔄 SMA-50 Pullback</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} price is within 2.5% of its 200 SMA" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🏰 SMA-200 Floor</span>
                                         </div>
-                                    </div>
+                                    </details>
                                     
                                     <!-- Group 4: Oscillators & Bands -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">🎯 Oscillators & Bands</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="alert-preset-group">
+                                        <summary>🎯 Oscillators & Bands</summary>
+                                        <div class="alert-preset-pills">
                                             <span class="nl-template-pill" data-template="Alert me when {STOCK} RSI-14 is less than 30" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🎯 RSI Oversold</span>
                                             <span class="nl-template-pill" data-template="Alert me when {STOCK} RSI-14 is greater than 70" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🎯 RSI Overbought</span>
                                             <span class="nl-template-pill" data-template="Alert me when {STOCK} MACD crosses above the Signal line by 0.5 points" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💥 MACD Bullish Cross</span>
@@ -2021,17 +2021,17 @@
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} crosses below its Bollinger Lower Band" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ BB Lower Band Touch</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} crosses above its Bollinger Upper Band" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ BB Upper Band Touch</span>
                                         </div>
-                                    </div>
+                                    </details>
                                     
                                     <!-- Group 5: Volume & Valuation -->
-                                    <div>
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">📊 Volumetric & Fundamentals</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="alert-preset-group">
+                                        <summary>📊 Volumetric & Fundamentals</summary>
+                                        <div class="alert-preset-pills">
                                             <span class="nl-template-pill" data-template="Alert me when {STOCK} volume is 3.0x higher than its 20-day average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚀 Volume Spurt</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} P/E drops below its historical median P/E" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💰 Deep Value P/E</span>
                                             <span class="nl-template-pill" data-template="Alert me if {STOCK} AI Analyst Rating equals BUY" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🤖 AI Rating Upgrade</span>
                                         </div>
-                                    </div>
+                                    </details>
                                 </div>
                                 <button class="btn-primary" id="alert-nl-submit" style="width: 100%; border: 1px solid rgba(168, 85, 247, 0.4); background: linear-gradient(135deg, rgba(147, 51, 234, 0.12) 0%, rgba(79, 70, 229, 0.12) 100%); transition: all 0.3s ease;">
                                     Generate AI Alert Rule
@@ -2115,22 +2115,16 @@
                                 <div class="radar-crosshair-v"></div>
                                 <div id="radar-targets-layer"></div>
                             </div>
-                        </div>
-
-                        <!-- Webhook Settings -->
-                        <div class="card">
-                            <h3>Webhook & Pager Integrations</h3>
-                            <p class="helper-text" style="margin-bottom: 12px;">Dispatches markdown triggers to Slack or rich embed color cards to Discord channels.</p>
-                            <div class="alert-form">
-                                <div class="form-group">
-                                    <label for="webhook-slack">Slack Webhook URL</label>
-                                    <input type="text" id="webhook-slack" placeholder="https://hooks.slack.com/services/..." value="">
+                            <!-- WhatsApp Dispatch Status -->
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px; padding: 8px 10px; border-radius: 6px; background: rgba(37, 211, 102, 0.03); border: 1px solid rgba(37, 211, 102, 0.1);">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-size: 12px;">📱</span>
+                                    <span style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">WhatsApp Alert Dispatch</span>
                                 </div>
-                                <div class="form-group">
-                                    <label for="webhook-discord">Discord Webhook URL</label>
-                                    <input type="text" id="webhook-discord" placeholder="https://discord.com/api/webhooks/..." value="">
-                                </div>
-                                <button class="btn-primary" id="save-webhooks-btn" style="width: 100%;">Save Webhook Settings</button>
+                                <span class="whatsapp-status-badge disconnected" id="whatsapp-status-badge">
+                                    <span class="status-dot"></span>
+                                    <span id="whatsapp-status-text">Checking...</span>
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -2149,7 +2143,6 @@
                             <table class="data-table" style="width: 100%;">
                                 <thead>
                                     <tr>
-                                        <th id="alerts-th-id" style="cursor: pointer; user-select: none;"># ID<span class="sort-indicator" style="opacity: 0.3; font-size: 10px;"></span></th>
                                         <th id="alerts-th-symbol" style="cursor: pointer; user-select: none;">📁 Stock<span class="sort-indicator" style="opacity: 0.3; font-size: 10px;"></span></th>
                                         <th id="alerts-th-condition" style="cursor: pointer; user-select: none;">⚙️ Condition<span class="sort-indicator" style="opacity: 0.3; font-size: 10px;"></span></th>
                                         <th id="alerts-th-value" style="cursor: pointer; user-select: none;">🎯 Target<span class="sort-indicator" style="opacity: 0.3; font-size: 10px;"></span></th>
@@ -2160,7 +2153,7 @@
                                 </thead>
                                 <tbody id="alerts-table-body">
                                     <tr>
-                                        <td colspan="7" class="center-text text-muted">No alert rules configured. Create one on the left.</td>
+                                        <td colspan="6" class="center-text text-muted">No alert rules configured. Create one on the left.</td>
                                     </tr>
                                 </tbody>
                             </table>
