@@ -1318,5 +1318,436 @@ class TestAlertsEnhancements(unittest.TestCase):
         self.assertEqual(alert["ai_context"], "ALERT: INFY.NS crossed RSI > 80. Extremely overbought, watch key consolidation support.")
 
 
+class TestRuleScannerAPI(unittest.TestCase):
+    """Tests for the Rule Scanner (Custom Trigger-Condition Scanner) API endpoints."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(app)
+        main.init_db()
+
+    def setUp(self):
+        """Insert mock universe and cached profiles for scanner tests."""
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM screener_universe")
+            cursor.execute("DELETE FROM cached_profiles")
+
+            # Stock 1: Low RSI, low PE, value candidate
+            cursor.execute(
+                "INSERT INTO screener_universe (symbol, base_symbol, company_name, sector, cap_type, last_rebalanced) VALUES (?, ?, ?, ?, ?, ?)",
+                ("INFY.NS", "INFY", "Infosys Ltd", "Technology", "large", "2026-06-01T00:00:00")
+            )
+            infy_profile = {
+                "fundamentals": {
+                    "current_price": 1400.0,
+                    "pe_ratio": 22.0,
+                    "year_high": 1800.0,
+                    "year_low": 1200.0,
+                    "debt_to_equity": 0.05
+                },
+                "technicals": {
+                    "rsi": 28.0,
+                    "sma_200": 1450.0,
+                    "sma_50": 1420.0,
+                    "ema_50": 1415.0,
+                    "ema_200": 1440.0,
+                    "volume_ratio": 2.5,
+                    "bb_lower": 1410.0,
+                    "bb_upper": 1500.0,
+                    "macd": -2.5,
+                    "signal": -1.0
+                },
+                "analysis": {
+                    "recommendation": "BUY",
+                    "score": 78,
+                    "composite_score": 78
+                }
+            }
+            cursor.execute(
+                "INSERT INTO cached_profiles (symbol, profile_json) VALUES (?, ?)",
+                ("INFY.NS", json.dumps(infy_profile))
+            )
+
+            # Stock 2: High RSI, high PE, growth stock
+            cursor.execute(
+                "INSERT INTO screener_universe (symbol, base_symbol, company_name, sector, cap_type, last_rebalanced) VALUES (?, ?, ?, ?, ?, ?)",
+                ("TCS.NS", "TCS", "Tata Consultancy Services", "Technology", "large", "2026-06-01T00:00:00")
+            )
+            tcs_profile = {
+                "fundamentals": {
+                    "current_price": 3800.0,
+                    "pe_ratio": 32.0,
+                    "year_high": 4200.0,
+                    "year_low": 3000.0,
+                    "debt_to_equity": 0.1
+                },
+                "technicals": {
+                    "rsi": 72.0,
+                    "sma_200": 3600.0,
+                    "sma_50": 3750.0,
+                    "ema_50": 3740.0,
+                    "ema_200": 3610.0,
+                    "volume_ratio": 0.8,
+                    "bb_lower": 3500.0,
+                    "bb_upper": 3780.0,
+                    "macd": 15.0,
+                    "signal": 10.0
+                },
+                "analysis": {
+                    "recommendation": "HOLD",
+                    "score": 65,
+                    "composite_score": 65
+                }
+            }
+            cursor.execute(
+                "INSERT INTO cached_profiles (symbol, profile_json) VALUES (?, ?)",
+                ("TCS.NS", json.dumps(tcs_profile))
+            )
+
+            # Stock 3: Mid-cap stock in different sector
+            cursor.execute(
+                "INSERT INTO screener_universe (symbol, base_symbol, company_name, sector, cap_type, last_rebalanced) VALUES (?, ?, ?, ?, ?, ?)",
+                ("BHARATFORG.NS", "BHARATFORG", "Bharat Forge Ltd", "Industrials", "mid", "2026-06-01T00:00:00")
+            )
+            bf_profile = {
+                "fundamentals": {
+                    "current_price": 950.0,
+                    "pe_ratio": 40.0,
+                    "year_high": 1100.0,
+                    "year_low": 700.0,
+                    "debt_to_equity": 0.8
+                },
+                "technicals": {
+                    "rsi": 55.0,
+                    "sma_200": 900.0,
+                    "sma_50": 930.0,
+                    "volume_ratio": 1.2,
+                    "bb_lower": 880.0,
+                    "bb_upper": 980.0,
+                    "macd": 3.0,
+                    "signal": 2.5
+                },
+                "analysis": {
+                    "recommendation": "STRONG BUY",
+                    "score": 82,
+                    "composite_score": 82
+                }
+            }
+            cursor.execute(
+                "INSERT INTO cached_profiles (symbol, profile_json) VALUES (?, ?)",
+                ("BHARATFORG.NS", json.dumps(bf_profile))
+            )
+
+            conn.commit()
+
+    def tearDown(self):
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM screener_universe")
+            cursor.execute("DELETE FROM cached_profiles")
+            conn.commit()
+
+    # ─── NL Prompt Parsing Tests ────────────────────────────────────────
+
+    @patch("backend.agent.call_groq_llm")
+    def test_parse_nl_scan_rsi_prompt(self, mock_llm):
+        """Verifies NL parser correctly extracts RSI condition from plain English."""
+        mock_llm.return_value = json.dumps({
+            "condition_type": "RSI",
+            "operator": "<",
+            "value": "35",
+            "universe": "mid"
+        })
+
+        response = self.client.post("/api/screener/parse-nl-scan", json={
+            "prompt": "Find mid cap stocks with RSI below 35"
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["condition_type"], "RSI")
+        self.assertEqual(data["operator"], "<")
+        self.assertEqual(data["value"], "35")
+        self.assertEqual(data["universe"], "mid")
+
+    @patch("backend.agent.call_groq_llm")
+    def test_parse_nl_scan_golden_cross(self, mock_llm):
+        """Verifies NL parser correctly extracts DMA_CROSS condition from crossover prompt."""
+        mock_llm.return_value = '```json\n{"condition_type": "DMA_CROSS", "operator": ">", "value": "0.0", "universe": "large"}\n```'
+
+        response = self.client.post("/api/screener/parse-nl-scan", json={
+            "prompt": "Scan large cap stocks for golden cross"
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["condition_type"], "DMA_CROSS")
+        self.assertEqual(data["operator"], ">")
+        self.assertEqual(data["universe"], "large")
+
+    @patch("backend.agent.call_groq_llm")
+    def test_parse_nl_scan_handles_markdown_wrapping(self, mock_llm):
+        """Verifies NL parser strips markdown code fences from LLM response."""
+        mock_llm.return_value = '```json\n{"condition_type": "PE", "operator": "<", "value": "15", "universe": "all"}\n```'
+
+        response = self.client.post("/api/screener/parse-nl-scan", json={
+            "prompt": "Show me stocks with PE less than 15"
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["condition_type"], "PE")
+        self.assertEqual(data["value"], "15")
+
+    # ─── Scan Trigger Tests ─────────────────────────────────────────────
+
+    def test_scan_trigger_rsi_below(self):
+        """Verifies RSI < 30 scan matches only INFY (RSI=28)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=RSI&operator=<&value=30&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["matched"], 1)
+        self.assertGreater(data["scanned"], 0)
+        self.assertEqual(data["results"][0]["symbol"], "INFY.NS")
+        self.assertIn("RSI: 28.0", data["results"][0]["trigger_value"])
+
+    def test_scan_trigger_rsi_above(self):
+        """Verifies RSI > 70 scan matches only TCS (RSI=72)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=RSI&operator=>&value=70&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "TCS.NS")
+
+    def test_scan_trigger_pe_below(self):
+        """Verifies PE < 25 scan matches only INFY (PE=22)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=PE&operator=<&value=25&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "INFY.NS")
+
+    def test_scan_trigger_pe_above(self):
+        """Verifies PE > 35 scan matches only BHARATFORG (PE=40)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=PE&operator=>&value=35&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "BHARATFORG.NS")
+
+    def test_scan_trigger_rating_filter(self):
+        """Verifies RATING == 'BUY' matches only INFY."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=RATING&operator===&value=BUY&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "INFY.NS")
+        self.assertEqual(data["results"][0]["rating"], "BUY")
+
+    def test_scan_trigger_price_below(self):
+        """Verifies PRICE < 1000 matches only BHARATFORG (price=950)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=PRICE&operator=<&value=1000&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "BHARATFORG.NS")
+
+    def test_scan_trigger_sma_below_200(self):
+        """Verifies SMA deviation < 0 matches INFY (price 1400 < SMA200 1450 = -3.4%)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=SMA&operator=<&value=0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # INFY: (1400-1450)/1450 * 100 = -3.4% < 0 => match
+        # TCS: (3800-3600)/3600 * 100 = +5.5% > 0 => no match
+        # BHARATFORG: (950-900)/900 * 100 = +5.5% > 0 => no match
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "INFY.NS")
+
+    def test_scan_trigger_volume_breakout(self):
+        """Verifies VOL_BREAKOUT > 2.0 matches only INFY (vol_ratio=2.5)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=VOL_BREAKOUT&operator=>&value=2.0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "INFY.NS")
+
+    def test_scan_trigger_macd_cross_bullish(self):
+        """Verifies MACD_CROSS > 0 matches TCS (MACD 15 - Signal 10 = 5 > 0) and BHARATFORG (3-2.5=0.5)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=MACD_CROSS&operator=>&value=0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # TCS: 15 - 10 = 5 > 0, BHARATFORG: 3 - 2.5 = 0.5 > 0, INFY: -2.5 - (-1.0) = -1.5 < 0
+        self.assertEqual(data["matched"], 2)
+        symbols = [r["symbol"] for r in data["results"]]
+        self.assertIn("TCS.NS", symbols)
+        self.assertIn("BHARATFORG.NS", symbols)
+
+    def test_scan_trigger_bb_lower_touch(self):
+        """Verifies BB_CROSS < 0 matches INFY (price 1400 < bb_lower 1410)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=BB_CROSS&operator=<&value=0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "INFY.NS")
+
+    def test_scan_trigger_bb_upper_touch(self):
+        """Verifies BB_CROSS > 0 matches TCS (price 3800 >= bb_upper 3780)."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=BB_CROSS&operator=>&value=0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "TCS.NS")
+
+    def test_scan_trigger_52w_near_high(self):
+        """Verifies 52W_PROXIMITY > 15 (within 15% of 52w high) matches TCS."""
+        # TCS: (4200-3800)/4200 * 100 = 9.5% < 15% => match
+        # INFY: (1800-1400)/1800 * 100 = 22.2% > 15% => no match
+        # BHARATFORG: (1100-950)/1100 * 100 = 13.6% < 15% => match
+        response = self.client.get("/api/screener/scan-trigger?condition_type=52W_PROXIMITY&operator=>&value=15&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 2)
+        symbols = [r["symbol"] for r in data["results"]]
+        self.assertIn("TCS.NS", symbols)
+        self.assertIn("BHARATFORG.NS", symbols)
+
+    def test_scan_trigger_fib_level(self):
+        """Verifies FIB_LEVEL scan checks proximity to any Fibonacci level."""
+        # BHARATFORG: high=1100, low=700, swing=400
+        # Fib 38.2% = 1100 - 0.382*400 = 947.2 => price 950, diff = 0.3% < 2% => match
+        response = self.client.get("/api/screener/scan-trigger?condition_type=FIB_LEVEL&operator===&value=2&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertGreaterEqual(data["matched"], 1)
+        symbols = [r["symbol"] for r in data["results"]]
+        self.assertIn("BHARATFORG.NS", symbols)
+
+    # ─── Universe Filter Tests ──────────────────────────────────────────
+
+    def test_scan_trigger_universe_filter_large(self):
+        """Verifies universe=large only scans large-cap stocks."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=RSI&operator=>&value=0&universe=large")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        # Only INFY and TCS are large cap
+        self.assertEqual(data["scanned"], 2)
+        symbols = [r["symbol"] for r in data["results"]]
+        self.assertNotIn("BHARATFORG.NS", symbols)
+
+    def test_scan_trigger_universe_filter_mid(self):
+        """Verifies universe=mid only scans mid-cap stocks."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=RSI&operator=>&value=0&universe=mid")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["scanned"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "BHARATFORG.NS")
+
+    def test_scan_trigger_empty_universe(self):
+        """Verifies scanner handles an empty universe gracefully."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=RSI&operator=<&value=30&universe=small")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 0)
+        self.assertEqual(data["results"], [])
+
+    # ─── Result Structure Tests ─────────────────────────────────────────
+
+    def test_scan_trigger_result_structure(self):
+        """Verifies each result object contains all expected fields."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=RSI&operator=<&value=30&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+
+        result = data["results"][0]
+        expected_keys = ["symbol", "company_name", "sector", "cap_type", "price", "pe", "rsi", "trigger_value", "rating", "score", "de_ratio"]
+        for key in expected_keys:
+            self.assertIn(key, result, f"Missing key: {key}")
+
+        self.assertEqual(result["symbol"], "INFY.NS")
+        self.assertEqual(result["company_name"], "Infosys Ltd")
+        self.assertEqual(result["sector"], "Technology")
+        self.assertEqual(result["cap_type"], "large")
+        self.assertEqual(result["price"], 1400.0)
+        self.assertEqual(result["pe"], 22.0)
+        self.assertEqual(result["rsi"], 28.0)
+        self.assertEqual(result["rating"], "BUY")
+        self.assertEqual(result["score"], 78.0)
+        self.assertEqual(result["de_ratio"], 0.05)
+
+    def test_scan_trigger_response_metadata(self):
+        """Verifies the top-level response contains correct metadata."""
+        response = self.client.get("/api/screener/scan-trigger?condition_type=PE&operator=<&value=25&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["universe"], "all")
+        self.assertEqual(data["condition"], "PE < 25")
+        self.assertIsInstance(data["scanned"], int)
+        self.assertIsInstance(data["matched"], int)
+
+    # ─── Synthesis Tests ────────────────────────────────────────────────
+
+    @patch("backend.agent.call_groq_llm")
+    def test_scan_synthesis_generation(self, mock_llm):
+        """Verifies AI synthesis endpoint generates a summary from scan results."""
+        mock_llm.return_value = "The RSI < 30 scan reveals concentration in the Technology sector with INFY showing deep oversold momentum at RSI 28. Valuation remains attractive at PE 22 with strong institutional sentiment reflected in the BUY rating."
+
+        response = self.client.post("/api/screener/scan-synthesis", json={
+            "results": [
+                {"symbol": "INFY.NS", "trigger_value": "RSI: 28.0", "sector": "Technology", "cap_type": "large", "pe": 22.0, "rsi": 28.0, "rating": "BUY"}
+            ],
+            "condition_desc": "RSI < 30 (Universe: all)"
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("Technology", data["synthesis"])
+        self.assertIn("RSI", data["synthesis"])
+
+    @patch("backend.agent.call_groq_llm")
+    def test_scan_synthesis_truncates_to_20_results(self, mock_llm):
+        """Verifies synthesis endpoint caps input to 20 results maximum."""
+        mock_llm.return_value = "Large scan synthesis."
+
+        results = [{"symbol": f"STOCK{i}.NS", "sector": "Technology"} for i in range(30)]
+        response = self.client.post("/api/screener/scan-synthesis", json={
+            "results": results,
+            "condition_desc": "RSI < 50"
+        })
+        self.assertEqual(response.status_code, 200)
+
+        # Verify the LLM was called with at most 20 results in the prompt
+        call_args = mock_llm.call_args
+        user_prompt = call_args[0][1]
+        stock_lines = [line for line in user_prompt.split("\n") if line.strip().startswith("- STOCK")]
+        self.assertLessEqual(len(stock_lines), 20)
+
+    # ─── DMA/EMA Cross Tests ───────────────────────────────────────────
+
+    def test_scan_trigger_dma_golden_cross(self):
+        """Verifies DMA_CROSS > 0 matches stocks where SMA50 > SMA200 (golden cross)."""
+        # TCS: SMA50=3750, SMA200=3600 => diff = +4.2% > 0 => match
+        # BHARATFORG: SMA50=930, SMA200=900 => diff = +3.3% > 0 => match
+        # INFY: SMA50=1420, SMA200=1450 => diff = -2.1% < 0 => no match
+        response = self.client.get("/api/screener/scan-trigger?condition_type=DMA_CROSS&operator=>&value=0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 2)
+        symbols = [r["symbol"] for r in data["results"]]
+        self.assertIn("TCS.NS", symbols)
+        self.assertIn("BHARATFORG.NS", symbols)
+        self.assertNotIn("INFY.NS", symbols)
+
+    def test_scan_trigger_dma_death_cross(self):
+        """Verifies DMA_CROSS < 0 matches stocks where SMA50 < SMA200 (death cross)."""
+        # INFY: SMA50=1420, SMA200=1450 => diff = -2.1% < 0 => match
+        response = self.client.get("/api/screener/scan-trigger?condition_type=DMA_CROSS&operator=<&value=0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "INFY.NS")
+
+
 if __name__ == "__main__":
     unittest.main()
