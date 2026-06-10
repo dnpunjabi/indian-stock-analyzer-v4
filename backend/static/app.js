@@ -14816,7 +14816,27 @@ const RULE_SCANNER_STRATEGY_GUIDE = {
     'FIB_382': '<strong>Fib 38.2%:</strong> Proximity to the 38.2% Fibonacci retracement level — intermediate pullback support zone.',
     'FIB_500': '<strong>Fib 50.0%:</strong> Proximity to the 50% Fibonacci level — key consolidation support level.',
     'FIB_618': '<strong>Fib 61.8%:</strong> Proximity to the golden ratio 61.8% Fibonacci level — strongest retracement support.',
-    'FIB_LEVEL': '<strong>All Fib Levels:</strong> Scans proximity to any major Fibonacci level (38.2%, 50.0%, 61.8%) simultaneously.'
+    'FIB_LEVEL': '<strong>All Fib Levels:</strong> Scans proximity to any major Fibonacci level (38.2%, 50.0%, 61.8%) simultaneously.',
+    'COMBO_BULL_PULLBACK': '<strong>Combo: Bull Pullback:</strong> RSI oversold pullback setups aligned with the long-term uptrend (RSI &lt; 35 + price &gt; 200 SMA).',
+    'COMBO_BEAR_PULLBACK': '<strong>Combo: Bear Pullback:</strong> RSI overbought rallies inside a long-term downtrend (RSI &gt; 60 + price &lt; 200 SMA).',
+    'COMBO_VALUE_REVERSAL': '<strong>Combo: Oversold Value:</strong> Screens for low P/E stocks (&lt; 15) that have entered oversold zones (RSI &lt; 35).',
+    'COMBO_GROWTH_MOMENTUM': '<strong>Combo: Growth Momentum:</strong> High-growth leaders in solid uptrends (price &gt; 200 SMA + RSI &gt; 65 + Strong Buy).',
+    'COMBO_VOL_BREAKOUT': '<strong>Combo: Vol Trend Spurt:</strong> Volume breakouts (&gt; 2x) on stocks trading above their short-term 50 SMA.',
+    'COMBO_52W_BREAKOUT': '<strong>Combo: 52W Trend Breakout:</strong> Stocks in long-term uptrends (price &gt; 200 SMA) breaking out within 3% of 52W High.',
+    'COMBO_52W_VAL_ENTRY': '<strong>Combo: 52W Value Entry:</strong> Potential value rebounds where price is near 52W Low (&lt; 5% margin) and RSI is oversold (&lt; 35).',
+    'COMBO_FIB_REVERSAL': '<strong>Combo: Fib Support Bounce:</strong> Captures high-probability retracement bounce zones (within 2% of Fib level + RSI &lt; 35).',
+    'COMBO_BB_REVERSION': '<strong>Combo: BB Mean Reversion:</strong> Mean reversion setups where price closes below BB Lower Band and RSI is oversold (&lt; 30).',
+    'COMBO_BB_BREAKOUT': '<strong>Combo: BB Breakout:</strong> Volatility breakouts where price crosses above BB Upper Band on strong volume surge (&gt; 2x).',
+    'COMBO_MACD_VOL': '<strong>Combo: MACD Vol Surge:</strong> Bullish momentum crossovers (MACD &gt; Signal) confirmed by institutional volume (&gt; 2x).',
+    'COMBO_HIGH_QUALITY_DIP': '<strong>Combo: Quality Dip Buy:</strong> Filters for stocks with Buy/Strong Buy ratings experiencing temporary pullback dips (RSI &lt; 35).',
+    'COMBO_DEATH_CROSS_VOL': '<strong>Combo: Death Cross Vol Spurt:</strong> Bearish distribution indicator where 50 SMA crosses below 200 SMA on heavy volume (&gt; 2x).',
+    'COMBO_FIB_SMA_BOUNCE': '<strong>Combo: Fib & SMA-200 Confluence:</strong> Confluence setups where price is near a major Fib level and supported by 200 SMA.',
+    'COMBO_PENNY_MOMENTUM': '<strong>Combo: Penny Momentum Surge:</strong> Low-priced stocks (&lt; Rs. 100) experiencing volume surges (&gt; 2x) and rising RSI (&gt; 65).',
+    'COMBO_PREMIUM_GROWTH': '<strong>Combo: Premium Quality Growth:</strong> Quality large-caps (&gt; Rs. 2000) with reasonable P/E (&lt; 30) and Strong Buy rating.',
+    'COMBO_EARNINGS_ACCUMULATION': '<strong>Combo: PE Value Accumulation:</strong> Undervalued stocks (P/E &lt; 20) experiencing significant volume accumulation (&gt; 2x).',
+    'COMBO_SHORT_TERM_REVERSION': '<strong>Combo: Short Pullback in Uptrend:</strong> Minor pullback setup where price drops below 50 SMA but stays above 200 SMA.',
+    'COMBO_BB_SQUEEZE_BREAK': '<strong>Combo: BB Squeeze Breakout:</strong> Volatility squeeze breakout where Bollinger Band width is narrow and price breaks above upper band on high volume.',
+    'COMBO_CONTRARIAN_VALUE': '<strong>Combo: Contrarian Value Play:</strong> Extreme value setups where P/E &lt; 12, price is below 200 SMA, and RSI is deeply oversold (&lt; 30).'
 };
 
 function setupRuleScanner() {

@@ -2232,9 +2232,9 @@
                                     <span style="font-size: 11px; color: var(--color-primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">💡 AI Scan Preset Dictionary</span>
                                     
                                     <!-- Group 1: Momentum & Oscillators -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">🎯 Momentum & Oscillators</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="rs-preset-group" open>
+                                        <summary>🎯 Momentum & Oscillators</summary>
+                                        <div class="rs-preset-group-content">
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with RSI below 30 across all segments" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🎯 RSI Oversold Universe</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with RSI above 70 across all segments" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🎯 RSI Overbought Universe</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks where MACD crosses above Signal line" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💥 MACD Bullish Cross</span>
@@ -2242,12 +2242,12 @@
                                             <span class="rs-nl-template-pill" data-template="Scan for mid-cap stocks with RSI less than 25" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🔻 Deep Oversold Mid-Caps</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for large cap stocks with RSI between 40 and 60" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">⚖️ Neutral RSI Large-Caps</span>
                                         </div>
-                                    </div>
+                                    </details>
                                     
                                     <!-- Group 2: Moving Averages & Crossovers -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">📈 Moving Averages & Crossovers</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="rs-preset-group">
+                                        <summary>📈 Moving Averages & Crossovers</summary>
+                                        <div class="rs-preset-group-content">
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with 50 SMA above 200 SMA golden cross" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📈 Golden Cross Stocks</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with 50 SMA below 200 SMA death cross" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📉 Death Cross Stocks</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks trading below their 200 SMA by more than 5%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📉 Below SMA-200 Pullback</span>
@@ -2256,45 +2256,45 @@
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with 50 EMA above 200 EMA crossover" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">⚡ EMA Golden Cross</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with 50 EMA below 200 EMA death cross" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">⚡ EMA Death Cross</span>
                                         </div>
-                                    </div>
-
+                                    </details>
+                                    
                                     <!-- Group 3: Bollinger Bands -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">🛡️ Bollinger Bands</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="rs-preset-group">
+                                        <summary>🛡️ Bollinger Bands</summary>
+                                        <div class="rs-preset-group-content">
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks crossing below Bollinger Lower Band" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ BB Lower Band Touch</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks crossing above Bollinger Upper Band" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚀 BB Upper Band Breakout</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for mid cap stocks below Bollinger Lower Band" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ Mid-Cap BB Squeeze</span>
                                         </div>
-                                    </div>
-
+                                    </details>
+                                    
                                     <!-- Group 4: Fibonacci & Support Zones -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">📐 Fibonacci & Support Zones</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="rs-preset-group">
+                                        <summary>📐 Fibonacci & Support Zones</summary>
+                                        <div class="rs-preset-group-content">
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks within 2% of any Fibonacci retracement level" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 All Fibonacci Levels</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks within 1.5% of the 38.2% Fibonacci retracement" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 Fib 38.2% Bounce Zone</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks within 1.5% of the 50.0% Fibonacci retracement" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 Fib 50.0% Midline</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks within 2% of the 61.8% Golden Ratio Fibonacci level" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 Fib 61.8% Golden Ratio</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for large cap stocks near any Fibonacci retracement within 1%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 Large-Cap Fib Entries</span>
                                         </div>
-                                    </div>
-
+                                    </details>
+                                    
                                     <!-- Group 5: 52-Week Range Plays -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">🏔️ 52-Week Range Plays</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="rs-preset-group">
+                                        <summary>🏔️ 52-Week Range Plays</summary>
+                                        <div class="rs-preset-group-content">
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks within 3% of their 52-week low" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ Near 52-Week Low</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks within 5% of their 52-week high" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚀 Near 52-Week High</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for large cap stocks within 2% of their 52-week high breakout" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🏆 Large-Cap 52W Breakout</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for mid cap stocks within 5% of their 52-week low for value entry" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💎 Mid-Cap 52W Value Entry</span>
                                         </div>
-                                    </div>
-
+                                    </details>
+                                    
                                     <!-- Group 6: Valuation & Fundamentals -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">💰 Valuation & Fundamentals</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="rs-preset-group">
+                                        <summary>💰 Valuation & Fundamentals</summary>
+                                        <div class="rs-preset-group-content">
                                             <span class="rs-nl-template-pill" data-template="Scan for large cap stocks with P/E less than 15" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💰 Deep Value P/E (<15)</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with P/E less than 10 in all segments" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💰 Ultra Value P/E (<10)</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with P/E above 50" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">⚠️ Overvalued P/E (>50)</span>
@@ -2303,23 +2303,23 @@
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with AI rating equals STRONG BUY" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🤖 AI Strong Buy Rated</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with AI rating equals BUY" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🤖 AI Buy Rated</span>
                                         </div>
-                                    </div>
-
+                                    </details>
+                                    
                                     <!-- Group 7: Volume & Institutional Activity -->
-                                    <div style="margin-bottom: 8px;">
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">📊 Volume & Institutional Activity</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="rs-preset-group">
+                                        <summary>📊 Volume & Institutional Activity</summary>
+                                        <div class="rs-preset-group-content">
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with volume 2x higher than 20-day average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📊 2x Volume Surge</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with volume 3x higher than 20-day average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚀 3x Volume Spurt</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with volume 5x higher than 20-day average across all segments" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🔥 5x Extreme Volume</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for large cap stocks with volume above 1.5x average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🏛️ Large-Cap Volume Alert</span>
                                         </div>
-                                    </div>
-
+                                    </details>
+                                    
                                     <!-- Group 8: Sector & Cap-Specific Strategies -->
-                                    <div>
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 4px; letter-spacing: 0.03em;">🧩 Sector & Cap-Specific Strategies</span>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                                    <details class="rs-preset-group">
+                                        <summary>🧩 Sector & Cap-Specific Strategies</summary>
+                                        <div class="rs-preset-group-content">
                                             <span class="rs-nl-template-pill" data-template="Scan for large cap stocks with RSI below 35 and golden cross" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🏛️ Large-Cap Reversal Setup</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for mid cap stocks with P/E below 20 and RSI below 40" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💎 Mid-Cap Value + Momentum</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for small cap stocks with volume above 3x average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🔬 Small-Cap Volume Breakout</span>
@@ -2327,7 +2327,34 @@
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with RSI above 65 and price above SMA 200 by 15%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚀 Momentum Leader Scan</span>
                                             <span class="rs-nl-template-pill" data-template="Scan for stocks with AI rating equals SELL" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚨 AI Sell-Rated Watch</span>
                                         </div>
-                                    </div>
+                                    </details>
+ 
+                                    <!-- Group 9: Multi-Factor Combo Strategies -->
+                                    <details class="rs-preset-group">
+                                        <summary>🔀 Multi-Factor Combo Strategies</summary>
+                                        <div class="rs-preset-group-content">
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with RSI below 35 in bullish pullback trend" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🔥 Bullish Pullback (RSI + SMA)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with RSI above 65 in bullish momentum trend" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💥 Breakout Momentum (RSI + SMA)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with PE below 15 and RSI below 35" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ Oversold Value Buy (PE + RSI)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with price above 200 SMA and RSI above 65 and AI rating equals STRONG BUY" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚀 Growth Momentum (SMA + RSI + Rating)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with volume ratio above 2.0x and price above SMA-50" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">⚡ Vol Trend Spurt (Volume + SMA50)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with price above 200 SMA and within 3% of 52-week high" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🏆 52W Trend Breakout (SMA200 + 52W High)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks within 5% of 52-week low and RSI below 35" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💎 52W Value Entry (52W Low + RSI)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks near Fibonacci level with RSI below 35" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 Fib Support Bounce (Fib + RSI)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks crossing below Bollinger Lower Band with RSI below 30" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ BB Reversion (BB Lower + RSI)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks crossing above Bollinger Upper Band with volume above 2x average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🚀 BB Breakout (BB Upper + Vol Surge)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks where MACD crosses above Signal line and volume above 2x average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💥 MACD Vol Surge (MACD + Vol Surge)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with AI rating equals STRONG BUY and RSI below 35" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🤖 Quality Dip Buy (Rating + RSI)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with 50 SMA below 200 SMA and volume above 2x average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📉 Death Cross Vol Spurt (SMA Cross + Vol)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks near Fibonacci level and price above 200 SMA" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">📐 Fib Trend Confluence (Fib + SMA200)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with price below Rs. 100 and RSI above 65 and volume above 2x average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🪙 Penny Momentum Surge (Price + RSI + Vol)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with price above Rs. 2000 and PE less than 30 and AI rating equals STRONG BUY" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">👑 Premium Quality Growth (Price + PE + Rating)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with PE less than 20 and volume above 2x average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💰 PE Value Accumulation (PE + Vol)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with price below SMA-50 and price above 200 SMA" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🔄 Short Pullback in Uptrend (SMA50 + SMA200)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with Bollinger Bands squeeze and volume above 2x average" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ BB Squeeze Breakout (Bands Width + Vol)</span>
+                                            <span class="rs-nl-template-pill" data-template="Scan for stocks with PE less than 12 and price below 200 SMA and RSI below 30" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🧲 Contrarian Value Play (PE + SMA + RSI)</span>
+                                        </div>
+                                    </details>
                                 </div>
                                 <button class="btn-primary" id="rule-scanner-nl-submit" style="width: 100%; border: 1px solid rgba(168, 85, 247, 0.4); background: linear-gradient(135deg, rgba(147, 51, 234, 0.12) 0%, rgba(79, 70, 229, 0.12) 100%); transition: all 0.3s ease;">
                                     🔮 Parse & Execute AI Scan
@@ -2373,6 +2400,28 @@
                                         <option value="FIB_500">Fibonacci 50.0% Retracement</option>
                                         <option value="FIB_618">Fibonacci 61.8% Retracement</option>
                                         <option value="FIB_LEVEL">Fibonacci Proximity (All Levels)</option>
+                                        
+                                        <!-- Combo Strategies Options -->
+                                        <option value="COMBO_BULL_PULLBACK">Combo: Bull Pullback (Oversold in Uptrend)</option>
+                                        <option value="COMBO_BEAR_PULLBACK">Combo: Bear Pullback (Overbought in Downtrend)</option>
+                                        <option value="COMBO_VALUE_REVERSAL">Combo: Oversold Value (Low PE + RSI < 35)</option>
+                                        <option value="COMBO_GROWTH_MOMENTUM">Combo: Growth Momentum (Uptrend + High RSI + Strong Buy)</option>
+                                        <option value="COMBO_VOL_BREAKOUT">Combo: Vol Trend Spurt (Volume + SMA-50)</option>
+                                        <option value="COMBO_52W_BREAKOUT">Combo: 52W Trend Breakout (SMA-200 + Near 52W High)</option>
+                                        <option value="COMBO_52W_VAL_ENTRY">Combo: 52W Value Entry (Near 52W Low + RSI < 35)</option>
+                                        <option value="COMBO_FIB_REVERSAL">Combo: Fib Support Bounce (Fib + RSI < 35)</option>
+                                        <option value="COMBO_BB_REVERSION">Combo: BB Mean Reversion (Below BB Lower + RSI < 30)</option>
+                                        <option value="COMBO_BB_BREAKOUT">Combo: BB Volatility Breakout (BB Upper + Vol Surge)</option>
+                                        <option value="COMBO_MACD_VOL">Combo: MACD Vol Surge (MACD Cross + Vol Surge)</option>
+                                        <option value="COMBO_HIGH_QUALITY_DIP">Combo: Quality Dip Buy (Strong Buy + RSI < 35)</option>
+                                        <option value="COMBO_DEATH_CROSS_VOL">Combo: Death Cross Vol Spurt (Death Cross + Vol Surge)</option>
+                                        <option value="COMBO_FIB_SMA_BOUNCE">Combo: Fib & SMA-200 Confluence (Fib + Above SMA200)</option>
+                                        <option value="COMBO_PENNY_MOMENTUM">Combo: Penny Momentum Surge (Price < 100 + RSI > 65)</option>
+                                        <option value="COMBO_PREMIUM_GROWTH">Combo: Premium Quality Growth (Price > 2000 + PE < 30)</option>
+                                        <option value="COMBO_EARNINGS_ACCUMULATION">Combo: PE Value Accumulation (PE < 20 + Vol Surge)</option>
+                                        <option value="COMBO_SHORT_TERM_REVERSION">Combo: Short Pullback in Uptrend (Below SMA50 + SMA200)</option>
+                                        <option value="COMBO_BB_SQUEEZE_BREAK">Combo: BB Squeeze Breakout (Narrow Bands + Vol Surge)</option>
+                                        <option value="COMBO_CONTRARIAN_VALUE">Combo: Contrarian Value Play (PE < 12 + Below SMA200 + RSI < 30)</option>
                                     </select>
                                     <div id="rule-scanner-strategy-guide" style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.35; margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--border-glass); box-sizing: border-box; transition: all 0.2s ease;">
                                         <span id="rule-scanner-strategy-text"><strong>RSI-14:</strong> Scans the universe for stocks crossing momentum boundaries. RSI &lt; 30 captures oversold candidates with potential reversal setups.</span>
