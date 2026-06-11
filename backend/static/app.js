@@ -133,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupRebalanceButton(); // Fix #4: wire Sync button
     setupGlobalProfileListeners(); // Dynamic reactive profile switcher!
     setupSidebarToggle(); // Initialize Collapsible Sidebar Workspace
+    setupSidebarAccordions(); // Initialize sidebar collapsible accordions
     setupEnterpriseHeader(); // Initialize Enterprise sticky header
     setupEnterpriseFooter(); // Initialize Enterprise diagnostics footer
     setupAuditSummary(); // Initialize Strategy Audit AI matrix summary
@@ -187,6 +188,69 @@ function setupSidebarToggle() {
     }
 }
 
+// Collapsible Sidebar Accordions (Global Investor Profile & Universe Status Drawers)
+function setupSidebarAccordions() {
+    const accordions = [
+        {
+            toggleId: 'profile-accordion-toggle',
+            contentId: 'profile-accordion-content',
+            arrowId: 'profile-accordion-arrow',
+            cardId: 'profile-sidebar-card'
+        },
+        {
+            toggleId: 'rebalancer-accordion-toggle',
+            contentId: 'rebalancer-accordion-content',
+            arrowId: 'rebalancer-accordion-arrow',
+            cardId: 'rebalancer-status-card'
+        }
+    ];
+
+    accordions.forEach(acc => {
+        const toggle = document.getElementById(acc.toggleId);
+        const content = document.getElementById(acc.contentId);
+        const arrow = document.getElementById(acc.arrowId);
+        const card = document.getElementById(acc.cardId);
+
+        if (toggle && content) {
+            // Load saved preference: default to open/expanded
+            const isClosed = localStorage.getItem(acc.cardId + '-collapsed') === 'true';
+            if (isClosed) {
+                content.style.maxHeight = '0px';
+                if (arrow) arrow.style.transform = 'rotate(-90deg)';
+                toggle.classList.remove('open');
+            } else {
+                content.style.maxHeight = content.scrollHeight + 'px';
+                if (arrow) arrow.style.transform = 'rotate(0deg)';
+                toggle.classList.add('open');
+            }
+
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const currentlyClosed = content.style.maxHeight === '0px' || content.style.maxHeight === '' || content.style.maxHeight === '0';
+                if (currentlyClosed) {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                    if (arrow) arrow.style.transform = 'rotate(0deg)';
+                    toggle.classList.add('open');
+                    localStorage.setItem(acc.cardId + '-collapsed', 'false');
+                } else {
+                    content.style.maxHeight = '0px';
+                    if (arrow) arrow.style.transform = 'rotate(-90deg)';
+                    toggle.classList.remove('open');
+                    localStorage.setItem(acc.cardId + '-collapsed', 'true');
+                }
+            });
+            
+            // Recalculate height dynamically when content inside shifts (e.g. NSE status loading)
+            const observer = new MutationObserver(() => {
+                if (content.style.maxHeight !== '0px' && content.style.maxHeight !== '') {
+                    content.style.maxHeight = content.scrollHeight + 'px';
+                }
+            });
+            observer.observe(content, { childList: true, subtree: true, characterData: true });
+        }
+    });
+}
+
 // Enterprise Header & Footer Controllers
 function setupEnterpriseHeader() {
     const bellBtn = document.getElementById('header-bell-btn');
@@ -238,6 +302,12 @@ function setupEnterpriseHeader() {
             e.stopPropagation();
             notifBody.innerHTML = '<div style="font-size:10px; color:var(--text-muted); padding:20px; text-align:center;">No new system notifications.</div>';
             badge.style.display = 'none';
+            badge.innerText = '0';
+            const sidebarBadge = document.getElementById('sidebar-alerts-badge');
+            if (sidebarBadge) {
+                sidebarBadge.style.display = 'none';
+                sidebarBadge.innerText = '0';
+            }
             showToast("System notifications cleared.", "success");
         });
     }
@@ -4752,6 +4822,12 @@ function startRealTimeAlertScanner() {
                     currentCount += data.triggers.length;
                     badge.innerText = currentCount;
                     badge.style.display = 'flex';
+
+                    const sidebarBadge = document.getElementById('sidebar-alerts-badge');
+                    if (sidebarBadge) {
+                        sidebarBadge.innerText = currentCount;
+                        sidebarBadge.style.display = 'flex';
+                    }
                 }
                 
                 // 6. If user is currently looking at the alert center tab, update the list automatically!
@@ -9765,7 +9841,8 @@ function setupRebalanceButton() {
     const btn = document.getElementById('rebalance-now-btn');
     if (!btn) return;
 
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         if (btn.classList.contains('syncing')) return;
 
         btn.classList.add('syncing');
