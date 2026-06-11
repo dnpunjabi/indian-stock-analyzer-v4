@@ -2688,9 +2688,13 @@ async def check_alerts():
                                     "body": msg_body
                                 }
                             }
-                            await asyncio.to_thread(requests.post, wa_url, headers=wa_headers, json=wa_payload, timeout=10)
+                            resp = await asyncio.to_thread(requests.post, wa_url, headers=wa_headers, json=wa_payload, timeout=10)
+                            if resp.status_code != 200:
+                                print(f"Failed to deliver WhatsApp alert. Status: {resp.status_code}, Response: {resp.text}")
+                            else:
+                                print(f"WhatsApp alert successfully delivered to {wa_recipient}. Response: {resp.text}")
                         except Exception as wa_err:
-                            print(f"Failed to deliver WhatsApp alert: {wa_err}")
+                            print(f"Failed to deliver WhatsApp alert due to error: {wa_err}")
 
                     asyncio.create_task(send_whatsapp_async(wa_msg))
 
