@@ -347,7 +347,8 @@ async def fetch_history_df(symbol: str, period: str = "6mo", interval: str = "1d
     from datetime import datetime
     
     symbol = symbol.strip().upper()
-    df = pd.DataFrame()
+    import os
+    proxy = os.environ.get("YFINANCE_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
     
     # 1. Try yfinance Ticker history (most robust, bypasses cloud VM blocks)
     try:
@@ -357,7 +358,8 @@ async def fetch_history_df(symbol: str, period: str = "6mo", interval: str = "1d
             ticker_obj.history, 
             period=period, 
             interval=interval, 
-            timeout=8
+            timeout=8,
+            proxy=proxy
         )
         if not df.empty:
             # Clean tz-aware index to naive naive datetime
@@ -384,7 +386,8 @@ async def fetch_history_df(symbol: str, period: str = "6mo", interval: str = "1d
         }
         
         # Run raw get in thread pool
-        res = await asyncio.to_thread(requests.get, url, headers=headers, timeout=8)
+        proxies = {"http": proxy, "https": proxy} if proxy else None
+        res = await asyncio.to_thread(requests.get, url, headers=headers, timeout=8, proxies=proxies)
         if res.status_code == 200:
             chart_data = res.json()
             result = chart_data.get("chart", {}).get("result", [None])[0]
