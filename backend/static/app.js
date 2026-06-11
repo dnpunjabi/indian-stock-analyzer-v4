@@ -15507,6 +15507,15 @@ function addCustomScreenerRow(data = null) {
     `;
     if (data && data.timeframe) tfSelect.value = data.timeframe;
 
+    // 1.5. Offset (Bars Ago)
+    const offsetInput = document.createElement('input');
+    offsetInput.type = 'number';
+    offsetInput.className = 'rule-offset';
+    offsetInput.min = '0';
+    offsetInput.value = data && data.offset !== undefined ? data.offset : '0';
+    offsetInput.placeholder = 'Ago';
+    offsetInput.title = 'Offset: number of bars/days ago to evaluate';
+
     // 2. Left Indicator
     const indSelect = document.createElement('select');
     indSelect.className = 'rule-indicator';
@@ -15580,6 +15589,16 @@ function addCustomScreenerRow(data = null) {
         }
     });
 
+    // 5.5. Threshold % (Proximity Buffer)
+    const thresholdInput = document.createElement('input');
+    thresholdInput.type = 'number';
+    thresholdInput.className = 'rule-threshold';
+    thresholdInput.min = '0';
+    thresholdInput.step = '0.1';
+    thresholdInput.value = data && data.threshold !== undefined ? data.threshold : '0';
+    thresholdInput.placeholder = 'Buffer %';
+    thresholdInput.title = 'Threshold %: allowed proximity margin percentage';
+
     // 6. Delete Button
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
@@ -15591,10 +15610,12 @@ function addCustomScreenerRow(data = null) {
 
     // Append child nodes
     row.appendChild(tfSelect);
+    row.appendChild(offsetInput);
     row.appendChild(indSelect);
     row.appendChild(opSelect);
     row.appendChild(valTypeSelect);
     row.appendChild(valContainer);
+    row.appendChild(thresholdInput);
     row.appendChild(delBtn);
 
     list.appendChild(row);
@@ -15634,6 +15655,14 @@ async function executeCustomScreenerScan() {
     const range = rangeSelect ? parseInt(rangeSelect.value) : 90;
     const isFormulaMode = (window.activeCustomScreenerMode === 'formula');
     
+    const execCustomBtn = document.getElementById('custom-screener-execute-btn');
+    let originalBtnText = '';
+    if (execCustomBtn) {
+        originalBtnText = execCustomBtn.innerHTML;
+        execCustomBtn.disabled = true;
+        execCustomBtn.innerHTML = '⏳ Compiling & Scanning...';
+    }
+    
     let universe = 'all';
     let logicGate = 'AND';
     let rules = [];
@@ -15644,6 +15673,10 @@ async function executeCustomScreenerScan() {
         formula = formulaInput ? formulaInput.value.trim() : '';
         if (!formula) {
             showToast('Please enter a formula to scan.', 'warning');
+            if (execCustomBtn) {
+                execCustomBtn.disabled = false;
+                execCustomBtn.innerHTML = originalBtnText;
+            }
             return;
         }
         universe = document.getElementById('custom-screener-formula-universe')?.value || 'all';
@@ -15658,6 +15691,10 @@ async function executeCustomScreenerScan() {
         const rowEls = document.querySelectorAll('.custom-screener-rule-row');
         if (rowEls.length === 0) {
             showToast('Please add at least one condition line.', 'warning');
+            if (execCustomBtn) {
+                execCustomBtn.disabled = false;
+                execCustomBtn.innerHTML = originalBtnText;
+            }
             return;
         }
         
@@ -15666,6 +15703,8 @@ async function executeCustomScreenerScan() {
             const indicator = row.querySelector('.rule-indicator').value;
             const operator = row.querySelector('.rule-operator').value;
             const valType = row.querySelector('.rule-val-type').value;
+            const offset = parseInt(row.querySelector('.rule-offset')?.value) || 0;
+            const threshold = parseFloat(row.querySelector('.rule-threshold')?.value) || 0.0;
             
             let value = '';
             if (valType === 'indicator') {
@@ -15674,7 +15713,7 @@ async function executeCustomScreenerScan() {
                 value = row.querySelector('.rule-val-input').value.trim();
             }
             
-            rules.push({ timeframe, indicator, operator, value });
+            rules.push({ timeframe, indicator, operator, value, offset, threshold });
         });
     }
 
@@ -15779,6 +15818,11 @@ async function executeCustomScreenerScan() {
     } catch (err) {
         showToast('Custom scan failed: ' + err.message, 'error');
         if (engineStatus) { engineStatus.textContent = 'ERROR'; engineStatus.style.color = '#ef4444'; }
+    } finally {
+        if (execCustomBtn) {
+            execCustomBtn.disabled = false;
+            execCustomBtn.innerHTML = originalBtnText;
+        }
     }
 }
 

@@ -1108,6 +1108,8 @@ class CustomScanRule(BaseModel):
     indicator: str
     operator: str
     value: str
+    offset: Optional[int] = 0
+    threshold: Optional[float] = 0.0
 
 class CustomScanRequest(BaseModel):
     universe: str = "all"
@@ -5926,10 +5928,27 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
                 for rule in data.rules:
                     ts = timeseries_cache.get(rule.timeframe)
                     if ts:
-                        latest_row = ts[-1]
-                        left_val = get_indicator_value(latest_row, fund, profile, rule.indicator)
-                        right_val = get_indicator_value(latest_row, fund, profile, rule.value)
+                        offset = rule.offset or 0
+                        idx = -1 - offset
+                        if idx < -len(ts) or idx >= 0:
+                            rule_evals.append(False)
+                            continue
+                        row = ts[idx]
+                        left_val = get_indicator_value(row, fund, profile, rule.indicator)
+                        right_val = get_indicator_value(row, fund, profile, rule.value)
                         passed = compare_rule_values(left_val, rule.operator, right_val)
+                        
+                        # Apply threshold proximity check if threshold > 0
+                        if passed and rule.threshold and rule.threshold > 0.0:
+                            try:
+                                l_num = float(left_val)
+                                r_num = float(right_val)
+                                diff_pct = abs(l_num - r_num) / (abs(r_num) + 1e-9) * 100.0
+                                if diff_pct > rule.threshold:
+                                    passed = False
+                            except Exception:
+                                pass
+                                
                         rule_evals.append(passed)
                     else:
                         rule_evals.append(False)
@@ -6001,23 +6020,44 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
                         passed = evaluate_ast_condition(left, op, right, timeseries_cache, base_idx_rel, base_tf)
                         rule_evals_dt.append(passed)
                 else:
-                    rows_at_dt = {}
-                    tf_valid = True
-                    for tf in required_timeframes:
-                        row = find_latest_row_before_or_equal(timeseries_cache[tf], dt)
-                        if not row:
-                            tf_valid = False
-                            break
-                        rows_at_dt[tf] = row
-                        
-                    if not tf_valid:
-                        continue
-                        
                     for rule in data.rules:
-                        row = rows_at_dt.get(rule.timeframe)
+                        ts = timeseries_cache.get(rule.timeframe)
+                        if not ts:
+                            rule_evals_dt.append(False)
+                            continue
+                            
+                        row_at_dt = find_latest_row_before_or_equal(ts, dt)
+                        if not row_at_dt:
+                            rule_evals_dt.append(False)
+                            continue
+                            
+                        idx_at_dt = next((i for i, r in enumerate(ts) if r["date"] == row_at_dt["date"]), -1)
+                        if idx_at_dt == -1:
+                            rule_evals_dt.append(False)
+                            continue
+                            
+                        offset = rule.offset or 0
+                        target_idx = idx_at_dt - offset
+                        if target_idx < 0 or target_idx >= len(ts):
+                            rule_evals_dt.append(False)
+                            continue
+                            
+                        row = ts[target_idx]
                         left_val = get_indicator_value(row, fund, profile, rule.indicator)
                         right_val = get_indicator_value(row, fund, profile, rule.value)
                         passed = compare_rule_values(left_val, rule.operator, right_val)
+                        
+                        # Apply threshold proximity check if threshold > 0
+                        if passed and rule.threshold and rule.threshold > 0.0:
+                            try:
+                                l_num = float(left_val)
+                                r_num = float(right_val)
+                                diff_pct = abs(l_num - r_num) / (abs(r_num) + 1e-9) * 100.0
+                                if diff_pct > rule.threshold:
+                                    passed = False
+                            except Exception:
+                                pass
+                                
                         rule_evals_dt.append(passed)
                     
                 dt_matched = False

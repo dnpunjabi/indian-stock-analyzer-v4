@@ -7662,7 +7662,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 /* Custom Screener Rule Row Layout */
 .custom-screener-rule-row {
     display: grid;
-    grid-template-columns: 80px 140px 100px 90px 1fr 35px;
+    grid-template-columns: 75px 55px 120px 85px 80px 1fr 65px 35px;
     gap: 8px;
     align-items: center;
     background: rgba(255, 255, 255, 0.02);
@@ -7854,6 +7854,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         grid-column: span 1;
     }
     
+    .custom-screener-rule-row .rule-offset {
+        grid-column: span 1;
+    }
+    
     .custom-screener-rule-row .rule-indicator {
         grid-column: span 1;
     }
@@ -7867,6 +7871,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     }
     
     .custom-screener-rule-row .rule-val-container {
+        grid-column: span 1;
+    }
+    
+    .custom-screener-rule-row .rule-threshold {
         grid-column: span 2;
     }
     
