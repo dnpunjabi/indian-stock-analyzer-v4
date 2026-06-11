@@ -2466,36 +2466,101 @@
                             </p>
                             
                             <div class="alert-form" style="display: flex; flex-direction: column; gap: 12px;">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                    <div class="form-group" style="margin: 0;">
-                                        <label for="custom-screener-universe">Universe Scope</label>
-                                        <select id="custom-screener-universe" style="width: 100%;">
-                                            <option value="all" selected>All Segments (Large + Mid + Small)</option>
-                                            <option value="large">Large Cap (Nifty 50)</option>
-                                            <option value="mid">Mid Cap (Nifty Midcap)</option>
-                                            <option value="small">Small Cap (Smallcap 250)</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group" style="margin: 0;">
-                                        <label for="custom-screener-logic">Logic Gate</label>
-                                        <select id="custom-screener-logic" style="width: 100%;">
-                                            <option value="AND" selected>Match ALL Conditions (AND)</option>
-                                            <option value="OR">Match ANY Condition (OR)</option>
-                                        </select>
-                                    </div>
+                                <!-- Toggle Build Mode -->
+                                <div style="display: flex; gap: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px;">
+                                    <button type="button" class="portfolio-subtab-btn active" id="custom-screener-mode-interactive-btn" style="cursor: pointer; padding: 6px 12px; border-radius: 4px; font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; border: 1px solid var(--border-glass); background: rgba(16, 185, 129, 0.1); color: #10b981; outline: none;">
+                                        🧱 Interactive Builder
+                                    </button>
+                                    <button type="button" class="portfolio-subtab-btn" id="custom-screener-mode-formula-btn" style="cursor: pointer; padding: 6px 12px; border-radius: 4px; font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; border: 1px solid transparent; background: transparent; color: var(--text-muted); outline: none;">
+                                        📝 Formula Editor
+                                    </button>
                                 </div>
                                 
-                                <!-- Condition Lines -->
-                                <div style="margin-top: 10px; margin-bottom: 5px;">
-                                    <span style="font-size: 10.5px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">Condition Lines</span>
-                                    <div id="custom-screener-rules-list" style="display: flex; flex-direction: column; gap: 8px;">
-                                        <!-- Dynamic rows inserted programmatically -->
+                                <!-- Interactive Builder Section -->
+                                <div id="custom-screener-interactive-section" style="display: flex; flex-direction: column; gap: 12px;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                        <div class="form-group" style="margin: 0;">
+                                            <label for="custom-screener-universe">Universe Scope</label>
+                                            <select id="custom-screener-universe" style="width: 100%;">
+                                                <option value="all" selected>All Segments (Large + Mid + Small)</option>
+                                                <option value="large">Large Cap (Nifty 50)</option>
+                                                <option value="mid">Mid Cap (Nifty Midcap)</option>
+                                                <option value="small">Small Cap (Smallcap 250)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group" style="margin: 0;">
+                                            <label for="custom-screener-logic">Logic Gate</label>
+                                            <select id="custom-screener-logic" style="width: 100%;">
+                                                <option value="AND" selected>Match ALL Conditions (AND)</option>
+                                                <option value="OR">Match ANY Condition (OR)</option>
+                                            </select>
+                                        </div>
                                     </div>
+                                    
+                                    <!-- Condition Lines -->
+                                    <div style="margin-top: 10px; margin-bottom: 5px;">
+                                        <span style="font-size: 10.5px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">Condition Lines</span>
+                                        <div id="custom-screener-rules-list" style="display: flex; flex-direction: column; gap: 8px;">
+                                            <!-- Dynamic rows inserted programmatically -->
+                                        </div>
+                                    </div>
+                                    
+                                    <button type="button" class="btn-secondary" id="custom-screener-add-row-btn" style="font-size: 11px; padding: 6px 12px; align-self: flex-start; margin-top: 5px; border: 1px dashed var(--border-glass); cursor: pointer;">
+                                        ➕ Add Condition Line
+                                    </button>
                                 </div>
                                 
-                                <button type="button" class="btn-secondary" id="custom-screener-add-row-btn" style="font-size: 11px; padding: 6px 12px; align-self: flex-start; margin-top: 5px; border: 1px dashed var(--border-glass); cursor: pointer;">
-                                    ➕ Add Condition Line
-                                </button>
+                                <!-- Formula Editor Section (Initially hidden) -->
+                                <div id="custom-screener-formula-section" style="display: none; flex-direction: column; gap: 12px;">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                        <div class="form-group" style="margin: 0;">
+                                            <label for="custom-screener-formula-universe">Universe Scope</label>
+                                            <select id="custom-screener-formula-universe" style="width: 100%;">
+                                                <option value="all" selected>All Segments (Large + Mid + Small)</option>
+                                                <option value="large">Large Cap (Nifty 50)</option>
+                                                <option value="mid">Mid Cap (Nifty Midcap)</option>
+                                                <option value="small">Small Cap (Smallcap 250)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group" style="margin: 0;">
+                                            <label for="custom-screener-formula-logic">Logic Gate</label>
+                                            <select id="custom-screener-formula-logic" style="width: 100%;">
+                                                <option value="AND" selected>Match ALL Conditions (AND)</option>
+                                                <option value="OR">Match ANY Condition (OR)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-group" style="margin: 0;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                            <label for="custom-screener-formula-input" style="margin: 0;">Paste Formula Code</label>
+                                            <span style="font-size: 10px; color: #10b981; font-weight: 700; cursor: pointer; text-decoration: underline;" id="custom-screener-load-example-link">Load Example Formula</span>
+                                        </div>
+                                        <div class="formula-terminal-editor">
+                                            <textarea id="custom-screener-formula-input" rows="8" placeholder="e.g.&#10;Daily Close * 1.05 > Daily Max ( 200 , Daily High )&#10;Daily Close > 90" style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 11px; background: #0f172a; color: #38bdf8; border: 1px solid #334155; border-radius: 4px; padding: 10px; box-sizing: border-box; resize: vertical; line-height: 1.5; font-weight: 600;"></textarea>
+                                        </div>
+                                        <div id="custom-screener-formula-error" style="color: #ef4444; font-family: monospace; font-size: 10.5px; margin-top: 5px; display: none; padding: 8px; border-radius: 4px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); white-space: pre-wrap;"></div>
+                                    </div>
+                                    
+                                    <!-- Formula Syntax Tips Card -->
+                                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px; padding: 10px; font-size: 10px; color: var(--text-secondary); line-height: 1.45;">
+                                        <span style="font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.03em; display: block; margin-bottom: 5px; font-size: 9px;">💡 Syntax Cheat Sheet</span>
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                            <div>
+                                                <strong>Indicators</strong>: <code>Close</code>, <code>High</code>, <code>Low</code>, <code>Volume</code>, <code>RSI</code>, <code>MACD</code>, <code>Signal</code>
+                                            </div>
+                                            <div>
+                                                <strong>Timeframes</strong>: Prefix with <code>Daily</code>, <code>Weekly</code>, or <code>Monthly</code>
+                                            </div>
+                                            <div>
+                                                <strong>Functions</strong>: <code>Max(period, expr)</code>, <code>Min(period, expr)</code>, <code>Sma(expr, period)</code>, <code>Ema(expr, period)</code>
+                                            </div>
+                                            <div>
+                                                <strong>Lookbacks</strong>: <code>30 days ago Max(8, High)</code>, <code>1 week ago Close</code>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 
                                 <!-- Screen Saving form -->
                                 <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-glass); display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">

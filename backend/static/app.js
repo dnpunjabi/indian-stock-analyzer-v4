@@ -14923,6 +14923,60 @@ function setupRuleScanner() {
     const saveBtn = document.getElementById('custom-screener-save-btn');
     if (saveBtn) saveBtn.addEventListener('click', saveCurrentScreen);
 
+    window.activeCustomScreenerMode = 'interactive';
+    const modeInteractiveBtn = document.getElementById('custom-screener-mode-interactive-btn');
+    const modeFormulaBtn = document.getElementById('custom-screener-mode-formula-btn');
+    const interactiveSection = document.getElementById('custom-screener-interactive-section');
+    const formulaSection = document.getElementById('custom-screener-formula-section');
+
+    if (modeInteractiveBtn && modeFormulaBtn && interactiveSection && formulaSection) {
+        modeInteractiveBtn.addEventListener('click', () => {
+            window.activeCustomScreenerMode = 'interactive';
+            modeInteractiveBtn.classList.add('active');
+            modeInteractiveBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+            modeInteractiveBtn.style.borderColor = 'var(--border-glass)';
+            modeInteractiveBtn.style.color = '#10b981';
+            
+            modeFormulaBtn.classList.remove('active');
+            modeFormulaBtn.style.background = 'transparent';
+            modeFormulaBtn.style.borderColor = 'transparent';
+            modeFormulaBtn.style.color = 'var(--text-muted)';
+            
+            interactiveSection.style.display = 'flex';
+            formulaSection.style.display = 'none';
+        });
+        
+        modeFormulaBtn.addEventListener('click', () => {
+            window.activeCustomScreenerMode = 'formula';
+            modeFormulaBtn.classList.add('active');
+            modeFormulaBtn.style.background = 'rgba(16, 185, 129, 0.1)';
+            modeFormulaBtn.style.borderColor = 'var(--border-glass)';
+            modeFormulaBtn.style.color = '#10b981';
+            
+            modeInteractiveBtn.classList.remove('active');
+            modeInteractiveBtn.style.background = 'transparent';
+            modeInteractiveBtn.style.borderColor = 'transparent';
+            modeInteractiveBtn.style.color = 'var(--text-muted)';
+            
+            interactiveSection.style.display = 'none';
+            formulaSection.style.display = 'flex';
+        });
+    }
+
+    const loadExampleLink = document.getElementById('custom-screener-load-example-link');
+    if (loadExampleLink) {
+        loadExampleLink.addEventListener('click', () => {
+            const formulaInput = document.getElementById('custom-screener-formula-input');
+            if (formulaInput) {
+                formulaInput.value = 
+                    "Daily Close * 1.05 > Daily Max ( 200 , Daily High )\n" +
+                    "Daily Max ( 30 , Daily High ) <= 30 days ago Max ( 8 , Daily High )\n" +
+                    "Daily Volume > Daily Sma ( Daily Volume , 50 )\n" +
+                    "Daily Close > 90";
+            }
+        });
+    }
+
     const rangeSelect = document.getElementById('rule-scanner-historical-range');
     if (rangeSelect) {
         rangeSelect.addEventListener('change', () => {
@@ -15571,33 +15625,53 @@ function createIndicatorSelector(selectedValue = 'SMA200') {
 }
 
 async function executeCustomScreenerScan() {
-    const universe = document.getElementById('custom-screener-universe')?.value || 'all';
-    const logicGate = document.getElementById('custom-screener-logic')?.value || 'AND';
     const rangeSelect = document.getElementById('rule-scanner-historical-range');
     const range = rangeSelect ? parseInt(rangeSelect.value) : 90;
-
-    const rowEls = document.querySelectorAll('.custom-screener-rule-row');
-    if (rowEls.length === 0) {
-        showToast('Please add at least one condition line.', 'warning');
-        return;
-    }
-
-    const rules = [];
-    rowEls.forEach(row => {
-        const timeframe = row.querySelector('.rule-timeframe').value;
-        const indicator = row.querySelector('.rule-indicator').value;
-        const operator = row.querySelector('.rule-operator').value;
-        const valType = row.querySelector('.rule-val-type').value;
-        
-        let value = '';
-        if (valType === 'indicator') {
-            value = row.querySelector('.rule-val-select').value;
-        } else {
-            value = row.querySelector('.rule-val-input').value.trim();
+    const isFormulaMode = (window.activeCustomScreenerMode === 'formula');
+    
+    let universe = 'all';
+    let logicGate = 'AND';
+    let rules = [];
+    let formula = '';
+    
+    if (isFormulaMode) {
+        const formulaInput = document.getElementById('custom-screener-formula-input');
+        formula = formulaInput ? formulaInput.value.trim() : '';
+        if (!formula) {
+            showToast('Please enter a formula to scan.', 'warning');
+            return;
         }
-
-        rules.push({ timeframe, indicator, operator, value });
-    });
+        universe = document.getElementById('custom-screener-formula-universe')?.value || 'all';
+        logicGate = document.getElementById('custom-screener-formula-logic')?.value || 'AND';
+        
+        const errDiv = document.getElementById('custom-screener-formula-error');
+        if (errDiv) errDiv.style.display = 'none';
+    } else {
+        universe = document.getElementById('custom-screener-universe')?.value || 'all';
+        logicGate = document.getElementById('custom-screener-logic')?.value || 'AND';
+        
+        const rowEls = document.querySelectorAll('.custom-screener-rule-row');
+        if (rowEls.length === 0) {
+            showToast('Please add at least one condition line.', 'warning');
+            return;
+        }
+        
+        rowEls.forEach(row => {
+            const timeframe = row.querySelector('.rule-timeframe').value;
+            const indicator = row.querySelector('.rule-indicator').value;
+            const operator = row.querySelector('.rule-operator').value;
+            const valType = row.querySelector('.rule-val-type').value;
+            
+            let value = '';
+            if (valType === 'indicator') {
+                value = row.querySelector('.rule-val-select').value;
+            } else {
+                value = row.querySelector('.rule-val-input').value.trim();
+            }
+            
+            rules.push({ timeframe, indicator, operator, value });
+        });
+    }
 
     // Reset Min Score and Max D/E filters for new scan
     ruleScanFilterMinScore = 0;
@@ -15622,14 +15696,19 @@ async function executeCustomScreenerScan() {
     if (engineStatus) { engineStatus.textContent = 'SCANNING...'; engineStatus.style.color = '#f59e0b'; }
 
     const activeCondEl = document.getElementById('rule-scanner-active-condition');
-    if (activeCondEl) activeCondEl.textContent = `Custom Screen (${logicGate}) with ${rules.length} Rules`;
+    if (activeCondEl) {
+        activeCondEl.textContent = isFormulaMode ? 
+            `Custom Screen (Formula Mode)` : 
+            `Custom Screen (${logicGate}) with ${rules.length} Rules`;
+    }
 
     try {
         const payload = {
             universe: universe,
             logic_gate: logicGate,
             historical_range: range,
-            rules: rules
+            rules: rules,
+            formula: formula
         };
 
         const res = await fetch('/api/screener/custom-scan', {
@@ -15638,6 +15717,17 @@ async function executeCustomScreenerScan() {
             body: JSON.stringify(payload)
         });
         const data = await res.json();
+
+        if (res.status === 400 && isFormulaMode) {
+            const errDiv = document.getElementById('custom-screener-formula-error');
+            if (errDiv) {
+                errDiv.textContent = data.detail || 'Parser error occurred.';
+                errDiv.style.display = 'block';
+            }
+            showToast('Formula parsing failed. See error output below editor.', 'error');
+            if (engineStatus) { engineStatus.textContent = 'ERROR'; engineStatus.style.color = '#ef4444'; }
+            return;
+        }
 
         if (data.status === 'success') {
             ruleScanAllResults = data.results || [];
@@ -15668,7 +15758,6 @@ async function executeCustomScreenerScan() {
             const chartCard = document.getElementById('rule-scanner-historical-chart-card');
             if (chartCard) {
                 chartCard.style.display = 'block';
-                // Delay render slightly so DOM is sized
                 setTimeout(() => {
                     renderRuleScannerHistoricalChart(data.historical_matches || []);
                 }, 50);
@@ -15676,7 +15765,7 @@ async function executeCustomScreenerScan() {
 
             // Trigger AI synthesis
             if (ruleScanAllResults.length > 0) {
-                requestRuleScanSynthesis(ruleScanAllResults, `Custom Stacked Scan (${logicGate})`);
+                requestRuleScanSynthesis(ruleScanAllResults, isFormulaMode ? 'Custom Formula Scan' : `Custom Stacked Scan (${logicGate})`);
             }
         } else {
             showToast('Scan failed: ' + (data.detail || 'Unknown error'), 'error');
@@ -15711,12 +15800,15 @@ async function loadSavedScreens() {
             info.style.flexDirection = 'column';
             info.style.gap = '2px';
             info.style.flex = '1';
+            
+            const isFormula = !!(screen.formula && screen.formula.trim());
+            const detailsText = isFormula ? 'Formula mode' : `${screen.rules ? screen.rules.length : 0} conditions`;
+            
             info.innerHTML = `
                 <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${screen.name}</span>
-                <span style="font-size: 9px; color: var(--text-muted);">${screen.rules ? screen.rules.length : 0} conditions</span>
+                <span style="font-size: 9px; color: var(--text-muted);">${detailsText}</span>
             `;
 
-            // Clicking loads the screen
             info.addEventListener('click', () => {
                 loadScreenIntoBuilder(screen);
             });
@@ -15749,34 +15841,56 @@ async function saveCurrentScreen() {
         return;
     }
 
-    const rowEls = document.querySelectorAll('.custom-screener-rule-row');
-    if (rowEls.length === 0) {
-        showToast('Please add at least one condition line to save.', 'warning');
-        return;
-    }
-
-    const rules = [];
-    rowEls.forEach(row => {
-        const timeframe = row.querySelector('.rule-timeframe').value;
-        const indicator = row.querySelector('.rule-indicator').value;
-        const operator = row.querySelector('.rule-operator').value;
-        const valType = row.querySelector('.rule-val-type').value;
-        
-        let value = '';
-        if (valType === 'indicator') {
-            value = row.querySelector('.rule-val-select').value;
-        } else {
-            value = row.querySelector('.rule-val-input').value.trim();
+    const isFormulaMode = (window.activeCustomScreenerMode === 'formula');
+    let rules = [];
+    let formula = '';
+    let universe = 'all';
+    let logicGate = 'AND';
+    
+    if (isFormulaMode) {
+        const formulaInput = document.getElementById('custom-screener-formula-input');
+        formula = formulaInput ? formulaInput.value.trim() : '';
+        if (!formula) {
+            showToast('Please enter a formula to save.', 'warning');
+            return;
         }
-
-        rules.push({ timeframe, indicator, operator, value });
-    });
+        universe = document.getElementById('custom-screener-formula-universe')?.value || 'all';
+        logicGate = document.getElementById('custom-screener-formula-logic')?.value || 'AND';
+    } else {
+        universe = document.getElementById('custom-screener-universe')?.value || 'all';
+        logicGate = document.getElementById('custom-screener-logic')?.value || 'AND';
+        
+        const rowEls = document.querySelectorAll('.custom-screener-rule-row');
+        if (rowEls.length === 0) {
+            showToast('Please add at least one condition line to save.', 'warning');
+            return;
+        }
+        
+        rowEls.forEach(row => {
+            const timeframe = row.querySelector('.rule-timeframe').value;
+            const indicator = row.querySelector('.rule-indicator').value;
+            const operator = row.querySelector('.rule-operator').value;
+            const valType = row.querySelector('.rule-val-type').value;
+            
+            let value = '';
+            if (valType === 'indicator') {
+                value = row.querySelector('.rule-val-select').value;
+            } else {
+                value = row.querySelector('.rule-val-input').value.trim();
+            }
+            
+            rules.push({ timeframe, indicator, operator, value });
+        });
+    }
 
     try {
         const payload = {
             name: name,
-            description: `Saved screen with ${rules.length} conditions`,
-            rules: rules
+            description: isFormulaMode ? 'Custom screener formula screen' : `Saved screen with ${rules.length} conditions`,
+            rules: rules,
+            formula: formula,
+            universe: universe,
+            logic_gate: logicGate
         };
 
         const res = await fetch('/api/screener/screens', {
@@ -15816,21 +15930,48 @@ async function deleteSavedScreen(screenId) {
 }
 
 function loadScreenIntoBuilder(screen) {
-    // Clear list
-    const list = document.getElementById('custom-screener-rules-list');
-    if (list) list.innerHTML = '';
-
-    // Populate rows
-    if (screen.rules && screen.rules.length > 0) {
-        screen.rules.forEach(rule => {
-            addCustomScreenerRow(rule);
-        });
+    // Check if the screen has a formula
+    if (screen.formula && screen.formula.trim()) {
+        const modeFormulaBtn = document.getElementById('custom-screener-mode-formula-btn');
+        if (modeFormulaBtn) modeFormulaBtn.click();
+        
+        const formulaInput = document.getElementById('custom-screener-formula-input');
+        if (formulaInput) formulaInput.value = screen.formula;
+        
+        const formulaUniverse = document.getElementById('custom-screener-formula-universe');
+        if (formulaUniverse) formulaUniverse.value = screen.universe || 'all';
+        
+        const formulaLogic = document.getElementById('custom-screener-formula-logic');
+        if (formulaLogic) formulaLogic.value = screen.logic_gate || 'AND';
+        
+        const errDiv = document.getElementById('custom-screener-formula-error');
+        if (errDiv) errDiv.style.display = 'none';
+        
+        const list = document.getElementById('custom-screener-rules-list');
+        if (list) list.innerHTML = '';
+        addCustomScreenerRow(); // add empty default interactive row in background
     } else {
-        // Fallback default row
-        addCustomScreenerRow();
+        const modeInteractiveBtn = document.getElementById('custom-screener-mode-interactive-btn');
+        if (modeInteractiveBtn) modeInteractiveBtn.click();
+        
+        const list = document.getElementById('custom-screener-rules-list');
+        if (list) list.innerHTML = '';
+        
+        if (screen.rules && screen.rules.length > 0) {
+            screen.rules.forEach(rule => {
+                addCustomScreenerRow(rule);
+            });
+        } else {
+            addCustomScreenerRow();
+        }
+        
+        const universeSelect = document.getElementById('custom-screener-universe');
+        if (universeSelect) universeSelect.value = screen.universe || 'all';
+        
+        const logicSelect = document.getElementById('custom-screener-logic');
+        if (logicSelect) logicSelect.value = screen.logic_gate || 'AND';
     }
 
-    // Set screen name input to name
     const nameEl = document.getElementById('custom-screener-name');
     if (nameEl) nameEl.value = screen.name;
 

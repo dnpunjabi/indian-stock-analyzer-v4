@@ -312,6 +312,26 @@ def init_db():
                         VALUES (?, 'SPLIT', ?, 2.0, ?)
                     """, (sym, ex_dt, ex_dt))
         
+        # Migrations to support formulas in custom screens
+        try:
+            cursor.execute("ALTER TABLE custom_screens ADD COLUMN formula TEXT DEFAULT ''")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE custom_screens ADD COLUMN logic_gate TEXT DEFAULT 'AND'")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE custom_screens ADD COLUMN universe TEXT DEFAULT 'all'")
+        except Exception:
+            pass
+            
+        # Invalidate existing technical indicators cache to force re-calculation with High/Low/Open
+        try:
+            cursor.execute("DELETE FROM cached_timeframe_indicators")
+        except Exception:
+            pass
+            
         conn.commit()
  
 init_db()
@@ -1094,6 +1114,7 @@ class CustomScanRequest(BaseModel):
     logic_gate: str = "AND"
     historical_range: int = 90
     rules: List[CustomScanRule]
+    formula: Optional[str] = None
 
 class SavedScreenCreate(BaseModel):
     name: str
@@ -1101,6 +1122,7 @@ class SavedScreenCreate(BaseModel):
     rules: List[dict]
     logic_gate: str = "AND"
     universe: str = "all"
+    formula: Optional[str] = None
 
 
 class WatchlistCreate(BaseModel):
@@ -5529,6 +5551,21 @@ def compute_dataframe_indicators(df: pd.DataFrame, timeframe: str) -> List[dict]
     df['Close'] = df['Close'].ffill().bfill()
     df['Volume'] = df['Volume'].ffill().bfill()
     
+    if 'High' in df.columns:
+        df['High'] = df['High'].ffill().bfill()
+    else:
+        df['High'] = df['Close']
+        
+    if 'Low' in df.columns:
+        df['Low'] = df['Low'].ffill().bfill()
+    else:
+        df['Low'] = df['Close']
+        
+    if 'Open' in df.columns:
+        df['Open'] = df['Open'].ffill().bfill()
+    else:
+        df['Open'] = df['Close']
+    
     df['SMA_50'] = df['Close'].rolling(window=50).mean()
     df['SMA_200'] = df['Close'].rolling(window=200).mean()
     df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
@@ -5562,7 +5599,7 @@ def compute_dataframe_indicators(df: pd.DataFrame, timeframe: str) -> List[dict]
     df['year_high'] = df['Close'].rolling(window=lookback, min_periods=1).max()
     df['year_low'] = df['Close'].rolling(window=lookback, min_periods=1).min()
     
-    cols = ['SMA_50', 'SMA_200', 'EMA_50', 'EMA_200', 'RSI_14', 'Vol_Ratio', 'BB_Upper', 'BB_Lower', 'MACD', 'MACD_Signal', 'year_high', 'year_low']
+    cols = ['Open', 'High', 'Low', 'SMA_50', 'SMA_200', 'EMA_50', 'EMA_200', 'RSI_14', 'Vol_Ratio', 'BB_Upper', 'BB_Lower', 'MACD', 'MACD_Signal', 'year_high', 'year_low']
     for col in cols:
         if col in df.columns:
             df[col] = df[col].bfill().ffill().fillna(0.0)
@@ -5584,6 +5621,9 @@ def compute_dataframe_indicators(df: pd.DataFrame, timeframe: str) -> List[dict]
         results.append({
             "date": date_str,
             "Close": float(row["Close"]),
+            "High": float(row["High"]),
+            "Low": float(row["Low"]),
+            "Open": float(row["Open"]),
             "Volume": float(row["Volume"]),
             "Vol_Ratio": float(row["Vol_Ratio"]),
             "RSI_14": float(row["RSI_14"]),
@@ -5749,7 +5789,28 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
     try:
         from backend.swing_utils import clean_float
         
-        # 1. Fetch universe stocks
+        # 1. Parse formula if provided
+        parsed_conditions = []
+        is_formula_mode = bool(data.formula and data.formula.strip())
+        
+        if is_formula_mode:
+            from backend.formula_parser import parse_formula_to_conditions
+            try:
+                parsed_conditions = parse_formula_to_conditions(data.formula)
+            except Exception as pe:
+                raise HTTPException(status_code=400, detail=str(pe))
+                
+            required_timeframes = set()
+            for left, op, right in parsed_conditions:
+                required_timeframes |= left.get_required_timeframes()
+                required_timeframes |= right.get_required_timeframes()
+        else:
+            required_timeframes = set(rule.timeframe for rule in data.rules)
+            
+        if not required_timeframes:
+            required_timeframes.add("1d")
+            
+        # 2. Fetch universe stocks
         with get_db() as conn:
             cursor = conn.cursor()
             if data.universe == "all":
@@ -5768,7 +5829,7 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
                 except Exception:
                     continue
                     
-        # 2. Get last N trading dates for historical match count chart
+        # 3. Get last N trading dates for historical match count chart
         benchmark_dates = []
         benchmark_history = await get_timeframe_indicators("TCS.NS", "1d")
         if not benchmark_history:
@@ -5787,7 +5848,7 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
             
         historical_counts = {dt: 0 for dt in benchmark_dates}
         
-        # 3. Evaluate rules
+        # 4. Evaluate rules
         matched_results = []
         scanned_count = 0
         
@@ -5799,10 +5860,6 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
                 
             fund = profile.get("fundamentals") or {}
             
-            required_timeframes = set(rule.timeframe for rule in data.rules)
-            if not required_timeframes:
-                required_timeframes.add("1d")
-                
             timeseries_cache = {}
             has_all_data = True
             for tf in required_timeframes:
@@ -5820,21 +5877,31 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
             
             # Current scan match evaluation
             current_match = True
-            if not data.rules:
-                current_match = False
+            if is_formula_mode:
+                if not parsed_conditions:
+                    current_match = False
+            else:
+                if not data.rules:
+                    current_match = False
                 
             rule_evals = []
-            for rule in data.rules:
-                ts = timeseries_cache.get(rule.timeframe)
-                if ts:
-                    latest_row = ts[-1]
-                    left_val = get_indicator_value(latest_row, fund, profile, rule.indicator)
-                    right_val = get_indicator_value(latest_row, fund, profile, rule.value)
-                    passed = compare_rule_values(left_val, rule.operator, right_val)
+            if is_formula_mode:
+                from backend.formula_parser import evaluate_ast_condition
+                for left, op, right in parsed_conditions:
+                    passed = evaluate_ast_condition(left, op, right, timeseries_cache, -1, "1d")
                     rule_evals.append(passed)
-                else:
-                    rule_evals.append(False)
-                    
+            else:
+                for rule in data.rules:
+                    ts = timeseries_cache.get(rule.timeframe)
+                    if ts:
+                        latest_row = ts[-1]
+                        left_val = get_indicator_value(latest_row, fund, profile, rule.indicator)
+                        right_val = get_indicator_value(latest_row, fund, profile, rule.value)
+                        passed = compare_rule_values(left_val, rule.operator, right_val)
+                        rule_evals.append(passed)
+                    else:
+                        rule_evals.append(False)
+                        
             if data.logic_gate == "AND":
                 current_match = all(rule_evals) if rule_evals else False
             else:
@@ -5852,11 +5919,16 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
                 rating = (analysis.get("recommendation") or profile.get("recommendation") or "N/A").upper()
                 
                 trigger_desc = []
-                for rule in data.rules:
-                    trigger_desc.append(f"{rule.timeframe.upper()} {rule.indicator} {rule.operator} {rule.value}")
-                trigger_str = ", ".join(trigger_desc[:3])
-                if len(trigger_desc) > 3:
-                    trigger_str += "..."
+                if is_formula_mode:
+                    trigger_str = "Formula: " + "; ".join(data.formula.strip().split("\n")[:2])
+                    if len(data.formula.strip().split("\n")) > 2:
+                        trigger_str += "..."
+                else:
+                    for rule in data.rules:
+                        trigger_desc.append(f"{rule.timeframe.upper()} {rule.indicator} {rule.operator} {rule.value}")
+                    trigger_str = ", ".join(trigger_desc[:3])
+                    if len(trigger_desc) > 3:
+                        trigger_str += "..."
                     
                 matched_results.append({
                     "symbol": sym,
@@ -5872,27 +5944,49 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
                     "de_ratio": round(de_ratio, 2)
                 })
                 
+            # Base timeframe for index alignment in history builder
+            base_tf = "1d"
+            if base_tf not in timeseries_cache:
+                base_tf = list(timeseries_cache.keys())[0]
+            base_ts = timeseries_cache[base_tf]
+            
             # Historical matches counts timeline builder
             for dt in benchmark_dates:
-                rows_at_dt = {}
-                tf_valid = True
-                for tf in required_timeframes:
-                    row = find_latest_row_before_or_equal(timeseries_cache[tf], dt)
-                    if not row:
-                        tf_valid = False
-                        break
-                    rows_at_dt[tf] = row
-                    
-                if not tf_valid:
+                row_at_dt = find_latest_row_before_or_equal(base_ts, dt)
+                if not row_at_dt:
                     continue
                     
+                base_idx_at_dt = next((i for i, r in enumerate(base_ts) if r["date"] == row_at_dt["date"]), -1)
+                if base_idx_at_dt == -1:
+                    continue
+                    
+                base_idx_rel = base_idx_at_dt - len(base_ts)
+                
                 rule_evals_dt = []
-                for rule in data.rules:
-                    row = rows_at_dt.get(rule.timeframe)
-                    left_val = get_indicator_value(row, fund, profile, rule.indicator)
-                    right_val = get_indicator_value(row, fund, profile, rule.value)
-                    passed = compare_rule_values(left_val, rule.operator, right_val)
-                    rule_evals_dt.append(passed)
+                if is_formula_mode:
+                    from backend.formula_parser import evaluate_ast_condition
+                    for left, op, right in parsed_conditions:
+                        passed = evaluate_ast_condition(left, op, right, timeseries_cache, base_idx_rel, base_tf)
+                        rule_evals_dt.append(passed)
+                else:
+                    rows_at_dt = {}
+                    tf_valid = True
+                    for tf in required_timeframes:
+                        row = find_latest_row_before_or_equal(timeseries_cache[tf], dt)
+                        if not row:
+                            tf_valid = False
+                            break
+                        rows_at_dt[tf] = row
+                        
+                    if not tf_valid:
+                        continue
+                        
+                    for rule in data.rules:
+                        row = rows_at_dt.get(rule.timeframe)
+                        left_val = get_indicator_value(row, fund, profile, rule.indicator)
+                        right_val = get_indicator_value(row, fund, profile, rule.value)
+                        passed = compare_rule_values(left_val, rule.operator, right_val)
+                        rule_evals_dt.append(passed)
                     
                 dt_matched = False
                 if data.logic_gate == "AND":
@@ -5906,7 +6000,9 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
         formatted_historical = [{"time": dt, "value": count} for dt, count in sorted(historical_counts.items())]
         
         cond_desc = f"Custom Screener ({data.logic_gate})"
-        if data.rules:
+        if is_formula_mode:
+            cond_desc += ": Formula Mode"
+        elif data.rules:
             cond_desc += f": {len(data.rules)} Rules"
             
         return {
@@ -5918,6 +6014,8 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
             "results": matched_results,
             "historical_matches": formatted_historical
         }
+    except HTTPException as he:
+        raise he
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -5928,7 +6026,7 @@ async def get_saved_screens():
     try:
         with get_db() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, name, description, rules_json, created_at FROM custom_screens ORDER BY name ASC")
+            cursor.execute("SELECT id, name, description, rules_json, formula, logic_gate, universe, created_at FROM custom_screens ORDER BY name ASC")
             rows = [dict(row) for row in cursor.fetchall()]
             
         for row in rows:
@@ -5936,6 +6034,8 @@ async def get_saved_screens():
                 row["rules"] = json.loads(row["rules_json"])
             except Exception:
                 row["rules"] = []
+            if "formula" not in row or row["formula"] is None:
+                row["formula"] = ""
         return rows
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch saved screens: {str(e)}")
@@ -5945,12 +6045,13 @@ async def save_custom_screen(data: SavedScreenCreate):
     try:
         screen_id = str(uuid.uuid4())
         rules_str = json.dumps(data.rules)
+        formula_str = data.formula or ""
         
         with get_db() as conn:
             conn.execute("""
-                INSERT OR REPLACE INTO custom_screens (id, name, description, rules_json, created_at) 
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (screen_id, data.name, data.description, rules_str))
+                INSERT OR REPLACE INTO custom_screens (id, name, description, rules_json, formula, logic_gate, universe, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (screen_id, data.name, data.description, rules_str, formula_str, data.logic_gate, data.universe))
             conn.commit()
         return {"status": "success", "id": screen_id, "name": data.name}
     except Exception as e:
