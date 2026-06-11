@@ -7659,6 +7659,21 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     text-transform: uppercase;
 }
 
+/* Custom Screener Rules Header Layout */
+.custom-screener-rules-header {
+    display: grid;
+    grid-template-columns: 75px 55px 120px 85px 80px 1fr 65px 35px;
+    gap: 8px;
+    margin-bottom: 6px;
+    padding: 0 12px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    box-sizing: border-box;
+}
+
 /* Custom Screener Rule Row Layout */
 .custom-screener-rule-row {
     display: grid;
@@ -7826,6 +7841,10 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 }
 
 @media (max-width: 600px) {
+    .custom-screener-rules-header {
+        display: none !important;
+    }
+
     .portfolio-subtabs-wrapper {
         flex-wrap: wrap;
         gap: 6px !important;
