@@ -5305,6 +5305,8 @@ async function deploySentinelTelemetry(item) {
         } else {
             // Proximity calculation
             let proximityMsg = '';
+            const tech = profile.technicals || {};
+            
             if (item.condition_type === 'PRICE' && price) {
                 const targetVal = parseFloat(item.value);
                 const diffPct = Math.abs(price - targetVal) / targetVal * 100;
@@ -5313,8 +5315,56 @@ async function deploySentinelTelemetry(item) {
                 const targetVal = parseFloat(item.value);
                 const diffPoints = Math.abs(rsi - targetVal);
                 proximityMsg = `Proximity margin is <strong>${diffPoints.toFixed(1)} points</strong> from the RSI momentum threshold.`;
-            } else if (item.condition_type.startsWith('FIB_') && profile.technicals?.fib_levels) {
-                const fib = profile.technicals.fib_levels;
+            } else if (item.condition_type === 'SMA50' && price && tech.sma_50) {
+                const targetVal = parseFloat(item.value) || 0.0;
+                const pctDiff = ((price - tech.sma_50) / tech.sma_50) * 100;
+                const diff = Math.abs(pctDiff - targetVal);
+                proximityMsg = `Proximity margin is <strong>${diff.toFixed(1)}%</strong> from the SMA50 crossover threshold (Current Diff: ${pctDiff > 0 ? '+' : ''}${pctDiff.toFixed(1)}%).`;
+            } else if (item.condition_type === '52W_PROXIMITY' && price && tech.high_52w && tech.low_52w) {
+                const targetVal = parseFloat(item.value) || 0.0;
+                let diff = 0.0;
+                if (item.operator === '>') { // Near 52W High
+                    const diffPct = ((tech.high_52w - price) / tech.high_52w) * 100;
+                    diff = Math.abs(diffPct - targetVal);
+                    proximityMsg = `Proximity is <strong>${diff.toFixed(1)}%</strong> from the 52w High boundary (Current Diff: ${diffPct.toFixed(1)}%).`;
+                } else { // Near 52W Low
+                    const diffPct = ((price - tech.low_52w) / tech.low_52w) * 100;
+                    diff = Math.abs(diffPct - targetVal);
+                    proximityMsg = `Proximity is <strong>${diff.toFixed(1)}%</strong> from the 52w Low floor (Current Diff: ${diffPct.toFixed(1)}%).`;
+                }
+            } else if (item.condition_type === 'VOL_BREAKOUT' && tech.volume_vs_avg20) {
+                const targetVal = parseFloat(item.value) || 1.0;
+                const diff = Math.abs(tech.volume_vs_avg20 - targetVal);
+                proximityMsg = `Proximity margin is <strong>${diff.toFixed(2)}x</strong> from the 20d Avg Volume ratio threshold (Current Ratio: ${tech.volume_vs_avg20.toFixed(2)}x).`;
+            } else if (item.condition_type === 'BB_CROSS' && price && tech.bb_upper && tech.bb_lower) {
+                if (item.operator === '>') {
+                    const diffPct = Math.abs(price - tech.bb_upper) / tech.bb_upper * 100;
+                    proximityMsg = `Proximity margin is <strong>${diffPct.toFixed(1)}%</strong> from the Bollinger Upper Band resistance (₹${tech.bb_upper.toFixed(1)}).`;
+                } else {
+                    const diffPct = Math.abs(price - tech.bb_lower) / tech.bb_lower * 100;
+                    proximityMsg = `Proximity margin is <strong>${diffPct.toFixed(1)}%</strong> from the Bollinger Lower Band support (₹${tech.bb_lower.toFixed(1)}).`;
+                }
+            } else if (item.condition_type === 'MACD_CROSS' && tech.macd !== undefined && tech.macd_signal !== undefined) {
+                const targetVal = parseFloat(item.value) || 0.0;
+                const macdDiff = tech.macd - tech.macd_signal;
+                const diff = Math.abs(macdDiff - targetVal);
+                proximityMsg = `Proximity margin is <strong>${diff.toFixed(3)}</strong> from the MACD signal crossover threshold (Current Diff: ${macdDiff.toFixed(3)}).`;
+            } else if ((item.condition_type === 'DMA_CROSS' || item.condition_type === 'EMA_CROSS') && tech.sma_50 !== undefined) {
+                const targetVal = parseFloat(item.value) || 0.0;
+                let ma50 = 0.0;
+                let ma200 = 0.0;
+                if (item.condition_type === 'DMA_CROSS') {
+                    ma50 = tech.sma_50 || price;
+                    ma200 = tech.sma_200 || price;
+                } else {
+                    ma50 = tech.ema_50 || price;
+                    ma200 = tech.ema_200 || price;
+                }
+                const pctDiff = ((ma50 - ma200) / ma200) * 100;
+                const diff = Math.abs(pctDiff - targetVal);
+                proximityMsg = `Proximity margin is <strong>${diff.toFixed(1)}%</strong> from the moving average cross threshold (Current Diff: ${pctDiff.toFixed(1)}%).`;
+            } else if (item.condition_type.startsWith('FIB_') && tech.fib_levels) {
+                const fib = tech.fib_levels;
                 let levelVal = null;
                 let levelName = '';
                 if (item.condition_type === 'FIB_618') {
