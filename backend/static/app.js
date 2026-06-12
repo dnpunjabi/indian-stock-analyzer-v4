@@ -2073,7 +2073,19 @@ function renderStockDashboard(p) {
     const priceEl = document.getElementById('meta-price');
     if (priceEl) priceEl.innerText = safeFormatRupees(p.fundamentals.current_price, 2);
     
-    // Populate Corporate Business Summary Collapsible Card
+    // Populate Corporate Business Summary Collapsible Card (Two-Column Layout)
+    const sectorVal = p.sector || 'N/A';
+    const capVal = p.cap_type ? (p.cap_type.toUpperCase() + ' CAP') : 'N/A';
+    const tickerVal = p.ticker || 'N/A';
+    
+    const corpSectorEl = document.getElementById('corp-sector');
+    const corpCapEl = document.getElementById('corp-cap');
+    const corpTickerEl = document.getElementById('corp-ticker');
+    
+    if (corpSectorEl) corpSectorEl.innerText = sectorVal;
+    if (corpCapEl) corpCapEl.innerText = capVal;
+    if (corpTickerEl) corpTickerEl.innerText = tickerVal;
+    
     const summaryText = document.getElementById('business-summary-text');
     if (summaryText) {
         const text = p.business_summary || "No corporate business summary details returned from Yahoo Finance.";
@@ -2098,6 +2110,9 @@ function renderStockDashboard(p) {
             <div style="font-size:12.5px; line-height:1.6; color:var(--text-secondary); margin-bottom:12px; font-weight:400;">
                 ${text}
             </div>
+            <div style="margin-top:12px; padding:10px 12px; background:rgba(59, 130, 246, 0.03); border-left:2.5px solid var(--color-primary); border-radius:0 6px 6px 0; font-size:11.5px; line-height:1.5; color:var(--text-muted);">
+                ${laymanSummary}
+            </div>
         `;
     }
     const bsContent = document.getElementById('business-summary-content');
@@ -2120,16 +2135,35 @@ function renderStockDashboard(p) {
     }
     
     const changeEl = document.getElementById('meta-change');
-    changeEl.innerText = changeText;
-    changeEl.className = isPositive ? "meta-change green-text" : "meta-change red-text";
+    if (changeEl) {
+        changeEl.innerText = changeText;
+        changeEl.className = isPositive ? "meta-change green-text" : "meta-change red-text";
+    }
     
     const scoring = p.score_metrics || {};
     const finalScore = scoring.final_score || 50;
     const finalAction = scoring.action || "HOLD";
     
-    const scoreBadge = document.getElementById('cio-badge-score');
-    if (scoreBadge) {
-        scoreBadge.innerText = `Score: ${finalScore}/100`;
+    // Animate Circular Donut Score Gauge
+    const scoreNum = document.getElementById('cio-score-num');
+    const scoreFill = document.getElementById('cio-score-fill');
+    if (scoreNum) {
+        scoreNum.innerText = finalScore;
+    }
+    if (scoreFill) {
+        const strokeCircumference = 251.2;
+        const strokeOffset = strokeCircumference - (finalScore / 100) * strokeCircumference;
+        scoreFill.style.strokeDasharray = strokeCircumference;
+        scoreFill.style.strokeDashoffset = strokeOffset.toFixed(1);
+        
+        // Dynamic coloring
+        if (finalScore >= 70) {
+            scoreFill.style.stroke = '#10b981'; // emerald
+        } else if (finalScore >= 50) {
+            scoreFill.style.stroke = '#f59e0b'; // amber
+        } else {
+            scoreFill.style.stroke = '#ef4444'; // crimson
+        }
     }
     
     // Reset/update top banner conviction trigger badge with the score calculated from profile
@@ -2140,7 +2174,6 @@ function renderStockDashboard(p) {
     }
     if (triggerBadge) {
         triggerBadge.style.opacity = '1';
-        // Adjust border and color based on recommendation
         if (finalAction.includes("BUY")) {
             triggerBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
             triggerBadge.style.color = '#10b981';
@@ -2163,7 +2196,7 @@ function renderStockDashboard(p) {
         if (finalAction.includes("SELL") || finalAction.includes("AVOID")) recBadge.classList.add('rec-sell');
     }
     
-    // Render the beautiful visual Checklist (Recommendation 3)
+    // Render the beautiful visual Checklist Cards
     const checklistContainer = document.getElementById('cio-checklist-container');
     if (checklistContainer) {
         checklistContainer.innerHTML = '';
@@ -2220,13 +2253,7 @@ function renderStockDashboard(p) {
         items.forEach((item, idx) => {
             const isPassed = passStateMap[idx];
             const row = document.createElement('div');
-            row.className = 'cio-checklist-row';
-            row.style.display = 'flex';
-            row.style.alignItems = 'center';
-            row.style.gap = '12px';
-            row.style.fontSize = '12px';
-            row.style.padding = '8px 12px';
-            row.style.borderRadius = '6px';
+            row.className = 'cio-checklist-card';
             
             let rowBg = 'rgba(245, 158, 11, 0.04)';
             let rowBorder = '1px solid rgba(245, 158, 11, 0.15)';
@@ -2246,9 +2273,9 @@ function renderStockDashboard(p) {
             row.style.background = rowBg;
             row.style.border = rowBorder;
             row.style.marginBottom = '6px';
-            row.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+            row.style.boxShadow = '0 2px 4px rgba(0,0,0,0.03)';
             
-            row.innerHTML = `<span style="font-size:14px; display:inline-flex; align-items:center; justify-content:center;">${iconText}</span> <span style="color:var(--text-primary);">${item.text}</span>`;
+            row.innerHTML = `<span style="font-size:13px; display:inline-flex; align-items:center; justify-content:center;">${iconText}</span> <span style="color:var(--text-primary); margin-left:8px;">${item.text}</span>`;
             checklistContainer.appendChild(row);
         });
     }
@@ -2295,28 +2322,103 @@ function renderStockDashboard(p) {
     
     const consensusSignal = (p.consensus && p.consensus.recommendation) ? p.consensus.recommendation.toUpperCase() : "HOLD";
     
-    document.getElementById('cio-fundamental-signal').innerText = fundamentalSignal;
-    document.getElementById('cio-technical-signal').innerText = technicalSignal;
-    document.getElementById('cio-consensus-signal').innerText = consensusSignal;
+    const fundSigEl = document.getElementById('cio-fundamental-signal');
+    const techSigEl = document.getElementById('cio-technical-signal');
+    const consSigEl = document.getElementById('cio-consensus-signal');
+    if (fundSigEl) fundSigEl.innerText = fundamentalSignal;
+    if (techSigEl) techSigEl.innerText = technicalSignal;
+    if (consSigEl) consSigEl.innerText = consensusSignal;
     
-    document.getElementById('target-buy-range').innerText = p.analysis.suggested_buy_price_range || "N/A";
-    document.getElementById('target-sell-range').innerText = p.analysis.suggested_sell_price_range || "N/A";
+    // Target Price Range Spectrum Slider Calculations & Positioning
+    const basePrice = p.fundamentals.current_price || 100.0;
+    const targetVal = p.analysis.target_12m || basePrice * 1.15;
+    const stopLossVal = p.analysis.stop_loss_12m || basePrice * 0.88;
     
-    // Bind 12M Target and Stop Loss
-    const targetEl = document.getElementById('target-12m-price');
-    const stopLossEl = document.getElementById('stop-loss-12m-price');
-    if (targetEl && stopLossEl) {
-        const basePrice = p.fundamentals.current_price;
-        const targetVal = p.analysis.target_12m || (basePrice !== null && basePrice !== undefined ? basePrice * 1.15 : null);
-        const stopLossVal = p.analysis.stop_loss_12m || (basePrice !== null && basePrice !== undefined ? basePrice * 0.88 : null);
-        targetEl.innerText = safeFormatRupees(targetVal, 2);
-        stopLossEl.innerText = safeFormatRupees(stopLossVal, 2);
+    // Suggested Buy Range Upper Bound
+    const buyRangeStr = p.analysis.suggested_buy_price_range || "";
+    const sellRangeStr = p.analysis.suggested_sell_price_range || "";
+    
+    const parseRangeVal = (str, defaultVal) => {
+        if (!str) return defaultVal;
+        const clean = str.replace(/[^0-9\-\.]/g, '');
+        const parts = clean.split('-');
+        if (parts.length > 0) {
+            const val = parseFloat(parts[parts.length - 1]);
+            return isNaN(val) ? defaultVal : val;
+        }
+        return defaultVal;
+    };
+    
+    const buyVal = parseRangeVal(buyRangeStr, basePrice * 0.95);
+    const sellVal = parseRangeVal(sellRangeStr, basePrice * 1.05);
+    
+    // Bounds of the spectrum: from Stop Loss to 12M Target
+    const minBound = Math.min(stopLossVal, basePrice) * 0.95;
+    const maxBound = Math.max(targetVal, basePrice) * 1.05;
+    const boundRange = maxBound - minBound;
+    
+    const getPct = (val) => {
+        if (boundRange <= 0) return 50;
+        return ((val - minBound) / boundRange) * 100;
+    };
+    
+    const stopPct = getPct(stopLossVal);
+    const buyPct = getPct(buyVal);
+    const sellPct = getPct(sellVal);
+    const targetPct = getPct(targetVal);
+    const curPct = getPct(basePrice);
+    
+    // Set styles of markers
+    const markerStop = document.getElementById('marker-stop');
+    const markerBuy = document.getElementById('marker-buy');
+    const markerSell = document.getElementById('marker-sell');
+    const markerTarget = document.getElementById('marker-target');
+    const prospectusPointer = document.getElementById('prospectus-pointer');
+    
+    if (markerStop) markerStop.style.left = `${Math.max(0, Math.min(100, stopPct))}%`;
+    if (markerBuy) markerBuy.style.left = `${Math.max(0, Math.min(100, buyPct))}%`;
+    if (markerSell) markerSell.style.left = `${Math.max(0, Math.min(100, sellPct))}%`;
+    if (markerTarget) markerTarget.style.left = `${Math.max(0, Math.min(100, targetPct))}%`;
+    if (prospectusPointer) prospectusPointer.style.left = `${Math.max(0, Math.min(100, curPct))}%`;
+    
+    // Set text labels of spectrum slider values
+    const specStopEl = document.getElementById('cio-spectrum-stop');
+    const specBuyEl = document.getElementById('cio-spectrum-buy');
+    const specSellEl = document.getElementById('cio-spectrum-sell');
+    const specTargetEl = document.getElementById('cio-spectrum-target');
+    const pointerValEl = document.getElementById('prospectus-pointer-val');
+    
+    if (specStopEl) specStopEl.innerText = `Rs. ${stopLossVal.toFixed(0)}`;
+    if (specBuyEl) specBuyEl.innerText = buyRangeStr || `Rs. ${buyVal.toFixed(0)}`;
+    if (specSellEl) specSellEl.innerText = sellRangeStr || `Rs. ${sellVal.toFixed(0)}`;
+    if (specTargetEl) specTargetEl.innerText = `Rs. ${targetVal.toFixed(0)}`;
+    if (pointerValEl) pointerValEl.innerText = `Rs. ${basePrice.toFixed(1)}`;
+    
+    // Upside potential calculations
+    const upsidePct = ((targetVal - basePrice) / basePrice) * 100;
+    const upsideValEl = document.getElementById('prospectus-slider-upside-val');
+    const upsideLabelEl = document.getElementById('prospectus-slider-upside-label');
+    
+    if (upsideValEl && upsideLabelEl) {
+        if (upsidePct >= 0) {
+            upsideLabelEl.innerText = '12M Target upside potential';
+            upsideValEl.innerText = `+${upsidePct.toFixed(1)}% Upside`;
+            upsideValEl.style.color = 'var(--neon-green)';
+        } else {
+            upsideLabelEl.innerText = '12M Target downside risk';
+            upsideValEl.innerText = `${upsidePct.toFixed(1)}% Downside`;
+            upsideValEl.style.color = 'var(--neon-red)';
+        }
     }
     
     // Bind Primary Risk Factor
     const primaryRiskEl = document.getElementById('cio-primary-risk-text');
-    if (primaryRiskEl && p.analysis.major_risks && p.analysis.major_risks.length > 0) {
-        primaryRiskEl.innerText = p.analysis.major_risks[0];
+    if (primaryRiskEl) {
+        if (p.analysis.major_risks && p.analysis.major_risks.length > 0) {
+            primaryRiskEl.innerText = p.analysis.major_risks[0];
+        } else {
+            primaryRiskEl.innerText = "No critical risk flagged.";
+        }
     }
     
     const thesisEl = document.getElementById('cio-investment-thesis');
@@ -2693,7 +2795,16 @@ function renderStockDashboard(p) {
                 const icons = ['🚀', '💡', '📈', '🔥'];
                 const icon = icons[idx % icons.length];
                 
-                row.innerHTML = `<span style="font-size:16px; margin-top:2px;">${icon}</span> <span style="font-size:11.5px; color:var(--text-primary); line-height:1.45;">${driver}</span>`;
+                // Classify catalyst impact
+                let tagText = "MEDIUM EXPANSION";
+                let tagClass = "medium";
+                const textLower = driver.toLowerCase();
+                if (textLower.includes("high") || textLower.includes("strong") || textLower.includes("lead") || textLower.includes("market") || textLower.includes("growth") || textLower.includes("cagr") || idx === 0) {
+                    tagText = "HIGH ADVANTAGE";
+                    tagClass = "advantage";
+                }
+                
+                row.innerHTML = `<span style="font-size:16px; margin-top:2px;">${icon}</span> <div style="display:flex; flex-direction:column; gap:4px;"><span class="impact-tag ${tagClass}">${tagText}</span><span style="font-size:11.5px; color:var(--text-primary); line-height:1.45;">${driver}</span></div>`;
                 growthList.appendChild(row);
             });
         } else {
@@ -2722,7 +2833,16 @@ function renderStockDashboard(p) {
                 const icons = ['🚨', '⚠️', '💸', '⚡'];
                 const icon = icons[idx % icons.length];
                 
-                row.innerHTML = `<span style="font-size:16px; margin-top:2px;">${icon}</span> <span style="font-size:11.5px; color:var(--text-primary); line-height:1.45;">${risk}</span>`;
+                // Classify risk impact
+                let tagText = "MODERATE HEADWIND";
+                let tagClass = "medium";
+                const textLower = risk.toLowerCase();
+                if (textLower.includes("critical") || textLower.includes("high") || textLower.includes("severe") || textLower.includes("debt") || textLower.includes("risk") || textLower.includes("pledge") || idx === 0) {
+                    tagText = "CRITICAL VULNERABILITY";
+                    tagClass = "high";
+                }
+                
+                row.innerHTML = `<span style="font-size:16px; margin-top:2px;">${icon}</span> <div style="display:flex; flex-direction:column; gap:4px;"><span class="impact-tag ${tagClass}">${tagText}</span><span style="font-size:11.5px; color:var(--text-primary); line-height:1.45;">${risk}</span></div>`;
                 riskList.appendChild(row);
             });
         } else {
@@ -2731,9 +2851,20 @@ function renderStockDashboard(p) {
     }
     
     const newsFeed = document.getElementById('news-feed-container');
+    const newsSentimentWrapper = document.getElementById('news-sentiment-wrapper');
+    const newsSentimentFill = document.getElementById('news-sentiment-thermometer-fill');
+    const newsSentimentVal = document.getElementById('news-sentiment-index-val');
+    const newsSentimentDesc = document.getElementById('news-sentiment-index-desc');
+    
     if (newsFeed) {
         newsFeed.innerHTML = '';
         if (p.news && p.news.length > 0) {
+            if (newsSentimentWrapper) newsSentimentWrapper.style.display = 'block';
+            
+            let posCount = 0;
+            let negCount = 0;
+            const totalNews = p.news.length;
+            
             p.news.forEach(item => {
                 const card = document.createElement('a');
                 card.className = 'news-card';
@@ -2764,11 +2895,13 @@ function renderStockDashboard(p) {
                     sentimentColor = "var(--neon-green)";
                     borderLeftColor = "var(--neon-green)";
                     bgTint = "rgba(0, 200, 115, 0.03)";
+                    posCount++;
                 } else if (isNeg) {
                     sentimentText = "🔴 BEARISH";
                     sentimentColor = "var(--neon-red)";
                     borderLeftColor = "var(--neon-red)";
                     bgTint = "rgba(255, 75, 75, 0.03)";
+                    negCount++;
                 }
                 
                 card.style.borderLeft = `3.5px solid ${borderLeftColor}`;
@@ -2796,7 +2929,38 @@ function renderStockDashboard(p) {
                 `;
                 newsFeed.appendChild(card);
             });
+            
+            // Calculate aggregate sentiment
+            const sentimentPct = totalNews > 0 ? Math.round(((posCount + (totalNews - posCount - negCount) * 0.5) / totalNews) * 100) : 50;
+            
+            if (newsSentimentFill) {
+                newsSentimentFill.style.width = `${sentimentPct}%`;
+            }
+            
+            if (newsSentimentVal) {
+                if (sentimentPct >= 60) {
+                    newsSentimentVal.innerText = `${sentimentPct}% Bullish`;
+                    newsSentimentVal.style.color = 'var(--neon-green)';
+                } else if (sentimentPct <= 40) {
+                    newsSentimentVal.innerText = `${sentimentPct}% Bearish`;
+                    newsSentimentVal.style.color = 'var(--neon-red)';
+                } else {
+                    newsSentimentVal.innerText = `${sentimentPct}% Balanced`;
+                    newsSentimentVal.style.color = 'var(--color-amber)';
+                }
+            }
+            
+            if (newsSentimentDesc) {
+                let contextText = "Neutral/mixed announcements; monitoring directional breakout catalysts.";
+                if (sentimentPct >= 60) {
+                    contextText = "Optimistic market narrative. Scrapes suggest robust institutional confidence and momentum.";
+                } else if (sentimentPct <= 40) {
+                    contextText = "Precautionary market narrative. News cycle highlights short-term warnings or earnings headwinds.";
+                }
+                newsSentimentDesc.innerHTML = `Consensus: <strong>${contextText}</strong> (Analysis based on ${totalNews} recent sources: ${posCount} Bullish, ${negCount} Bearish, ${totalNews - posCount - negCount} Neutral).`;
+            }
         } else {
+            if (newsSentimentWrapper) newsSentimentWrapper.style.display = 'none';
             newsFeed.innerHTML = '<div style="padding:20px; text-align: center; width: 100%; color: var(--text-muted);">No recent financial news articles found.</div>';
         }
     }

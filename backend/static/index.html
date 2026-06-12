@@ -606,9 +606,23 @@
                                 <span id="business-summary-arrow" style="font-size: 14px; transition: transform 0.25s ease;">▼</span>
                             </div>
                             <div id="business-summary-content" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out;">
-                                <p id="business-summary-text" style="font-size: 12px; line-height: 1.5; color: var(--text-secondary); padding-top: 15px; margin: 0;">
-                                    Loading company business summary...
-                                </p>
+                                <div class="corp-summary-grid" style="padding-top: 15px;">
+                                    <!-- Left Column: Data Sheet -->
+                                    <div class="corporate-data-sheet" style="border-right: 1px dashed var(--border-glass); padding-right: 20px;">
+                                        <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">Corporate Data Sheet</div>
+                                        <div class="corp-sheet-row"><span class="corp-sheet-label">Sector</span><span class="corp-sheet-value" id="corp-sector">N/A</span></div>
+                                        <div class="corp-sheet-row"><span class="corp-sheet-label">Cap Class</span><span class="corp-sheet-value" id="corp-cap">N/A</span></div>
+                                        <div class="corp-sheet-row"><span class="corp-sheet-label">Exchange</span><span class="corp-sheet-value">NSE / BSE</span></div>
+                                        <div class="corp-sheet-row"><span class="corp-sheet-label">Ticker</span><span class="corp-sheet-value" id="corp-ticker">N/A</span></div>
+                                    </div>
+                                    <!-- Right Column: Narrative Summary -->
+                                    <div>
+                                        <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">Business Overview & Strategic Segments</div>
+                                        <p id="business-summary-text" style="font-size: 12px; line-height: 1.55; color: var(--text-muted); margin: 0;">
+                                            Loading company business summary...
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -617,64 +631,82 @@
                             <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
                                 <h3>CIO INVESTMENT PROSPECTUS</h3>
                                 <div style="display:flex; gap:8px; align-items:center;">
-                                    <span class="badge-rec" id="cio-badge-score" style="background: rgba(255,255,255,0.08); color: var(--text-primary); font-weight:700; border: 1px solid var(--border-glass);">Score: --/100</span>
                                     <span class="badge-rec" id="cio-badge-rec">HOLD 🟡</span>
                                 </div>
                             </div>
                             
                             <div class="cio-summary-panel">
-                                <!-- Institutional Checklist Breakdown (Recommendation 3) -->
-                                <div class="institutional-checklist" id="cio-checklist-container" style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px;">
-                                    <!-- Loaded dynamically via app.js -->
-                                    <div style="font-size: 12px; color: var(--text-muted);">Calculating composite checklist...</div>
-                                </div>
-
-                                <!-- Prospectus separate rating breakdowns (Recommendation 3 restored!) -->
-                                <div class="prospectus-breakdown" style="display: flex; gap: 15px; margin-top: 15px; padding-top: 15px; border-top: 1px dashed var(--border-glass);">
-                                    <div style="flex: 1; text-align: center; padding: 6px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid var(--border-glass);">
-                                        <span style="font-size: 8px; color: var(--text-secondary); font-weight:600; display:block; text-transform:uppercase; letter-spacing:0.05em;">Fundamental Signal</span>
-                                        <strong id="cio-fundamental-signal" style="font-size: 10px; color: var(--text-primary); display:block; margin-top:2px;">N/A</strong>
+                                <!-- Top Row: 2-Column Score Gauge & Checklist -->
+                                <div style="display: grid; grid-template-columns: 100px 1fr; gap: 15px; align-items: start; margin-bottom: 15px;">
+                                    <!-- Score Gauge -->
+                                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 8px; background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-glass); border-radius: 8px; text-align: center; height: 100%; box-sizing: border-box;">
+                                        <div class="cio-score-gauge-container">
+                                            <svg class="cio-score-gauge-svg" viewBox="0 0 100 100">
+                                                <circle class="cio-score-gauge-bg" cx="50" cy="50" r="40"></circle>
+                                                <circle class="cio-score-gauge-fill" id="cio-score-fill" cx="50" cy="50" r="40"></circle>
+                                            </svg>
+                                            <div class="cio-score-gauge-text">
+                                                <span class="cio-score-number" id="cio-score-num">--</span>
+                                                <span class="cio-score-label">Score</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div style="flex: 1; text-align: center; padding: 6px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid var(--border-glass);">
-                                        <span style="font-size: 8px; color: var(--text-secondary); font-weight:600; display:block; text-transform:uppercase; letter-spacing:0.05em;">Technical Signal</span>
-                                        <strong id="cio-technical-signal" style="font-size: 10px; color: var(--text-primary); display:block; margin-top:2px;">N/A</strong>
-                                    </div>
-                                    <div style="flex: 1; text-align: center; padding: 6px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid var(--border-glass);">
-                                        <span style="font-size: 8px; color: var(--text-secondary); font-weight:600; display:block; text-transform:uppercase; letter-spacing:0.05em;">Consensus Decision</span>
-                                        <strong id="cio-consensus-signal" style="font-size: 10px; color: var(--text-primary); display:block; margin-top:2px;">N/A</strong>
-                                    </div>
-                                </div>
-
-                                <div class="price-targets-block has-border-top">
-                                    <div class="target-price-box buy-box" style="padding: 10px; background: rgba(0, 200, 115, 0.05); border-left: 3px solid var(--neon-green); border-radius: 4px;">
-                                        <span style="font-size: 8px; color: var(--text-secondary); display:block; margin-bottom: 2px; text-transform:uppercase;">SUGGESTED BUY TARGET RANGE</span>
-                                        <strong id="target-buy-range" style="font-size: 12px; color: var(--text-primary);">Rs. --</strong>
-                                    </div>
-                                    <div class="target-price-box sell-box" style="padding: 10px; background: rgba(255, 75, 75, 0.05); border-left: 3px solid var(--neon-red); border-radius: 4px;">
-                                        <span style="font-size: 8px; color: var(--text-secondary); display:block; margin-bottom: 2px; text-transform:uppercase;">SUGGESTED SELL TARGET RANGE</span>
-                                        <strong id="target-sell-range" style="font-size: 12px; color: var(--text-primary);">Rs. --</strong>
+                                    <!-- Checklist -->
+                                    <div class="institutional-checklist" id="cio-checklist-container" style="display: flex; flex-direction: column; gap: 6px; box-sizing: border-box;">
+                                        <div style="font-size: 11px; color: var(--text-muted);">Calculating composite checklist...</div>
                                     </div>
                                 </div>
 
-                                <div class="price-targets-block">
-                                    <div class="target-price-box buy-box" style="padding: 10px; background: rgba(0, 200, 115, 0.05); border-left: 3px solid var(--neon-green); border-radius: 4px;">
-                                        <span style="font-size: 8px; color: var(--text-secondary); display:block; margin-bottom: 2px; text-transform:uppercase;">12M INVESTMENT TARGET</span>
-                                        <strong id="target-12m-price" style="font-size: 14px; color: var(--neon-green);">Rs. --</strong>
+                                <!-- Prospectus separate rating breakdowns -->
+                                <div class="prospectus-breakdown" style="display: flex; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-glass);">
+                                    <div style="flex: 1; text-align: center; padding: 6px; background: rgba(255,255,255,0.015); border-radius: 6px; border: 1px solid var(--border-glass);">
+                                        <span style="font-size: 8px; color: var(--text-secondary); font-weight:600; display:block; text-transform:uppercase; letter-spacing:0.05em;">Fundamental</span>
+                                        <strong id="cio-fundamental-signal" style="font-size: 9.5px; color: var(--text-primary); display:block; margin-top:2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">N/A</strong>
                                     </div>
-                                    <div class="target-price-box sell-box" style="padding: 10px; background: rgba(255, 75, 75, 0.05); border-left: 3px solid var(--neon-red); border-radius: 4px;">
-                                        <span style="font-size: 8px; color: var(--text-secondary); display:block; margin-bottom: 2px; text-transform:uppercase;">12M PROTECTION STOP LOSS</span>
-                                        <strong id="stop-loss-12m-price" style="font-size: 14px; color: var(--neon-red);">Rs. --</strong>
+                                    <div style="flex: 1; text-align: center; padding: 6px; background: rgba(255,255,255,0.015); border-radius: 6px; border: 1px solid var(--border-glass);">
+                                        <span style="font-size: 8px; color: var(--text-secondary); font-weight:600; display:block; text-transform:uppercase; letter-spacing:0.05em;">Technical</span>
+                                        <strong id="cio-technical-signal" style="font-size: 9.5px; color: var(--text-primary); display:block; margin-top:2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">N/A</strong>
+                                    </div>
+                                    <div style="flex: 1; text-align: center; padding: 6px; background: rgba(255,255,255,0.015); border-radius: 6px; border: 1px solid var(--border-glass);">
+                                        <span style="font-size: 8px; color: var(--text-secondary); font-weight:600; display:block; text-transform:uppercase; letter-spacing:0.05em;">Consensus</span>
+                                        <strong id="cio-consensus-signal" style="font-size: 9.5px; color: var(--text-primary); display:block; margin-top:2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">N/A</strong>
                                     </div>
                                 </div>
 
-                                <div style="margin-top: 15px; padding: 10px 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px;">
-                                    <span style="font-size: 9px; font-weight:600; color: var(--text-secondary); letter-spacing:0.05em; display:block; text-transform:uppercase;">Primary Risk Factor</span>
-                                    <strong id="cio-primary-risk-text" style="font-size: 12px; color: var(--neon-red); display:block; margin-top:3px;">N/A</strong>
+                                <!-- Dynamic Target Price Spectrum Slider -->
+                                <div style="margin-top: 15px; padding: 12px 10px; background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: 8px;">
+                                    <span style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em;">Target Price Range Spectrum</span>
+                                    <div class="spectrum-slider-track" id="prospectus-spectrum-track">
+                                        <div class="spectrum-marker" id="marker-stop" style="left: 0%;" title="Stop Loss Floor"></div>
+                                        <div class="spectrum-marker" id="marker-buy" style="left: 35%;" title="Suggested Buy Ceiling"></div>
+                                        <div class="spectrum-marker" id="marker-sell" style="left: 70%;" title="Suggested Sell Target"></div>
+                                        <div class="spectrum-marker" id="marker-target" style="left: 100%;" title="12M Target ceiling"></div>
+                                        
+                                        <div class="spectrum-slider-pointer" id="prospectus-pointer" style="left: 50%;">
+                                            <div class="spectrum-slider-label" id="prospectus-pointer-label">Current</div>
+                                            <div class="spectrum-slider-value" id="prospectus-pointer-val">Rs. --</div>
+                                        </div>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; font-size: 9px; margin-top: 15px; border-top: 1px dashed rgba(255,255,255,0.05); padding-top: 8px;">
+                                        <div style="text-align: left;"><span style="color: var(--text-muted); display:block; font-size:7.5px; text-transform:uppercase;">Stop Loss</span><strong id="cio-spectrum-stop" style="color: var(--neon-red);">Rs. --</strong></div>
+                                        <div style="text-align: center;"><span style="color: var(--text-muted); display:block; font-size:7.5px; text-transform:uppercase;">Buy Range</span><strong id="cio-spectrum-buy" style="color: var(--neon-green);">Rs. --</strong></div>
+                                        <div style="text-align: center;"><span style="color: var(--text-muted); display:block; font-size:7.5px; text-transform:uppercase;">Sell Range</span><strong id="cio-spectrum-sell" style="color: var(--neon-red);">Rs. --</strong></div>
+                                        <div style="text-align: right;"><span style="color: var(--text-muted); display:block; font-size:7.5px; text-transform:uppercase;">12M Target</span><strong id="cio-spectrum-target" style="color: var(--neon-green);">Rs. --</strong></div>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; margin-top: 8px; background: rgba(59, 130, 246, 0.04); padding: 5px 8px; border-radius: 4px;">
+                                        <span style="color: var(--text-muted);" id="prospectus-slider-upside-label">Upside potential</span>
+                                        <strong style="color: var(--neon-green);" id="prospectus-slider-upside-val">+--%</strong>
+                                    </div>
                                 </div>
 
-                                <div class="cio-thesis-text" style="margin-top: 18px; padding: 12px 14px; background: rgba(59, 130, 246, 0.03); border-left: 3.5px solid var(--color-primary); border-radius: 0 6px 6px 0; border-top: 1px solid rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.02); box-shadow: 0 4px 6px rgba(0,0,0,0.15); width: 100%; box-sizing: border-box;">
-                                    <h4 style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">⚖️ CIO Strategic Investment Thesis</h4>
-                                    <p id="cio-investment-thesis" style="font-size: 12px; line-height: 1.55; color: var(--text-muted); margin: 0;">...</p>
+                                <div style="margin-top: 12px; padding: 8px 10px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px;">
+                                    <span style="font-size: 8.5px; font-weight:600; color: var(--text-secondary); letter-spacing:0.05em; display:block; text-transform:uppercase;">Primary Risk Factor</span>
+                                    <strong id="cio-primary-risk-text" style="font-size: 11.5px; color: var(--neon-red); display:block; margin-top:2px;">N/A</strong>
+                                </div>
+
+                                <div class="cio-thesis-text" style="margin-top: 15px; padding: 10px 12px; background: rgba(59, 130, 246, 0.03); border-left: 3.5px solid var(--color-primary); border-radius: 0 6px 6px 0; border-top: 1px solid rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.02); box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
+                                    <h4 style="margin: 0 0 5px 0; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">⚖️ CIO Strategic Investment Thesis</h4>
+                                    <p id="cio-investment-thesis" style="font-size: 11.5px; line-height: 1.5; color: var(--text-muted); margin: 0;">...</p>
                                 </div>
                             </div>
                         </div>
@@ -1907,6 +1939,17 @@
                                 <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Real-time Scrapes & Sentiment Analysis</span>
                             </div>
                             <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Auditing live NSE news catalogs and corporate announcements with quantitative sentiment parsing.</p>
+                            <!-- News Sentiment Thermometer -->
+                            <div class="news-sentiment-wrapper" id="news-sentiment-wrapper" style="display: none;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700;">
+                                    <span style="color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">📰 News Catalyst Sentiment Index</span>
+                                    <span style="color: var(--neon-green);" id="news-sentiment-index-val">0% Positive</span>
+                                </div>
+                                <div class="sentiment-thermometer-track">
+                                    <div class="sentiment-thermometer-fill" id="news-sentiment-thermometer-fill"></div>
+                                </div>
+                                <div style="font-size: 10px; color: var(--text-muted); margin-top: 6px;" id="news-sentiment-index-desc">Calculating consensus sentiment index...</div>
+                            </div>
                             <div class="news-grid" id="news-feed-container">
                                 <!-- Loaded dynamically -->
                             </div>
