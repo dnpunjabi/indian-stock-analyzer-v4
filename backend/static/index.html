@@ -3077,38 +3077,7 @@
                         </div>
                     </div>
                 </div>
-                <!-- Shared Results Telemetry and Sector Row -->
-                <div id="rule-scanner-results-telemetry-row" style="display: none; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; width: 100%; box-sizing: border-box;">
-                    <!-- Telemetry Card -->
-                    <div class="card" id="rule-scanner-status-card" style="margin: 0;">
-                        <h3 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-family: 'Outfit', sans-serif; font-size: 13px;">
-                            <span>📊 SCANNING TELEMETRY</span>
-                            <span class="radar-scan-status" style="font-size: 9px; color: var(--color-primary); background: rgba(59, 130, 246, 0.1); padding: 2px 6px; border-radius: 4px; font-weight: 700;" id="rule-scanner-engine-status">IDLE</span>
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                            <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-glass); text-align: center;">
-                                <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px;">Scanned</span>
-                                <span style="font-size: 20px; font-weight: 800; color: var(--color-primary); font-family: 'Outfit', sans-serif;" id="rule-scanner-scanned-count">—</span>
-                            </div>
-                            <div style="padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border-glass); text-align: center;">
-                                <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px;">Matches</span>
-                                <span style="font-size: 20px; font-weight: 800; color: var(--neon-green); font-family: 'Outfit', sans-serif;" id="rule-scanner-matched-count">—</span>
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 4px;">Active Condition</span>
-                            <div style="padding: 8px 10px; background: rgba(0,0,0,0.2); border-radius: 6px; border: 1px solid var(--border-glass); font-size: 11px; color: var(--text-primary); font-weight: 600;" id="rule-scanner-active-condition">No scan executed</div>
-                        </div>
-                    </div>
 
-                    <!-- Sector Concentration Card -->
-                    <div class="card" id="rule-scanner-sector-card" style="margin: 0;">
-                        <h3 style="margin-bottom: 12px; font-family: 'Outfit', sans-serif; font-size: 13px;">📊 SECTOR CONCENTRATION</h3>
-                        <div id="rule-scanner-sector-bars" style="display: flex; flex-direction: column; gap: 8px;">
-                            <p class="helper-text" style="margin: 0; font-size: 11px;">Execute a scan to view sector distribution of matched stocks.</p>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- FULL WIDTH: SCAN RESULTS -->
                 <div style="margin-top: 25px; width: 100%;">
@@ -3128,25 +3097,32 @@
 
                         <!-- Rule Scanner Telemetry Dashboard Grid -->
                         <div class="rs-telemetry-grid no-print" id="rule-scanner-telemetry-grid" style="display: none; margin-top: 5px; margin-bottom: 25px;">
-                            <!-- Card A: Hit Rate Radial Gauge -->
+                            <!-- Card A: Cap-Segment & Risk speed dial -->
                             <div class="rs-chart-card">
-                                <h4 style="margin: 0 0 12px 0; font-size: 11px; text-transform: uppercase; font-family: 'Outfit', sans-serif; color: var(--text-secondary); width: 100%; text-align: left; letter-spacing: 0.05em;">📡 Constituent Hit Rate</h4>
-                                <div id="rs-radial-match-gauge-container" style="width: 100%; height: 160px; display: flex; align-items: center; justify-content: center; position: relative;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 11px; text-transform: uppercase; font-family: 'Outfit', sans-serif; color: var(--text-secondary); width: 100%; text-align: left; letter-spacing: 0.05em;">📁 Allocation & Volatility Risk</h4>
+                                <div id="rs-cap-risk-container" style="width: 100%; height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; gap: 8px; width: 100%;">
+                                    <!-- Dynamic content injected by app.js -->
+                                </div>
+                            </div>
+                            <!-- Card B: Comparative KPI Heatmap Grid -->
+                            <div class="rs-chart-card">
+                                <h4 style="margin: 0 0 12px 0; font-size: 11px; text-transform: uppercase; font-family: 'Outfit', sans-serif; color: var(--text-secondary); width: 100%; text-align: left; letter-spacing: 0.05em;">📊 Top Candidates KPI Comparison</h4>
+                                <div id="rs-kpi-heatmap-container" style="width: 100%; height: 160px; display: flex; align-items: center; justify-content: center; position: relative; width: 100%;">
+                                    <!-- Dynamic Heatmap table injected by app.js -->
+                                </div>
+                            </div>
+                            <!-- Card C: DCF Margin vs. RSI Momentum Quadrant Matrix -->
+                            <div class="rs-chart-card" style="grid-column: span 2;">
+                                <h4 style="margin: 0 0 12px 0; font-size: 11px; text-transform: uppercase; font-family: 'Outfit', sans-serif; color: var(--text-secondary); width: 100%; text-align: left; letter-spacing: 0.05em;">🎯 Margin vs. Momentum Quadrant</h4>
+                                <div id="rs-val-mom-container" style="width: 100%; height: 220px; display: flex; align-items: center; justify-content: center; position: relative; width: 100%;">
                                     <!-- Dynamic SVG injected by app.js -->
                                 </div>
                             </div>
-                            <!-- Card B: Sector Dispersion Donut -->
-                            <div class="rs-chart-card">
-                                <h4 style="margin: 0 0 12px 0; font-size: 11px; text-transform: uppercase; font-family: 'Outfit', sans-serif; color: var(--text-secondary); width: 100%; text-align: left; letter-spacing: 0.05em;">🍰 Sector Distribution</h4>
-                                <div id="rs-sector-donut-container" style="width: 100%; height: 160px; display: flex; align-items: center; justify-content: center; position: relative;">
-                                    <!-- Dynamic SVG injected by app.js -->
-                                </div>
-                            </div>
-                            <!-- Card C: Value vs. Quality Scatter -->
-                            <div class="rs-chart-card">
-                                <h4 style="margin: 0 0 12px 0; font-size: 11px; text-transform: uppercase; font-family: 'Outfit', sans-serif; color: var(--text-secondary); width: 100%; text-align: left; letter-spacing: 0.05em;">🎯 Score vs. P/E Spectrum</h4>
-                                <div id="rs-value-quality-scatter-container" style="width: 100%; height: 160px; display: flex; align-items: center; justify-content: center; position: relative;">
-                                    <!-- Dynamic SVG injected by app.js -->
+                            <!-- Card D: Sector Concentration (Restored with previous working styles) -->
+                            <div class="card" id="rule-scanner-sector-card" style="margin: 0; box-sizing: border-box; grid-column: span 2;">
+                                <h3 style="margin-top: 0; margin-bottom: 12px; font-family: 'Outfit', sans-serif; font-size: 13px;">📊 SECTOR CONCENTRATION</h3>
+                                <div id="rule-scanner-sector-bars" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <p class="helper-text" style="margin: 0; font-size: 11px;">Execute a scan to view sector distribution of matched stocks.</p>
                                 </div>
                             </div>
                         </div>
