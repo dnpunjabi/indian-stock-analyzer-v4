@@ -687,104 +687,139 @@
                             </div>
                             <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Monitoring moving average crossovers, relative strength indexes, and capture thresholds.</p>
                             
-                            <div class="tech-metrics-grid">
-                                <div class="tech-capsule">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">📊</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">RSI-14</span>
+                            <div class="tech-metrics-container" style="display: flex; flex-direction: column; gap: 15px; margin-top: 10px; margin-bottom: 15px; width: 100%; box-sizing: border-box;">
+                                <!-- Row 1: RSI & 52-Week Range Spectrum (2 Columns) -->
+                                <div class="tech-row-2col" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%; box-sizing: border-box;">
+                                    <!-- RSI Gauge Box -->
+                                    <div style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; min-height: 95px; box-sizing: border-box;">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                            <div style="display: flex; align-items: center; gap: 6px;">
+                                                <span style="font-size: 14px;">⚡</span>
+                                                <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">RSI-14 Momentum Gauge</span>
+                                            </div>
+                                            <strong id="tech-rsi" style="font-size: 10.5px; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: 'Outfit', sans-serif;">--</strong>
+                                        </div>
+                                        <!-- Interactive Slider Track for RSI -->
+                                        <div style="position: relative; height: 8px; background: linear-gradient(to right, rgba(16, 185, 129, 0.2) 0%, rgba(16, 185, 129, 0.2) 30%, rgba(59, 130, 246, 0.1) 30%, rgba(59, 130, 246, 0.1) 70%, rgba(239, 68, 68, 0.2) 70%, rgba(239, 68, 68, 0.2) 100%); border-radius: 4px; margin: 15px 0 10px 0; border: 1px solid rgba(255,255,255,0.03);">
+                                            <!-- Zone dividers -->
+                                            <div style="position: absolute; left: 30%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.15);"></div>
+                                            <div style="position: absolute; left: 70%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.15);"></div>
+                                            <!-- Indicator needle / pointer -->
+                                            <div id="tech-rsi-pointer" style="position: absolute; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #ffffff; border: 2.5px solid var(--color-primary); box-shadow: 0 0 10px var(--color-primary); z-index: 10; transition: left 0.5s cubic-bezier(0.25, 1, 0.5, 1); left: 50%;"></div>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 8px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">
+                                            <span style="color: var(--color-emerald);">Oversold (&lt;30)</span>
+                                            <span style="color: var(--text-secondary);">Neutral (30-70)</span>
+                                            <span style="color: var(--color-crimson);">Overbought (&gt;70)</span>
+                                        </div>
                                     </div>
-                                    <strong id="tech-rsi" style="font-size: 14px; margin-top: 6px; color: var(--text-primary);">52.4 (Neutral)</strong>
+                                    
+                                    <!-- 52-Week Price Spectrum Slider -->
+                                    <div style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; min-height: 95px; box-sizing: border-box;">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                            <div style="display: flex; align-items: center; gap: 6px;">
+                                                <span style="font-size: 14px;">📅</span>
+                                                <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">52W Price Range Spectrum</span>
+                                            </div>
+                                            <strong id="tech-52w-position" style="font-size: 10px; color: var(--text-secondary); font-family: 'Outfit', sans-serif;">--% of Range</strong>
+                                        </div>
+                                        <!-- Slider track -->
+                                        <div style="position: relative; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; margin: 15px 0 10px 0; border: 1px solid rgba(255,255,255,0.03);">
+                                            <div id="tech-52w-range-band" style="position: absolute; height: 100%; background: var(--color-primary-glow); border-radius: 4px; left: 0%; width: 0%;"></div>
+                                            <div id="tech-52w-current-pointer" style="position: absolute; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #ffffff; border: 2.5px solid var(--color-primary); box-shadow: 0 0 10px var(--color-primary); z-index: 10; transition: left 0.5s cubic-bezier(0.25, 1, 0.5, 1); left: 50%;"></div>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 8px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.02em; font-family: 'Outfit', sans-serif; line-height: 1.25;">
+                                            <span id="tech-low-52w-label" style="text-align: left;">Low: Rs. 0.00<span id="tech-low-52w" style="display: none;">Rs. 0.00</span><span id="tech-dist-low" style="display: none;">0.0%</span></span>
+                                            <span id="tech-current-52w-label" style="color: var(--text-primary); font-weight: 700; text-align: center;">Current: Rs. 0.00</span>
+                                            <span id="tech-high-52w-label" style="text-align: right;">High: Rs. 0.00<span id="tech-high-52w" style="display: none;">Rs. 0.00</span><span id="tech-dist-high" style="display: none;">0.0%</span></span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🔄</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">SMA Crossover</span>
+                                
+                                <!-- Row 2: SMA Trend Stacking & Up/Down Capture Ratio -->
+                                <div class="tech-row-2col" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; width: 100%; box-sizing: border-box;">
+                                    <!-- SMA Trend Alignment Stack -->
+                                    <div style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; min-height: 155px; box-sizing: border-box;">
+                                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                                            <span style="font-size: 14px;">🔄</span>
+                                            <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">Moving Average Alignment Stack</span>
+                                        </div>
+                                        <!-- Stacking visual elements -->
+                                        <div id="tech-sma-stack-container" style="display: flex; flex-direction: column; gap: 2px; margin: 5px 0;">
+                                            <div style="padding: 6px 12px; border-radius: 6px; font-size: 11px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); display: flex; justify-content: space-between;">
+                                                <span>Current Price</span><strong id="tech-stack-price-val">Rs. --</strong>
+                                            </div>
+                                            <div style="text-align: center; font-size: 8px; color: var(--text-muted); margin: 1px 0;">▼</div>
+                                            <div style="padding: 6px 12px; border-radius: 6px; font-size: 11px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); display: flex; justify-content: space-between;">
+                                                <span>50-Day SMA</span><span id="tech-sma-50">Rs. --</span>
+                                            </div>
+                                            <div style="text-align: center; font-size: 8px; color: var(--text-muted); margin: 1px 0;">▼</div>
+                                            <div style="padding: 6px 12px; border-radius: 6px; font-size: 11px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); display: flex; justify-content: space-between;">
+                                                <span>200-Day SMA</span><span id="tech-sma-200">Rs. --</span>
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: var(--text-secondary); font-weight: 600; font-family: 'Outfit', sans-serif; margin-top: 6px; border-top: 1px dashed rgba(255,255,255,0.04); padding-top: 6px;">
+                                            <span>Trend Cross:</span>
+                                            <strong id="tech-sma-trend" style="text-transform: uppercase; font-size: 9.5px; font-weight: 700;">--</strong>
+                                        </div>
                                     </div>
-                                    <strong id="tech-sma-trend" style="font-size: 12px; margin-top: 6px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Golden Cross (Bullish)</strong>
+                                    
+                                    <!-- Up/Down Capture Ratio Performance Bar -->
+                                    <div style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; min-height: 155px; box-sizing: border-box;">
+                                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                                            <span style="font-size: 14px;">🛡️</span>
+                                            <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">Benchmark Capture Profile</span>
+                                        </div>
+                                        <div style="display: flex; flex-direction: column; gap: 12px; margin: 8px 0;">
+                                            <!-- Up Capture -->
+                                            <div>
+                                                <div style="display: flex; justify-content: space-between; font-size: 9.5px; margin-bottom: 4px; font-family: 'Outfit', sans-serif;">
+                                                    <span style="color: var(--text-secondary); font-weight: 500;">Up-Market Capture</span>
+                                                    <strong id="tech-up-capture-val">--%</strong>
+                                                </div>
+                                                <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; position: relative; border: 1px solid rgba(255,255,255,0.03);">
+                                                    <div id="tech-up-capture-bar" style="position: absolute; height: 100%; width: 0%; left: 0; background: var(--color-emerald); transition: width 0.5s ease;"></div>
+                                                    <div style="position: absolute; height: 100%; width: 1.5px; left: 50%; background: rgba(255,255,255,0.3); z-index: 2;" title="Index 100% Benchmark"></div>
+                                                </div>
+                                                <span id="tech-up-capture" style="display: none;">N/A</span>
+                                            </div>
+                                            <!-- Down Capture -->
+                                            <div>
+                                                <div style="display: flex; justify-content: space-between; font-size: 9.5px; margin-bottom: 4px; font-family: 'Outfit', sans-serif;">
+                                                    <span style="color: var(--text-secondary); font-weight: 500;">Down-Market Capture</span>
+                                                    <strong id="tech-down-capture-val">--%</strong>
+                                                </div>
+                                                <div style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; position: relative; border: 1px solid rgba(255,255,255,0.03);">
+                                                    <div id="tech-down-capture-bar" style="position: absolute; height: 100%; width: 0%; left: 0; background: var(--color-crimson); transition: width 0.5s ease;"></div>
+                                                    <div style="position: absolute; height: 100%; width: 1.5px; left: 50%; background: rgba(255,255,255,0.3); z-index: 2;" title="Index 100% Benchmark"></div>
+                                                </div>
+                                                <span id="tech-down-capture" style="display: none;">N/A</span>
+                                            </div>
+                                        </div>
+                                        <div style="font-size: 8.5px; color: var(--text-muted); font-weight: 600; text-align: center; text-transform: uppercase; font-family: 'Outfit', sans-serif; border-top: 1px dashed rgba(255,255,255,0.04); padding-top: 6px; letter-spacing: 0.04em;" id="tech-benchmark-reference">
+                                            Benchmarked vs Nifty 50
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">📈</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">50-Day SMA</span>
+                                
+                                <!-- Row 3: Daily Price action grid (4 Columns) -->
+                                <div class="tech-row-4col" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; box-sizing: border-box;">
+                                    <div style="background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 45px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); box-sizing: border-box;">
+                                        <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em; font-family: 'Outfit', sans-serif;">Open</span>
+                                        <strong id="tech-daily-open" style="font-size: 11px; margin-top: 3px; color: var(--text-primary); font-family: 'Outfit', sans-serif;">Rs. 0.00</strong>
                                     </div>
-                                    <strong id="tech-sma-50" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 3,745.20</strong>
-                                </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">📉</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">200-Day SMA</span>
+                                    <div style="background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 45px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); box-sizing: border-box;">
+                                        <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em; font-family: 'Outfit', sans-serif;">High</span>
+                                        <strong id="tech-daily-high" style="font-size: 11px; margin-top: 3px; color: var(--color-emerald); font-family: 'Outfit', sans-serif;">Rs. 0.00</strong>
                                     </div>
-                                    <strong id="tech-sma-200" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 3,580.40</strong>
-                                </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🔔</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">Daily Open</span>
+                                    <div style="background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 45px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); box-sizing: border-box;">
+                                        <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em; font-family: 'Outfit', sans-serif;">Low</span>
+                                        <strong id="tech-daily-low" style="font-size: 11px; margin-top: 3px; color: var(--color-crimson); font-family: 'Outfit', sans-serif;">Rs. 0.00</strong>
                                     </div>
-                                    <strong id="tech-daily-open" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 0.00</strong>
-                                </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🔺</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">Daily High</span>
+                                    <div style="background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 45px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); box-sizing: border-box;">
+                                        <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.03em; font-family: 'Outfit', sans-serif;">Close</span>
+                                        <strong id="tech-daily-close" style="font-size: 11px; margin-top: 3px; color: var(--text-primary); font-family: 'Outfit', sans-serif;">Rs. 0.00</strong>
                                     </div>
-                                    <strong id="tech-daily-high" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 0.00</strong>
-                                </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🔻</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">Daily Low</span>
-                                    </div>
-                                    <strong id="tech-daily-low" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 0.00</strong>
-                                </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🏁</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">Daily Close</span>
-                                    </div>
-                                    <strong id="tech-daily-close" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 0.00</strong>
-                                </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🏰</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">52W High Price</span>
-                                    </div>
-                                    <strong id="tech-high-52w" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 0.00</strong>
-                                </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🌊</span>
-                                        <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">52W Low Price</span>
-                                    </div>
-                                    <strong id="tech-low-52w" style="font-size: 13px; margin-top: 6px; color: var(--text-primary);">Rs. 0.00</strong>
-                                </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🏔️</span>
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">52W High Dist</span>
-                                    </div>
-                                    <strong id="tech-dist-high" style="font-size: 14px; margin-top: 6px; color: var(--text-primary);">6.2%</strong>
-                                </div>
-                                <div class="tech-capsule" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🌋</span>
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">52W Low Dist</span>
-                                    </div>
-                                    <strong id="tech-dist-low" style="font-size: 14px; margin-top: 6px; color: var(--text-primary);">22.8%</strong>
-                                </div>
-                                <div class="tech-capsule" style="grid-column: span 2; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🚀</span>
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">Up Capture</span>
-                                    </div>
-                                    <strong id="tech-up-capture" style="font-size: 12px; margin-top: 6px; color: var(--text-primary);">N/A</strong>
-                                </div>
-                                <div class="tech-capsule" style="grid-column: span 2; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; min-height: 70px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
-                                        <span style="font-size: 14px;">🛡️</span>
-                                        <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.03em;">Down Capture</span>
-                                    </div>
-                                    <strong id="tech-down-capture" style="font-size: 12px; margin-top: 6px; color: var(--text-primary);">N/A</strong>
                                 </div>
                             </div>
                             
@@ -1010,6 +1045,12 @@
                                 <p class="sandbox-desc" style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">Fine-tune the mathematical cash flow projections. Recalculates dynamically, aligning the active matrix coordinates.</p>
                                 
                                 <div class="sandbox-workspace">
+                                    <!-- Scenario Presets -->
+                                    <div class="dcf-scenario-presets" style="display: flex; gap: 6px; margin-bottom: 12px; width: 100%;">
+                                        <button class="preset-btn" id="dcf-preset-bear" style="flex: 1; font-size: 9.5px; padding: 6px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.06); color: var(--color-crimson); font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: var(--font-heading); text-transform: uppercase;">Bear Case</button>
+                                        <button class="preset-btn" id="dcf-preset-base" style="flex: 1; font-size: 9.5px; padding: 6px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.03); color: var(--text-secondary); font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: var(--font-heading); text-transform: uppercase;">Base Case</button>
+                                        <button class="preset-btn" id="dcf-preset-bull" style="flex: 1; font-size: 9.5px; padding: 6px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.3); background: rgba(16, 185, 129, 0.06); color: var(--color-emerald); font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: var(--font-heading); text-transform: uppercase;">Bull Case</button>
+                                    </div>
                                     <div class="sandbox-sliders" style="display: flex; flex-direction: column; gap: 10px;">
                                         <div class="slider-group" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 6px;">
                                             <div class="slider-header" style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
@@ -1082,31 +1123,57 @@
                             </div>
                         </div>
 
-                        <!-- Historical Valuation Bands Card (Recommendation 2) -->
+                        <!-- Historical Valuation Bands Card (Recommendation 2 Upgrade) -->
                         <div class="card col-span-2 card-hidden" id="historical-bands-card" data-subtab="valuation" style="display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
-                                <h3 style="margin: 0 0 12px 0; font-size: 12px; letter-spacing: 0.04em;">HISTORICAL P/E BANDS (3-5Y)</h3>
-                                <div class="pe-bands-summary" style="display: flex; gap: 15px;">
-                                    <div class="current-pe-callout" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.02) 100%); border: 1px solid rgba(59, 130, 246, 0.25); padding: 12px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
-                                        <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; text-align: center; letter-spacing: 0.03em;">Current P/E</span>
-                                        <strong id="pe-current" style="font-size: 22px; font-weight: 800; color: var(--text-primary); margin-top: 4px; text-shadow: 0 0 8px rgba(255,255,255,0.1);">28.5</strong>
+                                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border: none; padding: 0; margin-bottom: 12px; width: 100%;">
+                                    <h3 style="margin: 0; font-size: 12px; letter-spacing: 0.04em;">HISTORICAL VALUATION BANDS</h3>
+                                    <!-- Timeframe switcher segment controls -->
+                                    <div class="timeline-switcher" style="display: flex; gap: 4px; background: rgba(0,0,0,0.25); padding: 2px; border-radius: 4px; border: 1px solid var(--border-glass);">
+                                        <button class="time-btn" data-period="1" style="background: transparent; border: none; color: var(--text-secondary); font-size: 9px; font-weight: 600; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-family: var(--font-heading);">1Y</button>
+                                        <button class="time-btn active" data-period="3" style="background: rgba(59, 130, 246, 0.2); border: none; color: var(--text-primary); font-size: 9px; font-weight: 700; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-family: var(--font-heading);">3Y</button>
+                                        <button class="time-btn" data-period="5" style="background: transparent; border: none; color: var(--text-secondary); font-size: 9px; font-weight: 600; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-family: var(--font-heading);">5Y</button>
                                     </div>
-                                    <div class="pe-stat-list">
-                                        <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
-                                            <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">5Y Median P/E</span>
-                                            <strong id="pe-median" style="font-size: 12px; margin-top: 2px; color: var(--text-primary);">26.2</strong>
+                                </div>
+
+                                <div class="pe-bands-summary" style="display: flex; flex-direction: column; gap: 12px; margin-top: 5px;">
+                                    <!-- Top Row Callout + Mini Stats Grid -->
+                                    <div style="display: flex; gap: 12px; width: 100%; box-sizing: border-box;">
+                                        <div class="current-pe-callout" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.02) 100%); border: 1px solid rgba(59, 130, 246, 0.25); padding: 10px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 85px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+                                            <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.03em;">Current P/E</span>
+                                            <strong id="pe-current" style="font-size: 22px; font-weight: 800; color: var(--text-primary); margin-top: 4px; text-shadow: 0 0 8px rgba(255,255,255,0.1);">--</strong>
                                         </div>
-                                        <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
-                                            <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">5Y Max P/E Premium</span>
-                                            <strong id="pe-max" style="font-size: 12px; margin-top: 2px; color: var(--text-primary);">34.1</strong>
+                                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; width: 100%;">
+                                            <div class="pe-stat-item" style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                                                <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.02em;">Median P/E</span>
+                                                <strong id="pe-median" style="font-size: 12.5px; margin-top: 2px; color: var(--text-primary);">--</strong>
+                                            </div>
+                                            <div class="pe-stat-item" style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                                                <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.02em;">Spread Premium</span>
+                                                <strong id="pe-status" class="green-text" style="font-size: 12.5px; margin-top: 2px;">--</strong>
+                                            </div>
+                                            <div class="pe-stat-item" style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                                                <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.02em;">Min P/E Floor</span>
+                                                <strong id="pe-min" style="font-size: 12.5px; margin-top: 2px; color: var(--text-primary);">--</strong>
+                                            </div>
+                                            <div class="pe-stat-item" style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                                                <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.02em;">Max P/E Ceiling</span>
+                                                <strong id="pe-max" style="font-size: 12.5px; margin-top: 2px; color: var(--text-primary);">--</strong>
+                                            </div>
                                         </div>
-                                        <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
-                                            <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">5Y Min P/E Floor</span>
-                                            <strong id="pe-min" style="font-size: 12px; margin-top: 2px; color: var(--text-primary);">18.5</strong>
+                                    </div>
+
+                                    <!-- Interactive Multiple Spectrum Track -->
+                                    <div class="pe-spectrum-container" style="margin-top: 6px; padding: 0 5px; box-sizing: border-box; width: 100%;">
+                                        <span style="font-size: 8px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 8px; letter-spacing: 0.04em;">Multiple Spectrum Position Placement</span>
+                                        <div style="height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--color-emerald) 0%, var(--color-emerald) 35%, var(--color-amber) 35%, var(--color-amber) 65%, var(--color-crimson) 65%, var(--color-crimson) 100%); width: 100%; position: relative; border: 1px solid rgba(0,0,0,0.2);">
+                                            <!-- Sliding pin representing current PE -->
+                                            <div id="pe-slider-pin" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 11px; height: 11px; border-radius: 50%; background: #ffffff; box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); border: 2px solid var(--color-primary); transition: left 0.6s cubic-bezier(0.25, 1, 0.5, 1); cursor: pointer; z-index: 5;"></div>
                                         </div>
-                                        <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
-                                            <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">Premium / Discount</span>
-                                            <strong id="pe-status" class="green-text" style="font-size: 12px; margin-top: 2px;">-8.5% Discount</strong>
+                                        <div style="display: flex; justify-content: space-between; font-size: 7.5px; color: var(--text-muted); margin-top: 6px; font-weight: 700; text-transform: uppercase;">
+                                            <span>Floor (<span id="pe-min-lbl">--</span>)</span>
+                                            <span>Median (<span id="pe-median-lbl">--</span>)</span>
+                                            <span>Ceiling (<span id="pe-max-lbl">--</span>)</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1114,7 +1181,7 @@
                             
                             <!-- Premium Layman Translation Block -->
                             <div id="pe-layman-block" style="margin-top: 12px; padding: 10px 12px; background: rgba(59, 130, 246, 0.03); border-left: 2.5px solid var(--color-primary); border-radius: 0 6px 6px 0; border-top: 1px dashed rgba(255,255,255,0.05); border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); width: 100%; box-sizing: border-box;">
-                                <span style="font-size: 9px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em; margin-bottom: 4px;">💡 Historical P/E Layman Translation</span>
+                                <span style="font-size: 9px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em; margin-bottom: 4px;">💡 Historical P/E Layman Translation Verdict</span>
                                 <p id="pe-layman-text" style="font-size: 11px; color: var(--text-muted); line-height: 1.45; margin: 0;">Calculating statistical valuation premium...</p>
                             </div>
                         </div>
@@ -1139,6 +1206,47 @@
                                             <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.03); padding-bottom: 4px;"><span>Median Target:</span> <strong id="comp-street-median" style="color: var(--text-primary);">Rs. --</strong></div>
                                             <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.03); padding-bottom: 4px;"><span>High Target:</span> <span id="comp-street-high" class="green-text" style="font-weight:600;">Rs. --</span></div>
                                             <div style="display: flex; justify-content: space-between; padding-bottom: 2px;"><span>Low Target:</span> <span id="comp-street-low" class="red-text" style="font-weight:600;">Rs. --</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Sentiment Semicircle Gauge & Target price distribution slider -->
+                                <div class="consensus-gauge-and-slider" style="margin-top: 15px; display: flex; flex-direction: column; gap: 15px;">
+                                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; margin-top: 5px;">
+                                        <div class="consensus-gauge-track" style="position: relative; width: 140px; height: 70px; overflow: hidden;">
+                                            <svg viewBox="0 0 100 50" style="width: 100%; height: 100%; display: block;">
+                                                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8" stroke-linecap="round"/>
+                                                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="url(#gauge-gradient)" stroke-width="8" stroke-dasharray="125.6" stroke-dashoffset="0" stroke-linecap="round"/>
+                                                <defs>
+                                                    <linearGradient id="gauge-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                        <stop offset="0%" stop-color="var(--color-crimson)"/>
+                                                        <stop offset="50%" stop-color="var(--color-amber)"/>
+                                                        <stop offset="100%" stop-color="var(--color-emerald)"/>
+                                                    </linearGradient>
+                                                </defs>
+                                            </svg>
+                                            <div id="consensus-gauge-needle" style="position: absolute; bottom: 0; left: 50%; width: 4px; height: 35px; background: #ffffff; border-radius: 2px; transform-origin: bottom center; transform: translateX(-50%) rotate(0deg); transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1); box-shadow: 0 0 8px rgba(255,255,255,0.5);"></div>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; width: 140px; font-size: 8px; color: var(--text-muted); margin-top: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                                            <span>Sell</span>
+                                            <span>Hold</span>
+                                            <span>Buy</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="target-slider-wrapper" style="background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); border-radius: 6px; padding: 10px 12px;">
+                                        <span style="font-size: 8.5px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em; margin-bottom: 8px;">Target Price Distribution Spectrum</span>
+                                        <div style="position: relative; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; margin: 15px 0 10px 0;">
+                                            <div id="target-range-band" style="position: absolute; height: 100%; background: var(--color-primary-glow); border-radius: 3px; left: 0%; right: 0%;"></div>
+                                            <div id="target-current-marker" style="position: absolute; top: 50%; transform: translate(-50%, -50%); width: 10px; height: 10px; border-radius: 50%; background: #ffffff; border: 2.5px solid var(--color-primary); box-shadow: 0 0 10px var(--color-primary); z-index: 10; cursor: pointer;" title="Current Price"></div>
+                                            <div id="target-low-marker" style="position: absolute; top: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; border-radius: 50%; background: var(--color-crimson); z-index: 5;" title="Low Target"></div>
+                                            <div id="target-high-marker" style="position: absolute; top: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; border-radius: 50%; background: var(--color-emerald); z-index: 5;" title="High Target"></div>
+                                            <div id="target-median-marker" style="position: absolute; top: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; border-radius: 50%; background: var(--color-amber); z-index: 5;" title="Median Target"></div>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 8px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.02em;">
+                                            <span id="target-slider-low-label">Low: Rs. --</span>
+                                            <span id="target-slider-current-label" style="color: var(--text-primary); font-weight: 700;">Current: Rs. --</span>
+                                            <span id="target-slider-high-label">High: Rs. --</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1365,21 +1473,33 @@
                             <div>
                                 <h3 style="margin: 0 0 12px 0; font-size: 12px; letter-spacing: 0.04em;">SHAREHOLDING & GOVERNANCE AUDIT</h3>
                                 <div class="pe-stat-list has-margin-bottom">
-                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); position: relative;">
                                         <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">Promoter Holding</span>
-                                        <strong id="sh-promoter" style="font-size: 14px; margin-top: 2px; color: var(--text-primary);">72.4%</strong>
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 2px;">
+                                            <strong id="sh-promoter" style="font-size: 14px; color: var(--text-primary);">72.4%</strong>
+                                            <svg id="spark-promoter" style="width: 50px; height: 16px; margin-left: 8px; overflow: visible;"></svg>
+                                        </div>
                                     </div>
-                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); position: relative;">
                                         <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">Foreign Inst (FII)</span>
-                                        <strong id="sh-fii" style="font-size: 14px; margin-top: 2px; color: var(--text-primary);">14.2%</strong>
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 2px;">
+                                            <strong id="sh-fii" style="font-size: 14px; color: var(--text-primary);">14.2%</strong>
+                                            <svg id="spark-fii" style="width: 50px; height: 16px; margin-left: 8px; overflow: visible;"></svg>
+                                        </div>
                                     </div>
-                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); position: relative;">
                                         <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">Domestic Inst (DII)</span>
-                                        <strong id="sh-dii" style="font-size: 14px; margin-top: 2px; color: var(--text-primary);">8.5%</strong>
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 2px;">
+                                            <strong id="sh-dii" style="font-size: 14px; color: var(--text-primary);">8.5%</strong>
+                                            <svg id="spark-dii" style="width: 50px; height: 16px; margin-left: 8px; overflow: visible;"></svg>
+                                        </div>
                                     </div>
-                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08);">
+                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); position: relative;">
                                         <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">Retail & Public</span>
-                                        <strong id="sh-public" style="font-size: 14px; margin-top: 2px; color: var(--text-primary);">4.9%</strong>
+                                        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 2px;">
+                                            <strong id="sh-public" style="font-size: 14px; color: var(--text-primary);">4.9%</strong>
+                                            <svg id="spark-public" style="width: 50px; height: 16px; margin-left: 8px; overflow: visible;"></svg>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -1646,6 +1766,19 @@
                                 <span id="audit-explain-title" style="font-size: 12.5px; font-weight: 700; color: #ffffff; display: block; font-family: 'Outfit', sans-serif; letter-spacing: 0.02em;">Select a cell in the matrix above to view audit checklist details</span>
                                 <span id="audit-explain-desc" style="font-size: 11.5px; color: var(--text-muted); display: block; margin-top: 8px; line-height: 1.6; font-family: 'Inter', sans-serif;">Click any combination (e.g. Hybrid + Growth) to inspect exactly which fundamental quality gates, solvency thresholds, momentum trend timings, and score adjustments passed or failed.</span>
                             </div>
+
+                            <!-- AI Strategy Debate Arena -->
+                            <div id="audit-debate-panel" style="margin-top: 20px; background: rgba(11, 15, 29, 0.6); border: 1px solid var(--border-glass); padding: 18px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed rgba(255,255,255,0.06); padding-bottom: 10px; margin-bottom: 15px;">
+                                    <h4 style="margin: 0; font-size: 13px; color: var(--color-amber); text-transform: uppercase; letter-spacing: 0.06em; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px;">
+                                        <span>⚔️ AI Multi-Agent Verdict Debate</span>
+                                    </h4>
+                                    <span style="font-size: 9px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Dialectic Consensus Audit</span>
+                                </div>
+                                <div id="audit-debate-dialogue" style="display: flex; flex-direction: column; gap: 12px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                                    <div style="font-size: 11.5px; color: var(--text-muted); text-align: center; padding: 15px;">Run an asset analysis first to generate the debate arena.</div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- SECTION 9: PRICE VOLUME DYNAMICS -->
@@ -1888,6 +2021,7 @@
                         💬 Chat Advisor
                     </button>
                 </div>
+            </div>
             </section>
 
             <!-- SECTION 3: COMPARISON ARENA -->

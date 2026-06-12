@@ -1040,6 +1040,8 @@ input[type="text"]:focus {
     box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
     flex-wrap: wrap;
     transition: all 0.3s ease;
+    position: relative;
+    z-index: 200;
 }
 
 .workspace-header-actions:hover {
@@ -1113,7 +1115,7 @@ input[type="text"]:focus {
     border-radius: 8px !important;
     max-height: 220px;
     overflow-y: auto;
-    z-index: 100;
+    z-index: 1000;
     font-size: 11.5px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
     margin-top: 6px;
@@ -1135,6 +1137,27 @@ input[type="text"]:focus {
 
 .analyzer-suggestions-box div.active-suggestion {
     border-left: 3px solid var(--color-primary);
+}
+
+/* Light mode overrides for suggestions box */
+[data-mode="light"] .analyzer-suggestions-box,
+[data-theme="light"] .analyzer-suggestions-box {
+    background: rgba(255, 255, 255, 0.98) !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-mode="light"] .analyzer-suggestions-box div,
+[data-theme="light"] .analyzer-suggestions-box div {
+    color: var(--text-secondary);
+}
+
+[data-mode="light"] .analyzer-suggestions-box div:hover,
+[data-mode="light"] .analyzer-suggestions-box div.active-suggestion,
+[data-theme="light"] .analyzer-suggestions-box div:hover,
+[data-theme="light"] .analyzer-suggestions-box div.active-suggestion {
+    background: rgba(59, 130, 246, 0.12) !important;
+    color: var(--text-primary);
 }
 
 /* ── Analyze Asset Button ── */
@@ -3141,6 +3164,18 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 /* ==================== DCF SENSITIVITY GRID ==================== */
+.active-matrix-cell {
+    background: rgba(59, 130, 246, 0.95) !important;
+    color: #ffffff !important;
+    outline: 2.5px solid var(--neon-blue) !important;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.9) !important;
+    transform: scale(1.18) !important;
+    font-weight: 800 !important;
+    z-index: 20 !important;
+    position: relative !important;
+    border-radius: 4px !important;
+}
+
 .sensitivity-matrix-table {
     border-collapse: collapse !important;
 }
@@ -8185,3 +8220,32 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     display: inline-block;
     animation: bell-shake 0.8s ease-in-out;
 }
+
+/* -------------------------------------------------------------
+   TECHNICAL & MOMENTUM TIMING LAYOUT RESPONSIVE OVERRIDES
+   ------------------------------------------------------------- */
+.tech-row-2col {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+.tech-row-4col {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 900px) {
+    .tech-row-2col {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+    .tech-row-4col {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+}
+@media (max-width: 600px) {
+    .tech-row-4col {
+        grid-template-columns: 1fr !important;
+    }
+}
+

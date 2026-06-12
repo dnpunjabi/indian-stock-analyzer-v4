@@ -2324,20 +2324,51 @@ async def list_alerts():
 
 @app.get("/api/alerts/settings")
 async def get_alert_settings():
-    """Returns the WhatsApp Business API settings from .env file."""
+    """Returns the alert settings (WhatsApp from env, Slack/Discord from SQLite)."""
     wa_token = os.environ.get("WHATSAPP_TOKEN", "")
     wa_phone_id = os.environ.get("WHATSAPP_PHONE_ID", "")
     wa_recipient = os.environ.get("WHATSAPP_RECIPIENT", "")
-    # Mask the token for frontend display (show only last 8 chars)
     masked_token = ""
     if wa_token:
         masked_token = "*" * 20 + wa_token[-8:] if len(wa_token) > 8 else wa_token
+    
+    slack_webhook = ""
+    discord_webhook = ""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM alert_settings WHERE key IN ('slack_webhook', 'discord_webhook')")
+        for row in cursor.fetchall():
+            if row["key"] == "slack_webhook":
+                slack_webhook = row["value"]
+            elif row["key"] == "discord_webhook":
+                discord_webhook = row["value"]
+
     return {
         "whatsapp_configured": bool(wa_token and wa_phone_id and wa_recipient),
         "whatsapp_token_masked": masked_token,
         "whatsapp_phone_id": wa_phone_id,
-        "whatsapp_recipient": wa_recipient
+        "whatsapp_recipient": wa_recipient,
+        "slack_webhook": slack_webhook,
+        "discord_webhook": discord_webhook
     }
+
+@app.post("/api/alerts/settings")
+async def save_alert_settings(payload: dict):
+    """Saves Slack and Discord webhooks to alert_settings table in SQLite."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if "slack_webhook" in payload:
+            cursor.execute(
+                "INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('slack_webhook', ?)",
+                (payload["slack_webhook"],)
+            )
+        if "discord_webhook" in payload:
+            cursor.execute(
+                "INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('discord_webhook', ?)",
+                (payload["discord_webhook"],)
+            )
+        conn.commit()
+    return {"status": "success"}
 
 @app.post("/api/alerts/whatsapp/test")
 async def test_whatsapp():
@@ -2392,6 +2423,17 @@ async def check_alerts():
     wa_phone_id = os.environ.get("WHATSAPP_PHONE_ID", "")
     wa_recipient = os.environ.get("WHATSAPP_RECIPIENT", "")
     whatsapp_configured = bool(wa_token and wa_phone_id and wa_recipient)
+
+    slack_webhook = ""
+    discord_webhook = ""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM alert_settings WHERE key IN ('slack_webhook', 'discord_webhook')")
+        for row in cursor.fetchall():
+            if row["key"] == "slack_webhook":
+                slack_webhook = row["value"]
+            elif row["key"] == "discord_webhook":
+                discord_webhook = row["value"]
 
     triggers = []
     with get_db() as conn:
