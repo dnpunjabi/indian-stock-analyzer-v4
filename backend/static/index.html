@@ -482,6 +482,58 @@
                     </div>
                 </div>
 
+                <!-- Universe Telemetry Grid -->
+                <div class="universe-telemetry-grid">
+                    <!-- Cache Coverage Gauge Card -->
+                    <div class="card" style="display: flex; gap: 20px; align-items: center; min-height: 180px; padding: 20px; box-sizing: border-box;">
+                        <div class="synthesis-score-gauge-wrap" style="flex: 0 0 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(30, 41, 59, 0.25); border: 1px solid var(--border-glass); border-radius: 10px; padding: 12px; height: 100%; box-sizing: border-box;">
+                            <div class="synthesis-gauge-container" style="width: 72px; height: 72px; position: relative;">
+                                <svg viewBox="0 0 36 36" class="synthesis-gauge-svg">
+                                    <path class="synthesis-gauge-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path id="universe-cache-gauge-fill" class="synthesis-gauge-fill" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                </svg>
+                                <div class="synthesis-gauge-text" style="position: absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                                    <span id="universe-cache-rate-num" style="font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: var(--text-primary);">0%</span>
+                                    <span style="font-size: 7px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: -3px;">Warmed</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px;">
+                            <h4 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-primary);" id="universe-cache-title-status">DATABASE CACHE COVERAGE</h4>
+                            <p style="margin: 0; font-size: 11px; color: var(--text-secondary); line-height: 1.5;" id="universe-cache-desc-text">Warming coverage status description...</p>
+                            <div style="display: flex; gap: 10px; font-size: 10px; font-family: 'Outfit', sans-serif; font-weight: 700; margin-top: 4px;">
+                                <span style="color: #10B981;" id="universe-stats-large">0 Large</span>
+                                <span style="color: #60a5fa;" id="universe-stats-mid">0 Mid</span>
+                                <span style="color: #f59e0b;" id="universe-stats-small">0 Small</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cache Operations Cockpit Card -->
+                    <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 180px; box-sizing: border-box;">
+                        <div>
+                            <h3 style="margin: 0 0 6px 0; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-primary);">⚡ Cache Operations Cockpit</h3>
+                            <p style="margin: 0; font-size: 10.5px; color: var(--text-muted); line-height: 1.4;">Execute batch pre-fetches and cache purges to manage remote visual load latency across the workspace.</p>
+                        </div>
+                        
+                        <!-- Live Progress Bar -->
+                        <div id="universe-bulk-progress-wrap" style="display: none; margin-top: 10px; margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 9.5px; margin-bottom: 4px; font-weight: 600;">
+                                <span style="color: var(--neon-green);" id="universe-bulk-progress-lbl">Warming constituents...</span>
+                                <span id="universe-bulk-progress-pct" style="color: var(--text-primary);">0%</span>
+                            </div>
+                            <div style="width: 100%; height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; position: relative;">
+                                <div id="universe-bulk-progress-fill" style="width: 0%; height: 100%; background: var(--color-emerald); transition: width 0.3s ease; border-radius: 3px; box-shadow: 0 0 4px var(--color-emerald);"></div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
+                            <button class="btn-primary" id="universe-bulk-warm-btn" style="font-size: 10.5px; padding: 6px 12px; height: auto; font-weight: 600; border-radius: 6px;">⚡ Bulk Warm Segment</button>
+                            <button class="btn-secondary" id="universe-bulk-flush-btn" style="font-size: 10.5px; padding: 6px 12px; height: auto; font-weight: 600; border-radius: 6px; color: #ef4444; border-color: rgba(239, 68, 68, 0.25);">🧹 Flush Cache</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Universe constituents results -->
                 <div class="screener-results-container card">
                     <h3 style="font-size:14px; font-weight:700; color:var(--text-primary); margin-top: 0; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 15px;">
@@ -1206,8 +1258,8 @@
 
                                 <div class="pe-bands-summary" style="display: flex; flex-direction: column; gap: 12px; margin-top: 5px;">
                                     <!-- Top Row Callout + Mini Stats Grid -->
-                                    <div style="display: flex; gap: 12px; width: 100%; box-sizing: border-box;">
-                                        <div class="current-pe-callout" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.02) 100%); border: 1px solid rgba(59, 130, 246, 0.25); padding: 10px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 85px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
+                                    <div class="pe-bands-row">
+                                        <div class="current-pe-callout" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.02) 100%); border: 1px solid rgba(59, 130, 246, 0.25); padding: 10px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.15);">
                                             <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.03em;">Current P/E</span>
                                             <strong id="pe-current" style="font-size: 22px; font-weight: 800; color: var(--text-primary); margin-top: 4px; text-shadow: 0 0 8px rgba(255,255,255,0.1);">--</strong>
                                         </div>

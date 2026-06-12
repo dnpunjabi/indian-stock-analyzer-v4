@@ -1048,6 +1048,17 @@ async def get_rebalance_status():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Status fetch failed: {str(e)}")
 
+@app.post("/api/admin/flush-cache")
+async def flush_profile_cache():
+    """Manual administration endpoint to purge cached stock profiles from SQLite database."""
+    try:
+        with get_db() as conn:
+            conn.execute("DELETE FROM cached_profiles")
+            conn.commit()
+        return {"status": "success", "message": "Successfully purged cached stock profiles from SQLite database."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to flush cache: {str(e)}")
+
 # Environment-gated CORS
 cors_origins_env = os.environ.get("CORS_ORIGINS", "*")
 if cors_origins_env == "*":

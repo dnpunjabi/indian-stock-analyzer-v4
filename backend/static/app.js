@@ -11447,6 +11447,18 @@ function setupUniverseExplorer() {
         });
     }
     
+    // Bulk cache warming triggers
+    const bulkWarmBtn = document.getElementById('universe-bulk-warm-btn');
+    if (bulkWarmBtn) {
+        bulkWarmBtn.addEventListener('click', runUniverseBulkCacheWarming);
+    }
+
+    // Flush cache triggers
+    const bulkFlushBtn = document.getElementById('universe-bulk-flush-btn');
+    if (bulkFlushBtn) {
+        bulkFlushBtn.addEventListener('click', flushUniverseCache);
+    }
+    
     setupUniverseExplorerPagination();
 }
 
@@ -11639,6 +11651,14 @@ function filterAndRenderUniverse() {
             }
         });
         
+        // Add single-stock quick pre-warm listener on COLD badge click
+        const coldBadge = tr.querySelector('.cache-cold-badge');
+        if (coldBadge) {
+            coldBadge.addEventListener('click', () => {
+                runUniverseSingleCacheWarming(item.symbol, coldBadge);
+            });
+        }
+        
         tbody.appendChild(tr);
     });
 
@@ -11716,6 +11736,9 @@ function filterAndRenderUniverse() {
         summaryText.innerHTML = html;
         summaryBox.style.display = 'block';
     }
+    
+    // Update visual cache coverage donut gauge
+    updateUniverseCacheGauge(filtered);
 }
 
 function setupUniverseExplorerPagination() {
@@ -11748,6 +11771,173 @@ function setupUniverseExplorerPagination() {
             activeUniversePage = 1;
             filterAndRenderUniverse();
         });
+    }
+}
+
+function updateUniverseCacheGauge(filtered) {
+    const totalCount = filtered.length;
+    const warmedCount = filtered.filter(item => item.is_cached === 1).length;
+    const warmedPct = totalCount > 0 ? (warmedCount / totalCount) * 100 : 0;
+
+    const largeCount = filtered.filter(item => item.cap_type === 'large').length;
+    const midCount = filtered.filter(item => item.cap_type === 'mid').length;
+    const smallCount = filtered.filter(item => item.cap_type === 'small').length;
+
+    // Set numbers
+    const rateNumEl = document.getElementById('universe-cache-rate-num');
+    if (rateNumEl) rateNumEl.innerText = `${warmedPct.toFixed(0)}%`;
+    
+    // Animate Gauge Fill
+    const fillEl = document.getElementById('universe-cache-gauge-fill');
+    if (fillEl) {
+        fillEl.setAttribute('stroke-dasharray', `${warmedPct.toFixed(0)}, 100`);
+        let gaugeColor = 'var(--color-emerald)';
+        if (warmedPct < 40) gaugeColor = 'var(--color-crimson)';
+        else if (warmedPct < 80) gaugeColor = 'var(--color-amber)';
+        fillEl.style.stroke = gaugeColor;
+    }
+
+    // Set details text
+    const statsLargeEl = document.getElementById('universe-stats-large');
+    const statsMidEl = document.getElementById('universe-stats-mid');
+    const statsSmallEl = document.getElementById('universe-stats-small');
+    if (statsLargeEl) statsLargeEl.innerText = `${largeCount} Large`;
+    if (statsMidEl) statsMidEl.innerText = `${midCount} Mid`;
+    if (statsSmallEl) statsSmallEl.innerText = `${smallCount} Small`;
+
+    const titleEl = document.getElementById('universe-cache-title-status');
+    const descEl = document.getElementById('universe-cache-desc-text');
+    if (titleEl && descEl) {
+        if (warmedPct >= 80) {
+            titleEl.innerText = '🔥 HIGHLY PRE-PREPPED KITCHEN';
+            descEl.innerText = `Warming coverage stands at ${warmedPct.toFixed(1)}%. Workspace calculations for segment assets will render instantly with zero network delays.`;
+        } else if (warmedPct >= 40) {
+            titleEl.innerText = '⚖️ SEMI-WARMED ENGINE';
+            descEl.innerText = `Warming coverage is ${warmedPct.toFixed(1)}%. Basic assets will load instantly, but some tickers will trigger remote NSE searches.`;
+        } else {
+            titleEl.innerText = '❄️ COLD DATABASE STATUS';
+            descEl.innerText = `Only ${warmedPct.toFixed(1)}% of assets cached. Loading stock research workspaces will encounter latency from remote scraping.`;
+        }
+    }
+}
+
+async function runUniverseBulkCacheWarming() {
+    const segment = document.getElementById('universe-explorer-select').value;
+    // Get cold stocks of the CURRENT segment (or all if segment is 'all')
+    const coldStocks = universeConstituents.filter(item => 
+        item.is_cached === 0 && (segment === 'all' || item.cap_type === segment)
+    );
+
+    if (coldStocks.length === 0) {
+        showToast("All constituents in this segment are already pre-warmed!", "info");
+        return;
+    }
+
+    const progressWrap = document.getElementById('universe-bulk-progress-wrap');
+    const progressFill = document.getElementById('universe-bulk-progress-fill');
+    const progressPct = document.getElementById('universe-bulk-progress-pct');
+    const progressLbl = document.getElementById('universe-bulk-progress-lbl');
+    const warmBtn = document.getElementById('universe-bulk-warm-btn');
+
+    if (progressWrap) progressWrap.style.display = 'block';
+    if (warmBtn) warmBtn.disabled = true;
+
+    let completed = 0;
+    const total = coldStocks.length;
+
+    for (let i = 0; i < total; i++) {
+        const stock = coldStocks[i];
+        if (progressLbl) progressLbl.innerText = `Pre-warming ${stock.symbol} (${i + 1}/${total})...`;
+        
+        try {
+            // Call the analyze endpoint to warm this specific stock's profile cache
+            const res = await fetch(`/api/analyze?query=${encodeURIComponent(stock.symbol)}`);
+            if (res.ok) {
+                stock.is_cached = 1; // Mark in the local array
+                // Also update the global list if needed
+                const match = universeConstituents.find(item => item.symbol === stock.symbol);
+                if (match) match.is_cached = 1;
+            }
+            completed++;
+            
+            const pct = Math.round((completed / total) * 100);
+            if (progressFill) progressFill.style.width = `${pct}%`;
+            if (progressPct) progressPct.innerText = `${pct}%`;
+            
+            // Re-render constituents table and gauge in real time
+            filterAndRenderUniverse();
+        } catch (err) {
+            console.error(`Failed to warm ${stock.symbol}:`, err);
+        }
+    }
+
+    if (progressLbl) progressLbl.innerText = `Bulk pre-warming complete! Warmed ${completed} assets.`;
+    showToast(`Successfully pre-warmed ${completed} constituents!`, "success");
+    if (warmBtn) warmBtn.disabled = false;
+    
+    // Hide progress bar after 3 seconds
+    setTimeout(() => {
+        if (progressWrap) progressWrap.style.display = 'none';
+    }, 3000);
+
+    // Refresh parent rebalancer status if active
+    if (typeof loadRebalancerStatus === 'function') {
+        loadRebalancerStatus();
+    }
+}
+
+async function runUniverseSingleCacheWarming(symbol, badgeElement) {
+    if (!badgeElement) return;
+    
+    const originalHTML = badgeElement.outerHTML;
+    badgeElement.innerHTML = `<span class="spinner" style="display: inline-block; width: 10px; height: 10px; border: 1.5px solid rgba(255,255,255,0.1); border-top-color: var(--neon-green); border-radius: 50%; animation: spin 1s linear infinite; margin-right: 4px;"></span>WARMING`;
+    
+    try {
+        const res = await fetch(`/api/analyze?query=${encodeURIComponent(symbol)}`);
+        if (res.ok) {
+            showToast(`Successfully pre-warmed cache for ${symbol}!`, "success");
+            // Find and mark cached in universe list
+            const match = universeConstituents.find(item => item.symbol === symbol);
+            if (match) match.is_cached = 1;
+            filterAndRenderUniverse();
+            
+            // Refresh parent status
+            if (typeof loadRebalancerStatus === 'function') {
+                loadRebalancerStatus();
+            }
+        } else {
+            throw new Error("API warming failed");
+        }
+    } catch (err) {
+        showToast(`Failed to warm ${symbol}: ${err.message}`, "error");
+        badgeElement.outerHTML = originalHTML;
+    }
+}
+
+async function flushUniverseCache() {
+    if (!confirm("Are you sure you want to flush the persistent stock profiles cache? This will reset all constituent status diagnostics back to COLD, increasing workspace load latencies.")) {
+        return;
+    }
+    
+    showLoader("Purging Database Cache...", "Clearing sqlite cached profiles database table...");
+    try {
+        const res = await fetch('/api/admin/flush-cache', { method: 'POST' });
+        if (!res.ok) throw new Error("Failed to flush server profile cache.");
+        const data = await res.json();
+        showToast(data.message || "Cache flushed successfully.", "success");
+        
+        // Mark all constituents in memory as cold
+        universeConstituents.forEach(item => item.is_cached = 0);
+        filterAndRenderUniverse();
+        
+        // Refresh parent status
+        if (typeof loadRebalancerStatus === 'function') {
+            loadRebalancerStatus();
+        }
+    } catch (err) {
+        showToast(`Flush cache failed: ${err.message}`, "error");
+    } finally {
+        hideLoader();
     }
 }
 
