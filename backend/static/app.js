@@ -120,6 +120,9 @@ let activeUniversePage = 1;
 let activeUniversePageSize = 10;
 let activeWatchlistPage = 1;
 let activeWatchlistPageSize = 10;
+let watchlistSortCol = 'symbol';
+let watchlistSortAsc = true;
+let activeWatchlistScatterChart = null;
 let lastSwingScanResults = [];
 let swingScanPage = 1;
 let swingScanPageSize = 10;
@@ -9414,6 +9417,32 @@ async function setupWatchlistControls() {
         }
     }
     
+    // Sortable header click listeners for Watchlist Constituents
+    const headers = document.querySelectorAll('#tab-watchlist th.sortable-wl');
+    headers.forEach(h => {
+        h.addEventListener('click', () => {
+            const field = h.getAttribute('data-sort');
+            if (watchlistSortCol === field) {
+                watchlistSortAsc = !watchlistSortAsc;
+            } else {
+                watchlistSortCol = field;
+                watchlistSortAsc = true;
+            }
+            
+            // Reset and set indicators
+            headers.forEach(header => {
+                header.style.color = 'var(--text-secondary)';
+                header.innerText = header.innerText.replace(/[▲▼↕]/g, '↕');
+            });
+            
+            h.style.color = 'var(--color-primary)';
+            h.innerText = h.innerText.replace('↕', watchlistSortAsc ? '▲' : '▼');
+            
+            activeWatchlistPage = 1;
+            renderWatchlistItems();
+        });
+    });
+
     // Initial data fetch
     await fetchWatchlists();
     setupWatchlistPagination();
@@ -9659,10 +9688,17 @@ function renderWatchlistItems() {
     tbody.innerHTML = '';
     
     const resultsContainer = document.getElementById('watchlist-analysis-results');
-    if (resultsContainer) resultsContainer.style.display = 'none';
     const summaryBox = document.getElementById('watchlist-summary-box');
-    if (summaryBox) summaryBox.style.display = 'none';
-    activeWatchlistBatchData = null;
+    
+    if (typeof window.lastRenderedWatchlistId === 'undefined') {
+        window.lastRenderedWatchlistId = null;
+    }
+    if (window.lastRenderedWatchlistId !== activeWatchlistId) {
+        window.lastRenderedWatchlistId = activeWatchlistId;
+        activeWatchlistBatchData = null;
+        if (resultsContainer) resultsContainer.style.display = 'none';
+        if (summaryBox) summaryBox.style.display = 'none';
+    }
     
     const inlineAddContainer = document.getElementById('watchlist-inline-add-container');
     
@@ -9671,7 +9707,7 @@ function renderWatchlistItems() {
         if (deleteBtn) deleteBtn.style.display = 'none';
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
         if (inlineAddContainer) inlineAddContainer.style.display = 'none';
-        document.getElementById('watchlist-analysis-results').style.display = 'none';
+        if (resultsContainer) resultsContainer.style.display = 'none';
         tbody.innerHTML = '<tr><td colspan="4" class="center-text text-muted">Select or create a watchlist on the left to display its constituents.</td></tr>';
         return;
     }
@@ -9696,27 +9732,197 @@ function renderWatchlistItems() {
     if (activeWatch.items.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="center-text text-muted">This watchlist is empty. Load a stock inside the Analyzer and add it.</td></tr>';
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
-        document.getElementById('watchlist-analysis-results').style.display = 'none';
+        if (resultsContainer) resultsContainer.style.display = 'none';
         if (pagContainer) pagContainer.style.display = 'none';
         return;
     }
     
     if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'inline-block';
     
-    const totalPages = Math.ceil(activeWatch.items.length / activeWatchlistPageSize);
+    // --- WATCHLIST TELEMETRY & SECTOR CONCENTRATION ---
+    const totalItems = activeWatch.items.length;
+    
+    // 1. Calculate sector dispersion
+    const sectors = {};
+    activeWatch.items.forEach(item => {
+        const s = item.sector || 'Unclassified';
+        sectors[s] = (sectors[s] || 0) + 1;
+    });
+    const sortedSectors = Object.entries(sectors).sort((a, b) => b[1] - a[1]);
+    const displaySectors = [];
+    let otherCount = 0;
+    sortedSectors.forEach(([sec, count], idx) => {
+        if (idx < 5) {
+            displaySectors.push({ sector: sec, count: count });
+        } else {
+            otherCount += count;
+        }
+    });
+    if (otherCount > 0) {
+        displaySectors.push({ sector: 'Others', count: otherCount });
+    }
+    
+    const sectorColors = ['var(--color-primary-glow)', 'var(--color-emerald)', 'var(--color-amber)', 'var(--color-crimson)', '#8b5cf6', '#3b82f6'];
+    const dispersionContainer = document.querySelector('.watchlist-sector-dispersion');
+    const labelContainer = document.getElementById('watchlist-sector-labels');
+    
+    if (dispersionContainer && labelContainer) {
+        dispersionContainer.innerHTML = '';
+        labelContainer.innerHTML = '';
+        displaySectors.forEach((s, idx) => {
+            const pct = (s.count / totalItems * 100).toFixed(1);
+            const color = sectorColors[idx % sectorColors.length];
+            const seg = document.createElement('div');
+            seg.style.width = `${pct}%`;
+            seg.style.backgroundColor = color;
+            seg.title = `${s.sector}: ${s.count} (${pct}%)`;
+            dispersionContainer.appendChild(seg);
+            
+            const lbl = document.createElement('div');
+            lbl.style.display = 'flex';
+            lbl.style.alignItems = 'center';
+            lbl.style.gap = '4px';
+            lbl.innerHTML = `<span style="display:inline-block; width:6px; height:6px; border-radius:50%; background-color:${color};"></span> ${s.sector} (${pct}%)`;
+            labelContainer.appendChild(lbl);
+        });
+    }
+    
+    // 2. Warmed Cache Rate
+    let warmedCount = 0;
+    activeWatch.items.forEach(item => {
+        const match = universeConstituents.find(u => u.symbol.split(".")[0].toUpperCase() === item.symbol.split(".")[0].toUpperCase());
+        if (match && match.is_cached === 1) {
+            warmedCount++;
+        }
+    });
+    const warmedPct = (warmedCount / totalItems * 100).toFixed(0);
+    const warmEl = document.getElementById('watchlist-telemetry-warm');
+    if (warmEl) warmEl.innerText = `${warmedPct}%`;
+    
+    // 3. Score & checklist calculations
+    const scoreRing = document.getElementById('watchlist-avg-score-ring');
+    const scoreNum = document.getElementById('watchlist-avg-score-num');
+    const scoreLabel = document.getElementById('watchlist-avg-score-label');
+    const peEl = document.getElementById('watchlist-telemetry-pe');
+    const roeEl = document.getElementById('watchlist-telemetry-roe');
+    const mosEl = document.getElementById('watchlist-telemetry-mos');
+    
+    if (activeWatchlistBatchData && activeWatchlistBatchData.results && activeWatchlistBatchData.results.length > 0) {
+        const results = activeWatchlistBatchData.results;
+        const totalScore = results.reduce((acc, curr) => acc + (curr.score || 0), 0);
+        const avgScore = Math.round(totalScore / results.length);
+        
+        if (scoreNum) scoreNum.innerText = avgScore;
+        if (scoreRing) {
+            scoreRing.setAttribute('stroke-dasharray', `${avgScore}, 100`);
+            if (avgScore >= 70) {
+                scoreRing.style.stroke = 'var(--color-emerald)';
+                scoreRing.style.filter = 'drop-shadow(0 0 5px rgba(16, 185, 129, 0.4))';
+            } else if (avgScore >= 50) {
+                scoreRing.style.stroke = 'var(--color-amber)';
+                scoreRing.style.filter = 'drop-shadow(0 0 5px rgba(245, 158, 11, 0.4))';
+            } else {
+                scoreRing.style.stroke = 'var(--color-crimson)';
+                scoreRing.style.filter = 'drop-shadow(0 0 5px rgba(239, 68, 68, 0.4))';
+            }
+        }
+        if (scoreLabel) {
+            scoreLabel.style.display = 'inline-block';
+            if (avgScore >= 70) {
+                scoreLabel.innerText = "STRONG BUY";
+                scoreLabel.style.background = 'rgba(16, 185, 129, 0.12)';
+                scoreLabel.style.color = 'var(--color-emerald)';
+                scoreLabel.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+            } else if (avgScore >= 50) {
+                scoreLabel.innerText = "ACCUMULATE";
+                scoreLabel.style.background = 'rgba(245, 158, 11, 0.12)';
+                scoreLabel.style.color = 'var(--color-amber)';
+                scoreLabel.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+            } else {
+                scoreLabel.innerText = "UNDERPERFORM";
+                scoreLabel.style.background = 'rgba(239, 68, 68, 0.12)';
+                scoreLabel.style.color = 'var(--color-crimson)';
+                scoreLabel.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+            }
+        }
+        
+        let totalPE = 0, countPE = 0;
+        let totalROE = 0, countROE = 0;
+        let totalMOS = 0, countMOS = 0;
+        results.forEach(res => {
+            if (res.pe && res.pe > 0) {
+                totalPE += res.pe;
+                countPE++;
+            }
+            if (res.roe && res.roe > 0) {
+                totalROE += res.roe;
+                countROE++;
+            }
+            if (res.margin_of_safety !== null && res.margin_of_safety !== undefined) {
+                totalMOS += res.margin_of_safety;
+                countMOS++;
+            }
+        });
+        if (peEl) peEl.innerText = countPE > 0 ? (totalPE / countPE).toFixed(1) : '--';
+        if (roeEl) roeEl.innerText = countROE > 0 ? `${(totalROE / countROE).toFixed(1)}%` : '--';
+        if (mosEl) {
+            if (countMOS > 0) {
+                const avgMOS = totalMOS / countMOS;
+                mosEl.innerText = `${avgMOS > 0 ? '+' : ''}${avgMOS.toFixed(1)}%`;
+                mosEl.className = avgMOS >= 0 ? 'green-text' : 'red-text';
+            } else {
+                mosEl.innerText = '--';
+                mosEl.className = '';
+            }
+        }
+    } else {
+        if (scoreNum) scoreNum.innerText = '--';
+        if (scoreRing) scoreRing.setAttribute('stroke-dasharray', `0, 100`);
+        if (scoreLabel) scoreLabel.style.display = 'none';
+        if (peEl) peEl.innerText = '--';
+        if (roeEl) roeEl.innerText = '--';
+        if (mosEl) {
+            mosEl.innerText = '--';
+            mosEl.className = '';
+        }
+    }
+    
+    // --- SORT CONSTITUENTS ---
+    let sortedItems = [...activeWatch.items];
+    sortedItems.sort((a, b) => {
+        let valA = a[watchlistSortCol] || '';
+        let valB = b[watchlistSortCol] || '';
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return watchlistSortAsc ? -1 : 1;
+        if (valA > valB) return watchlistSortAsc ? 1 : -1;
+        return 0;
+    });
+    
+    const totalPages = Math.ceil(sortedItems.length / activeWatchlistPageSize);
     if (activeWatchlistPage < 1) activeWatchlistPage = 1;
     if (activeWatchlistPage > totalPages) activeWatchlistPage = totalPages;
     
     const startIndex = (activeWatchlistPage - 1) * activeWatchlistPageSize;
-    const endIndex = Math.min(startIndex + activeWatchlistPageSize, activeWatch.items.length);
-    const pageData = activeWatch.items.slice(startIndex, endIndex);
+    const endIndex = Math.min(startIndex + activeWatchlistPageSize, sortedItems.length);
+    const pageData = sortedItems.slice(startIndex, endIndex);
     
     pageData.forEach(item => {
+        const match = universeConstituents.find(u => u.symbol.split(".")[0].toUpperCase() === item.symbol.split(".")[0].toUpperCase());
+        const isCached = match ? match.is_cached : 0;
+        const cacheBadgeHTML = isCached === 1 
+            ? `<span class="badge-rec rec-buy" style="font-size: 8px; padding: 2px 5px; border-radius: 4px; font-weight: 700; cursor: default; border: 1px solid rgba(16,185,129,0.2);" title="Database cache warmed. Analysis loads instantly.">WARMED 🟢</span>`
+            : `<span class="badge-rec rec-hold click-to-warm" data-symbol="${item.symbol}" style="font-size: 8px; padding: 2px 5px; border-radius: 4px; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: var(--text-muted);" title="Uncached database profile. Click to pre-warm cache.">COLD ⚪</span>`;
+            
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>
-                <div class="watchlist-symbol-link" style="cursor: pointer;" title="Click to load research workspace">
-                    <strong style="color: var(--color-primary); text-decoration: underline;">${item.symbol}</strong>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div class="watchlist-symbol-link" style="cursor: pointer;" title="Click to load research workspace">
+                        <strong style="color: var(--color-primary); text-decoration: underline;">${item.symbol}</strong>
+                    </div>
+                    ${cacheBadgeHTML}
                 </div>
             </td>
             <td>
@@ -9730,11 +9936,18 @@ function renderWatchlistItems() {
             </td>
         `;
         
-        // Add click events
         tr.querySelectorAll('.watchlist-symbol-link').forEach(el => {
             el.addEventListener('click', () => {
                 switchTab('analyzer');
                 loadStockAnalyzer(item.symbol);
+            });
+        });
+        
+        tr.querySelectorAll('.click-to-warm').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const sym = el.getAttribute('data-symbol');
+                runUniverseSingleCacheWarming(sym, el);
             });
         });
         
@@ -9744,7 +9957,7 @@ function renderWatchlistItems() {
         
         tbody.appendChild(tr);
     });
-
+    
     if (pagContainer) {
         document.getElementById('watchlist-table-page-info').innerText = `Page ${activeWatchlistPage} of ${totalPages}`;
         document.getElementById('watchlist-table-prev-btn').disabled = (activeWatchlistPage === 1);
@@ -11319,6 +11532,7 @@ function exportTableToCSV(tbodyId, filename, theadId = null) {
 }
 
 // Watchlist Batch Portfolio Analytics Run
+// Watchlist Batch Portfolio Analytics Run
 async function runWatchlistBatchAnalysis() {
     if (activeWatchlistId === null) return;
     
@@ -11339,11 +11553,24 @@ async function runWatchlistBatchAnalysis() {
         
         activeWatchlistBatchData = data;
         
+        // Refresh watchlist card top headers & gauges
+        renderWatchlistItems();
+        
         tbody.innerHTML = '';
         if (data.results.length === 0) {
             tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">No items in watchlist to analyze.</td></tr>';
             return;
         }
+        
+        // Calculate PE and ROE statistics for z-scores
+        const peVals = data.results.map(r => r.pe).filter(v => v > 0);
+        const roeVals = data.results.map(r => r.roe).filter(v => v > 0);
+        
+        const avgPE = peVals.length > 0 ? (peVals.reduce((a,b) => a+b, 0) / peVals.length) : 0;
+        const stdPE = peVals.length > 0 ? Math.sqrt(peVals.reduce((a,b) => a + Math.pow(b - avgPE, 2), 0) / peVals.length) : 0;
+        
+        const avgROE = roeVals.length > 0 ? (roeVals.reduce((a,b) => a+b, 0) / roeVals.length) : 0;
+        const stdROE = roeVals.length > 0 ? Math.sqrt(roeVals.reduce((a,b) => a + Math.pow(b - avgROE, 2), 0) / roeVals.length) : 0;
         
         data.results.forEach(res => {
             const tr = document.createElement('tr');
@@ -11355,6 +11582,20 @@ async function runWatchlistBatchAnalysis() {
             let trendClass = "yellow-text";
             if (res.trend === 'Bullish') trendClass = "green-text";
             if (res.trend === 'Bearish') trendClass = "red-text";
+            
+            let peClass = '';
+            if (res.pe > 0 && stdPE > 0) {
+                const zPE = (res.pe - avgPE) / stdPE;
+                if (zPE <= -1.0) peClass = 'heatmap-z-high';
+                else if (zPE >= 1.0) peClass = 'heatmap-z-low';
+            }
+            
+            let roeClass = '';
+            if (res.roe > 0 && stdROE > 0) {
+                const zROE = (res.roe - avgROE) / stdROE;
+                if (zROE >= 1.0) roeClass = 'heatmap-z-high';
+                else if (zROE <= -1.0) roeClass = 'heatmap-z-low';
+            }
             
             const formattedPrice = res.current_price !== null && res.current_price !== undefined ? `Rs. ${res.current_price.toLocaleString('en-IN')}` : 'N/A';
             const formattedPE = res.pe !== null && res.pe !== undefined && res.pe > 0 ? res.pe.toFixed(1) : 'N/A';
@@ -11368,18 +11609,153 @@ async function runWatchlistBatchAnalysis() {
                 <td><span style="font-size:11px; font-weight:700; color:var(--text-primary);">${res.score}/100</span></td>
                 <td><span class="rec-glowing-badge ${recClass}">${res.action}</span></td>
                 <td>${formattedPrice}</td>
-                <td>${formattedPE}</td>
-                <td>${formattedROE}</td>
+                <td class="${peClass}">${formattedPE}</td>
+                <td class="${roeClass}">${formattedROE}</td>
                 <td class="${marginClass}">${formattedMargin}</td>
                 <td>${formattedRSI}</td>
                 <td><span class="${trendClass} font-weight-bold" style="font-size:10px;">${res.trend}</span></td>
             `;
             tbody.appendChild(tr);
         });
+        
+        // Update Chart.js risk scatter plot and thermometer
+        updateWatchlistScatterChart(data.results);
+        updateWatchlistThermometer(data.results);
+        
         showToast("Batch watchlist analysis complete.", "success");
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="9" class="center-text red-text font-weight-bold">Batch analysis failed: ${e.message}</td></tr>`;
         showToast("Batch analysis failed: " + e.message, "error");
+    }
+}
+
+function updateWatchlistScatterChart(results) {
+    const ctx = document.getElementById('watchlist-risk-scatter-chart');
+    if (!ctx) return;
+    
+    if (activeWatchlistScatterChart) {
+        activeWatchlistScatterChart.destroy();
+    }
+    
+    const validData = results.filter(r => r.pe > 0 && r.roe > 0);
+    const points = validData.map(r => ({
+        x: r.pe,
+        y: r.roe,
+        symbol: r.symbol,
+        name: r.name
+    }));
+    
+    const maxPE = Math.max(...points.map(p => p.x), 50);
+    const maxROE = Math.max(...points.map(p => p.y), 30);
+    
+    const isDark = document.documentElement.getAttribute('data-mode') !== 'light';
+    const textColor = isDark ? '#94a3b8' : '#475569';
+    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    
+    activeWatchlistScatterChart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Constituents',
+                data: points,
+                backgroundColor: 'rgba(37, 99, 235, 0.6)',
+                borderColor: 'var(--color-primary)',
+                borderWidth: 1.5,
+                pointRadius: 6,
+                pointHoverRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const p = context.raw;
+                            return `${p.symbol}: PE = ${p.x.toFixed(1)}, ROE = ${p.y.toFixed(1)}% (${p.name})`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Valuation Ratio (P/E)',
+                        color: textColor,
+                        font: { family: 'Outfit', size: 10, weight: 'bold' }
+                    },
+                    grid: { color: gridColor },
+                    ticks: { color: textColor },
+                    min: 0,
+                    max: maxPE * 1.1
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Return on Equity (ROE %)',
+                        color: textColor,
+                        font: { family: 'Outfit', size: 10, weight: 'bold' }
+                    },
+                    grid: { color: gridColor },
+                    ticks: { color: textColor },
+                    min: 0,
+                    max: maxROE * 1.1
+                }
+            }
+        }
+    });
+}
+
+function updateWatchlistThermometer(results) {
+    const thermometer = document.querySelector('.watchlist-consensus-thermometer');
+    const legend = document.getElementById('watchlist-consensus-thermometer-legend');
+    const summary = document.getElementById('watchlist-consensus-verdict-summary');
+    
+    if (!thermometer || !legend) return;
+    
+    let buyCount = 0;
+    let holdCount = 0;
+    let sellCount = 0;
+    
+    results.forEach(r => {
+        const act = r.action.toUpperCase();
+        if (act.includes('BUY')) {
+            buyCount++;
+        } else if (act.includes('SELL') || act.includes('AVOID') || act.includes('UNDERPERFORM')) {
+            sellCount++;
+        } else {
+            holdCount++;
+        }
+    });
+    
+    const total = results.length;
+    const buyPct = total > 0 ? (buyCount / total * 100) : 0;
+    const holdPct = total > 0 ? (holdCount / total * 100) : 0;
+    const sellPct = total > 0 ? (sellCount / total * 100) : 0;
+    
+    thermometer.innerHTML = `
+        <div style="width: ${buyPct}%; background: var(--color-emerald); height: 100%;" title="Buy: ${buyCount} (${buyPct.toFixed(0)}%)"></div>
+        <div style="width: ${holdPct}%; background: var(--color-amber); height: 100%;" title="Hold: ${holdCount} (${holdPct.toFixed(0)}%)"></div>
+        <div style="width: ${sellPct}%; background: var(--color-crimson); height: 100%;" title="Sell: ${sellCount} (${sellPct.toFixed(0)}%)"></div>
+    `;
+    
+    legend.innerHTML = `
+        <span style="color: var(--color-emerald)">Buy: ${buyCount} (${buyPct.toFixed(0)}%)</span>
+        <span style="color: var(--color-amber)">Hold: ${holdCount} (${holdPct.toFixed(0)}%)</span>
+        <span style="color: var(--color-crimson)">Sell: ${sellCount} (${sellPct.toFixed(0)}%)</span>
+    `;
+    
+    if (summary) {
+        if (buyPct > 60) {
+            summary.innerHTML = `🔥 <strong>Strong Bullish Bias</strong>: The portfolio has high conviction buy coverage (${buyPct.toFixed(0)}%). Consider capital allocation sizing.`;
+        } else if (sellPct > 40) {
+            summary.innerHTML = `⚠️ <strong>High Risk Dispersion</strong>: Over ${sellPct.toFixed(0)}% of constituents carry Underperform/Sell ratings. Portfolio consolidation recommended.`;
+        } else {
+            summary.innerHTML = `⚖️ <strong>Balanced Outlook</strong>: Portfolio is well-distributed across consensus recommendations. Ready for market cyclicality.`;
+        }
     }
 }
 
