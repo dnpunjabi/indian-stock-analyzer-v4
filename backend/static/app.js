@@ -11545,7 +11545,7 @@ async function runWatchlistBatchAnalysis() {
     if (!resultsContainer || !tbody) return;
     
     resultsContainer.style.display = 'block';
-    if (loadingPanel) loadingPanel.style.display = 'block';
+    if (loadingPanel) loadingPanel.style.display = 'flex';
     if (contentPanel) contentPanel.style.display = 'none';
     if (progressBar) progressBar.style.width = '5%';
     
