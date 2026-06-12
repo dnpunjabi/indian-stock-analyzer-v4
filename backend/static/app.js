@@ -566,16 +566,85 @@ function resetWorkspace() {
 }
 
 // 2. Global Loader Utilities
-function showLoader(title, subtitle) {
+let globalLoaderInterval = null;
+
+function showLoader(title, subtitle, showConsole = false, consoleLogs = []) {
     const titleEl = document.getElementById('loader-title');
     if (titleEl) titleEl.innerText = title || "Analyzing...";
     const subEl = document.getElementById('loader-subtitle');
     if (subEl) subEl.innerText = subtitle || "Consulting subagents asynchronously.";
+    
     const loaderEl = document.getElementById('global-loader');
+    const spinnerEl = document.getElementById('global-loader-spinner');
+    const iconEl = document.getElementById('global-loader-icon');
+    const progressArea = document.getElementById('global-loader-progress-area');
+    const progressBar = document.getElementById('global-loader-progress-bar');
+    const progressConsole = document.getElementById('global-loader-progress-console');
+    
+    // Clear any active intervals
+    if (globalLoaderInterval) {
+        clearInterval(globalLoaderInterval);
+        globalLoaderInterval = null;
+    }
+    
     if (loaderEl) loaderEl.style.display = 'flex';
+    
+    if (showConsole) {
+        if (spinnerEl) spinnerEl.style.display = 'none';
+        if (iconEl) iconEl.style.display = 'block';
+        if (progressArea) progressArea.style.display = 'block';
+        if (progressBar) progressBar.style.width = '5%';
+        
+        const defaultLogs = [
+            { threshold: 15, msg: "[INFO] Initializing rival query adapters...", color: '#38bdf8' },
+            { threshold: 30, msg: "[INFO] Pulling comparative corporate filings...", color: '#f59e0b' },
+            { threshold: 45, msg: "[INFO] Computing operational metrics and efficiency ratios...", color: '#10b981' },
+            { threshold: 60, msg: "[INFO] Executing multi-stock technical overlay analysis...", color: '#a855f7' },
+            { threshold: 75, msg: "[INFO] Spawning CIO agent to evaluate sector champions...", color: '#34d399' },
+            { threshold: 90, msg: "[INFO] Formulating active rebalancing recommendations...", color: '#38bdf8' }
+        ];
+        
+        const activeLogs = consoleLogs.length > 0 ? consoleLogs : defaultLogs;
+        
+        if (progressConsole) {
+            progressConsole.innerHTML = `
+                <div style="color: #64748b;">[SYSTEM] Initializing Parallel Engine...</div>
+                <div style="color: var(--color-primary-light);">[ENGINE] Batch comparison queued.</div>
+            `;
+        }
+        
+        let progress = 5;
+        let logIndex = 0;
+        globalLoaderInterval = setInterval(() => {
+            if (progress < 95) {
+                progress += Math.floor(Math.random() * 8) + 2;
+                if (progress > 95) progress = 95;
+                if (progressBar) progressBar.style.width = `${progress}%`;
+                
+                if (logIndex < activeLogs.length && progress >= activeLogs[logIndex].threshold) {
+                    if (progressConsole) {
+                        const line = document.createElement('div');
+                        line.style.color = activeLogs[logIndex].color;
+                        line.innerText = activeLogs[logIndex].msg;
+                        progressConsole.appendChild(line);
+                        progressConsole.scrollTop = progressConsole.scrollHeight;
+                    }
+                    logIndex++;
+                }
+            }
+        }, 450);
+    } else {
+        if (spinnerEl) spinnerEl.style.display = 'block';
+        if (iconEl) iconEl.style.display = 'none';
+        if (progressArea) progressArea.style.display = 'none';
+    }
 }
 
 function hideLoader() {
+    if (globalLoaderInterval) {
+        clearInterval(globalLoaderInterval);
+        globalLoaderInterval = null;
+    }
     const loaderEl = document.getElementById('global-loader');
     if (loaderEl) loaderEl.style.display = 'none';
 }
@@ -5911,7 +5980,16 @@ async function runComparisonAnalysis() {
     
     showLoader(
         "Benchmarking Rivals...",
-        "Orchestrating simultaneous scraper runs and consulting senior sector strategists to produce a competitive Sector Battleground analysis."
+        "Orchestrating simultaneous scraper runs and consulting senior sector strategists to produce a competitive Sector Battleground analysis.",
+        true,
+        [
+            { threshold: 15, msg: "[INFO] Fetching daily historical series for peer group...", color: '#38bdf8' },
+            { threshold: 30, msg: "[INFO] Aggregating operational margins, debt load, and interest cover...", color: '#f59e0b' },
+            { threshold: 45, msg: "[INFO] Generating multi-dimensional operational radar matrix...", color: '#10b981' },
+            { threshold: 60, msg: "[INFO] Initiating AI sector strategist peer comparison engine...", color: '#a855f7' },
+            { threshold: 75, msg: "[INFO] Evaluating historical performance and crowning sector champion...", color: '#34d399' },
+            { threshold: 90, msg: "[INFO] Compiling final battleground thesis report...", color: '#38bdf8' }
+        ]
     );
     
     try {
@@ -5919,11 +5997,27 @@ async function runComparisonAnalysis() {
         if (!response.ok) throw new Error("Comparison scan failed.");
         const data = await response.json();
         
-        renderComparisonArena(data);
+        // Complete the loader animation and console text
+        const progressBar = document.getElementById('global-loader-progress-bar');
+        const progressConsole = document.getElementById('global-loader-progress-console');
+        if (progressBar) progressBar.style.width = '100%';
+        if (progressConsole) {
+            const line = document.createElement('div');
+            line.style.color = 'var(--color-emerald)';
+            line.style.fontWeight = 'bold';
+            line.innerText = `[SUCCESS] Sector battleground diagnostics completed successfully!`;
+            progressConsole.appendChild(line);
+            progressConsole.scrollTop = progressConsole.scrollHeight;
+        }
+        
+        setTimeout(() => {
+            hideLoader();
+            renderComparisonArena(data);
+        }, 650);
+        
     } catch (e) {
-        showToast("Comparison Arena error: " + e.message, 'error');
-    } finally {
         hideLoader();
+        showToast("Comparison Arena error: " + e.message, 'error');
     }
 }
 
@@ -14491,7 +14585,18 @@ async function runPortfolioDoctorAnalysis() {
     
     try {
         runBtn.innerText = 'Analyzing Portfolio...';
-        showLoader("Running AI Portfolio Diagnostics...", "Orchestrating mathematical diversification filters, measuring HHI sector indices, and formulating rebalancing rules...");
+        showLoader(
+            "Running AI Portfolio Diagnostics...", 
+            "Orchestrating mathematical diversification filters, measuring HHI sector indices, and formulating rebalancing rules...",
+            true,
+            [
+                { threshold: 15, msg: "[INFO] Parsing equity positions and buy-in weights...", color: '#38bdf8' },
+                { threshold: 35, msg: "[INFO] Computing Herfindahl-Hirschman Index (HHI) concentration...", color: '#f59e0b' },
+                { threshold: 55, msg: "[INFO] Auditing sector vulnerabilities and macro exposures...", color: '#10b981' },
+                { threshold: 75, msg: "[INFO] Formulating asset allocation boundary constraints...", color: '#a855f7' },
+                { threshold: 90, msg: "[INFO] Compiling cardiology audit prescription report...", color: '#34d399' }
+            ]
+        );
         
         const response = await fetch('/api/portfolio-doctor', {
             method: 'POST',
@@ -14567,11 +14672,29 @@ async function runPortfolioDoctorAnalysis() {
         }
         
         showToast("Portfolio health report compiled successfully!", "success");
+        
+        // Complete the loader animation and console text
+        const progressBar = document.getElementById('global-loader-progress-bar');
+        const progressConsole = document.getElementById('global-loader-progress-console');
+        if (progressBar) progressBar.style.width = '100%';
+        if (progressConsole) {
+            const line = document.createElement('div');
+            line.style.color = 'var(--color-emerald)';
+            line.style.fontWeight = 'bold';
+            line.innerText = `[SUCCESS] AI structural cardiology audit completed successfully!`;
+            progressConsole.appendChild(line);
+            progressConsole.scrollTop = progressConsole.scrollHeight;
+        }
+        
+        setTimeout(() => {
+            hideLoader();
+            runBtn.innerText = 'Analyze Portfolio Health';
+        }, 650);
+        
     } catch (e) {
-        showToast("Doctor analysis failed: " + e.message, "error");
-    } finally {
         hideLoader();
         runBtn.innerText = 'Analyze Portfolio Health';
+        showToast("Doctor analysis failed: " + e.message, "error");
     }
 }
 

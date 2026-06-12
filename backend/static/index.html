@@ -4299,11 +4299,23 @@
     </div>
 
     <!-- Full screen global loader overlay -->
-    <div class="loader-overlay" id="global-loader" style="display: none;">
-        <div class="loader-content">
-            <div class="spinner"></div>
-            <h3 id="loader-title">Consulting Apex Agentic AI Engine...</h3>
-            <p id="loader-subtitle">CIO Parent Agent is spawning specialized subagents asynchronously to research fundamentals, technical chart lines, news sentiment, and promoter pledging status.</p>
+    <div class="loader-overlay" id="global-loader" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(7, 10, 18, 0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 9999; align-items: center; justify-content: center; box-sizing: border-box; padding: 20px;">
+        <div class="loader-content" style="width: 100%; max-width: 500px; padding: 40px; background: rgba(30, 41, 59, 0.45); border: 1px solid var(--border-glass); border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,0.8); text-align: center; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+            <div class="spinner" id="global-loader-spinner" style="width: 45px; height: 45px; border: 4.5px solid rgba(59, 130, 246, 0.1); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px auto; box-shadow: 0 0 15px var(--color-primary-glow);"></div>
+            <div style="font-size: 36px; margin-bottom: 20px; display: none;" id="global-loader-icon">🧬</div>
+            <h3 id="loader-title" style="margin: 0 0 10px 0; font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 800; color: var(--color-primary); letter-spacing: 0.05em; text-transform: uppercase;">Consulting Apex Agentic AI Engine...</h3>
+            <p id="loader-subtitle" style="font-size: 11.5px; color: var(--text-secondary); margin: 0 0 20px 0; line-height: 1.45;">CIO Parent Agent is spawning specialized subagents asynchronously to research fundamentals, technical chart lines, news sentiment, and promoter pledging status.</p>
+            
+            <!-- Dynamic progress details (shown optionally) -->
+            <div id="global-loader-progress-area" style="display: none;">
+                <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; margin: 0 auto 25px auto; overflow: hidden; border: 1px solid rgba(255,255,255,0.03);">
+                    <div id="global-loader-progress-bar" style="width: 5%; height: 100%; background: linear-gradient(90deg, var(--color-primary-glow), var(--color-emerald)); border-radius: 3px; transition: width 0.4s ease-out; box-shadow: 0 0 8px var(--color-primary);"></div>
+                </div>
+                
+                <div id="global-loader-progress-console" style="width: 100%; height: 95px; background: #070b12; border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 12px 15px; font-family: 'Courier New', Courier, monospace; font-size: 10px; text-align: left; overflow-y: auto; color: #34d399; line-height: 1.5; box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);">
+                    <div style="color: #64748b;">[SYSTEM] Initializing Agent Pipeline...</div>
+                </div>
+            </div>
         </div>
     </div>
 
