@@ -5505,8 +5505,8 @@ function calculateClientSideDCF() {
             thesisTextEl.innerHTML = `Under active assumptions of **${activeGrowthPct.toFixed(1)}%** Revenue Growth (${growthNarrative}) discounted at a hurdle rate of **${activeWaccPct.toFixed(1)}%** Hurdle WACC (${waccNarrative}), the equity is estimated to be **${ratingNarrative}** (Margin of Safety: **${margin.toFixed(1)}%**).`;
         }
     
-        // Highlight closest coordinates in sensitivity matrix heatmap
-        highlightActiveMatrixCoordinate();
+        // Re-render sensitivity matrix with the new center slider values in real-time
+        renderDCFSensitivityMatrix(activeStockProfile);
     } catch (err) {
         console.error("Error calculating client-side DCF:", err);
     }
@@ -11016,8 +11016,13 @@ function renderDCFSensitivityMatrix(p) {
     bodyContainer.innerHTML = '';
     
     const dcfModel = p.dcf_model || {};
-    const currentWacc = dcfModel.wacc !== null && dcfModel.wacc !== undefined ? dcfModel.wacc : 10.0; // WACC rate (e.g. 10.5)
-    const baseGrowth = (p.fundamentals && p.fundamentals.sales_growth_3y_pct) || 12.0;
+    
+    // Dynamically center the sensitivity matrix around active slider values if available
+    const waccEl = document.getElementById('sb-wacc');
+    const growthEl = document.getElementById('sb-growth');
+    
+    const currentWacc = waccEl ? parseFloat(waccEl.value) : (dcfModel.wacc !== null && dcfModel.wacc !== undefined ? dcfModel.wacc : 10.0);
+    const baseGrowth = growthEl ? parseFloat(growthEl.value) : ((p.fundamentals && p.fundamentals.sales_growth_3y_pct) || 12.0);
     const currentPrice = (p.fundamentals && p.fundamentals.current_price) || 100.0;
     
     let baselineFcf = 10000000;
