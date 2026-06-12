@@ -1689,6 +1689,7 @@ async function loadStockAnalyzer(query) {
         setupPeersControls();
         setupCapturePeriodControl();
         setupPEBandsTimeframes();
+        triggerLiveCompoundingCalculation();
         if (window.resetAnalyzerSubtabs) window.resetAnalyzerSubtabs();
         setAnalyzeBtnLoading(false);
     } catch (e) {
@@ -11129,11 +11130,11 @@ function drawChartJSDrawdownChart(data) {
 
 // 6. Return Calculator Controller
 let selectedReturnCalcType = 'cagr';
+let calcDebounceTimeout = null;
 
 function setupReturnCalculator() {
     const cagrBtn = document.getElementById('calc-type-cagr-btn');
     const sipBtn = document.getElementById('calc-type-sip-btn');
-    const runBtn = document.getElementById('run-calc-btn');
     const amountInput = document.getElementById('calc-amount-input');
     const amountSlider = document.getElementById('calc-amount-slider');
     const amountLabel = document.getElementById('calc-amount-label');
@@ -11159,10 +11160,11 @@ function setupReturnCalculator() {
             btn.style.cursor = 'pointer';
             btn.innerText = amt >= 100000 ? `₹${amt/100000}L` : `₹${amt/1000}K`;
             
-            btn.addEventListener('click', () => {
+            btn.onclick = () => {
                 if (amountInput) amountInput.value = amt;
                 if (amountSlider) amountSlider.value = amt;
-            });
+                triggerLiveCompoundingCalculation();
+            };
             quickAmountsDiv.appendChild(btn);
         });
     }
@@ -11208,23 +11210,22 @@ function setupReturnCalculator() {
             if (amountInput) amountInput.value = "5000";
             renderQuickAmounts(sipQuickList);
         }
+        triggerLiveCompoundingCalculation();
     }
     
     // Mode toggles
     if (cagrBtn && sipBtn) {
-        cagrBtn.addEventListener('click', () => setCalculatorMode('cagr'));
-        sipBtn.addEventListener('click', () => setCalculatorMode('sip'));
+        cagrBtn.onclick = () => setCalculatorMode('cagr');
+        sipBtn.onclick = () => setCalculatorMode('sip');
     }
-    
-    // Initialise default mode
-    setCalculatorMode('cagr');
     
     // Bidirectional sync between slider and input text
     if (amountSlider && amountInput) {
-        amountSlider.addEventListener('input', (e) => {
+        amountSlider.oninput = (e) => {
             amountInput.value = e.target.value;
-        });
-        amountInput.addEventListener('change', (e) => {
+            triggerLiveCompoundingCalculation();
+        };
+        amountInput.onchange = (e) => {
             let val = parseFloat(e.target.value) || 0;
             const min = parseFloat(amountSlider.min);
             const max = parseFloat(amountSlider.max);
@@ -11232,7 +11233,8 @@ function setupReturnCalculator() {
             if (val > max) val = max;
             amountInput.value = val;
             amountSlider.value = val;
-        });
+            triggerLiveCompoundingCalculation();
+        };
     }
     
     // === Custom Dropdown Calendar Logic ===
@@ -11284,14 +11286,10 @@ function setupReturnCalculator() {
         
         daysGrid.innerHTML = '';
         
-        // Find first day of the month and total days
         const firstDayIdx = new Date(year, month, 1).getDay();
         const totalDays = new Date(year, month + 1, 0).getDate();
-        
-        // Find total days in previous month for padding
         const prevMonthTotalDays = new Date(year, month, 0).getDate();
         
-        // Active selected date parsed from text input
         let activeDateObj = null;
         if (dateInput && dateInput.value) {
             const parts = dateInput.value.split('-');
@@ -11302,7 +11300,7 @@ function setupReturnCalculator() {
         
         const today = new Date();
         
-        // 1. Add days from previous month (as padding)
+        // 1. Padding days
         for (let i = firstDayIdx - 1; i >= 0; i--) {
             const dayNum = prevMonthTotalDays - i;
             const cell = document.createElement('div');
@@ -11311,7 +11309,7 @@ function setupReturnCalculator() {
             daysGrid.appendChild(cell);
         }
         
-        // 2. Add current month days
+        // 2. Current days
         for (let d = 1; d <= totalDays; d++) {
             const cell = document.createElement('div');
             cell.className = 'cal-day-cell';
@@ -11319,7 +11317,6 @@ function setupReturnCalculator() {
             
             const cellDate = new Date(year, month, d);
             
-            // Check if active selected date
             if (activeDateObj && 
                 cellDate.getFullYear() === activeDateObj.getFullYear() && 
                 cellDate.getMonth() === activeDateObj.getMonth() && 
@@ -11327,26 +11324,23 @@ function setupReturnCalculator() {
                 cell.classList.add('active');
             }
             
-            // Check if today
             if (cellDate.getFullYear() === today.getFullYear() && 
                 cellDate.getMonth() === today.getMonth() && 
                 cellDate.getDate() === today.getDate()) {
                 cell.classList.add('today');
             }
             
-            // Click to select date
-            cell.addEventListener('click', () => {
+            cell.onclick = () => {
                 const formattedMonth = String(month + 1).padStart(2, '0');
                 const formattedDay = String(d).padStart(2, '0');
                 if (dateInput) {
                     dateInput.value = `${year}-${formattedMonth}-${formattedDay}`;
-                    // Trigger change event to ensure any listener wakes up
-                    dateInput.dispatchEvent(new Event('change'));
+                    triggerLiveCompoundingCalculation();
                 }
                 if (calendarDropdown) {
                     calendarDropdown.style.display = 'none';
                 }
-            });
+            };
             
             daysGrid.appendChild(cell);
         }
@@ -11360,7 +11354,6 @@ function setupReturnCalculator() {
             if (isOpen) {
                 calendarDropdown.style.display = 'none';
             } else {
-                // Set calendar date based on current text input value
                 if (dateInput.value) {
                     const parts = dateInput.value.split('-');
                     if (parts.length === 3) {
@@ -11372,48 +11365,47 @@ function setupReturnCalculator() {
             }
         };
         
-        dateInput.addEventListener('click', toggleCalendar);
+        dateInput.onclick = toggleCalendar;
         const triggerIcon = document.getElementById('calc-date-trigger-icon');
         if (triggerIcon) {
-            triggerIcon.addEventListener('click', toggleCalendar);
+            triggerIcon.onclick = toggleCalendar;
         }
     }
     
     // Header navigation
     if (prevMonthBtn) {
-        prevMonthBtn.addEventListener('click', (e) => {
+        prevMonthBtn.onclick = (e) => {
             e.stopPropagation();
             currentCalDate.setMonth(currentCalDate.getMonth() - 1);
             renderCustomCalendar();
-        });
+        };
     }
     if (nextMonthBtn) {
-        nextMonthBtn.addEventListener('click', (e) => {
+        nextMonthBtn.onclick = (e) => {
             e.stopPropagation();
             currentCalDate.setMonth(currentCalDate.getMonth() + 1);
             renderCustomCalendar();
-        });
+        };
     }
     
     // Header drop menus selectors
     if (monthSelect) {
-        monthSelect.addEventListener('change', (e) => {
+        monthSelect.onchange = (e) => {
             currentCalDate.setMonth(parseInt(e.target.value));
             renderCustomCalendar();
-        });
+        };
     }
     if (yearSelect) {
-        yearSelect.addEventListener('change', (e) => {
+        yearSelect.onchange = (e) => {
             currentCalDate.setFullYear(parseInt(e.target.value));
             renderCustomCalendar();
-        });
+        };
     }
     
-    // Stop event propagation inside dropdown calendar container to prevent auto close
     if (calendarDropdown) {
-        calendarDropdown.addEventListener('click', (e) => {
+        calendarDropdown.onclick = (e) => {
             e.stopPropagation();
-        });
+        };
     }
     
     // Outside click closer
@@ -11426,7 +11418,7 @@ function setupReturnCalculator() {
     // Quick periods bindings
     const periodButtons = document.querySelectorAll('.period-quick-btn');
     periodButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.onclick = () => {
             const yearsAttr = btn.getAttribute('data-years');
             const dateInput = document.getElementById('calc-date-input');
             if (!dateInput) return;
@@ -11437,69 +11429,132 @@ function setupReturnCalculator() {
                 const years = parseInt(yearsAttr) || 1;
                 const d = new Date();
                 d.setFullYear(d.getFullYear() - years);
-                // format as YYYY-MM-DD
                 const yyyy = d.getFullYear();
                 const mm = String(d.getMonth() + 1).padStart(2, '0');
                 const dd = String(d.getDate()).padStart(2, '0');
                 dateInput.value = `${yyyy}-${mm}-${dd}`;
             }
-        });
+            triggerLiveCompoundingCalculation();
+        };
     });
     
-    if (runBtn) {
-        runBtn.addEventListener('click', async () => {
-            if (!activeStockProfile) return;
-            const symbol = activeStockProfile.ticker;
-            const amount = parseFloat(amountInput.value) || 100000;
-            const date = document.getElementById('calc-date-input').value || '2021-01-01';
+    // Initialise default mode
+    setCalculatorMode('cagr');
+}
+
+function triggerLiveCompoundingCalculation() {
+    clearTimeout(calcDebounceTimeout);
+    calcDebounceTimeout = setTimeout(executeHistoricalReturnCalculation, 150);
+}
+
+async function executeHistoricalReturnCalculation() {
+    if (!activeStockProfile) return;
+    
+    const symbol = activeStockProfile.ticker;
+    const amountInput = document.getElementById('calc-amount-input');
+    if (!amountInput) return;
+    const amount = parseFloat(amountInput.value) || 100000;
+    
+    const dateInput = document.getElementById('calc-date-input');
+    const date = dateInput ? dateInput.value : '2021-01-01';
+    
+    const amountVal = (selectedReturnCalcType === 'cagr') ? amount : 0;
+    const sipVal = (selectedReturnCalcType === 'sip') ? amount : 0;
+    
+    try {
+        const response = await fetch(`/api/returns?symbol=${encodeURIComponent(symbol)}&amount=${amountVal}&date_y=${date}&type=${selectedReturnCalcType}&sip_monthly=${sipVal}`);
+        if (!response.ok) throw new Error("Calculation failed");
+        const data = await response.json();
+        
+        const resultsBox = document.getElementById('calc-results-box');
+        if (resultsBox) resultsBox.style.display = 'grid';
+        
+        document.getElementById('calc-res-invested').innerText = `₹${data.invested_amount.toLocaleString('en-IN', {maximumFractionDigits:0})}`;
+        document.getElementById('calc-res-value').innerText = `₹${data.final_value.toLocaleString('en-IN', {maximumFractionDigits:0})}`;
+        
+        const profitTextEl = document.getElementById('calc-res-profit');
+        if (profitTextEl) {
+            profitTextEl.innerText = `₹${data.profit_loss.toLocaleString('en-IN', {maximumFractionDigits:0})} (${data.absolute_return_pct >= 0 ? '+' : ''}${data.absolute_return_pct}%)`;
+            profitTextEl.className = data.profit_loss >= 0 ? 'green-text' : 'red-text';
+        }
+        
+        const annualizedEl = document.getElementById('calc-res-annualized');
+        if (annualizedEl) {
+            annualizedEl.innerText = `${data.annualized_return_pct}% p.a.`;
+            annualizedEl.className = data.annualized_return_pct >= 0 ? 'green-text' : 'red-text';
+        }
+        
+        const multiplier = data.final_value / (data.invested_amount || 1);
+        const multiplierEl = document.getElementById('calc-capital-multiplier');
+        if (multiplierEl) {
+            multiplierEl.innerText = `${multiplier.toFixed(1)}x Mult`;
+            multiplierEl.style.display = 'inline-block';
+        }
+        
+        // Update Capital Ratio Composition Split Bar
+        const ratioContainer = document.getElementById('calc-ratio-container');
+        if (ratioContainer) {
+            ratioContainer.style.display = 'flex';
             
-            const amountVal = (selectedReturnCalcType === 'cagr') ? amount : 0;
-            const sipVal = (selectedReturnCalcType === 'sip') ? amount : 0;
+            const investedVal = data.invested_amount;
+            const finalVal = data.final_value;
             
-            try {
-                runBtn.innerText = 'Calculating...';
-                const response = await fetch(`/api/returns?symbol=${encodeURIComponent(symbol)}&amount=${amountVal}&date_y=${date}&type=${selectedReturnCalcType}&sip_monthly=${sipVal}`);
-                if (!response.ok) throw new Error("Calculation failed");
-                const data = await response.json();
-                
-                document.getElementById('calc-results-box').style.display = 'grid';
-                document.getElementById('calc-res-invested').innerText = `₹${data.invested_amount.toLocaleString('en-IN', {maximumFractionDigits:0})}`;
-                document.getElementById('calc-res-value').innerText = `₹${data.final_value.toLocaleString('en-IN', {maximumFractionDigits:0})}`;
-                
-                const profitTextEl = document.getElementById('calc-res-profit');
-                profitTextEl.innerText = `₹${data.profit_loss.toLocaleString('en-IN', {maximumFractionDigits:0})} (${data.absolute_return_pct >= 0 ? '+' : ''}${data.absolute_return_pct}%)`;
-                profitTextEl.className = data.profit_loss >= 0 ? 'green-text' : 'red-text';
-                
-                const annualizedEl = document.getElementById('calc-res-annualized');
-                annualizedEl.innerText = `${data.annualized_return_pct}% p.a.`;
-                annualizedEl.className = data.annualized_return_pct >= 0 ? 'green-text' : 'red-text';
-                
-                const multiplier = data.final_value / (data.invested_amount || 1);
-                const multiplierEl = document.getElementById('calc-capital-multiplier');
-                if (multiplierEl) {
-                    multiplierEl.innerText = `${multiplier.toFixed(1)}x Mult`;
-                    multiplierEl.style.display = 'inline-block';
-                }
-                
-                // Dynamic AI Summary
-                const summaryBlock = document.getElementById('calc-summary-block');
-                const summaryText = document.getElementById('calc-summary-text');
-                if (summaryBlock && summaryText) {
-                    summaryBlock.style.display = 'block';
-                    
-                    if (selectedReturnCalcType === 'cagr') {
-                        summaryText.innerHTML = `🛡️ **Institutional Synopsis:** A lump sum of **₹${data.invested_amount.toLocaleString('en-IN')}** invested on **${data.start_date}** grew by **${multiplier.toFixed(1)}x** to **₹${data.final_value.toLocaleString('en-IN')}**, generating an annualized CAGR of **${data.annualized_return_pct}%**. This absolute gain of **₹${data.profit_loss.toLocaleString('en-IN')}** significantly outperforms average historical fixed deposit (FD) benchmarks (6-7% p.a.).`;
-                    } else {
-                        summaryText.innerHTML = `🛡️ **Institutional Synopsis:** Committing a monthly SIP of **₹${data.monthly_sip.toLocaleString('en-IN')}** starting **${data.start_date}** accumulated a principal of **₹${data.invested_amount.toLocaleString('en-IN')}**. This systematic cost-averaging grew your capital to **₹${data.final_value.toLocaleString('en-IN')}** (**${multiplier.toFixed(1)}x** multiplier), delivering an annualized IRR of **${data.annualized_return_pct}%**.`;
-                    }
-                }
-            } catch (e) {
-                showToast("Return calculator error: " + e.message, "error");
-            } finally {
-                runBtn.innerText = 'Calculate Returns';
+            let investedPct = 0;
+            let profitPct = 0;
+            
+            if (finalVal > 0) {
+                investedPct = Math.max(0, Math.min(100, (investedVal / finalVal) * 100));
+                profitPct = 100 - investedPct;
+            } else {
+                investedPct = 100;
+                profitPct = 0;
             }
-        });
+            
+            document.getElementById('calc-ratio-invested-lbl').innerText = `${investedPct.toFixed(0)}%`;
+            document.getElementById('calc-ratio-profit-lbl').innerText = `${profitPct.toFixed(0)}%`;
+            
+            const investedBar = document.getElementById('calc-ratio-invested-bar');
+            const profitBar = document.getElementById('calc-ratio-profit-bar');
+            
+            if (investedBar) investedBar.style.width = `${investedPct}%`;
+            if (profitBar) profitBar.style.width = `${profitPct}%`;
+        }
+        
+        // Update Benchmark Outperformance Badge
+        const benchmarkBadge = document.getElementById('calc-benchmark-badge');
+        if (benchmarkBadge) {
+            const spread = data.annualized_return_pct - 6.5; // Benchmark risk-free rate
+            if (spread > 0) {
+                benchmarkBadge.innerText = `Beats FD (+${spread.toFixed(1)}% p.a.)`;
+                benchmarkBadge.className = 'badge-rec green-text';
+                benchmarkBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+                benchmarkBadge.style.color = 'var(--color-emerald)';
+                benchmarkBadge.style.border = '1px solid rgba(16, 185, 129, 0.25)';
+            } else {
+                benchmarkBadge.innerText = `Lagging FD (${spread.toFixed(1)}% p.a.)`;
+                benchmarkBadge.className = 'badge-rec red-text';
+                benchmarkBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+                benchmarkBadge.style.color = 'var(--color-crimson)';
+                benchmarkBadge.style.border = '1px solid rgba(239, 68, 68, 0.25)';
+            }
+            benchmarkBadge.style.display = 'inline-block';
+        }
+        
+        // Dynamic AI Summary
+        const summaryBlock = document.getElementById('calc-summary-block');
+        const summaryText = document.getElementById('calc-summary-text');
+        if (summaryBlock && summaryText) {
+            summaryBlock.style.display = 'block';
+            if (selectedReturnCalcType === 'cagr') {
+                summaryText.innerHTML = `A lump sum of **₹${data.invested_amount.toLocaleString('en-IN')}** invested on **${data.start_date}** compounded by **${multiplier.toFixed(1)}x** to **₹${data.final_value.toLocaleString('en-IN')}**, yielding an annualized CAGR of **${data.annualized_return_pct}%**. This represents a profit of **₹${data.profit_loss.toLocaleString('en-IN')}** over principal.`;
+            } else {
+                summaryText.innerHTML = `A monthly systematic investment of **₹${data.monthly_sip.toLocaleString('en-IN')}** since **${data.start_date}** accumulated a principal of **₹${data.invested_amount.toLocaleString('en-IN')}**, compounding to a total value of **₹${data.final_value.toLocaleString('en-IN')}** (**${multiplier.toFixed(1)}x** capital multiple) with a calculated IRR of **${data.annualized_return_pct}%**.`;
+            }
+        }
+    } catch (e) {
+        console.error("Compounding calculator error: ", e);
     }
+}
 }
 
 
