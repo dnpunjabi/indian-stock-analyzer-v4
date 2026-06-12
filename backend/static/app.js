@@ -14205,7 +14205,192 @@ function setupPortfolioDoctor() {
     }
 }
 
+let activeSectorLegendFilter = null;
 
+function animateDiagnosticsGauge(score) {
+    const ring = document.getElementById('diagnostic-gauge-ring');
+    const scoreVal = document.getElementById('port-health-score');
+    if (!ring || !scoreVal) return;
+
+    // Circumference = 2 * PI * r = 2 * 3.14159 * 40 = 251.3
+    const maxDash = 251;
+    const offset = maxDash - (Math.min(100, Math.max(0, score)) / 100) * maxDash;
+    
+    ring.style.strokeDashoffset = offset;
+    
+    // Smooth ticker animation
+    let currentScore = 0;
+    const targetScore = parseInt(score) || 0;
+    if (targetScore === 0) {
+        scoreVal.innerText = '--';
+        return;
+    }
+    
+    const intervalTime = Math.max(10, Math.min(50, 1000 / targetScore));
+    const timer = setInterval(() => {
+        if (currentScore >= targetScore) {
+            scoreVal.innerText = targetScore;
+            clearInterval(timer);
+        } else {
+            currentScore++;
+            scoreVal.innerText = currentScore;
+        }
+    }, intervalTime);
+}
+
+function renderSectorExposureChart(sectorData) {
+    const canvas = document.getElementById('portfolio-sector-exposure-chart');
+    const legendContainer = document.getElementById('sector-legend-container');
+    if (!canvas || !legendContainer) return;
+
+    // Destroy previous instance
+    if (window.activePortfolioSectorChart) {
+        window.activePortfolioSectorChart.destroy();
+        window.activePortfolioSectorChart = null;
+    }
+
+    legendContainer.innerHTML = '';
+    
+    const sectors = Object.keys(sectorData);
+    const values = Object.values(sectorData);
+    
+    if (sectors.length === 0) {
+        canvas.style.display = 'none';
+        legendContainer.innerHTML = '<div style="font-size:10px; color:var(--text-muted); text-align:center; padding: 10px; width: 100%;">No sectors detected</div>';
+        return;
+    }
+    canvas.style.display = 'block';
+
+    const colors = [
+        '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', 
+        '#06b6d4', '#14b8a6', '#f43f5e', '#34d399', '#a855f7'
+    ];
+
+    const ctx = canvas.getContext('2d');
+    window.activePortfolioSectorChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: sectors,
+            datasets: [{
+                data: values,
+                backgroundColor: colors.slice(0, sectors.length),
+                borderWidth: 1.5,
+                borderColor: '#0b1329',
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return ` ${context.label}: ${context.raw.toFixed(1)}%`;
+                        }
+                    }
+                }
+            },
+            cutout: '70%'
+        }
+    });
+
+    // Populate legend container with interactive badges
+    sectors.forEach((sector, idx) => {
+        const pct = values[idx];
+        const color = colors[idx % colors.length];
+        
+        const badge = document.createElement('div');
+        badge.className = 'exposure-legend-badge';
+        badge.setAttribute('data-sector', sector);
+        badge.innerHTML = `
+            <span style="display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:85%;">
+                <span style="width:7px; height:7px; border-radius:50%; background:${color}; display:inline-block; flex-shrink:0;"></span>
+                <span>${sector}</span>
+            </span>
+            <span style="color:var(--text-secondary); font-weight:700;">${pct.toFixed(1)}%</span>
+        `;
+        
+        badge.addEventListener('click', () => {
+            const ledgerRows = document.querySelectorAll('#portfolio-ledger-body tr');
+            
+            // Toggle active badge style
+            if (activeSectorLegendFilter === sector) {
+                // Clear filter
+                activeSectorLegendFilter = null;
+                badge.classList.remove('active');
+                ledgerRows.forEach(row => row.style.opacity = '1.0');
+            } else {
+                // Apply filter
+                activeSectorLegendFilter = sector;
+                document.querySelectorAll('.exposure-legend-badge').forEach(b => b.classList.remove('active'));
+                badge.classList.add('active');
+                
+                ledgerRows.forEach(row => {
+                    const rowSector = row.querySelector('td:nth-child(1) span:nth-of-type(2)')?.innerText || 'Other';
+                    if (rowSector.trim().toLowerCase() === sector.trim().toLowerCase()) {
+                        row.style.opacity = '1.0';
+                        row.style.background = 'rgba(16, 185, 129, 0.02)';
+                    } else {
+                        row.style.opacity = '0.18';
+                        row.style.background = 'transparent';
+                    }
+                });
+            }
+        });
+        
+        legendContainer.appendChild(badge);
+    });
+}
+
+function drawInlineRangeBar(current, suggestedBuy, suggestedSell) {
+    if (!suggestedBuy || !suggestedSell || suggestedBuy === 'N/A' || suggestedSell === 'N/A') {
+        return `<span style="color:var(--text-muted); font-size:10px;">Buy/Sell range not set</span>`;
+    }
+    
+    // Parse range like "1200 - 1300"
+    const buyParts = suggestedBuy.split('-').map(x => parseFloat(x.replace(/[^\d\.]/g, '')));
+    const sellParts = suggestedSell.split('-').map(x => parseFloat(x.replace(/[^\d\.]/g, '')));
+    
+    if (buyParts.length < 2 || sellParts.length < 2 || isNaN(buyParts[0]) || isNaN(sellParts[0])) {
+        return `<span style="color:var(--text-muted); font-size:10px;">Buy: ${suggestedBuy}<br>Sell: ${suggestedSell}</span>`;
+    }
+    
+    const buyMin = buyParts[0];
+    const buyMax = buyParts[1];
+    const sellMin = sellParts[0];
+    const sellMax = sellParts[1];
+    
+    // Total spectrum boundaries
+    const totalMin = Math.min(current, buyMin) * 0.9;
+    const totalMax = Math.max(current, sellMax) * 1.1;
+    const range = totalMax - totalMin;
+    
+    if (range <= 0) return `<span style="color:var(--text-muted); font-size:10px;">Range error</span>`;
+    
+    const buyLeft = ((buyMin - totalMin) / range) * 100;
+    const buyWidth = ((buyMax - buyMin) / range) * 100;
+    
+    const sellLeft = ((sellMin - totalMin) / range) * 100;
+    const sellWidth = ((sellMax - sellMin) / range) * 100;
+    
+    const pointerPos = Math.max(0, Math.min(100, ((current - totalMin) / range) * 100));
+    
+    return `
+        <div style="display:flex; flex-direction:column; gap:4px; align-items:center; width:125px; margin:0 auto; font-family:'Inter', sans-serif;">
+            <div class="inline-range-track">
+                <div class="inline-range-fill buy" style="left: ${buyLeft}%; width: ${buyWidth}%;"></div>
+                <div class="inline-range-fill sell" style="left: ${sellLeft}%; width: ${sellWidth}%;"></div>
+                <div class="inline-range-pointer" style="left: ${pointerPos}%;" title="Current: ₹${current.toFixed(2)} (Buy Zone: ₹${suggestedBuy} | Sell Zone: ₹${suggestedSell})"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; width:110px; font-size:8px; color:var(--text-muted);">
+                <span>Buy: ₹${buyMin.toFixed(0)}</span>
+                <span>Sell: ₹${sellMin.toFixed(0)}</span>
+            </div>
+        </div>
+    `;
+}
 
 async function loadPortfolioDoctorLedger(forceRefresh = false) {
     const ledgerBody = document.getElementById('portfolio-ledger-body');
@@ -14423,6 +14608,9 @@ async function loadPortfolioDoctorLedger(forceRefresh = false) {
                 <td style="padding: 10px; text-align: right;">
                     ${priceHTML}
                 </td>
+                <td style="padding: 10px; text-align: center; vertical-align: middle;">
+                    ${drawInlineRangeBar(currentPrice, item.suggested_buy_price_range, item.suggested_sell_price_range)}
+                </td>
                 <td style="padding: 10px; text-align: right; font-weight: 600; color: var(--text-primary);">
                     ${safeFormatRupees(currentPrice, 2)}
                 </td>
@@ -14441,12 +14629,6 @@ async function loadPortfolioDoctorLedger(forceRefresh = false) {
                 <td style="padding: 10px; text-align: right; font-weight: 700; color: ${plColor};">
                     ${plSign}${safeFormatRupees(plVal, 2)}<br>
                     <span style="font-size: 10px; color: ${plColor};">${plSign}${plPct.toFixed(2)}%</span>
-                </td>
-                <td style="padding: 10px; text-align: right; color: var(--neon-green); font-weight: 600;">
-                    ${item.suggested_buy_price_range || 'N/A'}
-                </td>
-                <td style="padding: 10px; text-align: right; color: var(--neon-red); font-weight: 600;">
-                    ${item.suggested_sell_price_range || 'N/A'}
                 </td>
                 <td style="padding: 10px; text-align: right; color: var(--neon-green); font-weight: 600;">
                     ${target12M}
@@ -14580,13 +14762,15 @@ async function loadPortfolioDoctorLedger(forceRefresh = false) {
         }
         const localHealthScore = Math.max(10, Math.min(100, localPortfolioScore + localDivBonus));
 
-        const healthEl = document.getElementById('port-health-score');
-        if (healthEl) {
-            healthEl.innerText = `${localHealthScore}/100`;
-            if (localHealthScore >= 70) healthEl.style.color = 'var(--neon-green)';
-            else if (localHealthScore >= 45) healthEl.style.color = 'var(--color-amber)';
-            else healthEl.style.color = 'var(--neon-red)';
+        animateDiagnosticsGauge(localHealthScore);
+        
+        let localSectorExposurePcts = {};
+        if (totalValue > 0) {
+            for (const sector in localSectorExposure) {
+                localSectorExposurePcts[sector] = (localSectorExposure[sector] / totalValue) * 100.0;
+            }
         }
+        renderSectorExposureChart(localSectorExposurePcts);
 
         const concEl = document.getElementById('port-concentration-label');
         if (concEl) {
@@ -14679,12 +14863,10 @@ async function runPortfolioDoctorAnalysis() {
         plTextEl.innerText = `₹${data.total_profit_loss.toLocaleString('en-IN', {maximumFractionDigits:2})} (${data.total_profit_loss_pct >= 0 ? '+' : ''}${data.total_profit_loss_pct}%)`;
         plTextEl.className = data.total_profit_loss >= 0 ? 'green-text' : 'red-text';
         
-        const healthEl = document.getElementById('port-health-score');
-        healthEl.innerText = `${data.health_score}/100`;
-        if (data.health_score >= 70) healthEl.style.color = 'var(--neon-green)';
-        else if (data.health_score >= 45) healthEl.style.color = 'var(--color-amber)';
-        else healthEl.style.color = 'var(--neon-red)';
-        healthEl.style.textShadow = '0 0 10px rgba(16, 185, 129, 0.1)';
+        animateDiagnosticsGauge(data.health_score);
+        if (data.sector_allocation) {
+            renderSectorExposureChart(data.sector_allocation);
+        }
         
         const concEl = document.getElementById('port-concentration-label');
         concEl.innerText = data.concentration_label;
@@ -15740,6 +15922,63 @@ async function loadTaxRawTransactionLedger() {
     }
 }
 
+function recalculateSimulatedTax() {
+    if (!window.activeTaxReport) return;
+    
+    const sum = window.activeTaxReport.summary;
+    const candidates = window.activeTaxReport.harvesting_opportunities || [];
+    
+    let simulatedLtcgLossRealized = 0;
+    let simulatedStcgLossRealized = 0;
+    
+    // Find all checked boxes
+    const checkboxes = document.querySelectorAll('.tax-sim-checkbox');
+    checkboxes.forEach(cb => {
+        if (cb.checked) {
+            const trancheId = parseInt(cb.getAttribute('data-id'));
+            const cand = candidates.find(c => c.id === trancheId);
+            if (cand) {
+                const loss = Math.abs(cand.unrealized_loss);
+                if (cand.classification === 'LTCG') {
+                    simulatedLtcgLossRealized += loss;
+                } else {
+                    simulatedStcgLossRealized += loss;
+                }
+            }
+        }
+    });
+    
+    // Recalculate gains and taxes based on original values
+    const stcgGain = sum.stcg_unrealized_pl > 0 ? sum.stcg_unrealized_pl : 0;
+    const ltcgGain = sum.ltcg_unrealized_pl > 0 ? sum.ltcg_unrealized_pl : 0;
+    
+    // Net gains after simulated loss harvesting
+    const simulatedStcgGains = Math.max(0, stcgGain - simulatedStcgLossRealized);
+    const simulatedLtcgGains = Math.max(0, ltcgGain - simulatedLtcgLossRealized);
+    
+    // Taxes: STCG = 20%, LTCG = 12.5% on gains exceeding ₹1.25L
+    const simulatedStcgTax = simulatedStcgGains * 0.20;
+    const simulatedLtcgTax = Math.max(0, simulatedLtcgGains - 125000) * 0.125;
+    
+    const simulatedTotalTax = simulatedStcgTax + simulatedLtcgTax;
+    const originalTotalTax = sum.total_tax_liability;
+    const savings = Math.max(0, originalTotalTax - simulatedTotalTax);
+    
+    // Update DOM indicators
+    document.getElementById('tax-metric-liability').innerText = `₹${simulatedTotalTax.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+    document.getElementById('tax-metric-harvest-savings').innerText = `₹${savings.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+    
+    // Dynamic text highlight if savings occur
+    const liabilityMetric = document.getElementById('tax-metric-liability');
+    if (savings > 0) {
+        liabilityMetric.style.color = 'var(--neon-green)';
+        liabilityMetric.style.textShadow = '0 0 10px rgba(16, 185, 129, 0.25)';
+    } else {
+        liabilityMetric.style.color = '';
+        liabilityMetric.style.textShadow = '';
+    }
+}
+
 async function loadTaxHarvestingReport() {
     const reportContainer = document.getElementById('tax-report-container');
     if (!reportContainer) return;
@@ -15749,6 +15988,9 @@ async function loadTaxHarvestingReport() {
         if (!response.ok) throw new Error("Failed to load tax report.");
         const report = await response.json();
         
+        // Save to window variable for simulated What-If recalculations
+        window.activeTaxReport = report;
+        
         reportContainer.style.display = 'block';
         
         const sum = report.summary;
@@ -15756,6 +15998,10 @@ async function loadTaxHarvestingReport() {
         document.getElementById('tax-metric-liability').innerText = `₹${sum.total_tax_liability.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
         document.getElementById('tax-metric-harvest-savings').innerText = `₹${sum.total_harvest_savings.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
         
+        // Reset dynamic style on liability metric
+        document.getElementById('tax-metric-liability').style.color = '';
+        document.getElementById('tax-metric-liability').style.textShadow = '';
+
         const netPLText = document.getElementById('tax-metric-net-pl');
         netPLText.innerText = `₹${sum.total_unrealized_pl.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (${sum.total_unrealized_pl_pct > 0 ? '+' : ''}${sum.total_unrealized_pl_pct.toFixed(2)}%)`;
         netPLText.style.color = sum.total_unrealized_pl >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
@@ -15776,6 +16022,31 @@ async function loadTaxHarvestingReport() {
         ltcgPl.style.color = sum.ltcg_unrealized_pl >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
         document.getElementById('tax-ltcg-liability').innerText = `₹${sum.ltcg_tax.toLocaleString('en-IN')}`;
         
+        // Update ₹1.25L Exemption Progress Bar
+        const exemptionLimit = 125000;
+        const currentLtcgGains = sum.ltcg_unrealized_pl > 0 ? sum.ltcg_unrealized_pl : 0;
+        const pctExempt = Math.min(100, (currentLtcgGains / exemptionLimit) * 100);
+        const exemptRemaining = Math.max(0, exemptionLimit - currentLtcgGains);
+        
+        const exemptFill = document.getElementById('tax-exemption-fill');
+        const exemptUsedLabel = document.getElementById('tax-exemption-used');
+        const exemptRemainingLabel = document.getElementById('tax-exemption-remaining');
+        
+        if (exemptFill) {
+            exemptFill.style.width = `${pctExempt}%`;
+            if (pctExempt >= 100) {
+                exemptFill.style.background = 'linear-gradient(90deg, #3b82f6, #ef4444)';
+            } else {
+                exemptFill.style.background = 'linear-gradient(90deg, #10b981, #3b82f6)';
+            }
+        }
+        if (exemptUsedLabel) {
+            exemptUsedLabel.innerText = `₹${Math.min(exemptionLimit, currentLtcgGains).toLocaleString('en-IN')}`;
+        }
+        if (exemptRemainingLabel) {
+            exemptRemainingLabel.innerText = `₹${exemptRemaining.toLocaleString('en-IN')} remaining`;
+        }
+
         const emptyState = document.getElementById('tax-harvesting-empty-state');
         const listContainer = document.getElementById('tax-harvesting-list');
         
@@ -15803,14 +16074,19 @@ async function loadTaxHarvestingReport() {
                 card.style.alignItems = 'center';
                 
                 card.innerHTML = `
-                    <div>
-                        <strong style="font-size: 12px; color: var(--text-primary);">${c.symbol}</strong>
-                        <span style="font-size: 10px; color: var(--text-muted); margin-left: 5px;">(${c.name})</span>
-                        <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 4px;">
-                            Acquired: ${c.quantity} shares @ ₹${c.purchase_price} | Current: ₹${c.current_price}
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <div style="display:flex; align-items:center; justify-content:center;">
+                            <input type="checkbox" class="tax-sim-checkbox" data-id="${c.id}" style="width:16px; height:16px; cursor:pointer;" title="Check to simulate harvesting this tranche loss">
                         </div>
-                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
-                            Holding period: <strong>${c.holding_days} days</strong> (${c.classification})
+                        <div>
+                            <strong style="font-size: 12px; color: var(--text-primary);">${c.symbol}</strong>
+                            <span style="font-size: 10px; color: var(--text-muted); margin-left: 5px;">(${c.name})</span>
+                            <div style="font-size: 10.5px; color: var(--text-secondary); margin-top: 4px;">
+                                Acquired: ${c.quantity} shares @ ₹${c.purchase_price} | Current: ₹${c.current_price}
+                            </div>
+                            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+                                Holding period: <strong>${c.holding_days} days</strong> (${c.classification})
+                            </div>
                         </div>
                     </div>
                     <div style="text-align: right;">
@@ -15819,6 +16095,10 @@ async function loadTaxHarvestingReport() {
                         <button class="btn-primary tax-harvest-action-btn" data-symbol="${c.symbol}" style="font-size: 9px; padding: 3px 6px; height: auto; border-radius: 4px; margin-top: 6px; font-weight: 700; border: none; background: rgba(16, 185, 129, 0.15); color: #10b981;">Harvest Loss</button>
                     </div>
                 `;
+                
+                card.querySelector('.tax-sim-checkbox').addEventListener('change', () => {
+                    recalculateSimulatedTax();
+                });
                 
                 card.querySelector('.tax-harvest-action-btn').addEventListener('click', () => {
                     alert(`To harvest the tax loss for ${c.symbol}:\n\n` +
@@ -16082,6 +16362,72 @@ function setupPortfolioBacktester() {
         });
     }
     
+    const equalWeightBtn = document.getElementById('backtest-equal-weight-btn');
+    if (equalWeightBtn) {
+        equalWeightBtn.addEventListener('click', () => {
+            const numAssets = backtestSandboxStocks.length;
+            if (numAssets === 0) {
+                showToast("No assets in backtest sandbox to balance.", "warning");
+                return;
+            }
+            const baseWeight = Math.floor(100 / numAssets);
+            const remainder = 100 - (baseWeight * numAssets);
+            backtestSandboxStocks.forEach((stock, idx) => {
+                stock.weight = baseWeight + (idx === 0 ? remainder : 0);
+            });
+            renderBacktestSandbox();
+            showToast("Sandbox weights balanced equally.", "success");
+        });
+    }
+    
+    const riskParityBtn = document.getElementById('backtest-risk-parity-btn');
+    if (riskParityBtn) {
+        riskParityBtn.addEventListener('click', async () => {
+            const numAssets = backtestSandboxStocks.length;
+            if (numAssets === 0) {
+                showToast("No assets in backtest sandbox to balance.", "warning");
+                return;
+            }
+            
+            riskParityBtn.disabled = true;
+            const originalText = riskParityBtn.innerHTML;
+            riskParityBtn.innerHTML = `<span>⏳ Optimizing...</span>`;
+            
+            try {
+                const response = await fetch('/api/portfolio/optimize-weights', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ tickers: backtestSandboxStocks.map(s => s.symbol) })
+                });
+                if (!response.ok) throw new Error("Parity API call failed.");
+                const data = await response.json();
+                
+                if (data.weights) {
+                    backtestSandboxStocks.forEach(stock => {
+                        if (data.weights[stock.symbol] !== undefined) {
+                            stock.weight = data.weights[stock.symbol];
+                        }
+                    });
+                    renderBacktestSandbox();
+                    showToast("Risk Parity (Inverse Volatility) allocations computed successfully.", "success");
+                }
+            } catch (err) {
+                console.error("Risk Parity Optimization failed: ", err);
+                showToast("Weight optimization failed. Defaulting to Equal Weight.", "error");
+                
+                const baseWeight = Math.floor(100 / numAssets);
+                const remainder = 100 - (baseWeight * numAssets);
+                backtestSandboxStocks.forEach((stock, idx) => {
+                    stock.weight = baseWeight + (idx === 0 ? remainder : 0);
+                });
+                renderBacktestSandbox();
+            } finally {
+                riskParityBtn.disabled = false;
+                riskParityBtn.innerHTML = originalText;
+            }
+        });
+    }
+    
     // Watch for theme/resize changes to dynamically update chart bounds
     window.addEventListener('resize', () => {
         if (window.activeBacktestLightweightChart) {
@@ -16089,10 +16435,14 @@ function setupPortfolioBacktester() {
             if (container) {
                 window.activeBacktestLightweightChart.resize(container.clientWidth || 600, 300);
             }
-            updateBacktestChartThemeColors();
-        } else if (backtestChartInstance) {
-            updateBacktestChartThemeColors();
         }
+        if (window.activeBacktestDrawdownChart) {
+            const ddContainer = document.getElementById('backtest-drawdown-chart-container');
+            if (ddContainer) {
+                window.activeBacktestDrawdownChart.resize(ddContainer.clientWidth || 600, 155);
+            }
+        }
+        updateBacktestChartThemeColors();
     });
 }
 
@@ -16557,15 +16907,101 @@ function renderBacktestChart(data) {
     // 4. Map and set data
     const portfolioData = [];
     const benchmarkData = [];
+    const drawdownData = [];
+    let maxVal = 0;
     for (let i = 0; i < data.dates.length; i++) {
         const dateStr = data.dates[i].split('T')[0];
-        portfolioData.push({ time: dateStr, value: data.portfolio_values[i] });
+        const val = data.portfolio_values[i];
+        portfolioData.push({ time: dateStr, value: val });
         benchmarkData.push({ time: dateStr, value: data.benchmark_values[i] });
+        
+        if (val > maxVal) {
+            maxVal = val;
+        }
+        const dd = maxVal > 0 ? ((val - maxVal) / maxVal) * 100 : 0;
+        drawdownData.push({ time: dateStr, value: dd });
     }
 
     portfolioSeries.setData(portfolioData);
     benchmarkSeries.setData(benchmarkData);
+    
+    // Add Rebalance Markers
+    const markers = [];
+    const rebalHistory = data.metrics.rebalancing_history || [];
+    rebalHistory.forEach(event => {
+        const dateStr = event.date.split('T')[0];
+        markers.push({
+            time: dateStr,
+            position: 'belowBar',
+            color: '#10b981',
+            shape: 'arrowUp',
+            text: 'Rebalance',
+            size: 1
+        });
+    });
+    if (markers.length > 0) {
+        portfolioSeries.setMarkers(markers);
+    }
+    
     chart.timeScale().fitContent();
+
+    // Render Drawdown Chart
+    if (window.activeBacktestDrawdownChart) {
+        window.activeBacktestDrawdownChart.remove();
+        window.activeBacktestDrawdownChart = null;
+    }
+    
+    const ddContainer = document.getElementById('backtest-drawdown-chart-container');
+    if (ddContainer) {
+        ddContainer.innerHTML = '';
+        
+        const ddChart = LightweightCharts.createChart(ddContainer, {
+            width: ddContainer.clientWidth || 600,
+            height: 155,
+            layout: {
+                background: { type: 'solid', color: 'transparent' },
+                textColor: isDarkTheme ? '#94a3b8' : '#334155',
+                fontFamily: 'Inter, sans-serif',
+            },
+            grid: {
+                vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+                horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            },
+            timeScale: {
+                borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                timeVisible: false,
+            },
+        });
+        window.activeBacktestDrawdownChart = ddChart;
+        
+        const ddSeries = ddChart.addAreaSeries({
+            topColor: 'rgba(239, 68, 68, 0.35)',
+            bottomColor: 'rgba(239, 68, 68, 0.0)',
+            lineColor: '#ef4444',
+            lineWidth: 2,
+            priceFormat: {
+                type: 'custom',
+                formatter: val => val.toFixed(2) + '%',
+            },
+            title: 'Drawdown',
+        });
+        ddSeries.setData(drawdownData);
+        ddChart.timeScale().fitContent();
+        
+        // Synchronize visible ranges
+        chart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+            ddChart.timeScale().setVisibleLogicalRange(range);
+        });
+        ddChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
+            chart.timeScale().setVisibleLogicalRange(range);
+        });
+    }
 }
 
 function drawChartJSBacktestChart(data) {
@@ -16639,6 +17075,66 @@ function drawChartJSBacktestChart(data) {
             }
         }
     });
+
+    // Draw Chart.js Drawdown fallback
+    const drawdownData = [];
+    let maxVal = 0;
+    for (let i = 0; i < data.dates.length; i++) {
+        const val = data.portfolio_values[i];
+        if (val > maxVal) {
+            maxVal = val;
+        }
+        const dd = maxVal > 0 ? ((val - maxVal) / maxVal) * 100 : 0;
+        drawdownData.push(dd);
+    }
+
+    const ddContainer = document.getElementById('backtest-drawdown-chart-container');
+    if (ddContainer) {
+        const restoredDDCanvas = getOrCreateCanvas('backtest-drawdown-chart', ddContainer);
+        if (restoredDDCanvas) {
+            const ddCtx = restoredDDCanvas.getContext('2d');
+            if (window.activeChartJSDrawdownInstance) {
+                window.activeChartJSDrawdownInstance.destroy();
+            }
+            window.activeChartJSDrawdownInstance = new Chart(ddCtx, {
+                type: 'line',
+                data: {
+                    labels: data.dates,
+                    datasets: [{
+                        label: 'Drawdown (%)',
+                        data: drawdownData,
+                        borderColor: '#ef4444',
+                        borderWidth: 1.5,
+                        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { family: 'Inter', size: 9 } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                font: { family: 'Inter', size: 9 },
+                                callback: function(value) { return value.toFixed(1) + '%'; }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
 }
 
 function updateBacktestChartThemeColors() {
@@ -16661,21 +17157,45 @@ function updateBacktestChartThemeColors() {
                 borderColor: isLightTheme ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
             },
         });
-        return;
+    }
+    
+    if (window.activeBacktestDrawdownChart) {
+        window.activeBacktestDrawdownChart.applyOptions({
+            layout: {
+                textColor: isLightTheme ? '#334155' : '#94a3b8',
+            },
+            grid: {
+                vertLines: { color: isLightTheme ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.02)' },
+                horzLines: { color: isLightTheme ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.02)' },
+            },
+            rightPriceScale: {
+                borderColor: isLightTheme ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
+            },
+            timeScale: {
+                borderColor: isLightTheme ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)',
+            },
+        });
     }
 
-    if (!backtestChartInstance) return;
-    
     const gridColor = isLightTheme ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)';
     const textColor = isLightTheme ? '#334155' : '#f8fafc';
+
+    if (backtestChartInstance) {
+        backtestChartInstance.options.plugins.legend.labels.color = textColor;
+        backtestChartInstance.options.scales.x.grid.color = gridColor;
+        backtestChartInstance.options.scales.x.ticks.color = textColor;
+        backtestChartInstance.options.scales.y.grid.color = gridColor;
+        backtestChartInstance.options.scales.y.ticks.color = textColor;
+        backtestChartInstance.update();
+    }
     
-    backtestChartInstance.options.plugins.legend.labels.color = textColor;
-    backtestChartInstance.options.scales.x.grid.color = gridColor;
-    backtestChartInstance.options.scales.x.ticks.color = textColor;
-    backtestChartInstance.options.scales.y.grid.color = gridColor;
-    backtestChartInstance.options.scales.y.ticks.color = textColor;
-    
-    backtestChartInstance.update();
+    if (window.activeChartJSDrawdownInstance) {
+        window.activeChartJSDrawdownInstance.options.scales.x.grid.color = gridColor;
+        window.activeChartJSDrawdownInstance.options.scales.x.ticks.color = textColor;
+        window.activeChartJSDrawdownInstance.options.scales.y.grid.color = gridColor;
+        window.activeChartJSDrawdownInstance.options.scales.y.ticks.color = textColor;
+        window.activeChartJSDrawdownInstance.update();
+    }
 }
 
 window.toggleRebalanceEventDetails = function(idx) {
@@ -18873,9 +19393,9 @@ async function executeRuleScan(cond, op, val, uni, isAIScan = false) {
             // Draw dynamic SVG charts
             const telGrid = document.getElementById('rule-scanner-telemetry-grid');
             if (telGrid) telGrid.style.display = 'grid';
-            drawRSRadialMatchGauge(data.matched, data.scanned);
-            drawRSSectorDonut(ruleScanAllResults);
-            drawRSValueQualityScatter(ruleScanAllResults);
+            drawRSCapRiskDiagnostic(ruleScanAllResults);
+            drawRSValuationQualityMatrix(ruleScanAllResults);
+            drawRSKPIHeatmap(ruleScanAllResults);
 
             // Trigger AI synthesis
             if (ruleScanAllResults.length > 0) {
@@ -19585,9 +20105,9 @@ async function executeCustomScreenerScan() {
             // Draw dynamic SVG charts
             const telGrid = document.getElementById('rule-scanner-telemetry-grid');
             if (telGrid) telGrid.style.display = 'grid';
-            drawRSRadialMatchGauge(data.matched, data.scanned);
-            drawRSSectorDonut(ruleScanAllResults);
-            drawRSValueQualityScatter(ruleScanAllResults);
+            drawRSCapRiskDiagnostic(ruleScanAllResults);
+            drawRSValuationQualityMatrix(ruleScanAllResults);
+            drawRSKPIHeatmap(ruleScanAllResults);
 
             // Display Historical matches trend chart
             const chartCard = document.getElementById('rule-scanner-historical-chart-card');
@@ -20009,208 +20529,593 @@ function renderRuleScannerHistoricalChart(matchesData) {
     resizeObserver.observe(container);
 }
 
-function drawRSRadialMatchGauge(matched, scanned) {
-    const container = document.getElementById('rs-radial-match-gauge-container');
+function drawRSCapRiskDiagnostic(results) {
+    const container = document.getElementById('rs-cap-risk-container');
     if (!container) return;
-    
-    const total = scanned || 1;
-    const count = matched || 0;
-    const pct = Math.min(100, Math.max(0, (count / total) * 100));
-    
-    const isDark = document.body.getAttribute('data-theme') !== 'light';
-    const trackColor = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)';
-    const strokeColor = 'url(#rs-gauge-gradient)';
-    const textColor = isDark ? '#ffffff' : '#0f172a';
-    const mutedColor = isDark ? '#94a3b8' : '#64748b';
+    if (!results || results.length === 0) {
+        container.innerHTML = `<span style="font-size: 11px; color: var(--text-muted);">No candidates to diagnose</span>`;
+        return;
+    }
 
-    const r = 54;
-    const circ = 2 * Math.PI * r;
-    const strokeOffset = circ - (pct / 100) * circ;
+    // 1. Calculate Cap Segments
+    let largeCount = 0, midCount = 0, smallCount = 0;
+    results.forEach(r => {
+        const cap = (r.cap_type || '').toLowerCase();
+        if (cap.includes('large')) largeCount++;
+        else if (cap.includes('mid')) midCount++;
+        else if (cap.includes('small')) smallCount++;
+        else {
+            smallCount++;
+        }
+    });
+    const total = results.length;
+    const largePct = ((largeCount / total) * 100).toFixed(0);
+    const midPct = ((midCount / total) * 100).toFixed(0);
+    const smallPct = ((smallCount / total) * 100).toFixed(0);
+
+    // 2. Calculate average Beta
+    let betaSum = 0;
+    let betaCount = 0;
+    results.forEach(r => {
+        let b = parseFloat(r.beta);
+        if (isNaN(b) || b <= 0) {
+            const sector = (r.sector || '').toLowerCase();
+            if (sector.includes('it') || sector.includes('tech') || sector.includes('finance') || sector.includes('bank')) {
+                b = 1.15;
+            } else if (sector.includes('pharma') || sector.includes('fmcg') || sector.includes('utilit') || sector.includes('power')) {
+                b = 0.75;
+            } else {
+                b = 1.0;
+            }
+        }
+        betaSum += b;
+        betaCount++;
+    });
+    const avgBeta = betaCount > 0 ? (betaSum / betaCount) : 1.0;
+    
+    const cx = 80;
+    const cy = 90;
+    const r = 55;
+    const needleLen = 45;
+    const clampedBeta = Math.min(2.0, Math.max(0.0, avgBeta));
+    const angleDegree = clampedBeta * 90; 
+    const angleRad = (angleDegree - 180) * Math.PI / 180;
+    const needleX = cx + needleLen * Math.cos(angleRad);
+    const needleY = cy + needleLen * Math.sin(angleRad);
+
+    const isDark = document.body.getAttribute('data-theme') !== 'light';
+    const textColor = isDark ? '#ffffff' : '#0f172a';
+    const labelColor = isDark ? '#94a3b8' : '#64748b';
+    
+    let betaLabel = "Market Equivalent";
+    let betaColor = "#6366f1";
+    if (avgBeta < 0.9) {
+        betaLabel = "Defensive Allocation";
+        betaColor = "#10b981";
+    } else if (avgBeta > 1.1) {
+        betaLabel = "Aggressive / Volatile";
+        betaColor = "#f59e0b";
+    }
 
     container.innerHTML = `
-        <svg width="150" height="150" viewBox="0 0 160 160" style="transform: rotate(-90deg);">
-            <defs>
-                <linearGradient id="rs-gauge-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#a855f7" />
-                    <stop offset="100%" stop-color="#4f46e5" />
-                </linearGradient>
-            </defs>
-            <!-- Background circle -->
-            <circle cx="80" cy="80" r="${r}" fill="transparent" stroke="${trackColor}" stroke-width="12" />
-            <!-- Foreground match arc -->
-            <circle cx="80" cy="80" r="${r}" fill="transparent" stroke="${strokeColor}" stroke-width="12" 
-                stroke-dasharray="${circ}" stroke-dashoffset="${strokeOffset}" stroke-linecap="round"
-                style="transition: stroke-dashoffset 0.8s ease-in-out;" />
-        </svg>
-        <div style="position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none;">
-            <span style="font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 800; color: ${textColor}; line-height: 1;">${pct.toFixed(1)}%</span>
-            <span style="font-size: 9px; color: ${mutedColor}; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px;">Hit Rate</span>
-            <span style="font-size: 9px; color: ${mutedColor}; margin-top: 2px;">${count} of ${total}</span>
+        <div style="display: flex; flex-direction: row; gap: 15px; width: 100%; height: 100%; align-items: center; justify-content: space-between;">
+            <!-- Left side: Speedometer -->
+            <div style="position: relative; width: 50%; height: 140px; display: flex; align-items: center; justify-content: center;">
+                <svg width="150" height="110" viewBox="0 0 160 110" style="overflow: visible;">
+                    <defs>
+                        <linearGradient id="rs-beta-arc-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#10b981" />
+                            <stop offset="50%" stop-color="#6366f1" />
+                            <stop offset="100%" stop-color="#f43f5e" />
+                        </linearGradient>
+                    </defs>
+                    <!-- Background Arc -->
+                    <path d="M 25,90 A 55,55 0 0,1 135,90" fill="none" stroke="${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}" stroke-width="12" stroke-linecap="round" />
+                    <!-- Colored Arc Overlay -->
+                    <path d="M 25,90 A 55,55 0 0,1 135,90" fill="none" stroke="url(#rs-beta-arc-grad)" stroke-width="12" stroke-linecap="round" opacity="0.85" />
+                    
+                    <!-- Needle Pin -->
+                    <circle cx="${cx}" cy="${cy}" r="6" fill="${textColor}" />
+                    <circle cx="${cx}" cy="${cy}" r="3" fill="${betaColor}" />
+                    <!-- Needle line -->
+                    <line x1="${cx}" y1="${cy}" x2="${needleX}" y2="${needleY}" stroke="${textColor}" stroke-width="3" stroke-linecap="round" style="transition: all 0.5s ease-out;" />
+                    
+                    <!-- Labels -->
+                    <text x="25" y="105" fill="${labelColor}" font-size="8" text-anchor="middle" font-weight="bold">0.0 (Def)</text>
+                    <text x="${cx}" y="20" fill="${labelColor}" font-size="8" text-anchor="middle" font-weight="bold">1.0 (Mkt)</text>
+                    <text x="135" y="105" fill="${labelColor}" font-size="8" text-anchor="middle" font-weight="bold">2.0 (Vol)</text>
+                </svg>
+                <div style="position: absolute; bottom: -8px; left: 0; right: 0; text-align: center; display: flex; flex-direction: column; align-items: center;">
+                    <span style="font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 800; color: ${textColor};">${avgBeta.toFixed(2)}</span>
+                    <span style="font-size: 8px; font-weight: 700; text-transform: uppercase; color: ${betaColor}; letter-spacing: 0.05em; margin-top: 1px;">${betaLabel}</span>
+                </div>
+            </div>
+            
+            <!-- Right side: Cap Segments -->
+            <div style="width: 50%; display: flex; flex-direction: column; gap: 8px; justify-content: center; padding-right: 5px;">
+                <div style="font-size: 8px; font-weight: 700; color: ${labelColor}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Cap Allocation</div>
+                
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: ${textColor};">
+                        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary);"></span>Large Cap</span>
+                        <strong>${largePct}%</strong>
+                    </div>
+                    <div style="width: 100%; height: 5px; background: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)'}; border-radius: 3px; overflow: hidden;">
+                        <div style="width: ${largePct}%; background: var(--color-primary); height: 100%; border-radius: 3px;"></div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: ${textColor};">
+                        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #3b82f6;"></span>Mid Cap</span>
+                        <strong>${midPct}%</strong>
+                    </div>
+                    <div style="width: 100%; height: 5px; background: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)'}; border-radius: 3px; overflow: hidden;">
+                        <div style="width: ${midPct}%; background: #3b82f6; height: 100%; border-radius: 3px;"></div>
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: ${textColor};">
+                        <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981;"></span>Small Cap</span>
+                        <strong>${smallPct}%</strong>
+                    </div>
+                    <div style="width: 100%; height: 5px; background: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)'}; border-radius: 3px; overflow: hidden;">
+                        <div style="width: ${smallPct}%; background: #10b981; height: 100%; border-radius: 3px;"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     `;
 }
 
-function drawRSSectorDonut(results) {
-    const container = document.getElementById('rs-sector-donut-container');
+function drawRSValuationQualityMatrix(results) {
+    const container = document.getElementById('rs-val-quality-container');
     if (!container) return;
-    
-    if (!results || results.length === 0) {
-        container.innerHTML = `<span style="font-size: 11px; color: var(--text-muted);">No candidates to map</span>`;
-        return;
-    }
-
-    // Group candidates by sector
-    const sectorCounts = {};
-    results.forEach(item => {
-        const sector = item.sector || 'Unclassified';
-        sectorCounts[sector] = (sectorCounts[sector] || 0) + 1;
-    });
-
-    const sectorsSorted = Object.entries(sectorCounts).sort((a, b) => b[1] - a[1]);
-    const totalCount = results.length;
-    
-    const palette = ['#a855f7', '#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#14b8a6', '#f43f5e'];
-    
-    const r = 50;
-    const circ = 2 * Math.PI * r;
-    let accumulatedPercent = 0;
-    
-    let svgContent = `<svg width="120" height="120" viewBox="0 0 160 160" style="transform: rotate(-90deg);">`;
-    
-    sectorsSorted.forEach(([sector, count], idx) => {
-        const pct = (count / totalCount) * 100;
-        const strokeOffset = circ - (pct / 100) * circ;
-        const rotation = accumulatedPercent * 3.6;
-        const color = palette[idx % palette.length];
-        
-        svgContent += `
-            <circle cx="80" cy="80" r="${r}" fill="transparent" stroke="${color}" stroke-width="12"
-                stroke-dasharray="${circ}" stroke-dashoffset="${strokeOffset}"
-                transform="rotate(${rotation} 80 80)"
-                style="transition: stroke-dashoffset 0.8s ease-in-out;"
-                title="${sector}: ${count} (${pct.toFixed(0)}%)" />
-        `;
-        
-        accumulatedPercent += pct;
-    });
-    
-    svgContent += `</svg>`;
-
-    // Add legend text on the right or overlay
-    const isDark = document.body.getAttribute('data-theme') !== 'light';
-    const labelColor = isDark ? '#ffffff' : '#0f172a';
-    
-    let legendHtml = `<div style="display:flex; align-items:center; gap: 8px; width: 100%; height: 100%;">`;
-    legendHtml += `<div style="width: 50%; height: 100%; display: flex; align-items: center; justify-content: center; position: relative;">${svgContent}</div>`;
-    legendHtml += `<div style="width: 50%; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 140px; padding-right: 4px; justify-content: center;">`;
-    
-    sectorsSorted.slice(0, 4).forEach(([sector, count], idx) => {
-        const pct = (count / totalCount) * 100;
-        const color = palette[idx % palette.length];
-        legendHtml += `
-            <div style="display: flex; align-items: center; gap: 6px; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: ${labelColor};" title="${sector}: ${count}">
-                <span style="width: 7px; height: 7px; border-radius: 50%; background: ${color}; flex-shrink: 0;"></span>
-                <span style="overflow: hidden; text-overflow: ellipsis; max-width: 60px;">${sector}</span>
-                <strong style="margin-left: auto;">${count}</strong>
-            </div>
-        `;
-    });
-    
-    if (sectorsSorted.length > 4) {
-        const otherCount = sectorsSorted.slice(4).reduce((sum, item) => sum + item[1], 0);
-        legendHtml += `
-            <div style="display: flex; align-items: center; gap: 6px; font-size: 9.5px; color: var(--text-muted);">
-                <span style="width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.15); flex-shrink: 0;"></span>
-                <span>Other</span>
-                <strong style="margin-left: auto;">${otherCount}</strong>
-            </div>
-        `;
-    }
-
-    legendHtml += `</div></div>`;
-    container.innerHTML = legendHtml;
-}
-
-function drawRSValueQualityScatter(results) {
-    const container = document.getElementById('rs-value-quality-scatter-container');
-    if (!container) return;
-
     if (!results || results.length === 0) {
         container.innerHTML = `<span style="font-size: 11px; color: var(--text-muted);">No candidates to map</span>`;
         return;
     }
 
     const isDark = document.body.getAttribute('data-theme') !== 'light';
-    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+    const axisLabelColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.5)';
     const textColor = isDark ? '#94a3b8' : '#64748b';
 
-    // Extract values and bounds
-    const dataPoints = results.map(item => {
-        let rawPe = parseFloat(item.pe) || 0;
-        let score = parseInt(item.score) || parseInt(item.rating_score) || 50;
-        return {
-            symbol: item.symbol || 'Stock',
-            pe: rawPe,
-            score: score
-        };
-    }).filter(d => d.pe > 0);
+    const width = 240;
+    const height = 140;
+    const paddingX = 24;
+    const paddingY = 15;
+    const drawW = width - 2 * paddingX;
+    const drawH = height - 2 * paddingY;
 
-    if (dataPoints.length === 0) {
-        container.innerHTML = `<span style="font-size: 11px; color: var(--text-muted);">Missing P/E metrics to chart</span>`;
+    // Filter out stocks with invalid P/E and compile points
+    const points = results.map(r => {
+        const pe = typeof r.pe === 'number' ? r.pe : 0;
+        const roe = typeof r.roe === 'number' ? r.roe : 0;
+        return {
+            symbol: (r.symbol || '').replace('.NS', ''),
+            pe: pe,
+            roe: roe,
+            score: r.score || 50
+        };
+    }).filter(pt => pt.pe > 0);
+
+    if (points.length === 0) {
+        container.innerHTML = `<span style="font-size: 11px; color: var(--text-muted);">No candidates with positive P/E to map</span>`;
         return;
     }
 
-    const maxPe = Math.max(...dataPoints.map(d => d.pe), 50);
-    const minPe = Math.min(...dataPoints.map(d => d.pe), 5);
-    const peRange = maxPe - minPe || 10;
+    // Map axes limits:
+    // P/E ranges from 5x to 65x. Center divider line is at 30x.
+    // ROE % ranges from 0% to 40%. Center divider line is at 15%.
+    const minPe = 5, maxPe = 65, peRange = maxPe - minPe;
+    const minRoe = 0, maxRoe = 40, roeRange = maxRoe - minRoe;
+    const splitPe = 30;
+    const splitRoe = 15;
 
-    const scoreRange = 100;
+    // Calculate center line positions
+    const midX = paddingX + ((splitPe - minPe) / peRange) * drawW;
+    const midY = paddingY + (1 - (splitRoe - minRoe) / roeRange) * drawH;
 
-    const width = 160;
-    const height = 130;
-    const padding = 15;
-
-    let svgContent = `<svg width="100%" height="100%" viewBox="0 0 ${width} ${height}">`;
+    // Build SVG Content
+    let svgContent = `<svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="overflow: visible;">`;
     
-    // Draw grid bounds
-    svgContent += `<line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="${gridColor}" stroke-width="1" />`;
-    svgContent += `<line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="${gridColor}" stroke-width="1" />`;
+    // Glowing neon drop shadow filter for dots
+    svgContent += `
+        <defs>
+            <filter id="rs-dot-glow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="1.2" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+        </defs>
+    `;
 
-    // Draw midpoint grid lines
-    const midX = width / 2;
-    const midY = height / 2;
-    svgContent += `<line x1="${midX}" y1="${padding}" x2="${midX}" y2="${height - padding}" stroke="${gridColor}" stroke-dasharray="2,2" stroke-width="1" />`;
-    svgContent += `<line x1="${padding}" y1="${midY}" x2="${width - padding}" y2="${midY}" stroke="${gridColor}" stroke-dasharray="2,2" stroke-width="1" />`;
+    // Ambient Quadrant Glow Overlays (background stack)
+    svgContent += `
+        <rect id="rs-quad-bg-garp" x="${paddingX}" y="${paddingY}" width="${midX - paddingX}" height="${midY - paddingY}" fill="transparent" style="transition: fill 0.3s ease; pointer-events: none;" />
+        <rect id="rs-quad-bg-premium" x="${midX}" y="${paddingY}" width="${width - paddingX - midX}" height="${midY - paddingY}" fill="transparent" style="transition: fill 0.3s ease; pointer-events: none;" />
+        <rect id="rs-quad-bg-trap" x="${paddingX}" y="${midY}" width="${midX - paddingX}" height="${height - paddingY - midY}" fill="transparent" style="transition: fill 0.3s ease; pointer-events: none;" />
+        <rect id="rs-quad-bg-speculative" x="${midX}" y="${midY}" width="${width - paddingX - midX}" height="${height - paddingY - midY}" fill="transparent" style="transition: fill 0.3s ease; pointer-events: none;" />
+    `;
 
-    // Map data points
-    dataPoints.forEach(point => {
-        const x = padding + ((point.pe - minPe) / peRange) * (width - 2 * padding);
-        const y = (height - padding) - (point.score / scoreRange) * (height - 2 * padding);
+    // Grid Matrix Frame & Dividers
+    svgContent += `<rect x="${paddingX}" y="${paddingY}" width="${drawW}" height="${drawH}" fill="transparent" stroke="${gridColor}" stroke-width="1" />`;
+    svgContent += `<line x1="${midX}" y1="${paddingY}" x2="${midX}" y2="${height - paddingY}" stroke="${gridColor}" stroke-dasharray="2,2" stroke-width="1" />`;
+    svgContent += `<line x1="${paddingX}" y1="${midY}" x2="${width - paddingX}" y2="${midY}" stroke="${gridColor}" stroke-dasharray="2,2" stroke-width="1" />`;
+
+    // Quadrant Labels
+    svgContent += `<text x="${paddingX + 6}" y="${paddingY + 12}" fill="${isDark ? '#10b981' : '#059669'}" font-size="7" font-weight="800" opacity="0.45" letter-spacing="0.05em">GARP</text>`;
+    svgContent += `<text x="${width - paddingX - 6}" y="${paddingY + 12}" fill="${isDark ? '#3b82f6' : '#1d4ed8'}" font-size="7" font-weight="800" opacity="0.45" letter-spacing="0.05em" text-anchor="end">PREMIUM QUALITY</text>`;
+    svgContent += `<text x="${paddingX + 6}" y="${height - paddingY - 8}" fill="${isDark ? '#ef4444' : '#b91c1c'}" font-size="7" font-weight="800" opacity="0.45" letter-spacing="0.05em">VALUE TRAPS</text>`;
+    svgContent += `<text x="${width - paddingX - 6}" y="${height - paddingY - 8}" fill="${isDark ? '#f59e0b' : '#b45309'}" font-size="7" font-weight="800" opacity="0.45" letter-spacing="0.05em" text-anchor="end">SPECULATIVE</text>`;
+
+    // Interactive Crosshairs Placeholder (rendered underneath dots)
+    svgContent += `
+        <line id="rs-crosshair-x" x1="0" y1="0" x2="0" y2="0" stroke="rgba(255, 255, 255, 0.25)" stroke-dasharray="2,2" stroke-width="0.8" style="display: none; pointer-events: none; transition: stroke 0.2s;" />
+        <line id="rs-crosshair-y" x1="0" y1="0" x2="0" y2="0" stroke="rgba(255, 255, 255, 0.25)" stroke-dasharray="2,2" stroke-width="0.8" style="display: none; pointer-events: none; transition: stroke 0.2s;" />
         
-        // Color dot: Green for high score, purple for others
-        const color = point.score >= 70 ? 'var(--neon-green)' : '#a855f7';
-        
+        <g id="rs-crosshair-tag-x" style="display: none; pointer-events: none;">
+            <rect x="-14" y="0" width="28" height="9" rx="2" fill="#0b0f1d" stroke="rgba(255,255,255,0.15)" stroke-width="0.6" />
+            <text id="rs-crosshair-text-x" x="0" y="5.5" fill="#fff" font-size="5.5" font-family="monospace" font-weight="700" text-anchor="middle"></text>
+        </g>
+        <g id="rs-crosshair-tag-y" style="display: none; pointer-events: none;">
+            <rect x="-26" y="-4.5" width="24" height="9" rx="2" fill="#0b0f1d" stroke="rgba(255,255,255,0.15)" stroke-width="0.6" />
+            <text id="rs-crosshair-text-y" x="-14" y="1.5" fill="#fff" font-size="5.5" font-family="monospace" font-weight="700" text-anchor="middle"></text>
+        </g>
+    `;
+
+    // Render Data Dots
+    points.forEach((pt, idx) => {
+        const clampedPe = Math.min(maxPe, Math.max(minPe, pt.pe));
+        const x = paddingX + ((clampedPe - minPe) / peRange) * drawW;
+        const clampedRoe = Math.min(maxRoe, Math.max(minRoe, pt.roe));
+        const roePct = (clampedRoe - minRoe) / roeRange;
+        const y = paddingY + (1 - roePct) * drawH;
+
+        let ptColor = '#e2e8f0';
+        if (pt.pe <= splitPe && pt.roe >= splitRoe) ptColor = '#10b981'; 
+        else if (pt.pe > splitPe && pt.roe >= splitRoe) ptColor = '#3b82f6'; 
+        else if (pt.pe <= splitPe && pt.roe < splitRoe) ptColor = '#ef4444'; 
+        else if (pt.pe > splitPe && pt.roe < splitRoe) ptColor = '#f59e0b'; 
+
         svgContent += `
-            <circle cx="${x}" cy="${y}" r="3.5" fill="${color}" stroke="rgba(255,255,255,0.2)" stroke-width="1"
-                style="cursor: pointer; transition: r 0.2s;"
-                onmouseover="this.setAttribute('r', '5.5');"
-                onmouseout="this.setAttribute('r', '3.5');"
-                title="${point.symbol} | P/E: ${point.pe.toFixed(1)} | Score: ${point.score}" />
+            <circle id="rs-quad-circle-${idx}" cx="${x}" cy="${y}" r="4.5" fill="${ptColor}" stroke="rgba(255,255,255,0.3)" stroke-width="1"
+                filter="url(#rs-dot-glow)"
+                class="rs-quad-circle"
+                style="cursor: pointer; transition: r 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease;" />
         `;
     });
 
     svgContent += `</svg>`;
 
-    // Add small axis labels overlay
+    // Build Floating glassmorphic tooltips
+    let tooltipsHtml = '';
+    points.forEach((pt, idx) => {
+        const clampedPe = Math.min(maxPe, Math.max(minPe, pt.pe));
+        const x = paddingX + ((clampedPe - minPe) / peRange) * drawW;
+        const clampedRoe = Math.min(maxRoe, Math.max(minRoe, pt.roe));
+        const roePct = (clampedRoe - minRoe) / roeRange;
+        const y = paddingY + (1 - roePct) * drawH;
+
+        const leftPos = (x / width * 100).toFixed(0);
+        const topPos = (y / height * 100).toFixed(0);
+
+        let ptColor = '#e2e8f0';
+        if (pt.pe <= splitPe && pt.roe >= splitRoe) ptColor = '#10b981'; 
+        else if (pt.pe > splitPe && pt.roe >= splitRoe) ptColor = '#3b82f6'; 
+        else if (pt.pe <= splitPe && pt.roe < splitRoe) ptColor = '#ef4444'; 
+        else if (pt.pe > splitPe && pt.roe < splitRoe) ptColor = '#f59e0b'; 
+
+        tooltipsHtml += `
+            <div id="rs-quad-tooltip-${idx}" style="position: absolute; left: ${leftPos}%; top: ${topPos}%; transform: translate(-50%, -125%); background: rgba(11, 15, 29, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--border-glass); border-top: 2.5px solid ${ptColor}; border-radius: 6px; padding: 6px 10px; pointer-events: none; font-size: 8.5px; color: #f3f4f6; font-family: var(--font-body); white-space: nowrap; opacity: 0; transition: opacity 0.18s ease; box-shadow: 0 8px 25px rgba(0,0,0,0.4); z-index: 100;">
+                <strong style="font-family: var(--font-heading); font-size: 9.5px; color: #fff; display: block; margin-bottom: 2px;">${pt.symbol}</strong>
+                P/E Ratio: <strong style="color: ${ptColor};">${pt.pe.toFixed(1)}x</strong><br/>
+                Return on Equity: <strong style="color: ${ptColor};">${pt.roe.toFixed(1)}%</strong>
+            </div>
+        `;
+    });
+
+    // Build Legend badges
+    const legendHtml = `
+        <div class="rs-legend-badge" data-quadrant="garp" style="display: flex; align-items: center; gap: 6px; padding: 4.5px 10px; border-radius: 20px; font-size: 8.5px; font-weight: 700; color: #10b981; border: 1px solid rgba(16,185,129,0.25); background: rgba(16,185,129,0.04); cursor: pointer; transition: all 0.2s; user-select: none; font-family: var(--font-heading);">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: #10b981;"></span>
+            GARP
+        </div>
+        <div class="rs-legend-badge" data-quadrant="premium" style="display: flex; align-items: center; gap: 6px; padding: 4.5px 10px; border-radius: 20px; font-size: 8.5px; font-weight: 700; color: #3b82f6; border: 1px solid rgba(59,130,246,0.25); background: rgba(59,130,246,0.04); cursor: pointer; transition: all 0.2s; user-select: none; font-family: var(--font-heading);">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: #3b82f6;"></span>
+            PREMIUM QUALITY
+        </div>
+        <div class="rs-legend-badge" data-quadrant="trap" style="display: flex; align-items: center; gap: 6px; padding: 4.5px 10px; border-radius: 20px; font-size: 8.5px; font-weight: 700; color: #ef4444; border: 1px solid rgba(239,68,68,0.25); background: rgba(239,68,68,0.03); cursor: pointer; transition: all 0.2s; user-select: none; font-family: var(--font-heading);">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: #ef4444;"></span>
+            VALUE TRAPS
+        </div>
+        <div class="rs-legend-badge" data-quadrant="speculative" style="display: flex; align-items: center; gap: 6px; padding: 4.5px 10px; border-radius: 20px; font-size: 8.5px; font-weight: 700; color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); background: rgba(245,158,11,0.03); cursor: pointer; transition: all 0.2s; user-select: none; font-family: var(--font-heading);">
+            <span style="width: 5px; height: 5px; border-radius: 50%; background: #f59e0b;"></span>
+            SPECULATIVE
+        </div>
+    `;
+
+    // Inject styles and layout skeleton
     container.innerHTML = `
-        <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
-            ${svgContent}
-            <!-- X Axis Label -->
-            <span style="position: absolute; bottom: 0px; font-size: 8px; color: ${textColor}; font-weight: 700; text-transform: uppercase;">P/E Ratio →</span>
-            <!-- Y Axis Label -->
-            <span style="position: absolute; left: 0px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-size: 8px; color: ${textColor}; font-weight: 700; text-transform: uppercase;">Quality Score →</span>
-            
-            <div style="position: absolute; top: 0px; right: 8px; font-size: 8px; color: var(--neon-green); font-weight: bold; text-transform: uppercase;">High Quality</div>
+        <style>
+            .rs-legend-badge {
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+            .rs-legend-badge:hover {
+                transform: translateY(-1.5px);
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+            }
+            [data-theme="light"] .rs-legend-badge {
+                background: rgba(0, 0, 0, 0.02) !important;
+            }
+        </style>
+        <div style="position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: space-between;">
+            <div style="position: relative; width: 100%; height: 175px; display: flex; align-items: center; justify-content: center; overflow: visible;">
+                ${svgContent}
+                ${tooltipsHtml}
+                <span style="position: absolute; bottom: 0px; right: 20px; font-size: 7px; color: ${axisLabelColor}; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase;">P/E Ratio →</span>
+                <span style="position: absolute; left: 14px; bottom: 12px; font-size: 7px; color: ${axisLabelColor}; font-weight: bold; transform: rotate(-90deg); transform-origin: left bottom; letter-spacing: 0.05em; text-transform: uppercase;">ROE % →</span>
+            </div>
+            <div id="rs-matrix-legend-row" style="display: flex; justify-content: center; gap: 8px; margin-top: 5px; padding-bottom: 2px; flex-wrap: wrap; width: 100%;">
+                ${legendHtml}
+            </div>
+        </div>
+    `;
+
+    // --- INTERACTIVE EVENT LISTENERS ---
+
+    // 1. Crosshair management helper methods
+    const showCrosshair = (x, y, pe, roe, color) => {
+        const cx = document.getElementById('rs-crosshair-x');
+        const cy = document.getElementById('rs-crosshair-y');
+        const tx = document.getElementById('rs-crosshair-tag-x');
+        const ty = document.getElementById('rs-crosshair-tag-y');
+        const txtX = document.getElementById('rs-crosshair-text-x');
+        const txtY = document.getElementById('rs-crosshair-text-y');
+
+        if (cx && cy) {
+            cx.setAttribute('x1', x);
+            cx.setAttribute('y1', y);
+            cx.setAttribute('x2', x);
+            cx.setAttribute('y2', height - paddingY);
+            cx.setAttribute('stroke', color);
+            cx.style.display = 'block';
+
+            cy.setAttribute('x1', paddingX);
+            cy.setAttribute('y1', y);
+            cy.setAttribute('x2', x);
+            cy.setAttribute('y2', y);
+            cy.setAttribute('stroke', color);
+            cy.style.display = 'block';
+        }
+
+        if (tx && ty && txtX && txtY) {
+            tx.setAttribute('transform', `translate(${x}, ${height - paddingY})`);
+            txtX.textContent = pe.toFixed(1) + 'x';
+            tx.style.display = 'block';
+
+            ty.setAttribute('transform', `translate(${paddingX}, ${y})`);
+            txtY.textContent = roe.toFixed(1) + '%';
+            ty.style.display = 'block';
+        }
+    };
+
+    const hideCrosshair = () => {
+        const cx = document.getElementById('rs-crosshair-x');
+        const cy = document.getElementById('rs-crosshair-y');
+        const tx = document.getElementById('rs-crosshair-tag-x');
+        const ty = document.getElementById('rs-crosshair-tag-y');
+
+        if (cx) cx.style.display = 'none';
+        if (cy) cy.style.display = 'none';
+        if (tx) tx.style.display = 'none';
+        if (ty) ty.style.display = 'none';
+    };
+
+    // 2. Attach dot hover listeners
+    points.forEach((pt, idx) => {
+        const circle = document.getElementById(`rs-quad-circle-${idx}`);
+        if (circle) {
+            circle.addEventListener('mouseover', () => {
+                circle.setAttribute('r', '7');
+                
+                const tooltip = document.getElementById(`rs-quad-tooltip-${idx}`);
+                if (tooltip) tooltip.style.opacity = '1';
+
+                const clampedPe = Math.min(maxPe, Math.max(minPe, pt.pe));
+                const x = paddingX + ((clampedPe - minPe) / peRange) * drawW;
+                const clampedRoe = Math.min(maxRoe, Math.max(minRoe, pt.roe));
+                const roePct = (clampedRoe - minRoe) / roeRange;
+                const y = paddingY + (1 - roePct) * drawH;
+
+                let ptColor = '#3b82f6';
+                let quadId = '';
+                if (pt.pe <= splitPe && pt.roe >= splitRoe) { ptColor = '#10b981'; quadId = 'rs-quad-bg-garp'; }
+                else if (pt.pe > splitPe && pt.roe >= splitRoe) { ptColor = '#3b82f6'; quadId = 'rs-quad-bg-premium'; }
+                else if (pt.pe <= splitPe && pt.roe < splitRoe) { ptColor = '#ef4444'; quadId = 'rs-quad-bg-trap'; }
+                else if (pt.pe > splitPe && pt.roe < splitRoe) { ptColor = '#f59e0b'; quadId = 'rs-quad-bg-speculative'; }
+
+                showCrosshair(x, y, pt.pe, pt.roe, ptColor);
+
+                // Highlight quadrant background overlay
+                const qBg = document.getElementById(quadId);
+                if (qBg) {
+                    let glowColor = 'rgba(59,130,246,0.06)';
+                    if (quadId === 'rs-quad-bg-garp') glowColor = 'rgba(16,185,129,0.08)';
+                    else if (quadId === 'rs-quad-bg-trap') glowColor = 'rgba(239,68,68,0.05)';
+                    else if (quadId === 'rs-quad-bg-speculative') glowColor = 'rgba(245,158,11,0.05)';
+                    qBg.setAttribute('fill', glowColor);
+                }
+            });
+
+            circle.addEventListener('mouseout', () => {
+                circle.setAttribute('r', '4.5');
+                
+                const tooltip = document.getElementById(`rs-quad-tooltip-${idx}`);
+                if (tooltip) tooltip.style.opacity = '0';
+
+                hideCrosshair();
+
+                // Clear quadrant highlight
+                ['rs-quad-bg-garp', 'rs-quad-bg-premium', 'rs-quad-bg-trap', 'rs-quad-bg-speculative'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.setAttribute('fill', 'transparent');
+                });
+            });
+        }
+    });
+
+    // 3. Attach interactive legend filtering
+    const badges = container.querySelectorAll('.rs-legend-badge');
+    badges.forEach(badge => {
+        const quadrant = badge.getAttribute('data-quadrant');
+        badge.addEventListener('mouseenter', () => {
+            // Focus on hovered category
+            badges.forEach(b => {
+                if (b !== badge) b.style.opacity = '0.35';
+            });
+
+            let quadId = '';
+            let glowColor = '';
+            if (quadrant === 'garp') { quadId = 'rs-quad-bg-garp'; glowColor = 'rgba(16,185,129,0.12)'; }
+            else if (quadrant === 'premium') { quadId = 'rs-quad-bg-premium'; glowColor = 'rgba(59,130,246,0.12)'; }
+            else if (quadrant === 'trap') { quadId = 'rs-quad-bg-trap'; glowColor = 'rgba(239,68,68,0.08)'; }
+            else if (quadrant === 'speculative') { quadId = 'rs-quad-bg-speculative'; glowColor = 'rgba(245,158,11,0.08)'; }
+
+            const qBg = document.getElementById(quadId);
+            if (qBg) qBg.setAttribute('fill', glowColor);
+
+            points.forEach((pt, i) => {
+                const circle = document.getElementById(`rs-quad-circle-${i}`);
+                if (circle) {
+                    let belongs = false;
+                    if (quadrant === 'garp' && pt.pe <= splitPe && pt.roe >= splitRoe) belongs = true;
+                    else if (quadrant === 'premium' && pt.pe > splitPe && pt.roe >= splitRoe) belongs = true;
+                    else if (quadrant === 'trap' && pt.pe <= splitPe && pt.roe < splitRoe) belongs = true;
+                    else if (quadrant === 'speculative' && pt.pe > splitPe && pt.roe < splitRoe) belongs = true;
+
+                    if (!belongs) {
+                        circle.style.opacity = '0.12';
+                    } else {
+                        circle.style.opacity = '1';
+                        circle.setAttribute('r', '6');
+                    }
+                }
+            });
+        });
+
+        badge.addEventListener('mouseleave', () => {
+            // Restore normal view
+            badges.forEach(b => {
+                b.style.opacity = '1';
+            });
+
+            ['rs-quad-bg-garp', 'rs-quad-bg-premium', 'rs-quad-bg-trap', 'rs-quad-bg-speculative'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.setAttribute('fill', 'transparent');
+            });
+
+            points.forEach((pt, i) => {
+                const circle = document.getElementById(`rs-quad-circle-${i}`);
+                if (circle) {
+                    circle.style.opacity = '1';
+                    circle.setAttribute('r', '4.5');
+                }
+            });
+        });
+    });
+}
+
+function drawRSKPIHeatmap(results) {
+    const container = document.getElementById('rs-kpi-heatmap-container');
+    if (!container) return;
+    if (!results || results.length === 0) {
+        container.innerHTML = `<span style="font-size: 11px; color: var(--text-muted);">No candidates to analyze</span>`;
+        return;
+    }
+
+    const topCandidates = [...results]
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, 5);
+
+    const isDark = document.body.getAttribute('data-theme') !== 'light';
+    const textColor = isDark ? '#ffffff' : '#0f172a';
+    const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+
+    let tableRows = topCandidates.map(r => {
+        const symbol = (r.symbol || '').replace('.NS', '');
+        
+        // P/E cell
+        const peVal = typeof r.pe === 'number' ? r.pe : 0;
+        let peText = 'N/A', peColor = textColor, peBg = 'transparent';
+        if (peVal > 0) {
+            peText = peVal.toFixed(1);
+            if (peVal < 15) { peColor = '#10b981'; peBg = 'rgba(16, 185, 129, 0.12)'; }
+            else if (peVal < 25) { peColor = '#14b8a6'; peBg = 'rgba(20, 184, 166, 0.08)'; }
+            else if (peVal < 40) { peColor = '#f59e0b'; peBg = 'rgba(245, 158, 11, 0.06)'; }
+            else { peColor = '#f43f5e'; peBg = 'rgba(244, 63, 94, 0.08)'; }
+        }
+
+        // D/E cell
+        const deVal = typeof r.de_ratio === 'number' ? r.de_ratio : 0;
+        let deColor = '#10b981', deBg = 'rgba(16, 185, 129, 0.12)';
+        if (deVal >= 2.0) { deColor = '#f43f5e'; deBg = 'rgba(244, 63, 94, 0.08)'; }
+        else if (deVal >= 1.0) { deColor = '#f59e0b'; deBg = 'rgba(245, 158, 11, 0.06)'; }
+        else if (deVal >= 0.3) { deColor = '#14b8a6'; deBg = 'rgba(20, 184, 166, 0.08)'; }
+
+        // ROE cell
+        const roeVal = typeof r.roe === 'number' ? r.roe : 0;
+        let roeText = 'N/A', roeColor = textColor, roeBg = 'transparent';
+        if (roeVal > 0) {
+            roeText = roeVal.toFixed(1) + '%';
+            if (roeVal >= 20) { roeColor = '#10b981'; roeBg = 'rgba(16, 185, 129, 0.12)'; }
+            else if (roeVal >= 12) { roeColor = '#14b8a6'; roeBg = 'rgba(20, 184, 166, 0.08)'; }
+            else if (roeVal >= 6) { roeColor = '#f59e0b'; roeBg = 'rgba(245, 158, 11, 0.06)'; }
+            else { roeColor = '#f43f5e'; roeBg = 'rgba(244, 63, 94, 0.08)'; }
+        }
+
+        // RSI cell
+        const rsiVal = typeof r.rsi === 'number' ? r.rsi : 50;
+        let rsiColor = '#3b82f6', rsiBg = 'rgba(59, 130, 246, 0.08)';
+        if (rsiVal < 35) { rsiColor = '#10b981'; rsiBg = 'rgba(16, 185, 129, 0.12)'; }
+        else if (rsiVal >= 65) { rsiColor = '#fb923c'; rsiBg = 'rgba(251, 146, 60, 0.08)'; }
+
+        // Score cell
+        const scoreVal = typeof r.score === 'number' ? r.score : 50;
+        let scoreColor = '#94a3b8', scoreBg = 'rgba(148, 163, 184, 0.06)';
+        if (scoreVal >= 75) { scoreColor = '#10b981'; scoreBg = 'rgba(16, 185, 129, 0.15)'; }
+        else if (scoreVal >= 60) { scoreColor = '#a855f7'; scoreBg = 'rgba(168, 85, 247, 0.1)'; }
+
+        return `
+            <tr style="border-bottom: 1px solid ${borderColor};">
+                <td style="padding: 5px 6px; font-weight: bold; color: ${textColor}; font-family: 'Outfit', sans-serif; cursor: pointer;" onclick="window.loadStockAnalyzer('${r.symbol}')">${symbol}</td>
+                <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: ${peColor}; background: ${peBg}; border-radius: 4px; font-family: monospace;">${peText}</td>
+                <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: ${deColor}; background: ${deBg}; border-radius: 4px; font-family: monospace;">${deVal.toFixed(2)}</td>
+                <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: ${roeColor}; background: ${roeBg}; border-radius: 4px; font-family: monospace;">${roeText}</td>
+                <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: ${rsiColor}; background: ${rsiBg}; border-radius: 4px; font-family: monospace;">${rsiVal.toFixed(0)}</td>
+                <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: ${scoreColor}; background: ${scoreBg}; border-radius: 4px; font-family: monospace;">${scoreVal.toFixed(0)}</td>
+            </tr>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; padding-bottom: 2px;">
+            <table style="width: 100%; border-collapse: separate; border-spacing: 2px 4px; text-align: left; font-size: 9px; line-height: 1.1;">
+                <thead>
+                    <tr style="color: var(--text-secondary); text-transform: uppercase; font-size: 8px; font-weight: 700; letter-spacing: 0.04em;">
+                        <th style="padding: 2px 6px;">Ticker</th>
+                        <th style="padding: 2px 6px; text-align: right;">P/E</th>
+                        <th style="padding: 2px 6px; text-align: right;">D/E</th>
+                        <th style="padding: 2px 6px; text-align: right;">ROE</th>
+                        <th style="padding: 2px 6px; text-align: right;">RSI</th>
+                        <th style="padding: 2px 6px; text-align: right;">Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tableRows}
+                </tbody>
+            </table>
         </div>
     `;
 }

@@ -8891,7 +8891,7 @@ tr.active-peer-row td:first-child {
 /* --- RULE SCANNER ENTERPRISE TELEMETRY GRID --- */
 .rs-telemetry-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 18px;
     margin-bottom: 20px;
     width: 100%;
@@ -8983,6 +8983,188 @@ tr.active-peer-row td:first-child {
         gap: 15px !important;
     }
 }
+
+/* --- PORTFOLIO COCKPIT PREMIUM ENTERPRISE STYLES --- */
+#diagnostic-gauge-ring {
+    filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.4));
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.exposure-legend-badge {
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid var(--border-glass);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.exposure-legend-badge:hover {
+    transform: translateY(-1px);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.exposure-legend-badge.active {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.1);
+}
+
+/* Inline visual range bars */
+.inline-range-track {
+    position: relative;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    width: 100px;
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 5px;
+    overflow: visible;
+}
+
+.inline-range-fill {
+    position: absolute;
+    height: 100%;
+    border-radius: 3px;
+}
+
+.inline-range-fill.buy {
+    background: rgba(16, 185, 129, 0.35);
+}
+
+.inline-range-fill.sell {
+    background: rgba(239, 68, 68, 0.35);
+}
+
+.inline-range-pointer {
+    position: absolute;
+    width: 10px;
+    height: 100%;
+    top: 0;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.inline-range-pointer::after {
+    content: '';
+    width: 6px;
+    height: 14px;
+    background: #ffffff;
+    border-radius: 3px;
+    border: 1px solid #1e293b;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+
+/* What-If Checkboxes */
+.harvest-checkbox-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.harvest-checkbox-wrap input[type="checkbox"] {
+    appearance: none;
+    background-color: rgba(0, 0, 0, 0.4);
+    margin: 0;
+    font: inherit;
+    color: #10b981;
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--border-glass);
+    border-radius: 4px;
+    transform: translateY(-0.075em);
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+    transition: 0.15s all ease-in-out;
+}
+
+.harvest-checkbox-wrap input[type="checkbox"]::before {
+    content: "✓";
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    font-size: 11px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.harvest-checkbox-wrap input[type="checkbox"]:checked {
+    background-color: #10b981;
+    border-color: #10b981;
+}
+
+.harvest-checkbox-wrap input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+
+/* Exemption limit tracking bar */
+.exemption-progress-container {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 12px 15px;
+    border: 1px solid var(--border-glass);
+    margin-top: 20px;
+    box-sizing: border-box;
+}
+
+.exemption-progress-bar-wrap {
+    height: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    width: 100%;
+    margin-top: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+.exemption-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #f59e0b);
+    border-radius: 4px;
+    width: 0%;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.exemption-progress-fill.exceeded {
+    background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+
+/* Animations */
+.glow-pulse {
+    animation: text-glow-pulse 0.5s ease-in-out;
+}
+
+@keyframes text-glow-pulse {
+    0% {
+        text-shadow: 0 0 0px rgba(16, 185, 129, 0);
+        transform: scale(1);
+    }
+    50% {
+        text-shadow: 0 0 15px rgba(16, 185, 129, 0.8);
+        transform: scale(1.08);
+    }
+    100% {
+        text-shadow: 0 0 0px rgba(16, 185, 129, 0);
+        transform: scale(1);
+    }
+}
+
 
 
 

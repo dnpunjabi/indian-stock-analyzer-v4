@@ -4083,6 +4083,73 @@ async def post_portfolio_backtest_synthesis(data: PortfolioBacktestSynthesisRequ
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest Synthesis Error: {str(e)}")
 
+
+class OptimizeWeightsRequest(BaseModel):
+    tickers: list[str]
+
+
+@app.post("/api/portfolio/optimize-weights")
+async def post_optimize_weights(data: OptimizeWeightsRequest):
+    try:
+        if not data.tickers:
+            return {"weights": {}}
+            
+        import yfinance as yf
+        import numpy as np
+        import pandas as pd
+        import asyncio
+        from backend.financial_utils import resolve_company_ticker
+        
+        tickers = []
+        for t in data.tickers:
+            try:
+                res = resolve_company_ticker(t)
+                yf_ticker = res.get("yf_ticker") or f"{t.strip().upper()}.NS"
+            except Exception:
+                yf_ticker = f"{t.strip().upper()}.NS"
+            tickers.append(yf_ticker)
+            
+        # Download 1y history for all tickers
+        loop = asyncio.get_event_loop()
+        download_tasks = []
+        for t in tickers:
+            download_tasks.append(
+                loop.run_in_executor(None, lambda ticker=t: yf.download(ticker, period="1y", progress=False))
+            )
+        dfs = await asyncio.gather(*download_tasks)
+        
+        vols = {}
+        for ticker, df in zip(tickers, dfs):
+            if df.empty or "Close" not in df.columns:
+                vols[ticker] = 0.25 # default 25% volatility fallback
+                continue
+            close = df["Close"]
+            if isinstance(close, pd.DataFrame):
+                close = close.iloc[:, 0]
+            pct_chg = close.pct_change().dropna()
+            vol = float(pct_chg.std() * np.sqrt(252))
+            vols[ticker] = vol if vol > 0.0 else 0.25
+            
+        # Compute Inverse Volatility Weights
+        inv_vols = {t: 1.0 / vols[t] for t in tickers}
+        sum_inv = sum(inv_vols.values())
+        
+        weights = {}
+        for original_t, yf_t in zip(data.tickers, tickers):
+            raw_w = (inv_vols[yf_t] / sum_inv) * 100.0
+            weights[original_t] = round(raw_w, 1)
+            
+        # Ensure it sums exactly to 100.0
+        sum_weights = sum(weights.values())
+        diff = 100.0 - sum_weights
+        if diff != 0 and weights:
+            first_ticker = list(weights.keys())[0]
+            weights[first_ticker] = round(weights[first_ticker] + diff, 1)
+            
+        return {"weights": weights}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Weight optimization failed: {str(e)}")
+
 class SwingSynthesisRequest(BaseModel):
     symbol: str
     strategy: str
@@ -5605,6 +5672,12 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                 rating = (analysis.get("recommendation") or prof.get("recommendation") or "N/A").upper()
                 score = clean_float(prof.get("final_score") or prof.get("score_metrics", {}).get("final_score") or analysis.get("score", analysis.get("composite_score")), 0.0)
                 de_ratio = clean_float(f.get("debt_to_equity", f.get("de_ratio")), 0.0)
+                roe = clean_float(f.get("roe_pct") or f.get("roe"), 0.0)
+                info_dict = prof.get("info") or {}
+                cons_dict = prof.get("consensus") or {}
+                n50_dict = prof.get("nifty50_risk") or {}
+                capm_dict = prof.get("capm_risk_nifty50") or {}
+                beta = clean_float(info_dict.get("beta") or cons_dict.get("beta") or n50_dict.get("beta") or capm_dict.get("beta"), 1.0)
 
                 matched.append({
                     "symbol": sym,
@@ -5617,7 +5690,9 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                     "trigger_value": cur_val,
                     "rating": rating,
                     "score": round(score, 1),
-                    "de_ratio": round(de_ratio, 2)
+                    "de_ratio": round(de_ratio, 2),
+                    "roe": round(roe, 1),
+                    "beta": round(beta, 2)
                 })
 
         return {
@@ -6095,6 +6170,12 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
                 de_ratio = clean_float(fund.get("debt_to_equity"), 0.0)
                 analysis = profile.get("analysis") or {}
                 rating = (analysis.get("recommendation") or profile.get("recommendation") or "N/A").upper()
+                roe = clean_float(fund.get("roe_pct") or fund.get("roe"), 0.0)
+                info_dict = profile.get("info") or {}
+                cons_dict = profile.get("consensus") or {}
+                n50_dict = profile.get("nifty50_risk") or {}
+                capm_dict = profile.get("capm_risk_nifty50") or {}
+                beta = clean_float(info_dict.get("beta") or cons_dict.get("beta") or n50_dict.get("beta") or capm_dict.get("beta"), 1.0)
                 
                 trigger_desc = []
                 if is_formula_mode:
@@ -6119,7 +6200,9 @@ async def execute_custom_screener_scan(data: CustomScanRequest):
                     "trigger_value": trigger_str,
                     "rating": rating,
                     "score": round(score, 1),
-                    "de_ratio": round(de_ratio, 2)
+                    "de_ratio": round(de_ratio, 2),
+                    "roe": round(roe, 1),
+                    "beta": round(beta, 2)
                 })
                 
             # Base timeframe for index alignment in history builder
