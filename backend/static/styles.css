@@ -8823,6 +8823,24 @@ tr.active-peer-row td:first-child {
     }
 }
 
+/* --- STREET CONSENSUS COMPARATOR LIGHT MODE CONTRAST FIXES --- */
+[data-mode="light"] #consensus-gauge-needle {
+    background: #0f172a !important;
+    box-shadow: 0 0 6px rgba(15, 23, 42, 0.4) !important;
+}
+
+[data-mode="light"] .consensus-gauge-track svg path:first-of-type {
+    stroke: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-mode="light"] .target-slider-wrapper {
+    background: rgba(0, 0, 0, 0.01) !important;
+}
+
+[data-mode="light"] .target-spectrum-track {
+    background: rgba(0, 0, 0, 0.08) !important;
+}
+
 
 
 

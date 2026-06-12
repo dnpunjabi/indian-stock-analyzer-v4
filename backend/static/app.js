@@ -11833,6 +11833,13 @@ async function runUniverseBulkCacheWarming() {
         return;
     }
 
+    if (!confirm(`Are you sure you want to run bulk cache warming for all ${coldStocks.length} cold stocks in the "${segment.toUpperCase()}" segment? This triggers background analysis requests.`)) {
+        return;
+    }
+    if (!confirm("CONFIRMATION REQUIRED (2/2): Do you want to start the bulk pre-warming operation now?")) {
+        return;
+    }
+
     const progressWrap = document.getElementById('universe-bulk-progress-wrap');
     const progressFill = document.getElementById('universe-bulk-progress-fill');
     const progressPct = document.getElementById('universe-bulk-progress-pct');
@@ -11916,6 +11923,9 @@ async function runUniverseSingleCacheWarming(symbol, badgeElement) {
 
 async function flushUniverseCache() {
     if (!confirm("Are you sure you want to flush the persistent stock profiles cache? This will reset all constituent status diagnostics back to COLD, increasing workspace load latencies.")) {
+        return;
+    }
+    if (!confirm("CONFIRMATION REQUIRED (2/2): This is a critical admin action that will purge all stored analysis caches. Are you absolutely certain you want to proceed?")) {
         return;
     }
     
