@@ -11555,7 +11555,6 @@ async function executeHistoricalReturnCalculation() {
         console.error("Compounding calculator error: ", e);
     }
 }
-}
 
 
 // 7b. Equity Research Terminal Sub-Tabs Controller
