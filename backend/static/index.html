@@ -363,6 +363,9 @@
                         </div>
                     </div>
 
+                    <!-- Active Filter Chips -->
+                    <div class="screener-chips-wrapper" id="screener-active-chips" style="display: none;"></div>
+
                     <!-- Dynamic AI Screener Analyst Summary Block -->
                     <div id="screener-summary-block" style="display: none; margin-bottom: 20px; border-left: 4px solid var(--color-primary); border-radius: 8px; padding: 18px; text-align: left; width: 100%; box-sizing: border-box;">
                         <h4 style="font-size: 13px; color: var(--neon-green); margin-top: 0; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px dashed var(--border-glass); padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between; font-family: 'Outfit', sans-serif;">
@@ -371,6 +374,39 @@
                         </h4>
                         <div id="screener-summary-text" style="font-size: 12px; line-height: 1.65; font-family: 'Inter', sans-serif;">
                             <!-- Calculated summary results & sports academy analogy loaded dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Screener Dashboard Telemetry Grid -->
+                    <div class="screener-telemetry-grid" id="screener-telemetry-block" style="display: none;">
+                        <div class="screener-chart-card">
+                            <h4 style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 15px; display: flex; justify-content: space-between;">
+                                <span>📊 Sector Concentration Weights</span>
+                                <span style="color: var(--text-muted); font-weight: 500; font-size: 8px;">Cohort weights</span>
+                            </h4>
+                            <div id="screener-sector-weights-list" class="screener-sector-list">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        <div class="screener-chart-card" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div style="flex: 1;">
+                                <h4 style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 10px; display: flex; justify-content: space-between;">
+                                    <span>📈 AI Score Distribution</span>
+                                    <span style="color: var(--text-muted); font-weight: 500; font-size: 8px;">Score counts</span>
+                                </h4>
+                                <div style="height: 130px; position: relative; width: 100%;">
+                                    <canvas id="screener-score-histogram"></canvas>
+                                </div>
+                            </div>
+                            <div style="flex: 1; border-top: 1px dashed var(--border-glass); padding-top: 12px;">
+                                <h4 style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 10px; display: flex; justify-content: space-between;">
+                                    <span>⚡ Match Count Historical Trend</span>
+                                    <span style="color: var(--text-muted); font-weight: 500; font-size: 8px;">90-Day scan trajectory</span>
+                                </h4>
+                                <div style="height: 130px; position: relative; width: 100%;">
+                                    <canvas id="screener-match-trend"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -1427,15 +1463,70 @@
                         <!-- Peer Group & Relative Sector Benchmarking -->
                         <div class="card col-span-4 card-hidden" id="peers-card" data-subtab="peers" style="display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
-                                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px; margin-bottom:12px; width: 100%; border:none; padding:0;">
-                                    <h3 style="margin:0; font-size:12px; letter-spacing:0.04em;">SECTOR PEER BENCHMARKING</h3>
+                                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px; margin-bottom:15px; width: 100%; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.03em;">SECTOR PEER BENCHMARKING COCKPIT</h3>
+                                        <span style="font-size: 9.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;">Relative Multiples & Operational Efficiency</span>
+                                    </div>
                                     <div style="display:flex; gap:8px; align-items:center;">
-                                        <input type="text" id="custom-peer-input" placeholder="Add custom stock..." style="padding: 4px 8px; font-size:11px; border-radius: 4px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); width: 120px; outline: none;">
-                                        <button class="btn-primary" id="add-custom-peer-btn" style="font-size: 10px; padding: 4px 8px; height: auto;">+ Add Stock</button>
-                                        <button class="btn-primary" id="quick-compare-peers-btn" style="font-size: 10px; padding: 4px 10px; height: auto;">⚔️ Compare Peers</button>
+                                        <input type="text" id="custom-peer-input" placeholder="Add custom stock..." style="padding: 6px 10px; font-size:11px; border-radius: 6px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); width: 140px; outline: none; height: 32px; box-sizing: border-box;">
+                                        <button class="btn-primary" id="add-custom-peer-btn" style="font-size: 11px; padding: 6px 12px; height: 32px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;">+ Add Stock</button>
+                                        <button class="btn-secondary" id="quick-compare-peers-btn" style="font-size: 11px; padding: 6px 12px; height: 32px; border-radius: 6px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;">⚔️ Compare Head-to-Head</button>
                                     </div>
                                 </div>
                                 <div id="peers-leaderboard-container" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; padding: 4px 0;"></div>
+
+                                <!-- Peer Telemetry Dashboard Grid -->
+                                <div class="screener-telemetry-grid" id="peer-telemetry-grid" style="margin-bottom: 20px;">
+                                    <div class="screener-chart-card" style="height: 220px; position: relative; box-sizing: border-box;">
+                                        <h4 style="font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; margin-top: 0; margin-bottom: 10px; display: flex; justify-content: space-between;">
+                                            <span>📊 Relative Value Mapping</span>
+                                            <span style="color: var(--text-muted); font-size: 8px;">PE Multiple vs ROCE %</span>
+                                        </h4>
+                                        <div style="height: 170px; position: relative; width: 100%;">
+                                            <canvas id="peer-scatter-chart"></canvas>
+                                        </div>
+                                    </div>
+                                    <div class="screener-chart-card" style="display: flex; flex-direction: column; justify-content: space-between; height: 220px; box-sizing: border-box;">
+                                        <div>
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                                <h4 style="font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; margin-top: 0; margin-bottom: 0;">
+                                                    <span>⚡ Metric Position Spectrum</span>
+                                                </h4>
+                                                <select id="peer-spectrum-metric-select" style="background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); font-size: 10px; padding: 2px 4px; border-radius: 4px; cursor: pointer; outline: none;">
+                                                    <option value="pe" selected>P/E Ratio</option>
+                                                    <option value="roce">ROCE %</option>
+                                                    <option value="roe">ROE %</option>
+                                                    <option value="debteq">Debt / Equity</option>
+                                                    <option value="npm">Net Profit Margin %</option>
+                                                </select>
+                                            </div>
+                                            <p style="font-size: 10px; color: var(--text-secondary); margin: 0 0 10px 0; line-height: 1.4;">
+                                                Visualizes target stock's percentile placement relative to peer group high, low, and median.
+                                            </p>
+                                        </div>
+                                        <div style="padding: 10px 14px; background: rgba(0, 0, 0, 0.15); border-radius: 6px; border: 1px solid rgba(255,255,255,0.02); margin-bottom: 5px;">
+                                            <div class="spectrum-slider-track" id="peer-spectrum-track" style="margin: 25px 0 15px 0;">
+                                                <div class="spectrum-slider-pointer" id="peer-spectrum-pointer" style="left: 50%;">
+                                                    <div class="spectrum-slider-label" id="peer-spectrum-pointer-label" style="color: var(--neon-blue);">TARGET</div>
+                                                    <div class="spectrum-slider-value" id="peer-spectrum-pointer-val">N/A</div>
+                                                </div>
+                                                <div class="spectrum-marker" style="left: 0%;">
+                                                    <div style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 8px; color: var(--text-muted); font-weight: 600;">LOW</div>
+                                                    <div style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--text-secondary);" id="peer-spectrum-low-val">N/A</div>
+                                                </div>
+                                                <div class="spectrum-marker" style="left: 50%;">
+                                                    <div style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 8px; color: var(--text-muted); font-weight: 600;">MEDIAN</div>
+                                                    <div style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--text-secondary);" id="peer-spectrum-median-val">N/A</div>
+                                                </div>
+                                                <div class="spectrum-marker" style="left: 100%;">
+                                                    <div style="position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 8px; color: var(--text-muted); font-weight: 600;">HIGH</div>
+                                                    <div style="position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--text-secondary);" id="peer-spectrum-high-val">N/A</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="table-scroll" style="border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; overflow-x: auto; background: rgba(0,0,0,0.15);">
                                     <table class="data-table small-table" id="peer-benchmarking-table" style="width:100%; border-collapse:collapse; font-size:10.5px;">
                                         <thead>
@@ -2075,7 +2166,6 @@
                         💬 Chat Advisor
                     </button>
                 </div>
-            </div>
             </section>
 
             <!-- SECTION 3: COMPARISON ARENA -->

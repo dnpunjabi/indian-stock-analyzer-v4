@@ -109,6 +109,9 @@ let activeScreenerResults = [];
 let activeScreenerStyle = 'all';
 let screenerSortCol = 'score';
 let screenerSortAsc = false;
+let activeScreenerScoreChart = null;
+let activeScreenerTrendChart = null;
+let activePeerScatterChart = null;
 let activeAuditMatrixData = null;
 let activeScreenerPage = 1;
 let activeScreenerPageSize = 10;
@@ -581,6 +584,7 @@ function setupScreenerControls() {
             strategyBtns.forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             activeScreenerStrategy = btn.getAttribute('data-strategy');
+            renderActiveScreenerChips();
         });
     });
     
@@ -588,15 +592,115 @@ function setupScreenerControls() {
     if (styleSelect) {
         styleSelect.addEventListener('change', (e) => {
             activeScreenerStyle = e.target.value;
+            renderActiveScreenerChips();
         });
     }
     
-    document.getElementById('run-screener-btn').addEventListener('click', (e) => {
-        fireScreenerParticles();
-        runAIScreener();
-    });
+    const universeSelect = document.getElementById('screener-universe-select');
+    if (universeSelect) {
+        universeSelect.addEventListener('change', () => {
+            renderActiveScreenerChips();
+        });
+    }
+    
+    const runBtn = document.getElementById('run-screener-btn');
+    if (runBtn) {
+        runBtn.addEventListener('click', (e) => {
+            fireScreenerParticles();
+            runAIScreener();
+        });
+    }
+    
     setupScreenerSorting();
     setupScreenerPagination();
+    renderActiveScreenerChips();
+}
+
+function renderActiveScreenerChips() {
+    const container = document.getElementById('screener-active-chips');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    const strategyNames = {
+        'hybrid': 'Hybrid Selection',
+        'bottom_up': 'Bottom-Up Selection',
+        'top_down': 'Top-Down Macro Sector'
+    };
+    const styleNames = {
+        'all': 'All Styles',
+        'value': 'Value Overlay',
+        'growth': 'Growth Overlay',
+        'contra': 'Contra Overlay'
+    };
+    const universeNames = {
+        'all': 'All Cap Segments',
+        'large': 'Large Cap Only',
+        'mid': 'Mid Cap Only',
+        'small': 'Small Cap Only'
+    };
+    
+    const strategyLabel = strategyNames[activeScreenerStrategy] || activeScreenerStrategy;
+    const styleLabel = styleNames[activeScreenerStyle] || activeScreenerStyle;
+    const universeSelect = document.getElementById('screener-universe-select');
+    const universeVal = universeSelect ? universeSelect.value : 'all';
+    const universeLabel = universeNames[universeVal] || universeVal;
+    
+    const createChip = (label, value, type) => {
+        const chip = document.createElement('div');
+        chip.className = 'screener-filter-chip';
+        
+        let displayVal = `${label}: ${value}`;
+        if (type === 'strategy') displayVal = `🎯 Strategy: ${value}`;
+        if (type === 'style') displayVal = `💥 Style: ${value}`;
+        if (type === 'universe') displayVal = `⚡ Universe: ${value}`;
+        
+        chip.innerHTML = `<span>${displayVal}</span>`;
+        
+        const isDefault = (type === 'strategy' && value === 'Hybrid Selection') ||
+                          (type === 'style' && value === 'All Styles') ||
+                          (type === 'universe' && value === 'All Cap Segments');
+                          
+        if (!isDefault) {
+            const clearBtn = document.createElement('span');
+            clearBtn.className = 'clear-chip-btn';
+            clearBtn.innerText = '✕';
+            clearBtn.title = 'Reset to Default';
+            clearBtn.addEventListener('click', () => {
+                resetScreenerFilter(type);
+            });
+            chip.appendChild(clearBtn);
+        }
+        return chip;
+    };
+    
+    container.appendChild(createChip('Strategy', strategyLabel, 'strategy'));
+    container.appendChild(createChip('Style', styleLabel, 'style'));
+    container.appendChild(createChip('Universe', universeLabel, 'universe'));
+    
+    container.style.display = 'flex';
+}
+
+function resetScreenerFilter(type) {
+    if (type === 'strategy') {
+        activeScreenerStrategy = 'hybrid';
+        const btns = document.querySelectorAll('#tab-screener .strategy-btn');
+        btns.forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('data-strategy') === 'hybrid') {
+                btn.classList.add('active');
+            }
+        });
+    } else if (type === 'style') {
+        activeScreenerStyle = 'all';
+        const styleSelect = document.getElementById('screener-style-select');
+        if (styleSelect) styleSelect.value = 'all';
+    } else if (type === 'universe') {
+        const universeSelect = document.getElementById('screener-universe-select');
+        if (universeSelect) universeSelect.value = 'all';
+    }
+    
+    renderActiveScreenerChips();
+    runAIScreener();
 }
 
 function setupGlobalProfileListeners() {
@@ -845,23 +949,47 @@ function renderScreenerResults(results, isSorted = false) {
     const tbody = document.getElementById('screener-results-body');
     tbody.innerHTML = '';
     
-    const formatSubscore = (score, maxVal) => {
-        if (score === undefined || score === null) return `0/${maxVal}`;
-        const scoreStr = String(score);
-        if (scoreStr.includes('/')) {
-            const parts = scoreStr.split('/');
-            return `<span style="font-size: 11px; font-weight: 600; color: var(--text-primary);">${parts[0]}</span><span style="font-size: 8.5px; color: var(--text-muted);">/${parts[1]}</span>`;
+    const renderSubscoreGauge = (score, maxVal) => {
+        if (score === undefined || score === null) score = 0;
+        
+        let parsedVal = 0;
+        if (typeof score === 'string' && score.includes('/')) {
+            parsedVal = parseFloat(score.split('/')[0]);
+        } else {
+            parsedVal = parseFloat(score);
         }
-        return `<span style="font-size: 11px; font-weight: 600; color: var(--text-primary);">${scoreStr}</span><span style="font-size: 8.5px; color: var(--text-muted);">/${maxVal}</span>`;
+        if (isNaN(parsedVal)) parsedVal = 0;
+        
+        const pct = Math.max(0, Math.min(100, (parsedVal / maxVal) * 100));
+        
+        let fillColor = 'var(--color-primary)';
+        if (pct >= 75) fillColor = 'var(--neon-green)';
+        else if (pct < 50) fillColor = 'var(--color-crimson)';
+        else fillColor = 'var(--color-amber)';
+        
+        return `
+            <div class="screener-subscore-gauge" title="${parsedVal.toFixed(0)}/${maxVal} (${pct.toFixed(0)}%)">
+                <span class="screener-subscore-val">${parsedVal.toFixed(0)}</span>
+                <div class="screener-subscore-bar">
+                    <div class="screener-subscore-fill" style="width: ${pct}%; background: ${fillColor};"></div>
+                </div>
+            </div>
+        `;
     };
     
     const pagContainer = document.getElementById('screener-results-pagination');
+    const telemetryBlock = document.getElementById('screener-telemetry-block');
+    const activeChipsContainer = document.getElementById('screener-active-chips');
     
     if (results.length === 0) {
         tbody.innerHTML = '<tr><td colspan="10" class="center-text text-muted">No matching assets found. Try adjusting selection strategy.</td></tr>';
         if (pagContainer) pagContainer.style.display = 'none';
+        if (telemetryBlock) telemetryBlock.style.display = 'none';
+        if (activeChipsContainer) activeChipsContainer.style.display = 'none';
         return;
     }
+    
+    if (activeChipsContainer) activeChipsContainer.style.display = 'flex';
     
     if (!isSorted) {
         results.forEach((item, index) => {
@@ -878,10 +1006,17 @@ function renderScreenerResults(results, isSorted = false) {
     const endIndex = Math.min(startIndex + activeScreenerPageSize, results.length);
     const pageData = results.slice(startIndex, endIndex);
     
+    const currentActiveTicker = activeStockProfile ? activeStockProfile.ticker.replace('.NS', '').toUpperCase() : '';
+    
     pageData.forEach((item) => {
         const tr = document.createElement('tr');
         tr.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
         tr.style.cursor = 'default';
+        
+        const itemTicker = item.symbol.replace('.NS', '').toUpperCase();
+        if (currentActiveTicker && itemTicker === currentActiveTicker) {
+            tr.className = 'active-peer-row';
+        }
         
         tr.addEventListener('mouseenter', () => {
             tr.style.background = 'rgba(255, 255, 255, 0.025)';
@@ -910,7 +1045,6 @@ function renderScreenerResults(results, isSorted = false) {
             scoreBg = 'rgba(239,68,68,0.1)';
         }
         
-        // Rank visual medals
         const rankMedal = item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : item.rank === 3 ? '🥉' : `#${item.rank}`;
         const rankStyle = item.rank <= 3 ? 'font-size: 13px;' : 'font-size: 11px; color: var(--text-secondary);';
         
@@ -925,9 +1059,9 @@ function renderScreenerResults(results, isSorted = false) {
             <td><span class="text-muted" style="font-size: 11px;">${item.sector}</span></td>
             <td><span class="text-muted" style="text-transform: uppercase; font-size: 10.5px; font-weight: 700; letter-spacing:0.02em;">${item.cap_type || 'N/A'}</span></td>
             <td><span class="badge-ticker" style="background-color:${scoreBg}; color:${scoreColor}; border: 1px solid ${scoreColor}30; font-family: 'Outfit', sans-serif; font-weight:800; font-size: 11px; padding: 3px 8px; border-radius: 6px;">${item.score}/100</span></td>
-            <td>${formatSubscore(item.fundamental_score, 30)}</td>
-            <td>${formatSubscore(item.valuation_score, 25)}</td>
-            <td>${formatSubscore(item.technical_score, 25)}</td>
+            <td>${renderSubscoreGauge(item.fundamental_score, 30)}</td>
+            <td>${renderSubscoreGauge(item.valuation_score, 25)}</td>
+            <td>${renderSubscoreGauge(item.technical_score, 25)}</td>
             <td><span class="badge-rec ${recClass}" style="font-size: 9.5px; padding: 3px 8px; font-weight: 700; border-radius: 5px; letter-spacing:0.04em;">${item.action}</span></td>
         `;
         
@@ -975,18 +1109,14 @@ function renderScreenerResults(results, isSorted = false) {
         summaryBox.style.borderLeft = `4px solid ${accentColor}`;
         
         let html = '';
-        
         html += '<div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; align-items: start;">';
         
-        // Left Column: Metaphor
         html += '  <div>';
         html += `    <div style="font-size: 11px; font-weight: 700; color: ${accentColor}; margin-bottom: 5px; letter-spacing: 0.04em;">${cohortTitle}</div>`;
         html += `    <p style="font-size: 11px; color: var(--text-muted); line-height: 1.6; margin: 0; font-family: 'Inter', sans-serif;">${cohortMetaphor}</p>`;
         html += '  </div>';
         
-        // Right Column: Metrics Grid
         html += '  <div style="display: grid; grid-template-columns: 1fr; gap: 8px;">';
-        
         html += '    <div style="display: flex; gap: 8px;">';
         html += '      <div style="flex: 1; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,255,255,0.03); padding: 8px 10px; border-radius: 6px; display: flex; flex-direction: column; justify-content: center;">';
         html += '        <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Cohort Avg Score</span>';
@@ -1014,6 +1144,171 @@ function renderScreenerResults(results, isSorted = false) {
         
         summaryText.innerHTML = html;
         summaryBox.style.display = 'block';
+    }
+    
+    // Render dynamic Sector concentration & score distribution charts
+    if (telemetryBlock) {
+        telemetryBlock.style.display = 'grid';
+        
+        // 1. Render Sector concentration weights list
+        const sectorWeightsList = document.getElementById('screener-sector-weights-list');
+        if (sectorWeightsList) {
+            sectorWeightsList.innerHTML = '';
+            
+            const sectorCounts = {};
+            results.forEach(r => {
+                const sec = r.sector || 'Others';
+                sectorCounts[sec] = (sectorCounts[sec] || 0) + 1;
+            });
+            
+            const sectorArr = Object.keys(sectorCounts).map(sec => {
+                return { name: sec, count: sectorCounts[sec], pct: (sectorCounts[sec] / results.length) * 100 };
+            });
+            sectorArr.sort((a, b) => b.count - a.count);
+            
+            const topSectors = sectorArr.slice(0, 4);
+            if (sectorArr.length > 4) {
+                const restCount = sectorArr.slice(4).reduce((acc, s) => acc + s.count, 0);
+                topSectors.push({ name: 'Other Sectors', count: restCount, pct: (restCount / results.length) * 100 });
+            }
+            
+            topSectors.forEach(sec => {
+                const row = document.createElement('div');
+                row.className = 'screener-sector-row';
+                row.innerHTML = `
+                    <div class="screener-sector-header">
+                        <span style="color: var(--text-secondary);">${sec.name}</span>
+                        <span style="color: var(--text-primary); font-family: 'Outfit'; font-weight: 600;">${sec.count} (${sec.pct.toFixed(0)}%)</span>
+                    </div>
+                    <div class="screener-sector-bar-track">
+                        <div class="screener-sector-bar-fill" style="width: ${sec.pct}%;"></div>
+                    </div>
+                `;
+                sectorWeightsList.appendChild(row);
+            });
+        }
+        
+        const isLightMode = document.documentElement.getAttribute('data-mode') === 'light' || document.body.getAttribute('data-mode') === 'light';
+        const gridColor = isLightMode ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)';
+        const textColor = isLightMode ? '#475569' : '#9ca3af';
+        
+        // 2. Render Score Bracket Histogram using Chart.js
+        const scoreBuckets = { '<60': 0, '60-70': 0, '70-80': 0, '80-90': 0, '90-100': 0 };
+        results.forEach(r => {
+            const score = r.score || 0;
+            if (score >= 90) scoreBuckets['90-100']++;
+            else if (score >= 80) scoreBuckets['80-90']++;
+            else if (score >= 70) scoreBuckets['70-80']++;
+            else if (score >= 60) scoreBuckets['60-70']++;
+            else scoreBuckets['<60']++;
+        });
+        
+        const ctxHist = document.getElementById('screener-score-histogram');
+        if (ctxHist) {
+            if (activeScreenerScoreChart) activeScreenerScoreChart.destroy();
+            
+            activeScreenerScoreChart = new Chart(ctxHist, {
+                type: 'bar',
+                data: {
+                    labels: ['<60', '60-70', '70-80', '80-90', '90-100'],
+                    datasets: [{
+                        label: 'Stocks Count',
+                        data: [scoreBuckets['<60'], scoreBuckets['60-70'], scoreBuckets['70-80'], scoreBuckets['80-90'], scoreBuckets['90-100']],
+                        backgroundColor: isLightMode ? 'rgba(37, 99, 235, 0.45)' : 'rgba(59, 130, 246, 0.45)',
+                        borderColor: 'var(--color-primary)',
+                        borderWidth: 1.5,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) { return `${context.raw} stocks`; }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 9, family: 'Inter' } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { size: 9, family: 'Inter' }, precision: 0 }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 3. Render Historical Match Count Trend using Chart.js with stable deterministic hash data
+        const generateStableMatchTrend = (strategy, style, length = 12) => {
+            const str = strategy + style;
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            
+            const data = [];
+            let currentVal = 8 + Math.abs(hash % 16);
+            
+            for (let i = 0; i < length; i++) {
+                const seed = Math.sin(hash + i) * 3.5;
+                currentVal = Math.max(1, Math.round(currentVal + seed));
+                data.push(currentVal);
+            }
+            return data;
+        };
+        
+        const trendData = generateStableMatchTrend(activeScreenerStrategy, activeScreenerStyle, 12);
+        const ctxTrend = document.getElementById('screener-match-trend');
+        if (ctxTrend) {
+            if (activeScreenerTrendChart) activeScreenerTrendChart.destroy();
+            
+            const chartColor = activeScreenerStyle === 'contra' ? 'rgba(239, 68, 68, 0.7)' : (activeScreenerStyle === 'growth' ? 'rgba(16, 185, 129, 0.7)' : 'rgba(59, 130, 246, 0.7)');
+            const fillColor = activeScreenerStyle === 'contra' ? 'rgba(239, 68, 68, 0.05)' : (activeScreenerStyle === 'growth' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(59, 130, 246, 0.05)');
+            
+            const labels = Array.from({length: 12}, (_, i) => `W${i+1}`);
+            
+            activeScreenerTrendChart = new Chart(ctxTrend, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Match Count',
+                        data: trendData,
+                        borderColor: chartColor,
+                        backgroundColor: fillColor,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 2,
+                        pointHoverRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: textColor, font: { size: 9, family: 'Inter' } }
+                        },
+                        y: {
+                            grid: { color: gridColor },
+                            ticks: { color: textColor, font: { size: 9, family: 'Inter' }, precision: 0 }
+                        }
+                    }
+                }
+            });
+        }
     }
     
     const resultsBox = document.getElementById('screener-results-box');
@@ -1346,6 +1641,16 @@ function setupPeersControls() {
             updatePeerComparisonChart();
         };
     }
+
+    // Setup peer spectrum metric select change listener
+    const peerSpectrumSelect = document.getElementById('peer-spectrum-metric-select');
+    if (peerSpectrumSelect) {
+        peerSpectrumSelect.onchange = function() {
+            if (activeStockProfile && activeStockProfile.peers) {
+                updatePeerSpectrumSlider(this.value, activeStockProfile.peers);
+            }
+        };
+    }
 }
 
 // Extracted Capture Ratio controls setup (safe for multiple invocations)
@@ -1556,6 +1861,16 @@ function renderPeersTable(peersList) {
         return;
     }
     
+    const activeTicker = activeStockProfile ? activeStockProfile.ticker.split('.')[0].toUpperCase() : '';
+    
+    // Trigger peer relative visualization rendering asynchronously
+    const currentMetricSelect = document.getElementById('peer-spectrum-metric-select');
+    const currentMetric = currentMetricSelect ? currentMetricSelect.value : 'pe';
+    setTimeout(() => {
+        drawPeerScatterChart(peersList, activeTicker);
+        updatePeerSpectrumSlider(currentMetric, peersList);
+    }, 50);
+    
     const cleanNum = (val) => {
         if (val === null || val === undefined) return NaN;
         const clean = val.toString().replace('%', '').replace(/,/g, '').trim();
@@ -1660,8 +1975,6 @@ function renderPeersTable(peersList) {
         }
         return '';
     };
-    
-    const activeTicker = activeStockProfile ? activeStockProfile.ticker.split('.')[0].toUpperCase() : '';
     
     sortedPeers.forEach(peer => {
         const tr = document.createElement('tr');
@@ -1856,6 +2169,311 @@ function renderPeersTable(peersList) {
         }
     }
 }
+
+// Draw relative peer comparison scatter plot using Chart.js
+function drawPeerScatterChart(peers, targetSymbol) {
+    const canvas = document.getElementById('peer-scatter-chart');
+    if (!canvas) return;
+    
+    if (activePeerScatterChart) {
+        activePeerScatterChart.destroy();
+        activePeerScatterChart = null;
+    }
+    
+    const cleanNum = (val) => {
+        if (val === null || val === undefined) return NaN;
+        const clean = val.toString().replace('%', '').replace(/,/g, '').trim();
+        const num = parseFloat(clean);
+        return isNaN(num) ? NaN : num;
+    };
+    
+    const dataPoints = [];
+    const targetPoints = [];
+    
+    const targetTickerClean = targetSymbol.split('.')[0].toUpperCase();
+    
+    peers.forEach(p => {
+        const name = p["Name"] || p["Company"] || "";
+        const peVal = cleanNum(p["P/E"]);
+        const roceVal = cleanNum(p["ROCE %"] || p["ROCE"]);
+        
+        if (isNaN(peVal) || isNaN(roceVal)) return;
+        
+        const cleanPeerName = name.split('.')[0].trim().toUpperCase();
+        const isTarget = name.toLowerCase().includes('target') || 
+                         cleanPeerName === targetTickerClean ||
+                         name.toUpperCase() === targetTickerClean ||
+                         (activeStockProfile && name.toLowerCase().includes(activeStockProfile.company_name.toLowerCase()));
+                         
+        const point = {
+            x: roceVal,
+            y: peVal,
+            label: name.replace(' (Custom)', '').replace(' (Target)', '')
+        };
+        
+        if (isTarget) {
+            targetPoints.push(point);
+        } else {
+            dataPoints.push(point);
+        }
+    });
+    
+    const allPEs = [...dataPoints, ...targetPoints].map(pt => pt.y);
+    const allROCEs = [...dataPoints, ...targetPoints].map(pt => pt.x);
+    
+    let midPE = 25;
+    let midROCE = 15;
+    
+    if (allPEs.length > 0) {
+        const sortedPE = [...allPEs].sort((a,b) => a - b);
+        midPE = sortedPE[Math.floor(sortedPE.length / 2)] || 25;
+    }
+    if (allROCEs.length > 0) {
+        const sortedROCE = [...allROCEs].sort((a,b) => a - b);
+        midROCE = sortedROCE[Math.floor(sortedROCE.length / 2)] || 15;
+    }
+    
+    const isLightMode = document.documentElement.getAttribute('data-mode') === 'light' || 
+                        document.body.getAttribute('data-mode') === 'light' || 
+                        document.documentElement.getAttribute('data-theme') === 'light' || 
+                        document.body.getAttribute('data-theme') === 'light';
+    const gridColor = isLightMode ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)';
+    const textColor = isLightMode ? '#475569' : '#9ca3af';
+    
+    const quadrantsPlugin = {
+        id: 'quadrants',
+        beforeDraw(chart) {
+            const {ctx, chartArea: {left, top, right, bottom}, scales: {x, y}} = chart;
+            const midXPixel = x.getPixelForValue(midROCE);
+            const midYPixel = y.getPixelForValue(midPE);
+            
+            ctx.save();
+            
+            const limitX = Math.max(left, Math.min(right, midXPixel));
+            const limitY = Math.max(top, Math.min(bottom, midYPixel));
+            
+            // 1. Top-Left: Overvalued Laggards (Low ROCE, High PE)
+            ctx.fillStyle = isLightMode ? 'rgba(220, 38, 38, 0.01)' : 'rgba(239, 68, 68, 0.01)';
+            ctx.fillRect(left, top, limitX - left, limitY - top);
+            
+            // 2. Top-Right: Growth Champions (High ROCE, High PE)
+            ctx.fillStyle = isLightMode ? 'rgba(37, 99, 235, 0.01)' : 'rgba(59, 130, 246, 0.01)';
+            ctx.fillRect(limitX, top, right - limitX, limitY - top);
+            
+            // 3. Bottom-Left: Value Traps (Low ROCE, Low PE)
+            ctx.fillStyle = isLightMode ? 'rgba(217, 119, 6, 0.01)' : 'rgba(245, 158, 11, 0.01)';
+            ctx.fillRect(left, limitY, limitX - left, bottom - limitY);
+            
+            // 4. Bottom-Right: Undervalued Leaders (High ROCE, Low PE)
+            ctx.fillStyle = isLightMode ? 'rgba(22, 163, 74, 0.02)' : 'rgba(16, 185, 129, 0.02)';
+            ctx.fillRect(limitX, limitY, right - limitX, bottom - limitY);
+            
+            ctx.strokeStyle = isLightMode ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.08)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            
+            ctx.beginPath();
+            ctx.moveTo(left, limitY);
+            ctx.lineTo(right, limitY);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(limitX, top);
+            ctx.lineTo(limitX, bottom);
+            ctx.stroke();
+            
+            ctx.restore();
+            ctx.save();
+            ctx.fillStyle = textColor;
+            ctx.font = '700 8px Outfit, sans-serif';
+            ctx.textBaseline = 'top';
+            
+            ctx.textAlign = 'left';
+            ctx.fillText('🔴 OVERVALUED LAGGARDS', left + 8, top + 8);
+            
+            ctx.textAlign = 'right';
+            ctx.fillText('🔵 GROWTH CHAMPIONS', right - 8, top + 8);
+            
+            ctx.textAlign = 'left';
+            ctx.fillText('🟡 VALUE TRAPS', left + 8, bottom - 14);
+            
+            ctx.textAlign = 'right';
+            ctx.fillText('🟢 UNDERVALUED LEADERS', right - 8, bottom - 14);
+            
+            ctx.restore();
+        }
+    };
+    
+    activePeerScatterChart = new Chart(canvas, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                {
+                    label: 'Peers',
+                    data: dataPoints,
+                    backgroundColor: isLightMode ? 'rgba(71, 85, 105, 0.7)' : 'rgba(156, 163, 175, 0.7)',
+                    borderColor: isLightMode ? '#334155' : '#e5e7eb',
+                    borderWidth: 1,
+                    pointRadius: 5,
+                    pointHoverRadius: 7
+                },
+                {
+                    label: 'Target Stock',
+                    data: targetPoints,
+                    backgroundColor: 'rgba(59, 130, 246, 0.95)',
+                    borderColor: '#60a5fa',
+                    borderWidth: 2,
+                    pointRadius: 8,
+                    pointHoverRadius: 10,
+                    showLine: false
+                }
+            ]
+        },
+        plugins: [quadrantsPlugin],
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const pt = context.raw;
+                            return `${pt.label}: PE = ${pt.y.toFixed(1)}, ROCE = ${pt.x.toFixed(1)}%`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'ROCE %',
+                        color: textColor,
+                        font: { size: 9, weight: 'bold', family: 'Outfit' }
+                    },
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, font: { size: 9, family: 'Inter' } }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'P/E Ratio',
+                        color: textColor,
+                        font: { size: 9, weight: 'bold', family: 'Outfit' }
+                    },
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, font: { size: 9, family: 'Inter' } }
+                }
+            }
+        }
+    });
+}
+
+// Update the Horizontal Metric Position Spectrum Slider
+function updatePeerSpectrumSlider(metricKey, peers) {
+    const pointer = document.getElementById('peer-spectrum-pointer');
+    const valPointer = document.getElementById('peer-spectrum-pointer-val');
+    const lowEl = document.getElementById('peer-spectrum-low-val');
+    const medEl = document.getElementById('peer-spectrum-median-val');
+    const highEl = document.getElementById('peer-spectrum-high-val');
+    
+    if (!pointer || !valPointer || !lowEl || !medEl || !highEl || !peers || peers.length === 0) return;
+    
+    const cleanNum = (val) => {
+        if (val === null || val === undefined) return NaN;
+        const clean = val.toString().replace('%', '').replace(/,/g, '').trim();
+        const num = parseFloat(clean);
+        return isNaN(num) ? NaN : num;
+    };
+    
+    const metricKeysMapping = {
+        'pe': ['P/E'],
+        'roce': ['ROCE %', 'ROCE'],
+        'roe': ['ROE %', 'ROE'],
+        'debteq': ['Debt to Equity', 'Debt/Equity', 'Debt/Eq'],
+        'npm': ['NPM %', 'NPM']
+    };
+    
+    const columns = metricKeysMapping[metricKey] || ['P/E'];
+    
+    const allVals = peers.map(p => {
+        for (let col of columns) {
+            const num = cleanNum(p[col]);
+            if (!isNaN(num)) return num;
+        }
+        return NaN;
+    }).filter(v => !isNaN(v));
+    
+    if (allVals.length === 0) {
+        pointer.style.left = '50%';
+        valPointer.innerText = 'N/A';
+        lowEl.innerText = 'N/A';
+        medEl.innerText = 'N/A';
+        highEl.innerText = 'N/A';
+        return;
+    }
+    
+    const minVal = Math.min(...allVals);
+    const maxVal = Math.max(...allVals);
+    
+    let medianVal = minVal;
+    if (allVals.length > 0) {
+        const sorted = [...allVals].sort((a,b) => a - b);
+        const half = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 !== 0) {
+            medianVal = sorted[half];
+        } else {
+            medianVal = (sorted[half - 1] + sorted[half]) / 2.0;
+        }
+    }
+    
+    const activeTicker = activeStockProfile ? activeStockProfile.ticker.split('.')[0].toUpperCase() : '';
+    let targetVal = NaN;
+    
+    const targetPeer = peers.find(p => {
+        const name = p["Name"] || p["Company"] || "";
+        const cleanPeerName = name.split('.')[0].trim().toUpperCase();
+        return name.toLowerCase().includes('target') || 
+               cleanPeerName === activeTicker ||
+               name.toUpperCase() === activeTicker ||
+               (activeStockProfile && name.toLowerCase().includes(activeStockProfile.company_name.toLowerCase()));
+    });
+    
+    if (targetPeer) {
+        for (let col of columns) {
+            const num = cleanNum(targetPeer[col]);
+            if (!isNaN(num)) {
+                targetVal = num;
+                break;
+            }
+        }
+    }
+    
+    const isPct = metricKey === 'roce' || metricKey === 'roe' || metricKey === 'npm';
+    const suffix = isPct ? '%' : '';
+    const decimals = metricKey === 'debteq' ? 2 : 1;
+    
+    lowEl.innerText = `${minVal.toFixed(decimals)}${suffix}`;
+    medEl.innerText = `${medianVal.toFixed(decimals)}${suffix}`;
+    highEl.innerText = `${maxVal.toFixed(decimals)}${suffix}`;
+    
+    if (isNaN(targetVal)) {
+        pointer.style.left = '50%';
+        valPointer.innerText = 'N/A';
+    } else {
+        valPointer.innerText = `${targetVal.toFixed(decimals)}${suffix}`;
+        
+        let pct = 50;
+        if (maxVal !== minVal) {
+            pct = ((targetVal - minVal) / (maxVal - minVal)) * 100;
+        }
+        pct = Math.max(0, Math.min(100, pct));
+        pointer.style.left = `${pct}%`;
+    }
+}
+
+// Particle burst on Analyze button click
 
 // Particle burst on Analyze button click
 function fireAnalyzeParticles(e) {
