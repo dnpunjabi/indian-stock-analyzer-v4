@@ -10856,17 +10856,30 @@ function executeSystemPrint(printContent, customFeatures = 'width=850,height=900
         setTimeout(cleanup, 25000);
     }
 }
+const LIGHT_THEMES = ['light', 'geist-light', 'nord-light', 'solarized-light', 'github-light'];
+
 // Dark/Light Theme Handler
 function setupThemeToggle() {
     const savedMode = localStorage.getItem('theme-mode') || localStorage.getItem('theme') || 'dark';
-    let savedAccent = localStorage.getItem('theme-accent') || 'classic';
+    let savedAccent;
+    if (savedMode === 'light') {
+        savedAccent = localStorage.getItem('theme-accent-light') || 'light';
+    } else {
+        savedAccent = localStorage.getItem('theme-accent') || 'classic';
+    }
     if (savedAccent === 'emerald-capital') {
         savedAccent = 'slate-quantitative';
         localStorage.setItem('theme-accent', 'slate-quantitative');
     }
     
     document.documentElement.setAttribute('data-mode', savedMode);
-    document.documentElement.setAttribute('data-theme', savedAccent);
+    if (savedMode === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-accent', savedAccent);
+    } else {
+        document.documentElement.setAttribute('data-theme', savedAccent);
+        document.documentElement.removeAttribute('data-accent');
+    }
     
     // Wire dropdown selectors
     const modeSelect = document.getElementById('setting-theme-mode');
@@ -10903,28 +10916,61 @@ function setupThemeToggle() {
 
 function setWorkstationMode(mode) {
     document.documentElement.setAttribute('data-mode', mode);
-    // Backward compatibility for general dark/light class toggles in existing scripts
-    document.documentElement.setAttribute('data-theme', mode === 'light' ? 'light' : localStorage.getItem('theme-accent') || 'classic');
+    
+    let activeAccent;
+    if (mode === 'light') {
+        activeAccent = localStorage.getItem('theme-accent-light') || 'light';
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-accent', activeAccent);
+    } else {
+        activeAccent = localStorage.getItem('theme-accent') || 'classic';
+        document.documentElement.setAttribute('data-theme', activeAccent);
+        document.documentElement.removeAttribute('data-accent');
+    }
+    
     localStorage.setItem('theme-mode', mode);
     localStorage.setItem('theme', mode); // legacy support
     
     const modeSelect = document.getElementById('setting-theme-mode');
     if (modeSelect) modeSelect.value = mode;
     
-    showToast(`Workstation Mode set to ${mode === 'light' ? 'Alabaster Day' : 'Dark Mode'}`, 'success');
+    const accentSelect = document.getElementById('setting-theme-accent');
+    if (accentSelect) accentSelect.value = activeAccent;
+    
+    showToast(`Workstation Mode set to ${mode === 'light' ? 'Light Mode' : 'Dark Mode'}`, 'success');
     
     refreshChartThemeColors();
 }
 
 function setWorkstationAccent(accent) {
-    document.documentElement.setAttribute('data-theme', accent);
-    localStorage.setItem('theme-accent', accent);
+    const isLightAccent = LIGHT_THEMES.includes(accent);
+    const mode = isLightAccent ? 'light' : 'dark';
+    
+    document.documentElement.setAttribute('data-mode', mode);
+    localStorage.setItem('theme-mode', mode);
+    localStorage.setItem('theme', mode); // legacy support
+    
+    if (isLightAccent) {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.setAttribute('data-accent', accent);
+        localStorage.setItem('theme-accent-light', accent);
+    } else {
+        document.documentElement.setAttribute('data-theme', accent);
+        document.documentElement.removeAttribute('data-accent');
+        localStorage.setItem('theme-accent', accent);
+    }
+    
+    const modeSelect = document.getElementById('setting-theme-mode');
+    if (modeSelect) modeSelect.value = mode;
     
     const accentSelect = document.getElementById('setting-theme-accent');
-    if (accentSelect) accentSelect.value = accent;
-    
-    const textLabel = accentSelect ? accentSelect.options[accentSelect.selectedIndex].text : accent;
-    showToast(`Visual Theme set to ${textLabel}`, 'success');
+    if (accentSelect) {
+        accentSelect.value = accent;
+        const textLabel = accentSelect.options[accentSelect.selectedIndex].text;
+        showToast(`Visual Theme set to ${textLabel}`, 'success');
+    } else {
+        showToast(`Visual Theme set to ${accent}`, 'success');
+    }
     
     refreshChartThemeColors();
 }
@@ -12878,8 +12924,8 @@ function renderEarningsQuality(p) {
             const cell = document.createElement('div');
             cell.className = 'piotroski-matrix-cell';
             
-            const cellColor = item.passed ? 'rgba(16, 185, 129, 0.04)' : 'rgba(239, 68, 68, 0.04)';
-            const cellBorder = item.passed ? '1.5px solid rgba(16, 185, 129, 0.2)' : '1.5px solid rgba(239, 68, 68, 0.2)';
+            const cellColor = item.passed ? 'var(--audit-pass-bg)' : 'var(--audit-fail-bg)';
+            const cellBorder = item.passed ? '1.5px solid var(--audit-pass-border)' : '1.5px solid var(--audit-fail-border)';
             
             cell.style.background = cellColor;
             cell.style.border = cellBorder;

@@ -39,6 +39,17 @@
     --audit-fail-bg-hover: rgba(239, 68, 68, 0.06);
     --audit-pass-border-hover: rgba(16, 185, 129, 0.3);
     --audit-fail-border-hover: rgba(239, 68, 68, 0.3);
+    --audit-pass-border: rgba(16, 185, 129, 0.25);
+    --audit-fail-border: rgba(239, 68, 68, 0.2);
+
+    /* Theme sub-component & track colors */
+    --bg-card-sub: rgba(255, 255, 255, 0.015);
+    --border-sub: rgba(255, 255, 255, 0.04);
+    --bg-track: rgba(255, 255, 255, 0.06);
+    --border-track: rgba(255, 255, 255, 0.03);
+    --stroke-gauge-bg: rgba(255, 255, 255, 0.04);
+    --bg-explanation-panel: rgba(0, 0, 0, 0.25);
+    --bg-select-input: rgba(0, 0, 0, 0.4);
 }
 
 /* ==================== BASE MODES ==================== */
@@ -62,6 +73,17 @@
     --audit-fail-bg-hover: rgba(239, 68, 68, 0.06);
     --audit-pass-border-hover: rgba(16, 185, 129, 0.3);
     --audit-fail-border-hover: rgba(239, 68, 68, 0.3);
+    --audit-pass-border: rgba(16, 185, 129, 0.25);
+    --audit-fail-border: rgba(239, 68, 68, 0.2);
+
+    /* Theme sub-component & track colors */
+    --bg-card-sub: rgba(255, 255, 255, 0.015);
+    --border-sub: rgba(255, 255, 255, 0.04);
+    --bg-track: rgba(255, 255, 255, 0.06);
+    --border-track: rgba(255, 255, 255, 0.03);
+    --stroke-gauge-bg: rgba(255, 255, 255, 0.04);
+    --bg-explanation-panel: rgba(0, 0, 0, 0.25);
+    --bg-select-input: rgba(0, 0, 0, 0.4);
 }
 
 /* Light/Alabaster Mode Base Variables - The 1 Light Theme (Alabaster Day) */
@@ -96,6 +118,17 @@
     --audit-fail-bg-hover: rgba(239, 68, 68, 0.1);
     --audit-pass-border-hover: rgba(16, 185, 129, 0.4);
     --audit-fail-border-hover: rgba(239, 68, 68, 0.4);
+    --audit-pass-border: rgba(16, 185, 129, 0.35);
+    --audit-fail-border: rgba(239, 68, 68, 0.3);
+
+    /* Theme sub-component & track colors */
+    --bg-card-sub: rgba(0, 0, 0, 0.02);
+    --border-sub: rgba(0, 0, 0, 0.06);
+    --bg-track: rgba(0, 0, 0, 0.06);
+    --border-track: rgba(0, 0, 0, 0.04);
+    --stroke-gauge-bg: rgba(0, 0, 0, 0.06);
+    --bg-explanation-panel: rgba(0, 0, 0, 0.04);
+    --bg-select-input: rgba(255, 255, 255, 0.9);
 }
 
 /* ==================== THE 8 DARK THEMES ==================== */
@@ -536,6 +569,110 @@
     --neon-green: #7fd962;
     --glow-shadow: 0 0 10px rgba(226, 125, 96, 0.2);
     --bg-row-hover: rgba(226, 125, 96, 0.05);
+}
+
+/* Light Accent Theme: Geist Light */
+[data-mode="light"][data-accent="geist-light"] {
+    --bg-main: #ffffff;
+    --bg-sidebar: #fafafa;
+    --bg-card: rgba(255, 255, 255, 0.9);
+    --bg-card-hover: #ffffff;
+    --border-glass: rgba(0, 0, 0, 0.08);
+    --bg-glass-input: #ffffff;
+    
+    --text-primary: #000000;
+    --text-secondary: #0070f3;
+    --text-muted: #888888;
+    
+    --color-primary: #0070f3;
+    --color-primary-glow: rgba(0, 112, 243, 0.15);
+    --color-emerald: #10b981;
+    --color-emerald-glow: rgba(16, 185, 129, 0.12);
+    --color-crimson: #ee0000;
+    --color-crimson-glow: rgba(238, 0, 0, 0.12);
+    --color-amber: #f5a623;
+    --color-amber-glow: rgba(245, 166, 35, 0.12);
+    --neon-green: #10b981;
+    --glow-shadow: 0 4px 12px rgba(0, 112, 243, 0.06);
+    --bg-row-hover: rgba(0, 112, 243, 0.03);
+}
+
+/* Light Accent Theme: Nord Light */
+[data-mode="light"][data-accent="nord-light"] {
+    --bg-main: #eceff4;
+    --bg-sidebar: #e5e9f0;
+    --bg-card: rgba(243, 245, 249, 0.85);
+    --bg-card-hover: #ffffff;
+    --border-glass: rgba(94, 129, 172, 0.12);
+    --bg-glass-input: #eceff4;
+    
+    --text-primary: #2e3440;
+    --text-secondary: #5e81ac;
+    --text-muted: #4c566a;
+    
+    --color-primary: #5e81ac;
+    --color-primary-glow: rgba(94, 129, 172, 0.18);
+    --color-emerald: #a3be8c;
+    --color-emerald-glow: rgba(163, 190, 140, 0.12);
+    --color-crimson: #bf616a;
+    --color-crimson-glow: rgba(191, 97, 106, 0.12);
+    --color-amber: #ebcb8b;
+    --color-amber-glow: rgba(235, 203, 139, 0.12);
+    --neon-green: #a3be8c;
+    --glow-shadow: 0 4px 12px rgba(94, 129, 172, 0.08);
+    --bg-row-hover: rgba(94, 129, 172, 0.04);
+}
+
+/* Light Accent Theme: Solarized Light */
+[data-mode="light"][data-accent="solarized-light"] {
+    --bg-main: #fdf6e3;
+    --bg-sidebar: #eee8d5;
+    --bg-card: rgba(253, 246, 227, 0.85);
+    --bg-card-hover: #fdf6e3;
+    --border-glass: rgba(147, 161, 161, 0.15);
+    --bg-glass-input: #eee8d5;
+    
+    --text-primary: #586e75;
+    --text-secondary: #268bd2;
+    --text-muted: #93a1a1;
+    
+    --color-primary: #268bd2;
+    --color-primary-glow: rgba(38, 139, 210, 0.18);
+    --color-emerald: #859900;
+    --color-emerald-glow: rgba(133, 153, 0, 0.12);
+    --color-crimson: #dc322f;
+    --color-crimson-glow: rgba(220, 50, 47, 0.12);
+    --color-amber: #b58900;
+    --color-amber-glow: rgba(181, 137, 0, 0.12);
+    --neon-green: #859900;
+    --glow-shadow: 0 4px 12px rgba(38, 139, 210, 0.08);
+    --bg-row-hover: rgba(38, 139, 210, 0.04);
+}
+
+/* Light Accent Theme: GitHub Light */
+[data-mode="light"][data-accent="github-light"] {
+    --bg-main: #ffffff;
+    --bg-sidebar: #f6f8fa;
+    --bg-card: rgba(255, 255, 255, 0.9);
+    --bg-card-hover: #ffffff;
+    --border-glass: rgba(208, 215, 222, 0.5);
+    --bg-glass-input: #f6f8fa;
+    
+    --text-primary: #24292f;
+    --text-secondary: #0969da;
+    --text-muted: #57606a;
+    
+    --color-primary: #0969da;
+    --color-primary-glow: rgba(9, 105, 218, 0.15);
+    --color-emerald: #1a7f37;
+    --color-emerald-glow: rgba(26, 127, 55, 0.12);
+    --color-crimson: #cf222e;
+    --color-crimson-glow: rgba(207, 34, 46, 0.12);
+    --color-amber: #9a6700;
+    --color-amber-glow: rgba(154, 103, 0, 0.12);
+    --neon-green: #1a7f37;
+    --glow-shadow: 0 4px 12px rgba(9, 105, 218, 0.06);
+    --bg-row-hover: rgba(9, 105, 218, 0.03);
 }
 
 
@@ -4111,10 +4248,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
     user-select: none;
 }
 .piotroski-matrix-cell:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--bg-card-hover);
     transform: translateY(-1.5px);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    border-color: rgba(255, 255, 255, 0.15) !important;
+    box-shadow: var(--glow-shadow);
+    border-color: var(--color-primary) !important;
 }
 .piotroski-matrix-cell .cell-abbrev {
     font-size: 8.5px;
