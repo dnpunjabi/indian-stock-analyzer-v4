@@ -280,7 +280,7 @@
                                         <option value="ayu-mirage">🎨 Ayu Mirage</option>
                                         <option value="nord-ice">❄️ Nord Ice</option>
                                         <option value="dracula">🧛 Dracula Dark</option>
-                                        <option value="emerald-capital">🌿 Emerald Capital</option>
+                                        <option value="slate-quantitative">📈 Slate Quantitative</option>
                                         <option value="solarized-paper">☀️ Solarized Paper</option>
                                     </select>
                                 </div>
@@ -2342,7 +2342,7 @@
                                 <div class="form-group" style="margin: 0;">
                                     <textarea id="alert-nl-prompt" rows="3" placeholder="e.g. Alert me if TCS drops within 1.5% of its 50.0% Fibonacci retracement level or if Infosys crosses below its 200 SMA by 2.0%" style="width: 100%; min-height: 60px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-family: inherit; font-size: 11.5px; line-height: 1.4; resize: vertical; outline: none; transition: border-color 0.2s; box-sizing: border-box;"></textarea>
                                 </div>
-                                <div class="ai-presets-container" style="margin-top: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
+                                <div class="ai-presets-container" style="margin-top: 10px; margin-bottom: 10px; background: var(--bg-glass-input); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">
                                     <span style="font-size: 11px; color: var(--color-primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">💡 AI Alert Dictionary & Presets</span>
                                     
                                     <!-- Group 1: Price Levels & Breakouts -->
@@ -2644,25 +2644,25 @@
 
                     <div class="scanner-panel-grid">
                         <!-- Left: Command Station -->
-                        <div class="card" style="position: relative; border: 1px solid rgba(168, 85, 247, 0.2); background: rgba(168, 85, 247, 0.01); margin: 0;">
+                        <div class="card" style="position: relative; border: 1px solid var(--color-primary-glow); background: var(--bg-card); margin: 0;">
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                                 <h3 style="margin: 0; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px; font-size: 13px;">
                                     <span>🔮</span> AI SCAN COMMAND STATION
                                 </h3>
-                                <span class="ai-badge" style="font-size: 8px; padding: 2px 6px; border-radius: 4px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #d8b4fe; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">Groq Copilot</span>
+                                <span class="ai-badge" style="font-size: 8px; padding: 2px 6px; border-radius: 4px; background: var(--color-primary-glow); border: 1px solid var(--color-primary); color: var(--text-primary); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">Groq Copilot</span>
                             </div>
                             <p style="font-size: 11px; line-height: 1.45; color: var(--text-secondary); margin-bottom: 12px; margin-top: 0;">
                                 Describe your scanning criteria in plain English. The AI Copilot will parse conditions, resolve parameters, and configure the scanner automatically.
                             </p>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group" style="margin: 0;">
-                                    <textarea id="rule-scanner-nl-prompt" rows="4" placeholder='e.g. "Scan for mid-cap stocks with RSI below 35" or "Find large cap stocks near their 52-week low"' style="width: 100%; min-height: 80px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: #fff; font-family: inherit; font-size: 11.5px; line-height: 1.4; resize: vertical; outline: none; transition: border-color 0.2s; box-sizing: border-box;"></textarea>
+                                    <textarea id="rule-scanner-nl-prompt" rows="4" placeholder='e.g. "Scan for mid-cap stocks with RSI below 35" or "Find large cap stocks near their 52-week low"' style="width: 100%; min-height: 80px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-primary); font-family: inherit; font-size: 11.5px; line-height: 1.4; resize: vertical; outline: none; transition: border-color 0.2s; box-sizing: border-box;"></textarea>
                                 </div>
                                 <button class="btn-primary" id="rule-scanner-nl-submit" style="width: 100%;">
                                     🔮 Parse & Execute AI Scan
                                 </button>
-                                <div id="rule-scanner-nl-loader" style="display: none; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: #a855f7; margin-top: 5px;">
-                                    <span class="spinner-mini" style="width: 12px; height: 12px; border: 2px solid rgba(168, 85, 247, 0.3); border-top-color: #a855f7; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite;"></span>
+                                <div id="rule-scanner-nl-loader" style="display: none; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: var(--color-primary); margin-top: 5px;">
+                                    <span class="spinner-mini" style="width: 12px; height: 12px; border: 2px solid var(--color-primary-glow); border-top-color: var(--color-primary); border-radius: 50%; display: inline-block; animation: spin 1s linear infinite;"></span>
                                     <span>AI Copilot parsing scan request...</span>
                                 </div>
                             </div>
@@ -2671,7 +2671,7 @@
                         <!-- Right: Preset Dictionary -->
                         <div class="card" style="margin: 0; display: flex; flex-direction: column;">
                             <span style="font-size: 11px; color: var(--color-primary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 8px;">💡 AI Scan Preset Dictionary</span>
-                            <div class="ai-presets-container" style="background: rgba(0,0,0,0.15); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass); max-height: 320px; overflow-y: auto;">
+                            <div class="ai-presets-container" style="background: var(--bg-glass-input); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass); max-height: 320px; overflow-y: auto;">
                                 <!-- Group 1: Momentum & Oscillators -->
                                 <details class="rs-preset-group" open>
                                     <summary>🎯 Momentum & Oscillators</summary>
@@ -2979,7 +2979,7 @@
                                             </div>
                                         </div>
                                         <div class="formula-terminal-editor">
-                                            <textarea id="custom-screener-formula-input" rows="8" placeholder="e.g.&#10;Daily Close * 1.05 > Daily Max ( 200 , Daily High )&#10;Daily Close > 90" style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 11px; background: #0f172a; color: #38bdf8; border: 1px solid #334155; border-radius: 4px; padding: 10px; box-sizing: border-box; resize: vertical; line-height: 1.5; font-weight: 600;"></textarea>
+                                            <textarea id="custom-screener-formula-input" rows="8" placeholder="e.g.&#10;Daily Close * 1.05 > Daily Max ( 200 , Daily High )&#10;Daily Close > 90" class="formula-textarea" style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 11px; border-radius: 4px; padding: 10px; box-sizing: border-box; resize: vertical; line-height: 1.5; font-weight: 600;"></textarea>
                                         </div>
                                         <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; margin-bottom: 8px; max-width: 100%;">
                                             <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; display: flex; align-items: center; margin-right: 4px;">Insert:</span>
@@ -3287,7 +3287,7 @@
                                 <div id="watchlist-inline-add-container" style="display: none; align-items: center; gap: 6px; margin-right: 10px;">
                                     <div style="position: relative; display: flex; align-items: center;">
                                         <input type="text" id="watchlist-inline-add-input" placeholder="Stock symbol (e.g. TCS)..." style="padding: 5px 8px; font-size:11px; border-radius: 4px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); width: 150px; outline: none;" autocomplete="off">
-                                        <div id="watchlist-inline-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #161616; border: 1px solid var(--border-glass); border-radius: 6px; max-height: 180px; overflow-y: auto; z-index: 100; font-size: 11px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); min-width: 220px; border-color: rgba(255,255,255,0.08); margin-top: 5px;"></div>
+                                        <div id="watchlist-inline-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-sidebar); border: 1px solid var(--border-glass); border-radius: 6px; max-height: 180px; overflow-y: auto; z-index: 100; font-size: 11px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); min-width: 220px; border-color: var(--border-glass); margin-top: 5px;"></div>
                                     </div>
                                     <button class="btn-primary" id="watchlist-inline-add-btn" style="font-size: 11px; padding: 5px 10px; height: auto;">+ Add Stock</button>
                                 </div>
@@ -3348,7 +3348,7 @@
                             <div id="watchlist-analysis-loading-panel" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(7, 10, 18, 0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 9999; align-items: center; justify-content: center; box-sizing: border-box; padding: 20px;">
                                 <div style="width: 100%; max-width: 500px; padding: 40px; background: rgba(30, 41, 59, 0.45); border: 1px solid var(--border-glass); border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,0.8); text-align: center; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
                                     <div style="font-size: 36px; margin-bottom: 20px; animation: pulse 1.5s infinite ease-in-out;">🧬</div>
-                                    <h3 style="margin: 0 0 10px 0; font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 800; color: var(--color-primary); letter-spacing: 0.06em; text-transform: uppercase;">QUANT PORTFOLIO SYNTHESIS</h3>
+                                    <h3 style="margin: 0 0 10px 0; font-family: 'Outfit', sans-serif; font-size: 17px; font-weight: 800; color: var(--color-primary); letter-spacing: 0.06em; text-transform: uppercase;">QUANT WATCHLIST SYNTHESIS</h3>
                                     <p style="font-size: 11.5px; color: var(--text-secondary); margin: 0 0 25px 0; line-height: 1.45;">Evaluating financial profiles, DCF valuation models, and technical trends for all constituents.</p>
                                     
                                     <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; margin: 0 auto 25px auto; overflow: hidden; border: 1px solid rgba(255,255,255,0.03);">
@@ -3525,7 +3525,7 @@
                                                 </defs>
                                             </svg>
                                             <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center;">
-                                                <span id="port-health-score" style="font-size: 18px; font-family: 'Outfit', sans-serif; font-weight: 800; color: #fff;">--</span>
+                                                <span id="port-health-score" style="font-size: 18px; font-family: 'Outfit', sans-serif; font-weight: 800; color: var(--text-primary);">--</span>
                                                 <span style="font-size: 7px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">HEALTH</span>
                                             </div>
                                         </div>
@@ -3877,7 +3877,7 @@
                                 <span style="font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: 0.03em;">ADD EXPERIMENTAL TICKER:</span>
                                 <div style="display: flex; align-items: center; gap: 6px; position: relative;">
                                     <input type="text" id="backtest-custom-stock-input" placeholder="Type stock (e.g. RELIANCE)..." style="padding: 4px 8px; font-size:11px; border-radius: 4px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); width: 180px; outline: none;" autocomplete="off">
-                                    <div id="backtest-custom-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #0b1329; border: 1px solid var(--border-glass); border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 10;"></div>
+                                    <div id="backtest-custom-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-sidebar); border: 1px solid var(--border-glass); border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 10;"></div>
                                     <button id="backtest-add-custom-btn" class="btn-primary" style="font-size: 11px; padding: 4px 10px; height: auto;">+ Add Asset</button>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap;">

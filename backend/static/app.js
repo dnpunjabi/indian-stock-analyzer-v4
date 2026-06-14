@@ -4002,8 +4002,8 @@ function drawPeerComparisonChart(dates, series, benchmarkSymbol) {
             fontFamily: 'Inter, sans-serif',
         },
         grid: {
-            vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
-            horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.08)' },
+            horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.08)' },
         },
         rightPriceScale: {
             borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
@@ -10859,7 +10859,11 @@ function executeSystemPrint(printContent, customFeatures = 'width=850,height=900
 // Dark/Light Theme Handler
 function setupThemeToggle() {
     const savedMode = localStorage.getItem('theme-mode') || localStorage.getItem('theme') || 'dark';
-    const savedAccent = localStorage.getItem('theme-accent') || 'classic';
+    let savedAccent = localStorage.getItem('theme-accent') || 'classic';
+    if (savedAccent === 'emerald-capital') {
+        savedAccent = 'slate-quantitative';
+        localStorage.setItem('theme-accent', 'slate-quantitative');
+    }
     
     document.documentElement.setAttribute('data-mode', savedMode);
     document.documentElement.setAttribute('data-theme', savedAccent);
@@ -10933,18 +10937,24 @@ function refreshChartThemeColors() {
     if (window.Chart) {
         Chart.defaults.color = textColor;
         
+        const computedStyles = getComputedStyle(document.documentElement);
+        const primaryColor = computedStyles.getPropertyValue('--color-primary').trim() || '#6366f1';
+        const primaryGlow = computedStyles.getPropertyValue('--color-primary-glow').trim() || 'rgba(99, 102, 241, 0.1)';
+        
         // Also update existing chart instances if they are currently drawn
         const chartInstances = [
-            activeChartInstance,
-            activePeerChartInstance,
-            alertsAnalyticsChartInstance,
-            activeFibChartInstance,
-            activeDrawdownChartInstance,
-            backtestChartInstance,
-            activeRiskChartInstance,
-            activeVolumePriceChart,
-            activeVolumeDeliveryChart
+            typeof activeChartInstance !== 'undefined' ? activeChartInstance : null,
+            typeof activePeerChartInstance !== 'undefined' ? activePeerChartInstance : null,
+            typeof alertsAnalyticsChartInstance !== 'undefined' ? alertsAnalyticsChartInstance : null,
+            typeof activeFibChartInstance !== 'undefined' ? activeFibChartInstance : null,
+            typeof activeDrawdownChartInstance !== 'undefined' ? activeDrawdownChartInstance : null,
+            typeof backtestChartInstance !== 'undefined' ? backtestChartInstance : null,
+            typeof activeRiskChartInstance !== 'undefined' ? activeRiskChartInstance : null,
+            typeof activeVolumePriceChart !== 'undefined' ? activeVolumePriceChart : null,
+            typeof activeVolumeDeliveryChart !== 'undefined' ? activeVolumeDeliveryChart : null,
+            typeof activeWatchlistScatterChart !== 'undefined' ? activeWatchlistScatterChart : null
         ];
+        
         chartInstances.forEach(chart => {
             if (chart && chart.options) {
                 // Update scales colors
@@ -10958,6 +10968,33 @@ function refreshChartThemeColors() {
                 // Update legend labels
                 if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
                     chart.options.plugins.legend.labels.color = textColor;
+                }
+                // Update dynamic datasets colors
+                if (chart.data && chart.data.datasets) {
+                    if (typeof activeWatchlistScatterChart !== 'undefined' && chart === activeWatchlistScatterChart && chart.data.datasets[0]) {
+                        chart.data.datasets[0].borderColor = primaryColor;
+                        chart.data.datasets[0].backgroundColor = primaryGlow;
+                    }
+                    else if (typeof activeChartInstance !== 'undefined' && chart === activeChartInstance && chart.data.datasets[0]) {
+                        chart.data.datasets[0].borderColor = primaryColor;
+                        chart.data.datasets[0].backgroundColor = primaryGlow;
+                    }
+                    else if (typeof activePeerChartInstance !== 'undefined' && chart === activePeerChartInstance) {
+                        chart.data.datasets.forEach((dataset, idx) => {
+                            if (idx === 0) {
+                                dataset.borderColor = primaryColor;
+                                dataset.backgroundColor = primaryGlow;
+                            }
+                        });
+                    }
+                    else if (typeof backtestChartInstance !== 'undefined' && chart === backtestChartInstance && chart.data.datasets[0]) {
+                        chart.data.datasets[0].borderColor = primaryColor;
+                        chart.data.datasets[0].backgroundColor = primaryGlow;
+                    }
+                    else if (typeof alertsAnalyticsChartInstance !== 'undefined' && chart === alertsAnalyticsChartInstance && chart.data.datasets[0]) {
+                        chart.data.datasets[0].borderColor = primaryColor;
+                        chart.data.datasets[0].backgroundColor = primaryColor;
+                    }
                 }
                 chart.update();
             }
@@ -10973,7 +11010,54 @@ function refreshChartThemeColors() {
     if (typeof updateVolumeChartThemeColors === 'function') {
         updateVolumeChartThemeColors();
     }
-}// Mobile Responsive Toggler
+    if (typeof updateLightweightChartsThemeColors === 'function') {
+        updateLightweightChartsThemeColors();
+    }
+}
+
+function updateLightweightChartsThemeColors() {
+    if (typeof LightweightCharts === 'undefined') return;
+    const isLight = document.documentElement.getAttribute('data-mode') === 'light';
+    const textColor = isLight ? '#334155' : '#94a3b8';
+    const gridColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.02)';
+    const borderColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
+
+    const applyToLightweightChart = (chart) => {
+        if (!chart) return;
+        try {
+            chart.applyOptions({
+                layout: {
+                    textColor: textColor,
+                },
+                grid: {
+                    vertLines: { color: gridColor },
+                    horzLines: { color: gridColor },
+                },
+                rightPriceScale: {
+                    borderColor: borderColor,
+                },
+                timeScale: {
+                    borderColor: borderColor,
+                }
+            });
+        } catch (e) {
+            console.warn("Failed to apply theme options to Lightweight Chart instance", e);
+        }
+    };
+
+    applyToLightweightChart(window.activeLightweightPeerChart);
+    applyToLightweightChart(window.activeLightweightChart);
+    applyToLightweightChart(window.activeFibLightweightChart);
+
+    if (window.activeVolatilityLightweightCharts) {
+        applyToLightweightChart(window.activeVolatilityLightweightCharts.bb);
+        applyToLightweightChart(window.activeVolatilityLightweightCharts.atr);
+        applyToLightweightChart(window.activeVolatilityLightweightCharts.macd);
+        applyToLightweightChart(window.activeVolatilityLightweightCharts.vpt);
+    }
+}
+
+// Mobile Responsive Toggler
 function setupMobileMenu() {
     const toggleBtn = document.getElementById('mobile-menu-toggle');
     const sidebar = document.getElementById('sidebar');
