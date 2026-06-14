@@ -3988,7 +3988,7 @@ function drawPeerComparisonChart(dates, series, benchmarkSymbol) {
     }
 
     container.innerHTML = ''; // Clear container for TradingView Canvas
-    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+    const isDarkTheme = document.documentElement.getAttribute('data-mode') !== 'light';
     const legendEl = document.getElementById('peer-chart-legend');
 
     // 1. Create Chart
@@ -4804,7 +4804,7 @@ function drawStockChartCanvas(data) {
     }
     
     container.innerHTML = ''; // Clear container for TradingView Canvas
-    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+    const isDarkTheme = document.documentElement.getAttribute('data-mode') !== 'light';
 
     // 1. Initialize TradingView Chart
     const initialHeight = window.innerWidth <= 768 ? 250 : 380;
@@ -7590,7 +7590,7 @@ function updateAlertsAnalyticsChart(list) {
     const data = Object.values(groups);
 
     // Dynamic color palette matching our dark/light glassmorphic theme
-    const isDark = document.body.getAttribute('data-theme') !== 'light';
+    const isDark = document.documentElement.getAttribute('data-mode') !== 'light';
     const borderCol = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
     const textCol = isDark ? '#9ca3af' : '#4b5563';
 
@@ -8701,7 +8701,7 @@ function drawFibonacciChart(p) {
     }
 
     container.innerHTML = ''; // Clear container for TradingView Canvas
-    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+    const isDarkTheme = document.documentElement.getAttribute('data-mode') !== 'light';
     const hudEl = document.getElementById('fibonacci-chart-hud');
 
     const fib = p.technicals ? p.technicals.fib_levels : null;
@@ -8989,7 +8989,7 @@ function drawVolatilityMomentumMiniCharts(data) {
         }
     });
 
-    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+    const isDarkTheme = document.documentElement.getAttribute('data-mode') !== 'light';
     const hudEl = document.getElementById('volatility-chart-hud');
 
     // Containers
@@ -13083,7 +13083,7 @@ async function loadDrawdownChart(ticker, period) {
         }
 
         container.innerHTML = ''; // Clear container for TradingView Canvas
-        const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+        const isDarkTheme = document.documentElement.getAttribute('data-mode') !== 'light';
         const hudEl = document.getElementById('drawdown-chart-hud');
 
         // Create Lightweight Chart
@@ -18431,7 +18431,7 @@ async function loadSwingCandidate(symbol, timeframe = '1D') {
         const container = document.getElementById('swing-risk-chart');
         if (container && typeof LightweightCharts !== 'undefined') {
             container.innerHTML = '';
-            const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+            const isDarkTheme = document.documentElement.getAttribute('data-mode') !== 'light';
             
             const chart = LightweightCharts.createChart(container, {
                 width: container.clientWidth || 400,
@@ -18661,7 +18661,7 @@ async function runSwingBacktest() {
                 activeSwingBacktestChart.remove();
                 activeSwingBacktestChart = null;
             }
-            const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+            const isDarkTheme = document.documentElement.getAttribute('data-mode') !== 'light';
             container.style.position = 'relative';
             const chart = LightweightCharts.createChart(container, {
                 width: container.clientWidth || 300,
@@ -20467,7 +20467,7 @@ function renderRuleScannerHistoricalChart(matchesData) {
         activeRuleScannerHistoricalChart = null;
     }
 
-    const isDarkTheme = document.body.getAttribute('data-theme') !== 'light';
+    const isDarkTheme = document.documentElement.getAttribute('data-mode') !== 'light';
 
     // Create Chart
     const chart = LightweightCharts.createChart(container, {
@@ -20582,10 +20582,6 @@ function drawRSCapRiskDiagnostic(results) {
     const angleRad = (angleDegree - 180) * Math.PI / 180;
     const needleX = cx + needleLen * Math.cos(angleRad);
     const needleY = cy + needleLen * Math.sin(angleRad);
-
-    const isDark = document.body.getAttribute('data-theme') !== 'light';
-    const textColor = isDark ? '#ffffff' : '#0f172a';
-    const labelColor = isDark ? '#94a3b8' : '#64748b';
     
     let betaLabel = "Market Equivalent";
     let betaColor = "#6366f1";
@@ -20610,57 +20606,57 @@ function drawRSCapRiskDiagnostic(results) {
                         </linearGradient>
                     </defs>
                     <!-- Background Arc -->
-                    <path d="M 25,90 A 55,55 0 0,1 135,90" fill="none" stroke="${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)'}" stroke-width="12" stroke-linecap="round" />
+                    <path d="M 25,90 A 55,55 0 0,1 135,90" fill="none" stroke="var(--border-glass)" stroke-width="12" stroke-linecap="round" />
                     <!-- Colored Arc Overlay -->
                     <path d="M 25,90 A 55,55 0 0,1 135,90" fill="none" stroke="url(#rs-beta-arc-grad)" stroke-width="12" stroke-linecap="round" opacity="0.85" />
                     
                     <!-- Needle Pin -->
-                    <circle cx="${cx}" cy="${cy}" r="6" fill="${textColor}" />
+                    <circle cx="${cx}" cy="${cy}" r="6" fill="var(--text-primary)" />
                     <circle cx="${cx}" cy="${cy}" r="3" fill="${betaColor}" />
                     <!-- Needle line -->
-                    <line x1="${cx}" y1="${cy}" x2="${needleX}" y2="${needleY}" stroke="${textColor}" stroke-width="3" stroke-linecap="round" style="transition: all 0.5s ease-out;" />
+                    <line x1="${cx}" y1="${cy}" x2="${needleX}" y2="${needleY}" stroke="var(--text-primary)" stroke-width="3" stroke-linecap="round" style="transition: all 0.5s ease-out;" />
                     
                     <!-- Labels -->
-                    <text x="25" y="105" fill="${labelColor}" font-size="8" text-anchor="middle" font-weight="bold">0.0 (Def)</text>
-                    <text x="${cx}" y="20" fill="${labelColor}" font-size="8" text-anchor="middle" font-weight="bold">1.0 (Mkt)</text>
-                    <text x="135" y="105" fill="${labelColor}" font-size="8" text-anchor="middle" font-weight="bold">2.0 (Vol)</text>
+                    <text x="25" y="105" fill="var(--text-muted)" font-size="8" text-anchor="middle" font-weight="bold">0.0 (Def)</text>
+                    <text x="${cx}" y="20" fill="var(--text-muted)" font-size="8" text-anchor="middle" font-weight="bold">1.0 (Mkt)</text>
+                    <text x="135" y="105" fill="var(--text-muted)" font-size="8" text-anchor="middle" font-weight="bold">2.0 (Vol)</text>
                 </svg>
                 <div style="position: absolute; bottom: -8px; left: 0; right: 0; text-align: center; display: flex; flex-direction: column; align-items: center;">
-                    <span style="font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 800; color: ${textColor};">${avgBeta.toFixed(2)}</span>
+                    <span style="font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 800; color: var(--text-primary);">${avgBeta.toFixed(2)}</span>
                     <span style="font-size: 8px; font-weight: 700; text-transform: uppercase; color: ${betaColor}; letter-spacing: 0.05em; margin-top: 1px;">${betaLabel}</span>
                 </div>
             </div>
             
             <!-- Right side: Cap Segments -->
             <div style="width: 50%; display: flex; flex-direction: column; gap: 8px; justify-content: center; padding-right: 5px;">
-                <div style="font-size: 8px; font-weight: 700; color: ${labelColor}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Cap Allocation</div>
+                <div style="font-size: 8px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">Cap Allocation</div>
                 
                 <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: ${textColor};">
+                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-primary);">
                         <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary);"></span>Large Cap</span>
                         <strong>${largePct}%</strong>
                     </div>
-                    <div style="width: 100%; height: 5px; background: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)'}; border-radius: 3px; overflow: hidden;">
+                    <div style="width: 100%; height: 5px; background: var(--border-glass); border-radius: 3px; overflow: hidden;">
                         <div style="width: ${largePct}%; background: var(--color-primary); height: 100%; border-radius: 3px;"></div>
                     </div>
                 </div>
                 
                 <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: ${textColor};">
+                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-primary);">
                         <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #3b82f6;"></span>Mid Cap</span>
                         <strong>${midPct}%</strong>
                     </div>
-                    <div style="width: 100%; height: 5px; background: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)'}; border-radius: 3px; overflow: hidden;">
+                    <div style="width: 100%; height: 5px; background: var(--border-glass); border-radius: 3px; overflow: hidden;">
                         <div style="width: ${midPct}%; background: #3b82f6; height: 100%; border-radius: 3px;"></div>
                     </div>
                 </div>
                 
                 <div style="display: flex; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: ${textColor};">
+                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-primary);">
                         <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981;"></span>Small Cap</span>
                         <strong>${smallPct}%</strong>
                     </div>
-                    <div style="width: 100%; height: 5px; background: ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)'}; border-radius: 3px; overflow: hidden;">
+                    <div style="width: 100%; height: 5px; background: var(--border-glass); border-radius: 3px; overflow: hidden;">
                         <div style="width: ${smallPct}%; background: #10b981; height: 100%; border-radius: 3px;"></div>
                     </div>
                 </div>
@@ -20676,11 +20672,6 @@ function drawRSValuationQualityMatrix(results) {
         container.innerHTML = `<span style="font-size: 11px; color: var(--text-muted);">No candidates to map</span>`;
         return;
     }
-
-    const isDark = document.body.getAttribute('data-theme') !== 'light';
-    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
-    const axisLabelColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.5)';
-    const textColor = isDark ? '#94a3b8' : '#64748b';
 
     const width = 240;
     const height = 140;
@@ -20740,28 +20731,28 @@ function drawRSValuationQualityMatrix(results) {
     `;
 
     // Grid Matrix Frame & Dividers
-    svgContent += `<rect x="${paddingX}" y="${paddingY}" width="${drawW}" height="${drawH}" fill="transparent" stroke="${gridColor}" stroke-width="1" />`;
-    svgContent += `<line x1="${midX}" y1="${paddingY}" x2="${midX}" y2="${height - paddingY}" stroke="${gridColor}" stroke-dasharray="2,2" stroke-width="1" />`;
-    svgContent += `<line x1="${paddingX}" y1="${midY}" x2="${width - paddingX}" y2="${midY}" stroke="${gridColor}" stroke-dasharray="2,2" stroke-width="1" />`;
+    svgContent += `<rect x="${paddingX}" y="${paddingY}" width="${drawW}" height="${drawH}" fill="transparent" stroke="var(--border-glass)" stroke-width="1" />`;
+    svgContent += `<line x1="${midX}" y1="${paddingY}" x2="${midX}" y2="${height - paddingY}" stroke="var(--border-glass)" stroke-dasharray="2,2" stroke-width="1" />`;
+    svgContent += `<line x1="${paddingX}" y1="${midY}" x2="${width - paddingX}" y2="${midY}" stroke="var(--border-glass)" stroke-dasharray="2,2" stroke-width="1" />`;
 
-    // Quadrant Labels
-    svgContent += `<text x="${paddingX + 6}" y="${paddingY + 12}" fill="${isDark ? '#10b981' : '#059669'}" font-size="7" font-weight="800" opacity="0.45" letter-spacing="0.05em">GARP</text>`;
-    svgContent += `<text x="${width - paddingX - 6}" y="${paddingY + 12}" fill="${isDark ? '#3b82f6' : '#1d4ed8'}" font-size="7" font-weight="800" opacity="0.45" letter-spacing="0.05em" text-anchor="end">PREMIUM QUALITY</text>`;
-    svgContent += `<text x="${paddingX + 6}" y="${height - paddingY - 8}" fill="${isDark ? '#ef4444' : '#b91c1c'}" font-size="7" font-weight="800" opacity="0.45" letter-spacing="0.05em">VALUE TRAPS</text>`;
-    svgContent += `<text x="${width - paddingX - 6}" y="${height - paddingY - 8}" fill="${isDark ? '#f59e0b' : '#b45309'}" font-size="7" font-weight="800" opacity="0.45" letter-spacing="0.05em" text-anchor="end">SPECULATIVE</text>`;
+    // Quadrant Labels (using highly visible, saturated, standard colors)
+    svgContent += `<text x="${paddingX + 6}" y="${paddingY + 12}" fill="#10b981" font-size="7" font-weight="800" opacity="0.55" letter-spacing="0.05em">GARP</text>`;
+    svgContent += `<text x="${width - paddingX - 6}" y="${paddingY + 12}" fill="#3b82f6" font-size="7" font-weight="800" opacity="0.55" letter-spacing="0.05em" text-anchor="end">PREMIUM QUALITY</text>`;
+    svgContent += `<text x="${paddingX + 6}" y="${height - paddingY - 8}" fill="#ef4444" font-size="7" font-weight="800" opacity="0.55" letter-spacing="0.05em">VALUE TRAPS</text>`;
+    svgContent += `<text x="${width - paddingX - 6}" y="${height - paddingY - 8}" fill="#f59e0b" font-size="7" font-weight="800" opacity="0.55" letter-spacing="0.05em" text-anchor="end">SPECULATIVE</text>`;
 
     // Interactive Crosshairs Placeholder (rendered underneath dots)
     svgContent += `
-        <line id="rs-crosshair-x" x1="0" y1="0" x2="0" y2="0" stroke="rgba(255, 255, 255, 0.25)" stroke-dasharray="2,2" stroke-width="0.8" style="display: none; pointer-events: none; transition: stroke 0.2s;" />
-        <line id="rs-crosshair-y" x1="0" y1="0" x2="0" y2="0" stroke="rgba(255, 255, 255, 0.25)" stroke-dasharray="2,2" stroke-width="0.8" style="display: none; pointer-events: none; transition: stroke 0.2s;" />
+        <line id="rs-crosshair-x" x1="0" y1="0" x2="0" y2="0" stroke="var(--text-muted)" stroke-dasharray="2,2" stroke-width="0.8" style="display: none; pointer-events: none; transition: stroke 0.2s; opacity: 0.6;" />
+        <line id="rs-crosshair-y" x1="0" y1="0" x2="0" y2="0" stroke="var(--text-muted)" stroke-dasharray="2,2" stroke-width="0.8" style="display: none; pointer-events: none; transition: stroke 0.2s; opacity: 0.6;" />
         
         <g id="rs-crosshair-tag-x" style="display: none; pointer-events: none;">
-            <rect x="-14" y="0" width="28" height="9" rx="2" fill="#0b0f1d" stroke="rgba(255,255,255,0.15)" stroke-width="0.6" />
-            <text id="rs-crosshair-text-x" x="0" y="5.5" fill="#fff" font-size="5.5" font-family="monospace" font-weight="700" text-anchor="middle"></text>
+            <rect x="-14" y="0" width="28" height="9" rx="2" fill="var(--bg-glass-input)" stroke="var(--border-glass)" stroke-width="0.6" />
+            <text id="rs-crosshair-text-x" x="0" y="5.5" fill="var(--text-primary)" font-size="5.5" font-family="monospace" font-weight="700" text-anchor="middle"></text>
         </g>
         <g id="rs-crosshair-tag-y" style="display: none; pointer-events: none;">
-            <rect x="-26" y="-4.5" width="24" height="9" rx="2" fill="#0b0f1d" stroke="rgba(255,255,255,0.15)" stroke-width="0.6" />
-            <text id="rs-crosshair-text-y" x="-14" y="1.5" fill="#fff" font-size="5.5" font-family="monospace" font-weight="700" text-anchor="middle"></text>
+            <rect x="-26" y="-4.5" width="24" height="9" rx="2" fill="var(--bg-glass-input)" stroke="var(--border-glass)" stroke-width="0.6" />
+            <text id="rs-crosshair-text-y" x="-14" y="1.5" fill="var(--text-primary)" font-size="5.5" font-family="monospace" font-weight="700" text-anchor="middle"></text>
         </g>
     `;
 
@@ -20854,8 +20845,8 @@ function drawRSValuationQualityMatrix(results) {
             <div style="position: relative; width: 100%; height: 175px; display: flex; align-items: center; justify-content: center; overflow: visible;">
                 ${svgContent}
                 ${tooltipsHtml}
-                <span style="position: absolute; bottom: 0px; right: 20px; font-size: 7px; color: ${axisLabelColor}; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase;">P/E Ratio →</span>
-                <span style="position: absolute; left: 14px; bottom: 12px; font-size: 7px; color: ${axisLabelColor}; font-weight: bold; transform: rotate(-90deg); transform-origin: left bottom; letter-spacing: 0.05em; text-transform: uppercase;">ROE % →</span>
+                <span style="position: absolute; bottom: 0px; right: 20px; font-size: 7px; color: var(--text-muted); font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase;">P/E Ratio →</span>
+                <span style="position: absolute; left: 14px; bottom: 12px; font-size: 7px; color: var(--text-muted); font-weight: bold; transform: rotate(-90deg); transform-origin: left bottom; letter-spacing: 0.05em; text-transform: uppercase;">ROE % →</span>
             </div>
             <div id="rs-matrix-legend-row" style="display: flex; justify-content: center; gap: 8px; margin-top: 5px; padding-bottom: 2px; flex-wrap: wrap; width: 100%;">
                 ${legendHtml}
@@ -21039,16 +21030,12 @@ function drawRSKPIHeatmap(results) {
         .sort((a, b) => (b.score || 0) - (a.score || 0))
         .slice(0, 5);
 
-    const isDark = document.body.getAttribute('data-theme') !== 'light';
-    const textColor = isDark ? '#ffffff' : '#0f172a';
-    const borderColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
-
     let tableRows = topCandidates.map(r => {
         const symbol = (r.symbol || '').replace('.NS', '');
         
         // P/E cell
         const peVal = typeof r.pe === 'number' ? r.pe : 0;
-        let peText = 'N/A', peColor = textColor, peBg = 'transparent';
+        let peText = 'N/A', peColor = 'var(--text-primary)', peBg = 'transparent';
         if (peVal > 0) {
             peText = peVal.toFixed(1);
             if (peVal < 15) { peColor = '#10b981'; peBg = 'rgba(16, 185, 129, 0.12)'; }
@@ -21066,7 +21053,7 @@ function drawRSKPIHeatmap(results) {
 
         // ROE cell
         const roeVal = typeof r.roe === 'number' ? r.roe : 0;
-        let roeText = 'N/A', roeColor = textColor, roeBg = 'transparent';
+        let roeText = 'N/A', roeColor = 'var(--text-primary)', roeBg = 'transparent';
         if (roeVal > 0) {
             roeText = roeVal.toFixed(1) + '%';
             if (roeVal >= 20) { roeColor = '#10b981'; roeBg = 'rgba(16, 185, 129, 0.12)'; }
@@ -21083,13 +21070,13 @@ function drawRSKPIHeatmap(results) {
 
         // Score cell
         const scoreVal = typeof r.score === 'number' ? r.score : 50;
-        let scoreColor = '#94a3b8', scoreBg = 'rgba(148, 163, 184, 0.06)';
+        let scoreColor = 'var(--text-muted)', scoreBg = 'rgba(148, 163, 184, 0.06)';
         if (scoreVal >= 75) { scoreColor = '#10b981'; scoreBg = 'rgba(16, 185, 129, 0.15)'; }
         else if (scoreVal >= 60) { scoreColor = '#a855f7'; scoreBg = 'rgba(168, 85, 247, 0.1)'; }
 
         return `
-            <tr style="border-bottom: 1px solid ${borderColor};">
-                <td style="padding: 5px 6px; font-weight: bold; color: ${textColor}; font-family: 'Outfit', sans-serif; cursor: pointer;" onclick="window.loadStockAnalyzer('${r.symbol}')">${symbol}</td>
+            <tr style="border-bottom: 1px solid var(--border-glass);">
+                <td style="padding: 5px 6px; font-weight: bold; color: var(--text-primary); font-family: 'Outfit', sans-serif; cursor: pointer;" onclick="window.loadStockAnalyzer('${r.symbol}')">${symbol}</td>
                 <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: ${peColor}; background: ${peBg}; border-radius: 4px; font-family: monospace;">${peText}</td>
                 <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: ${deColor}; background: ${deBg}; border-radius: 4px; font-family: monospace;">${deVal.toFixed(2)}</td>
                 <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: ${roeColor}; background: ${roeBg}; border-radius: 4px; font-family: monospace;">${roeText}</td>

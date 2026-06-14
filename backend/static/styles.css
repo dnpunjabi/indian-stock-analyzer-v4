@@ -1697,6 +1697,10 @@ input[type="text"]:focus {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    padding: 8px 10px;
+    border-radius: 6px;
 }
 
 .slider-header {
@@ -3443,7 +3447,62 @@ input[type="range"]::-webkit-slider-thumb:hover {
         align-items: center !important;
         box-sizing: border-box !important;
     }
+
+    /* Watchlist Registry Mobile Ordering */
+    #tab-watchlist.active {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    
+    .watchlist-telemetry-grid,
+    .watchlist-grid {
+        display: contents !important;
+    }
+    
+    #watchlist-manage-card {
+        order: 1 !important;
+    }
+    
+    .watchlist-telemetry-grid > .card {
+        order: 2 !important;
+        margin-top: 10px !important;
+        margin-bottom: 10px !important;
+    }
+    
+    #watchlist-items-card {
+        order: 3 !important;
+        margin-top: 10px !important;
+    }
+
+    /* Rule Scanner Mobile Grid Stacking */
+    .rs-telemetry-grid {
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+    }
+    .rs-telemetry-grid > div {
+        grid-column: span 1 !important;
+    }
+    
+    /* Agent Strategy Audit Header and Button Wrapping */
+    #strategical-audit-card .card-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+    #strategical-audit-card .card-header > div {
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        width: 100% !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
+    }
+    #run-audit-summary-btn {
+        flex-grow: 0 !important;
+        width: auto !important;
+    }
 }
+
 
 @media (max-width: 480px) {
     .main-content {
@@ -4283,9 +4342,20 @@ input[type="range"]::-webkit-slider-thumb:hover {
     border-right: 1px solid var(--border-glass) !important;
 }
 
-[data-theme="light"] .primary-card {
+[data-theme="light"] .primary-card,
+[data-theme="light"] .sandbox-card {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(243, 244, 246, 0.85)) !important;
     border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="light"] .sandbox-outputs {
+    background-color: rgba(0, 0, 0, 0.02) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .slider-group {
+    background: rgba(0, 0, 0, 0.02) !important;
+    border-color: rgba(0, 0, 0, 0.06) !important;
 }
 
 [data-theme="light"] .stock-meta-banner {
@@ -6340,6 +6410,29 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     }
 }
 
+.audit-strategy-column {
+    background: rgba(30, 41, 59, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(12px);
+}
+
+.audit-strategy-column h4 {
+    text-align: center;
+    color: #ffffff;
+    font-family: 'Outfit', sans-serif;
+    font-size: 12.5px;
+    margin-top: 0;
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 10px;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+}
+
 /* ========================================================
    LIGHT THEME OVERRIDES FOR AGENT STRATEGY AUDIT
    ======================================================== */
@@ -7708,33 +7801,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background: rgba(168, 85, 247, 0.06) !important;
 }
 
-#rule-scanner-nl-submit,
-#alert-nl-submit {
-    transition: all 0.3s ease;
-}
-
-#rule-scanner-nl-submit:hover,
-#alert-nl-submit:hover {
-    background: linear-gradient(135deg, rgba(147, 51, 234, 0.25) 0%, rgba(79, 70, 229, 0.25) 100%) !important;
-    border-color: rgba(168, 85, 247, 0.6) !important;
-    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.1) !important;
-    transform: translateY(-1px);
-}
-
-[data-theme="light"] #rule-scanner-nl-submit,
-[data-theme="light"] #alert-nl-submit {
-    background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%) !important;
-    color: #ffffff !important;
-    border-color: #6d28d9 !important;
-}
-
-[data-theme="light"] #rule-scanner-nl-submit:hover,
-[data-theme="light"] #alert-nl-submit:hover {
-    background: linear-gradient(135deg, #6d28d9 0%, #4338ca 100%) !important;
-    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25) !important;
-    transform: translateY(-1px);
-}
-
 /* AI Scan Preset collapsible groups styling */
 .rs-preset-group {
     margin-bottom: 8px;
@@ -8116,26 +8182,6 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background: rgba(239, 68, 68, 0.1);
 }
 
-/* Execute Custom Screen Scan button overrides */
-#custom-screener-execute-btn:hover {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.22) 100%) !important;
-    border-color: rgba(16, 185, 129, 0.6) !important;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15) !important;
-    transform: translateY(-1px);
-}
-
-[data-theme="light"] #custom-screener-execute-btn {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
-    color: #ffffff !important;
-    border-color: #059669 !important;
-}
-
-[data-theme="light"] #custom-screener-execute-btn:hover {
-    background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
-    transform: translateY(-1px);
-}
-
 #rule-scanner-results-telemetry-row {
     display: none;
     grid-template-columns: 1fr 1fr;
@@ -8471,7 +8517,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     height: 6px;
     border-radius: 3px;
     background: linear-gradient(90deg, #ef4444 0%, #f59e0b 40%, #10b981 70%, #ef4444 100%);
-    margin: 28px 0 16px 0;
+    margin: 28px 12px 16px 12px;
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
 }
 [data-theme="light"] .spectrum-slider-track {
