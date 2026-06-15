@@ -21476,7 +21476,13 @@ function speakNextSegment() {
         }
     }
     
-    currentUtterance.pitch = segment.pitch;
+    // Microsoft voices on Windows (OneCore/SAPI5) fail with synthesis error if pitch is not 1.0
+    const isMicrosoftVoice = currentUtterance.voice && currentUtterance.voice.name.includes("Microsoft");
+    if (isMicrosoftVoice) {
+        currentUtterance.pitch = 1.0;
+    } else {
+        currentUtterance.pitch = segment.pitch;
+    }
     
     // Bind selected speed rate if configured
     const rateSelect = document.getElementById('audio-rate-select');
