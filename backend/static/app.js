@@ -6331,6 +6331,41 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
     const isLightMode = document.documentElement.getAttribute('data-theme') === 'light' || document.documentElement.getAttribute('data-mode') === 'light';
     const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
     const textColor = isLightMode ? '#374151' : '#d1d5db';
+    const ctx = canvas.getContext('2d');
+
+    // Define color palette for companies
+    const colors = [
+        { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.08)' },
+        { border: '#10b981', bg: 'rgba(16, 185, 129, 0.08)' },
+        { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.08)' },
+        { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.08)' },
+        { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.08)' }
+    ];
+
+    // Helper to convert hex to rgb
+    function hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : null;
+    }
+
+    // Helper to create radial gradient for fill
+    function createDatasetGradient(borderColor, opacity1 = 0.15, opacity2 = 0.02) {
+        const width = canvas.width || 300;
+        const height = canvas.height || 300;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const radius = Math.min(width, height) / 2;
+        
+        try {
+            const grad = ctx.createRadialGradient(centerX, centerY, 10, centerX, centerY, radius || 150);
+            const rgb = hexToRgb(borderColor) || '59, 130, 246';
+            grad.addColorStop(0, `rgba(${rgb}, ${opacity1})`);
+            grad.addColorStop(1, `rgba(${rgb}, ${opacity2})`);
+            return grad;
+        } catch (e) {
+            return borderColor + '10'; // Safe fallback string
+        }
+    }
 
     let chartLabels = [];
     if (selectedMetric === 'all') {
@@ -6347,17 +6382,8 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
         chartLabels = ['Valuation', 'Quality', 'Growth', 'Momentum', 'Financial Health'];
     }
 
-    const colors = [
-        { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.10)' },
-        { border: '#10b981', bg: 'rgba(16, 185, 129, 0.10)' },
-        { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.10)' },
-        { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.10)' },
-        { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.10)' }
-    ];
-
-    const chartDatasets = matrix.map((item, idx) => {
-        const color = colors[idx % colors.length];
-        
+    // Pre-calculate company scores
+    const companyScores = matrix.map(item => {
         const peVal = typeof item.pe === 'number' ? item.pe : 30;
         const peScore = Math.max(0, Math.min(100, (100 - peVal * 1.5)));
         
@@ -6376,63 +6402,113 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
         const scoreVal = typeof item.score === 'number' ? item.score : 50;
         const rsiVal = typeof item.rsi === 'number' ? item.rsi : 50;
 
+        let trendVal = 50;
+        const trendStr = (item.trend || '').toLowerCase();
+        if (trendStr.includes('bullish') || trendStr.includes('bull')) trendVal = 90;
+        else if (trendStr.includes('bearish') || trendStr.includes('bear')) trendVal = 20;
+
+        let valRatingScore = 60;
+        const valRatingStr = (item.valuation_rating || '').toLowerCase();
+        if (valRatingStr.includes('under')) valRatingScore = 100;
+        else if (valRatingStr.includes('over')) valRatingScore = 20;
+
+        const peRaw = typeof item.pe === 'number' ? item.pe.toFixed(1) : 'N/A';
+        const roeRaw = typeof item.roe === 'number' ? item.roe.toFixed(1) + '%' : 'N/A';
+        const roceRaw = typeof item.roce === 'number' ? item.roce.toFixed(1) + '%' : 'N/A';
+        const deRaw = typeof item.debt_eq === 'number' ? item.debt_eq.toFixed(2) : 'N/A';
+        const mosRaw = typeof item.margin_of_safety === 'number' ? item.margin_of_safety.toFixed(1) + '%' : 'N/A';
+        const rsiRaw = typeof item.rsi === 'number' ? item.rsi.toFixed(1) : 'N/A';
+
+        // Pack values into mapped dictionary matching label index keys
         let dataValues = [];
         if (selectedMetric === 'all') {
-            // Moneycontrol 5-Pillar Score computation
-            const valScore = Math.round(peScore * 0.5 + mosScore * 0.5);
-            const qualScore = Math.round(roceScore * 0.5 + roeScore * 0.5);
-            const growthScore = Math.round(scoreVal * 0.85 + roeScore * 0.15);
-            
-            let trendVal = 50;
-            const trendStr = (item.trend || '').toLowerCase();
-            if (trendStr.includes('bullish') || trendStr.includes('bull')) trendVal = 90;
-            else if (trendStr.includes('bearish') || trendStr.includes('bear')) trendVal = 20;
-            const momScore = Math.round(rsiVal * 0.4 + trendVal * 0.6);
-            
-            const finScore = Math.round(deScore * 0.6 + mosScore * 0.4);
-
-            dataValues = [valScore, qualScore, growthScore, momScore, finScore];
+            dataValues = [
+                Math.round(peScore * 0.5 + mosScore * 0.5), // Valuation
+                Math.round(roceScore * 0.5 + roeScore * 0.5), // Quality
+                Math.round(scoreVal * 0.85 + roeScore * 0.15), // Growth
+                Math.round(rsiVal * 0.4 + trendVal * 0.6), // Momentum
+                Math.round(deScore * 0.6 + mosScore * 0.4) // Financial Health
+            ];
         } else if (selectedMetric === 'valuation') {
-            let valRatingScore = 60;
-            const valRatingStr = (item.valuation_rating || '').toLowerCase();
-            if (valRatingStr.includes('under')) valRatingScore = 100;
-            else if (valRatingStr.includes('over')) valRatingScore = 20;
-
             dataValues = [peScore, mosScore, valRatingScore, scoreVal];
         } else if (selectedMetric === 'quality') {
-            const capEff = (roceScore + roeScore) / 2;
-            dataValues = [roceScore, roeScore, capEff, scoreVal];
+            dataValues = [roceScore, roeScore, Math.round((roceScore + roeScore) / 2), scoreVal];
         } else if (selectedMetric === 'solvency') {
-            const finCushion = (deScore + mosScore) / 2;
-            dataValues = [deScore, mosScore, finCushion, scoreVal];
+            dataValues = [deScore, mosScore, Math.round((deScore + mosScore) / 2), scoreVal];
         } else if (selectedMetric === 'momentum') {
-            let trendScore = 60;
-            const trendStr = (item.trend || '').toLowerCase();
-            if (trendStr.includes('bullish') || trendStr.includes('bull')) trendScore = 100;
-            else if (trendStr.includes('bearish') || trendStr.includes('bear')) trendScore = 20;
-
-            dataValues = [rsiVal, trendScore, trendScore, scoreVal];
+            dataValues = [rsiVal, trendVal, trendVal, scoreVal];
         } else {
             dataValues = [peScore, roceScore, roeScore, deScore, mosScore];
         }
 
         return {
-            label: item.company_name,
-            data: dataValues,
+            companyName: item.company_name,
+            ticker: item.ticker.replace('.NS', '').replace('.BO', ''),
+            scores: dataValues,
+            raw: { pe: peRaw, roe: roeRaw, roce: roceRaw, de: deRaw, mos: mosRaw, rsi: rsiRaw, trend: item.trend, valRating: item.valuation_rating }
+        };
+    });
+
+    // Compute Sector Average
+    const numAxes = chartLabels.length;
+    const sectorAverages = [];
+    for (let i = 0; i < numAxes; i++) {
+        let sum = 0;
+        companyScores.forEach(c => {
+            sum += c.scores[i] || 0;
+        });
+        sectorAverages.push(Math.round(sum / companyScores.length));
+    }
+
+    // Build the chart datasets
+    const chartDatasets = companyScores.map((c, idx) => {
+        const color = colors[idx % colors.length];
+        return {
+            label: c.ticker,
+            data: c.scores,
             borderColor: color.border,
-            backgroundColor: color.bg,
-            borderWidth: 2,
+            backgroundColor: createDatasetGradient(color.border, 0.15, 0.02),
+            borderWidth: 2.5,
             pointRadius: 4,
             pointBackgroundColor: color.border,
             pointBorderColor: '#fff',
-            pointHoverRadius: 6
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: color.border,
+            pointHoverBorderColor: '#fff',
+            tension: 0.35, // Smooth organic loops!
+            companyName: c.companyName,
+            rawMetrics: c.raw
         };
+    });
+
+    // Add Sector Average as a dashed reference line
+    chartDatasets.push({
+        label: 'Sector Average',
+        data: sectorAverages,
+        borderColor: '#9ca3af',
+        backgroundColor: 'rgba(156, 163, 175, 0.02)',
+        borderWidth: 1.5,
+        borderDash: [5, 5], // Dashed reference line
+        pointRadius: 3,
+        pointBackgroundColor: '#9ca3af',
+        pointBorderColor: '#fff',
+        pointHoverRadius: 5,
+        tension: 0.35,
+        companyName: 'Sector Average',
+        rawMetrics: null
     });
 
     const chartScales = {
         r: {
-            angleLines: { color: gridColor },
-            grid: { color: gridColor },
+            grid: {
+                circular: true, // Enterprise-standard circular radar grids!
+                color: gridColor,
+                lineWidth: 1
+            },
+            angleLines: {
+                display: true,
+                color: gridColor
+            },
             pointLabels: {
                 color: textColor,
                 font: { family: "'Outfit', sans-serif", size: 10, weight: '700' }
@@ -6458,6 +6534,11 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+                duration: 1500,
+                easing: 'easeOutElastic' // Organic bounce animation on load
+            },
+            // Interactive legend highlights
             plugins: {
                 legend: {
                     display: true,
@@ -6466,62 +6547,79 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
                         color: textColor,
                         font: {
                             family: "'Outfit', sans-serif",
-                            size: 10
+                            size: 10,
+                            weight: '600'
                         },
-                        boxWidth: 10
+                        boxWidth: 12,
+                        padding: 15
                     }
                 },
                 tooltip: {
                     callbacks: {
                         title: function(context) {
-                            return context[0].dataset.label;
+                            const dataset = context[0].dataset;
+                            return dataset.label; // Company Ticker
                         },
                         label: function(context) {
-                            const companyName = context.dataset.label;
-                            const item = matrix.find(x => x.company_name === companyName);
-                            if (!item) return `${context.label}: ${context.raw.toFixed(1)}`;
-
-                            const index = context.dataIndex;
-                            const label = context.chart.data.labels[index];
+                            const dataset = context.dataset;
                             const score = context.raw;
+                            const label = context.label; // Axis label
 
-                            const pe = typeof item.pe === 'number' ? item.pe.toFixed(1) : 'N/A';
-                            const roe = typeof item.roe === 'number' ? item.roe.toFixed(1) + '%' : 'N/A';
-                            const roce = typeof item.roce === 'number' ? item.roce.toFixed(1) + '%' : 'N/A';
-                            const de = typeof item.debt_eq === 'number' ? item.debt_eq.toFixed(2) : 'N/A';
-                            const mos = typeof item.margin_of_safety === 'number' ? item.margin_of_safety.toFixed(1) + '%' : 'N/A';
-                            const rsi = typeof item.rsi === 'number' ? item.rsi.toFixed(1) : 'N/A';
-
-                            if (selectedMetric === 'all') {
-                                if (index === 0) return `Valuation Score: ${score.toFixed(0)}/100 (P/E: ${pe}, MoS: ${mos})`;
-                                if (index === 1) return `Quality Score: ${score.toFixed(0)}/100 (ROCE: ${roce})`;
-                                if (index === 2) return `Growth Score: ${score.toFixed(0)}/100 (ROE: ${roe})`;
-                                if (index === 3) return `Momentum Score: ${score.toFixed(0)}/100 (RSI: ${rsi})`;
-                                if (index === 4) return `Financial Health Score: ${score.toFixed(0)}/100 (D/E: ${de})`;
-                            } else if (selectedMetric === 'valuation') {
-                                if (index === 0) return `P/E Multiple Score: ${score.toFixed(0)}/100 (P/E: ${pe})`;
-                                if (index === 1) return `Intrinsic Discount Score: ${score.toFixed(0)}/100 (MoS: ${mos})`;
-                                if (index === 2) return `Valuation Rating: ${score.toFixed(0)}/100 (${item.valuation_rating || 'N/A'})`;
-                                if (index === 3) return `AI Advisory Score: ${score.toFixed(0)}/100`;
-                            } else if (selectedMetric === 'quality') {
-                                if (index === 0) return `ROCE Strength: ${score.toFixed(0)}/100 (ROCE: ${roce})`;
-                                if (index === 1) return `ROE Strength: ${score.toFixed(0)}/100 (ROE: ${roe})`;
-                                if (index === 2) return `Capital Efficiency Score: ${score.toFixed(0)}/100`;
-                                if (index === 3) return `AI Advisory Score: ${score.toFixed(0)}/100`;
-                            } else if (selectedMetric === 'solvency') {
-                                if (index === 0) return `Solvency (D/E) Score: ${score.toFixed(0)}/100 (D/E: ${de})`;
-                                if (index === 1) return `Margin of Safety Score: ${score.toFixed(0)}/100 (MoS: ${mos})`;
-                                if (index === 2) return `Solvency Strength: ${score.toFixed(0)}/100`;
-                                if (index === 3) return `AI Advisory Score: ${score.toFixed(0)}/100`;
-                            } else if (selectedMetric === 'momentum') {
-                                if (index === 0) return `RSI-14 Momentum: ${score.toFixed(0)}/100 (RSI: ${rsi})`;
-                                if (index === 1) return `Trend Alignment: ${score.toFixed(0)}/100 (Trend: ${item.trend || 'N/A'})`;
-                                if (index === 2) return `Momentum Strength: ${score.toFixed(0)}/100`;
-                                if (index === 3) return `AI Advisory Score: ${score.toFixed(0)}/100`;
+                            if (dataset.label === 'Sector Average') {
+                                return `Sector Avg - ${label}: ${score.toFixed(0)}/100`;
                             }
-                            return `${label}: ${score.toFixed(1)}`;
+
+                            const raw = dataset.rawMetrics;
+                            if (!raw) return `${label}: ${score.toFixed(0)}/100`;
+
+                            if (label === 'Valuation' || label === 'P/E Multiple Score') {
+                                return `${label}: ${score.toFixed(0)}/100 (P/E: ${raw.pe}, MoS: ${raw.mos})`;
+                            }
+                            if (label === 'Quality' || label === 'ROCE Strength' || label === 'ROE Strength' || label === 'Capital Efficiency') {
+                                return `${label}: ${score.toFixed(0)}/100 (ROE: ${raw.roe}, ROCE: ${raw.roce})`;
+                            }
+                            if (label === 'Momentum' || label === 'RSI-14 Momentum' || label === 'Trend Alignment') {
+                                return `${label}: ${score.toFixed(0)}/100 (RSI: ${raw.rsi}, Trend: ${raw.trend || 'N/A'})`;
+                            }
+                            if (label === 'Financial Health' || label === 'Solvency (D/E)' || label === 'Financial Cushion') {
+                                return `${label}: ${score.toFixed(0)}/100 (D/E: ${raw.de}, MoS: ${raw.mos})`;
+                            }
+                            if (label === 'AI Advisory Score') {
+                                return `AI Score: ${score.toFixed(0)}/100`;
+                            }
+
+                            return `${label}: ${score.toFixed(0)}/100`;
                         }
                     }
+                }
+            },
+            // Interactive hover highlight effect
+            onHover: (event, chartElements) => {
+                if (!activeCompareRadarChart) return;
+                const activeIndex = chartElements.length > 0 ? chartElements[0].datasetIndex : -1;
+                
+                let changed = false;
+                activeCompareRadarChart.data.datasets.forEach((dataset, idx) => {
+                    // Skip sector average modification to keep it clean as a reference
+                    if (dataset.label === 'Sector Average') return;
+
+                    const originalColor = colors[idx % colors.length];
+                    const targetBorderColor = activeIndex === -1 || idx === activeIndex 
+                        ? originalColor.border 
+                        : `${originalColor.border}22`; // Dim non-hovered borders
+                    const targetBgColor = activeIndex === -1 || idx === activeIndex 
+                        ? createDatasetGradient(originalColor.border, 0.15, 0.02)
+                        : 'rgba(0, 0, 0, 0)'; // Dim non-hovered fills
+                    
+                    if (dataset.borderColor !== targetBorderColor) {
+                        dataset.borderColor = targetBorderColor;
+                        dataset.backgroundColor = targetBgColor;
+                        changed = true;
+                    }
+                });
+                
+                if (changed) {
+                    activeCompareRadarChart.update('none'); // Update responsively without animation lag
                 }
             },
             scales: chartScales
