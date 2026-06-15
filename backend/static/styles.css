@@ -9941,3 +9941,20 @@ tr.active-peer-row td:first-child {
 .metric-tooltip-trigger:hover::after {
     display: block;
 }
+
+/* Responsive Styles for SWOT and Price Performance */
+@media (max-width: 900px) {
+    .perf-row-container {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+    .swot-grid-2x2 {
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .perf-row-container {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}

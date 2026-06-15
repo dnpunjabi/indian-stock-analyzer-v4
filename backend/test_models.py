@@ -1748,6 +1748,86 @@ class TestRuleScannerAPI(unittest.TestCase):
         self.assertEqual(data["matched"], 1)
         self.assertEqual(data["results"][0]["symbol"], "INFY.NS")
 
+    def test_generate_swot_analysis_and_price_performance(self):
+        """Verifies swot rules engine and calculate_price_performance run correctly."""
+        from backend.financial_utils import generate_swot_analysis, calculate_price_performance
+        
+        # Test SWOT with mock inputs
+        screener_data = {
+            "ratios": {
+                "Stock P/E": 12.0,
+                "ROE": 22.0,
+                "ROCE": 25.0,
+                "Debt to Equity": 0.0
+            },
+            "shareholding": {
+                "Promoter": 65.0,
+                "Promoter_prev": 64.0,
+                "FIIs": 12.0,
+                "FIIs_prev": 13.0,
+                "Promoter Pledging %": 0.0
+            },
+            "quarterly_results": {
+                "sales": [100, 110, 120, 130],
+                "net_profit": [10, 12, 14, 16],
+                "eps": [1.0, 1.2, 1.4, 1.6],
+                "opm": [10.0, 11.0, 11.5, 12.0]
+            }
+        }
+        technicals = {
+            "current_price": 100.0,
+            "high_52w": 102.0,
+            "low_52w": 50.0,
+            "dist_high_52w_pct": 2.0,
+            "dist_low_52w_pct": 100.0,
+            "volume_vs_avg20": 1.8,
+            "rsi": 55.0,
+            "sma_200": 80.0,
+            "sma_50": 95.0,
+            "ema_20": 98.0
+        }
+        dcf_data = {
+            "margin_of_safety": 25.0
+        }
+        performance = {
+            "1W": 5.0,
+            "1M": 18.0,
+            "3M": 40.0,
+            "YTD": 35.0,
+            "1Y": 110.0,
+            "3Y": 250.0
+        }
+        
+        swot = generate_swot_analysis("INFY.NS", screener_data, technicals, dcf_data, performance)
+        self.assertIn("Promoter Increasing Holding QoQ", swot["strengths"])
+        self.assertIn("Company with No Debt (Debt-Free)", swot["strengths"])
+        self.assertIn("Company with Zero Promoter Pledge", swot["strengths"])
+        self.assertIn("Increasing Revenue every Quarter for the past 4 Quarters", swot["strengths"])
+        self.assertIn("Increasing profits every quarter for the past 4 quarters", swot["strengths"])
+        self.assertIn("Quarterly EPS Improving for last 3 Quarters", swot["strengths"])
+        self.assertIn("Growth in operating margins (OPM% QoQ)", swot["strengths"])
+        self.assertIn("Growth in Net Profit with increasing Profit Margin (QoQ)", swot["strengths"])
+        self.assertIn("Strong QoQ Net Profit Growth in recent result", swot["strengths"])
+        self.assertIn("Multi-Year Wealth Creator (+250.0% Return over 3 Years)", swot["strengths"])
+        
+        self.assertIn("FII/FPI decreased their shareholding last quarter", swot["weaknesses"])
+        
+        self.assertIn("Highest Recovery from 52 Week Low (+100.0%)", swot["opportunities"])
+        self.assertIn("Buying with Strong Volumes (1.8x of 20D average)", swot["opportunities"])
+        self.assertIn("Trading Above 200 DMA (Long-term Bullish)", swot["opportunities"])
+
+        # Test calculate_price_performance with mock yfinance stock
+        import pandas as pd
+        mock_stock = MagicMock()
+        idx = pd.date_range(end="2026-06-15", periods=50, freq="7D")
+        closes = [100.0 + i * 2.0 for i in range(50)]
+        mock_stock.history.return_value = pd.DataFrame({"Close": closes}, index=idx)
+        
+        perf_res = calculate_price_performance(mock_stock)
+        self.assertIn("1W", perf_res)
+        self.assertIn("1Y", perf_res)
+        self.assertIn("3Y", perf_res)
+
 
 if __name__ == "__main__":
     unittest.main()

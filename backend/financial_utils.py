@@ -554,6 +554,11 @@ def fetch_screener_data(symbol: str) -> dict:
                         if len(cells) > 1:
                             latest_val = cells[-1].text.strip()
                             result["shareholding"][clean_key] = clean_scraped_number(latest_val)
+                            if len(cells) > 2:
+                                prev_val = cells[-2].text.strip()
+                                result["shareholding"][clean_key + "_prev"] = clean_scraped_number(prev_val)
+                            else:
+                                result["shareholding"][clean_key + "_prev"] = clean_scraped_number(latest_val)
                             
         # Pledging check
         pledged = 0.0
@@ -562,6 +567,33 @@ def fetch_screener_data(symbol: str) -> dict:
                 pledged = v
                 break
         result["shareholding"]["Promoter Pledging %"] = pledged
+
+        # 4. Scrape Quarterly Results (table inside section#quarters)
+        result["quarterly_results"] = {
+            "sales": [],
+            "net_profit": [],
+            "eps": [],
+            "opm": []
+        }
+        quarters_section = soup.select_one("section#quarters") or soup.select_one("#quarters")
+        if quarters_section:
+            q_table = quarters_section.select_one("table")
+            if q_table:
+                q_rows = q_table.select("tbody tr") or q_table.find_all("tr")
+                for q_row in q_rows:
+                    q_cells = q_row.select("td")
+                    if q_cells:
+                        row_title = q_cells[0].text.strip().lower()
+                        values = [clean_scraped_number(c.text) for c in q_cells[1:]]
+                        
+                        if "sales" in row_title or "revenue" in row_title:
+                            result["quarterly_results"]["sales"] = values
+                        elif "net profit" in row_title or "net income" in row_title:
+                            result["quarterly_results"]["net_profit"] = values
+                        elif "eps" in row_title or "earnings per share" in row_title:
+                            result["quarterly_results"]["eps"] = values
+                        elif "opm" in row_title or "operating profit margin" in row_title:
+                            result["quarterly_results"]["opm"] = values
         
     except Exception as e:
         print(f"Error scraping Screener.in: {e}")
@@ -1837,6 +1869,233 @@ def get_complete_financial_profile(ticker_query: str, bypass_db_cache: bool = Fa
             
     return result
 
+def calculate_price_performance(stock_obj) -> dict:
+    perf = {"1W": 0.0, "1M": 0.0, "3M": 0.0, "YTD": 0.0, "1Y": 0.0, "3Y": 0.0}
+    try:
+        df = stock_obj.history(period="3y")
+        if df.empty or "Close" not in df.columns or len(df) < 2:
+            return perf
+        df = df.dropna(subset=["Close"])
+        if len(df) < 2:
+            return perf
+            
+        current_price = float(df["Close"].iloc[-1])
+        dates = df.index
+        latest_date = dates[-1]
+        
+        def get_return(target_date):
+            time_diffs = abs(dates - target_date)
+            closest_idx = time_diffs.argmin()
+            price_past = float(df["Close"].iloc[closest_idx])
+            if price_past > 0:
+                return ((current_price - price_past) / price_past) * 100.0
+            return 0.0
+            
+        from datetime import timedelta
+        import pandas as pd
+        
+        perf["1W"] = get_return(latest_date - timedelta(days=7))
+        perf["1M"] = get_return(latest_date - timedelta(days=30))
+        perf["3M"] = get_return(latest_date - timedelta(days=90))
+        
+        current_year = latest_date.year
+        target_ytd = pd.Timestamp(year=current_year - 1, month=12, day=31, tz=latest_date.tz)
+        perf["YTD"] = get_return(target_ytd)
+        
+        perf["1Y"] = get_return(latest_date - timedelta(days=365))
+        perf["3Y"] = get_return(latest_date - timedelta(days=1095))
+        
+    except Exception as e:
+        print(f"Error calculating price performance for stock: {e}")
+    return perf
+
+def generate_swot_analysis(ticker: str, screener_data: dict, technicals: dict, dcf_data: dict, performance: dict) -> dict:
+    strengths = []
+    weaknesses = []
+    opportunities = []
+    threats = []
+    
+    # 1. Ratios and metrics extraction
+    ratios = screener_data.get("ratios", {})
+    shareholding = screener_data.get("shareholding", {})
+    q_results = screener_data.get("quarterly_results", {})
+    
+    pe_ratio = ratios.get("Stock P/E") or ratios.get("PE") or ratios.get("P/E") or ratios.get("P/E Ratio") or technicals.get("current_price", 100) / 25.0
+    roe = ratios.get("ROE") or ratios.get("Return on Equity") or 15.0
+    roce = ratios.get("ROCE") or ratios.get("Return on Capital Employed") or 15.0
+    debt_eq = ratios.get("Debt to Equity") or ratios.get("Debt/Equity") or 0.0
+    mos = dcf_data.get("margin_of_safety", 0.0) if dcf_data else 0.0
+    current_price = technicals.get("current_price", 100.0)
+    high_52w = technicals.get("high_52w", 100.0)
+    low_52w = technicals.get("low_52w", 100.0)
+    dist_high_52w_pct = technicals.get("dist_high_52w_pct", 10.0)
+    dist_low_52w_pct = technicals.get("dist_low_52w_pct", 10.0)
+    vol_ratio = technicals.get("volume_vs_avg20", 1.0)
+    rsi = technicals.get("rsi", 50.0)
+    
+    # promoter pledges
+    pledge = shareholding.get("Promoter Pledging %", 0.0)
+    
+    # ------------------ STRENGTHS ------------------
+    # Promoter holding increasing
+    if shareholding.get("Promoter", 0) > shareholding.get("Promoter_prev", 0):
+        strengths.append("Promoter Increasing Holding QoQ")
+        
+    # Near 52-week high
+    if dist_high_52w_pct <= 5.0:
+        strengths.append("Trading Near 52-Week High")
+        
+    # Debt-free company
+    if debt_eq == 0:
+        strengths.append("Company with No Debt (Debt-Free)")
+    elif debt_eq <= 0.2:
+        strengths.append(f"Highly Conservative Leverage (D/E: {debt_eq:.2f}x)")
+        
+    # Zero Promoter pledge
+    if pledge == 0:
+        strengths.append("Company with Zero Promoter Pledge")
+        
+    # Quarterly EPS/Profit/Revenue increasing trends
+    sales = q_results.get("sales", [])
+    if len(sales) >= 4 and all(sales[i] > sales[i-1] for i in range(len(sales)-3, len(sales))):
+        strengths.append("Increasing Revenue every Quarter for the past 4 Quarters")
+        
+    profits = q_results.get("net_profit", [])
+    if len(profits) >= 4 and all(profits[i] > profits[i-1] for i in range(len(profits)-3, len(profits))):
+        strengths.append("Increasing profits every quarter for the past 4 quarters")
+        
+    eps = q_results.get("eps", [])
+    if len(eps) >= 3 and all(eps[i] > eps[i-1] for i in range(len(eps)-2, len(eps))):
+        strengths.append("Quarterly EPS Improving for last 3 Quarters")
+        
+    # Growth in operating margins
+    opm = q_results.get("opm", [])
+    if len(opm) >= 2 and opm[-1] > opm[-2]:
+        strengths.append("Growth in operating margins (OPM% QoQ)")
+
+    # Growth in Net Profit with increasing Profit Margin (QoQ)
+    if len(profits) >= 2 and profits[-1] > profits[-2] and len(opm) >= 2 and opm[-1] > opm[-2]:
+        strengths.append("Growth in Net Profit with increasing Profit Margin (QoQ)")
+
+    # Strong QoQ Net Profit Growth in recent result
+    if len(profits) >= 2 and profits[-2] > 0 and (profits[-1] - profits[-2]) / profits[-2] >= 0.1:
+        strengths.append("Strong QoQ Net Profit Growth in recent result")
+        
+    # Return metrics strength
+    if roe > 18.0:
+        strengths.append(f"High Return on Equity (ROE: {roe:.1f}%)")
+    if roce > 20.0:
+        strengths.append(f"High Return on Capital Employed (ROCE: {roce:.1f}%)")
+
+    # Performance strengths
+    if performance:
+        y3_ret = performance.get("3Y", 0.0)
+        y1_ret = performance.get("1Y", 0.0)
+        m1_ret = performance.get("1M", 0.0)
+        if y3_ret > 75.0:
+            strengths.append(f"Multi-Year Wealth Creator (+{y3_ret:.1f}% Return over 3 Years)")
+        if y1_ret > 50.0:
+            strengths.append(f"Strong 1-Year Price Performance (+{y1_ret:.1f}% Price Return)")
+        if m1_ret > 15.0:
+            strengths.append(f"Strong Short-Term Momentum (+{m1_ret:.1f}% Price Return in 1 Month)")
+            
+    # If strengths are empty, add fallback
+    if not strengths:
+        strengths.append("Stable fundamental base and business model.")
+
+    # ------------------ WEAKNESSES ------------------
+    # FII/FPI decreasing shareholding
+    if shareholding.get("FIIs", 0) < shareholding.get("FIIs_prev", 0):
+        weaknesses.append("FII/FPI decreased their shareholding last quarter")
+        
+    # High debt levels
+    if debt_eq > 1.2:
+        weaknesses.append(f"Elevated Leverage Structure (Debt to Equity: {debt_eq:.2f}x)")
+        
+    # Deteriorating quarterly sales or profits
+    if len(sales) >= 2 and sales[-1] < sales[-2]:
+        weaknesses.append("Decline in Net Sales / Revenue (QoQ)")
+    if len(profits) >= 2 and profits[-1] < profits[-2]:
+        weaknesses.append("Decline in Quarterly Net Profits (QoQ)")
+        
+    # Promoter pledge high
+    if pledge > 10.0:
+        weaknesses.append(f"Promoter pledged shares are significant ({pledge:.1f}%)")
+
+    # Performance weaknesses
+    if performance:
+        y1_ret = performance.get("1Y", 0.0)
+        m3_ret = performance.get("3M", 0.0)
+        if y1_ret < -20.0:
+            weaknesses.append(f"Significant 1-Year Price Decline ({y1_ret:.1f}%)")
+        if m3_ret < -12.0:
+            weaknesses.append(f"Medium-Term Underperformance ({m3_ret:.1f}% over 3 Months)")
+
+    # If weaknesses is empty, add a default fallback so it doesn't look blank
+    if not weaknesses:
+        weaknesses.append("No material operational weaknesses flagged in recent audits.")
+
+    # ------------------ OPPORTUNITIES ------------------
+    # Recovery from 52 week low
+    if dist_low_52w_pct >= 50.0:
+        opportunities.append(f"Highest Recovery from 52 Week Low (+{dist_low_52w_pct:.1f}%)")
+        
+    # PE metrics
+    if pe_ratio <= 15.0 and pe_ratio > 0:
+        opportunities.append(f"Stock with Low PE (PE <= 15: current PE {pe_ratio:.1f})")
+        
+    # Volume spikes
+    if vol_ratio > 1.5:
+        opportunities.append(f"Buying with Strong Volumes ({vol_ratio:.1f}x of 20D average)")
+        
+    # Technical DMA indicators
+    sma_50 = technicals.get("sma_50", current_price)
+    sma_200 = technicals.get("sma_200", current_price)
+    ema_20 = technicals.get("ema_20", current_price)
+    
+    if current_price > sma_200:
+        opportunities.append("Trading Above 200 DMA (Long-term Bullish)")
+    if current_price > sma_50:
+        opportunities.append("Trading Above 50 DMA")
+    if current_price > ema_20:
+        opportunities.append("Trading Above 20 DMA")
+        
+    # Turnaround QoQ
+    if len(profits) >= 2 and profits[-2] <= 0 and profits[-1] > 0:
+        opportunities.append("Turnaround company - loss to profit QoQ")
+
+    # If opportunities is empty, fallback
+    if not opportunities:
+        opportunities.append("Monitor sector consolidation for breakout entry opportunities.")
+
+    # ------------------ THREATS ------------------
+    # High PE stocks
+    if pe_ratio >= 40.0:
+        threats.append(f"Stock with high PE valuation premium (PE > 40: current PE {pe_ratio:.1f})")
+        
+    # Trading below key DMA
+    if current_price < ema_20:
+        threats.append("Trading Below 20 DMA")
+    if current_price < sma_50:
+        threats.append("Trading Below 50 DMA")
+        
+    # Bearish indicator status
+    if rsi >= 75.0:
+        threats.append("Extremely Overbought RSI - potential correction threat")
+    elif rsi <= 30.0:
+        threats.append("Strong Bearish Signal (Oversold momentum)")
+
+    # If threats is empty
+    if not threats:
+        threats.append("No Threat for this stock")
+        
+    return {
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "opportunities": opportunities,
+        "threats": threats
+    }
+
 def _build_financial_profile(ticker_query: str) -> dict:
     """Internal: builds the full financial profile (uncached)."""
     resolution = resolve_company_ticker(ticker_query)
@@ -2302,6 +2561,8 @@ def _build_financial_profile(ticker_query: str) -> dict:
     else:
         pricing_power_proxy = "Low (Commoditized)"
 
+    performance_metrics = calculate_price_performance(stock)
+
     unified_profile = {
         "ticker": yf_ticker,
         "base_symbol": base_symbol,
@@ -2346,9 +2607,13 @@ def _build_financial_profile(ticker_query: str) -> dict:
         "earnings_quality": calculate_earnings_quality_scores(stock),
         "capm_risk_nifty50": risk_nifty50,
         "capm_risk_sector": risk_sector,
-        "drawdown_metrics": drawdown
+        "drawdown_metrics": drawdown,
+        "swot_performance": {
+            "performance": performance_metrics,
+            "swot": generate_swot_analysis(yf_ticker, screener_data, tech, dcf, performance_metrics)
+        }
     }
-    
+
     scoring_result = calculate_composite_score(unified_profile)
     unified_profile["score_metrics"] = scoring_result
     

@@ -3709,10 +3709,131 @@ function renderStockDashboard(p) {
     // Render the new AI Strategical Audit & Gate Diagnostics Matrix
     renderStrategyAuditMatrix(p.ticker);
 
+    // Render SWOT & Price Performance
+    renderSWOTAndPerformance(p);
+
     // Render CAPM Risk Analytics (Alpha & Beta)
     if (window.loadRiskFactorsData) {
         window.loadRiskFactorsData(p.ticker);
     }
+}
+
+function renderSWOTAndPerformance(p) {
+    if (!p || !p.swot_performance) return;
+    
+    const data = p.swot_performance;
+    const perf = data.performance || {};
+    const swot = data.swot || {};
+    
+    // 1. Render Price Performance
+    const periods = ['1w', '1m', '3m', 'ytd', '1y', '3y'];
+    periods.forEach(per => {
+        const key = per.toUpperCase();
+        const val = perf[key] || 0.0;
+        const valEl = document.getElementById(`perf-val-${per}`);
+        const barEl = document.getElementById(`perf-bar-${per}`);
+        
+        if (valEl) {
+            const sign = val >= 0 ? '+' : '';
+            valEl.innerText = `${sign}${val.toFixed(2)}%`;
+            valEl.style.color = val >= 0 ? '#10b981' : '#ef4444';
+        }
+        
+        if (barEl) {
+            const limitVal = Math.min(Math.abs(val), 100.0);
+            const halfWidth = limitVal / 2.0; // scale 0-100% to 0-50% width
+            
+            if (val >= 0) {
+                barEl.style.left = '50%';
+                barEl.style.width = `${halfWidth}%`;
+                barEl.style.backgroundColor = '#10b981';
+            } else {
+                barEl.style.left = `${50.0 - halfWidth}%`;
+                barEl.style.width = `${halfWidth}%`;
+                barEl.style.backgroundColor = '#ef4444';
+            }
+        }
+    });
+    
+    // 2. Render SWOT Quadrants
+    const quadrants = ['strengths', 'weaknesses', 'opportunities', 'threats'];
+    quadrants.forEach(quad => {
+        const items = swot[quad] || [];
+        const badgeEl = document.getElementById(`swot-${quad}-badge`);
+        const listEl = document.getElementById(`swot-${quad}-list`);
+        
+        if (badgeEl) {
+            badgeEl.innerText = items.length;
+        }
+        
+        if (listEl) {
+            listEl.innerHTML = '';
+            if (items.length === 0) {
+                const li = document.createElement('li');
+                li.innerText = quad === 'threats' ? 'No Threat for this stock' : 'No metrics detected';
+                li.style.color = 'var(--text-muted)';
+                listEl.appendChild(li);
+            } else {
+                items.forEach(item => {
+                    const li = document.createElement('li');
+                    li.style.listStyleType = 'none';
+                    li.style.position = 'relative';
+                    li.style.paddingLeft = '18px';
+                    li.style.marginBottom = '6px';
+                    
+                    const dot = document.createElement('span');
+                    dot.style.position = 'absolute';
+                    dot.style.left = '0';
+                    dot.style.top = '1px';
+                    
+                    if (quad === 'strengths') {
+                        dot.innerText = '🟢';
+                    } else if (quad === 'weaknesses') {
+                        dot.innerText = '🔴';
+                    } else if (quad === 'opportunities') {
+                        dot.innerText = '🔵';
+                    } else {
+                        dot.innerText = '⚫';
+                    }
+                    dot.style.fontSize = '9px';
+                    
+                    li.appendChild(dot);
+                    li.appendChild(document.createTextNode(item));
+                    listEl.appendChild(li);
+                });
+            }
+        }
+    });
+    
+    // 3. Set up interactive click toggles for SWOT cards
+    quadrants.forEach(quad => {
+        const header = document.getElementById(`swot-${quad}-header`);
+        const content = document.getElementById(`swot-${quad}-content`);
+        const card = document.getElementById(`swot-${quad}-card`);
+        
+        if (header && content) {
+            // Remove any old event listeners
+            const newHeader = header.cloneNode(true);
+            header.parentNode.replaceChild(newHeader, header);
+            
+            // Set initial state
+            content.style.transition = 'max-height 0.3s ease-out, padding 0.3s ease-out';
+            content.style.maxHeight = '350px';
+            content.style.overflow = 'hidden';
+            
+            newHeader.addEventListener('click', () => {
+                if (content.style.maxHeight === '0px' || content.style.maxHeight === '0') {
+                    content.style.maxHeight = '350px';
+                    content.style.padding = '15px';
+                    if (card) card.style.opacity = '1';
+                } else {
+                    content.style.maxHeight = '0px';
+                    content.style.padding = '0px 15px';
+                    if (card) card.style.opacity = '0.85';
+                }
+            });
+        }
+    });
 }
 
 async function updateInteractiveCaptureCard(p, customYears) {
@@ -6147,7 +6268,7 @@ function renderComparisonArena(data) {
                     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px;">
                         <strong>${v}/100</strong>
                     </div>
-                    <div style="width: 100%; height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; position: relative;">
+                    <div style="width: 100%; height: 5px; background: var(--bg-track); border-radius: 3px; overflow: hidden; position: relative;">
                         <div style="width: ${percent}%; height: 100%; background: ${color}; border-radius: 3px; box-shadow: 0 0 4px ${color};"></div>
                     </div>
                 </div>
@@ -6169,7 +6290,7 @@ function renderComparisonArena(data) {
             return `
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                     <div>${val.toFixed(1)}%</div>
-                    <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
+                    <div style="width: 100%; height: 4px; background: var(--bg-track); border-radius: 2px; overflow: hidden;">
                         <div style="width: ${percent}%; height: 100%; background: var(--color-emerald); border-radius: 2px;"></div>
                     </div>
                 </div>
@@ -6182,7 +6303,7 @@ function renderComparisonArena(data) {
             return `
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                     <div>${val.toFixed(1)}%</div>
-                    <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
+                    <div style="width: 100%; height: 4px; background: var(--bg-track); border-radius: 2px; overflow: hidden;">
                         <div style="width: ${percent}%; height: 100%; background: var(--color-emerald); border-radius: 2px;"></div>
                     </div>
                 </div>
@@ -6198,7 +6319,7 @@ function renderComparisonArena(data) {
             return `
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                     <div>${val.toFixed(2)}</div>
-                    <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden;">
+                    <div style="width: 100%; height: 4px; background: var(--bg-track); border-radius: 2px; overflow: hidden;">
                         <div style="width: ${percent}%; height: 100%; background: ${color}; border-radius: 2px;"></div>
                     </div>
                 </div>
@@ -6215,7 +6336,7 @@ function renderComparisonArena(data) {
             return `
                 <div style="display: flex; flex-direction: column; gap: 4px;">
                     <span class="${val >= 0 ? 'green-text' : 'red-text'}">${val > 0 ? '+' : ''}${val.toFixed(1)}%</span>
-                    <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; position: relative; overflow: hidden;">
+                    <div style="width: 100%; height: 4px; background: var(--bg-track); border-radius: 2px; position: relative; overflow: hidden;">
                         <div style="position: absolute; left: ${left}%; width: ${width}%; height: 100%; background: ${color}; border-radius: 2px;"></div>
                     </div>
                 </div>
