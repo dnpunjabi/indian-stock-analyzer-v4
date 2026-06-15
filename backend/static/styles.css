@@ -9856,9 +9856,8 @@ tr.active-peer-row td:first-child {
 
 .audio-console-controls {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 6px;
-    flex-wrap: wrap;
     width: 100%;
 }
 
