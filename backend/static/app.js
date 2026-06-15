@@ -21454,6 +21454,17 @@ function speakNextSegment() {
     }
     
     currentUtterance = new SpeechSynthesisUtterance(segment.text);
+    
+    // Bind selected voice preference if configured
+    const voiceSelect = document.getElementById('audio-voice-select');
+    if (voiceSelect && voiceSelect.value !== 'default') {
+        const voices = window.speechSynthesis.getVoices();
+        const selectedIndex = parseInt(voiceSelect.value);
+        if (!isNaN(selectedIndex) && voices[selectedIndex]) {
+            currentUtterance.voice = voices[selectedIndex];
+        }
+    }
+    
     currentUtterance.pitch = segment.pitch;
     currentUtterance.rate = 1.0;
     
@@ -21547,9 +21558,54 @@ function startAudioPlayback() {
     speakNextSegment();
 }
 
+function populateVoiceList() {
+    if (!window.speechSynthesis) return;
+    const voiceSelect = document.getElementById('audio-voice-select');
+    if (!voiceSelect) return;
+    
+    const voices = window.speechSynthesis.getVoices();
+    voiceSelect.innerHTML = '<option value="default">Default System Voice</option>';
+    
+    const indianVoices = [];
+    const otherVoices = [];
+    
+    voices.forEach((voice, index) => {
+        const isIndian = voice.lang === 'en-IN' || voice.name.toLowerCase().includes('india') || voice.name.toLowerCase().includes('in-');
+        if (isIndian) {
+            indianVoices.push({ voice, index });
+        } else if (voice.lang.startsWith('en') || voice.lang.startsWith('en-')) {
+            otherVoices.push({ voice, index });
+        }
+    });
+    
+    // Populate Indian English voices first with flag indicators
+    indianVoices.forEach(item => {
+        const option = document.createElement('option');
+        option.textContent = `🇮🇳 ${item.voice.name} (${item.voice.lang})`;
+        option.value = item.index;
+        voiceSelect.appendChild(option);
+    });
+    
+    // Populate other English voices
+    otherVoices.forEach(item => {
+        const option = document.createElement('option');
+        option.textContent = `🌐 ${item.voice.name} (${item.voice.lang})`;
+        option.value = item.index;
+        voiceSelect.appendChild(option);
+    });
+}
+
 function setupAudioConsoleBindings() {
     const playPauseBtn = document.getElementById('audio-play-pause-btn');
     const stopBtn = document.getElementById('audio-stop-btn');
+    
+    // Bind dynamic voice loader
+    populateVoiceList();
+    if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener === 'function') {
+        window.speechSynthesis.addEventListener('voiceschanged', populateVoiceList);
+    } else if (window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = populateVoiceList;
+    }
     
     if (playPauseBtn) {
         playPauseBtn.addEventListener('click', () => {

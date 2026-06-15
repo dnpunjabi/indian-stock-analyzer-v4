@@ -2088,7 +2088,7 @@ async def get_synthesis(
             "</div>\n"
             "<div class=\"agent-debate-block cio\">\n"
             "  <div class=\"agent-header\">⚖️ Lead CIO Referee (Consensus Moderator)</div>\n"
-            "  <div class=\"agent-comment\">Synthesize the relationships and conflicts between all technical, fundamental, and governance parameters (e.g. high PE but strong support, or high quality but bearish trend). Declare the final strategic consensus recommendation (Tactical BUY, Strategic AVOID, or Neutral HOLD) with a clear, definitive, and comprehensive explanation. Incorporate the Composite AI Conviction Score, suggested Buy/Entry price range, suggested Sell/Exit target range, and smart money bulk deals footprint.</div>\n"
+            "  <div class=\"agent-comment\">Synthesize the relationships and conflicts between all technical, fundamental, and governance parameters (e.g. high PE but strong support, or high quality but bearish trend). Declare the final strategic consensus recommendation (Tactical BUY, Strategic AVOID, or Neutral HOLD) with a clear, definitive, and comprehensive explanation. Incorporate the Composite AI Conviction Score, suggested Buy/Entry price range, and suggested Sell/Exit target range.</div>\n"
             "</div>\n"
             "After this block, you must append the EXACT markdown table of the Strategic Investment Verdict Matrix (do not omit or alter it).\n"
             "\n"
@@ -2142,7 +2142,6 @@ async def get_synthesis(
         - Suggested Buy Range: {profile.get('analysis', {}).get('suggested_buy_price_range', 'N/A')}
         - Suggested Sell Range: {profile.get('analysis', {}).get('suggested_sell_price_range', 'N/A')}
         - Analyst Target Median: Rs. {profile.get('consensus', {}).get('target_median', 'N/A')}
-        - Real Bulk/Block Deals Footprint (past 60 days): {len(real_deals_summary)} transactions. Details: {real_deals_summary}
         - Exact Strategic Investment Verdict Matrix Markdown Table (print this EXACT table at the end of Section V):
 {verdict_matrix_md}
         """
@@ -2206,7 +2205,7 @@ async def get_synthesis(
                 f"</div>\n"
                 f"<div class=\"agent-debate-block cio\">\n"
                 f"  <div class=\"agent-header\">⚖️ Lead CIO Referee (Consensus Moderator)</div>\n"
-                f"  <div class=\"agent-comment\">Considering the interplay of safe solvency (Altman Z of **{altman_z_score:.2f}**), strong valuation margin, and robust smart money support (Deliverable Z of **{delivery_z_score:+.2f}**), we issue a **{recommendation}** verdict for the **{horizon}** horizon. AI composite conviction score is **{final_score}/100**. Actionable buy/entry range is suggested at **{profile.get('analysis', {}).get('suggested_buy_price_range', 'Rs. ' + str(round(current_price * 0.95)) + ' - Rs. ' + str(round(current_price * 1.02)))}**, and suggested sell/exit range is at **{profile.get('analysis', {}).get('suggested_sell_price_range', 'Rs. ' + str(round(current_price * 1.15)) + ' - Rs. ' + str(round(current_price * 1.25)))}**. Institutional Deals footprints report: {deals_sum_str}.</div>\n"
+                f"  <div class=\"agent-comment\">Considering the interplay of safe solvency (Altman Z of **{altman_z_score:.2f}**), strong valuation margin, and robust smart money support (Deliverable Z of **{delivery_z_score:+.2f}**), we issue a **{recommendation}** verdict for the **{horizon}** horizon. AI composite conviction score is **{final_score}/100**. Actionable buy/entry range is suggested at **{profile.get('analysis', {}).get('suggested_buy_price_range', 'Rs. ' + str(round(current_price * 0.95)) + ' - Rs. ' + str(round(current_price * 1.02)))}**, and suggested sell/exit range is at **{profile.get('analysis', {}).get('suggested_sell_price_range', 'Rs. ' + str(round(current_price * 1.15)) + ' - Rs. ' + str(round(current_price * 1.25)))}**.</div>\n"
                 f"</div>\n\n"
                 f"**Strategic Investment Verdict Matrix:**\n\n"
                 f"{verdict_matrix_md}"
