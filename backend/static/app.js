@@ -7692,7 +7692,12 @@ function setupChatDrawer() {
     const closeBtn = document.getElementById('close-chat-btn');
     
     openBtn.addEventListener('click', () => drawer.classList.add('open'));
-    closeBtn.addEventListener('click', () => drawer.classList.remove('open'));
+    closeBtn.addEventListener('click', () => {
+        drawer.classList.remove('open');
+        if (typeof pauseAudioPlayback === 'function') {
+            pauseAudioPlayback();
+        }
+    });
     
     document.getElementById('send-chat-btn').addEventListener('click', sendUserChatMessage);
     document.getElementById('chat-user-input').addEventListener('keypress', (e) => {
@@ -7735,6 +7740,9 @@ function setupChatDrawer() {
             e.stopPropagation(); // Prevent immediate click-outside handler trigger
             if (drawer.classList.contains('open')) {
                 drawer.classList.remove('open');
+                if (typeof pauseAudioPlayback === 'function') {
+                    pauseAudioPlayback();
+                }
             } else {
                 drawer.classList.add('open');
                 if (tabSynthesis) {
@@ -7757,6 +7765,9 @@ function setupChatDrawer() {
 
         if (!isClickInsideDrawer && !isClickOnPill && !isClickOnOpenBtn) {
             drawer.classList.remove('open');
+            if (typeof pauseAudioPlayback === 'function') {
+                pauseAudioPlayback();
+            }
         }
     });
 
