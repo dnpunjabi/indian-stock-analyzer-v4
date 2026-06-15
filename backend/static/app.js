@@ -8429,18 +8429,31 @@ async function loadStockSynthesis(symbol) {
             formattedText = parsedLines.join('\n');
         }
 
+        // Apply inline formatting and list formatting
         formattedText = formattedText
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/### (.*?)\n/g, '<h3>$1</h3>')
-            .replace(/\* (.*?)\n/g, '<li>$1</li>')
-            .replace(/\n\n/g, '</p><p>');
+            .replace(/\* (.*?)\n/g, '<li>$1</li>');
         
         if (formattedText.includes('<li>')) {
             formattedText = formattedText.replace(/(<li>.*?<\/li>)/gs, '<ul>$1</ul>');
         }
         
+        // Split by paragraph segments and wrap non-HTML blocks in <p>
+        const segments = formattedText.split('\n\n');
+        let finalHtml = '';
+        for (let segment of segments) {
+            segment = segment.trim();
+            if (!segment) continue;
+            if (segment.startsWith('<div') || segment.startsWith('</div') || segment.startsWith('<table') || segment.includes('class="synthesis-header-block"') || segment.includes('class="agent-debate-block"') || segment.includes('class="synthesis-markdown-table"')) {
+                finalHtml += segment + '\n';
+            } else {
+                finalHtml += `<p>${segment}</p>\n`;
+            }
+        }
+        
         if (reportTextEl) {
-            reportTextEl.innerHTML = `${warningHtml}<p>${formattedText}</p>`;
+            reportTextEl.innerHTML = `${warningHtml}${finalHtml}`;
         }
     } catch (e) {
         console.error("Synthesis load error:", e);
@@ -11395,95 +11408,83 @@ function renderAIDebate(p) {
     const ticker = p.ticker.split('.')[0].toUpperCase();
     const curPrice = p.fundamentals.current_price || 0;
     const pe = p.fundamentals.pe_ratio || 0;
+    const pb = p.fundamentals.pb_ratio || 0;
+    const peg = p.score_metrics ? (p.score_metrics.peg_ratio || "N/A") : "N/A";
     const de = p.fundamentals.debt_to_equity || 0;
+    const cr = p.fundamentals.current_ratio || 0;
+    const cfoPat = p.fundamentals.cfo_to_pat || 0;
+    const fScore = p.earnings_quality ? (p.earnings_quality.piotroski_score || 0) : 0;
+    const zScore = p.earnings_quality ? (p.earnings_quality.altman_z_score || 0) : 0;
+    const zZone = p.earnings_quality ? (p.earnings_quality.altman_zone || "Unknown Zone") : "Unknown Zone";
+    const pledge = p.fundamentals.promoter_pledge_pct || 0;
+    
     const rsi = p.technicals ? (p.technicals.rsi || 50) : 50;
     const rsiStatus = p.technicals ? (p.technicals.rsi_status || "Neutral") : "Neutral";
     const trend = p.technicals ? (p.technicals.trend_50_vs_200 || "Neutral") : "Neutral";
     const breakout = p.technicals ? (p.technicals.breakout_status || "Neutral") : "Neutral";
+    const high52w = p.technicals ? (p.technicals.high_52w || 0) : 0;
+    const low52w = p.technicals ? (p.technicals.low_52w || 0) : 0;
+    const distHigh52w = p.technicals ? (p.technicals.dist_high_52w_pct || 0) : 0;
+    const distLow52w = p.technicals ? (p.technicals.dist_low_52w_pct || 0) : 0;
+    const sma50 = p.technicals ? (p.technicals.sma_50 || 0) : 0;
+    const sma200 = p.technicals ? (p.technicals.sma_200 || 0) : 0;
+    const squeeze = p.technicals ? (p.technicals.bb_squeeze_pct || 0) : 0;
+    const atr = p.technicals ? (p.technicals.atr || 0) : 0;
+    const atrStop = p.technicals ? (p.technicals.volatility_stop_loss_floor || (curPrice - 2 * atr)) : (curPrice - 2 * atr);
+    const macdVal = p.technicals ? (p.technicals.macd || 0) : 0;
+    const macdSig = p.technicals ? (p.technicals.macd_signal || 0) : 0;
+    const macdHist = p.technicals ? (p.technicals.macd_hist || 0) : 0;
+    const macdStatus = macdHist > 0 ? "Bullish Crossover" : (macdHist < 0 ? "Bearish Divergence" : "Neutral");
+    const vptVal = p.technicals ? (p.technicals.vpt || 0) : 0;
+    const vptStatus = p.technicals ? (p.technicals.vpt_status || "Neutral") : "Neutral";
+    const delivZ = p.technicals ? (p.technicals.delivery_z_score || 0.0) : 0.0;
+    const vsaPattern = p.technicals ? (p.technicals.vsa_pattern || "Normal Price Action") : "Normal Price Action";
+    const vsaDesc = p.technicals ? (p.technicals.vsa_desc || "") : "";
+    const poc = p.technicals ? (p.technicals.poc_price || curPrice) : curPrice;
+    
     const intrinsic = (p.dcf_model && p.dcf_model.intrinsic_value) || 0;
     const margin = (p.dcf_model && p.dcf_model.margin_of_safety) || 0;
     const action = p.score_metrics ? (p.score_metrics.action || "HOLD") : "HOLD";
     const score = p.score_metrics ? (p.score_metrics.final_score || 50) : 50;
     
-    let bullSpeech = '';
-    let bearSpeech = '';
-    let modSpeech = '';
-    
-    if (trend === 'Bullish') {
-        bullSpeech = `Looking at **${ticker}**, the price action is exceptionally constructive! We are riding a **Bullish** structural trend with the 50-day SMA holding above the 200-day SMA. `;
-        if (rsi > 70) {
-            bullSpeech += `Even with an RSI of **${rsi.toFixed(1)}** (${rsiStatus}), this represents strong momentum strength and breakout persistence rather than exhaustion. Institutional volume dynamics suggest aggressive accumulation!`;
-        } else {
-            bullSpeech += `With the RSI at a healthy **${rsi.toFixed(1)}** (${rsiStatus}), there is significant runway before overbought conditions. The recent breakout status is **${breakout}**, showing clear acceleration.`;
-        }
-    } else {
-        bullSpeech = `While the macro trend for **${ticker}** is currently **${trend}**, our technical oscillators indicate a base formation. `;
-        if (rsi < 35) {
-            bullSpeech += `The stock is deeply oversold with an RSI of **${rsi.toFixed(1)}** (${rsiStatus}). Historically, buying at these technical extremes offers an asymmetric risk-reward setup with massive reversal potential!`;
-        } else {
-            bullSpeech += `RSI stands at **${rsi.toFixed(1)}**. We are witnessing consolidation with low volatility, setting the stage for a volatility squeeze and upward continuation.`;
-        }
-    }
-    
-    if (margin < 0) {
-        bearSpeech = `I urge extreme caution here. **${ticker}** is mathematically **overvalued** under our DCF sandbox. The intrinsic value is **Rs. ${intrinsic.toFixed(2)}**, representing a **${margin.toFixed(1)}%** margin of safety deficit relative to current market price of **Rs. ${curPrice.toFixed(2)}**! `;
-    } else {
-        bearSpeech = `Even with a nominal DCF margin of safety of **${margin.toFixed(1)}%** (Fair Value: **Rs. ${intrinsic.toFixed(2)}** vs Price: **Rs. ${curPrice.toFixed(2)}**), `;
-    }
-    
-    if (pe > 40) {
-        bearSpeech += `The earnings multiple is a sky-high **${pe.toFixed(1)}** P/E. We are paying a massive premium for growth that might not materialize. `;
-    } else if (pe > 0) {
-        bearSpeech += `At a **${pe.toFixed(1)}** P/E multiple, the valuation seems reasonable on paper, but the terminal assumptions in our DCF model remain highly sensitive to macro shocks. `;
-    } else {
-        bearSpeech += `Negative or unavailable trailing earnings multiple increases operational obscurity. `;
-    }
-    
-    if (de > 1.5) {
-        bearSpeech += `Furthermore, the balance sheet carries elevated leverage risk with a Debt-to-Equity ratio of **${de.toFixed(2)}**. Any margin compression will squeeze free cash flows and hurt equity holders first.`;
-    } else {
-        bearSpeech += `While Debt-to-Equity is low at **${de.toFixed(2)}**, we cannot ignore historical cyclical margins. The terminal growth projection assumes perpetuity, which is a dangerous assumption in this economic landscape.`;
-    }
-    
-    modSpeech = `Gentlemen, let's look at the dialectic consensus. **${ticker}** presents a classic tug-of-war between technical momentum and fundamental valuation bounds. `;
-    if (score >= 70) {
-        modSpeech += `The quantitative model resolves this in favor of the Bulls, yielding a high conviction score of **${score}/100** and a **${action}** verdict. The structural trend alignment and strong solvency outweigh the valuation premiums. We recommend accumulating on minor drawdowns.`;
-    } else if (score >= 50) {
-        modSpeech += `The model leans neutral with a conviction score of **${score}/100** resulting in a **${action}** rating. Given the lack of margin of safety combined with neutral technicals, patience is advised. Build positions strictly using disciplined limit orders during market pullbacks.`;
-    } else {
-        modSpeech += `The model returns a low conviction score of **${score}/100** with a clear **${action}** call. The combination of valuation friction, potential margin pressure, and bearish technical setups suggests high capital risk. Capital conservation is prioritized; look for better risk-reward setups elsewhere.`;
-    }
+    const niftyBeta = p.capm_risk_nifty50 ? (p.capm_risk_nifty50.beta || 1.0) : 1.0;
+    const niftyAlpha = p.capm_risk_nifty50 ? (p.capm_risk_nifty50.alpha || 0.0) : 0.0;
+    const niftyCorr = p.capm_risk_nifty50 ? (p.capm_risk_nifty50.correlation || 1.0) : 1.0;
+    const upCapture = p.capture_ratios ? (p.capture_ratios.upside_capture || 100.0) : 100.0;
+    const downCapture = p.capture_ratios ? (p.capture_ratios.downside_capture || 100.0) : 100.0;
+    const maxDd = p.drawdown_metrics ? (p.drawdown_metrics.max_drawdown_pct || 0.0) : 0.0;
+    const worstDdDays = p.drawdown_metrics ? (p.drawdown_metrics.worst_drawdown_duration_days || 0) : 0;
     
     const speeches = [
         {
-            role: "🐂 Bull Momentum Agent",
-            content: bullSpeech,
+            role: "📊 Fundamental & Valuation Analyst",
+            class: "fundamental",
             align: "left",
-            border: "rgba(16, 185, 129, 0.25)",
-            bg: "rgba(16, 185, 129, 0.04)"
+            content: `From a quality and solvency perspective, **${ticker}** holds a Piotroski F-Score of **${fScore}/9** (${fScore >= 7 ? 'Strong' : fScore >= 4 ? 'Moderate' : 'Weak'}) and Altman Z-Score of **${zScore.toFixed(2)}** (${zZone}). Debt-to-Equity is comfortable at **${de.toFixed(2)}x**, Current Ratio is **${cr.toFixed(2)}x**, and cash conversion quality is at a CFO-to-PAT ratio of **${cfoPat.toFixed(2)}x**. Under our DCF analysis, the intrinsic value is **Rs. ${intrinsic.toFixed(2)}**, representing a **${margin.toFixed(1)}% margin of safety**. Current PE stands at **${pe.toFixed(1)}x** with PB at **${pb.toFixed(1)}x** and PEG at **${peg}**.`
         },
         {
-            role: "🐻 Bear Valuation Agent",
-            content: bearSpeech,
+            role: "📈 Technical & VSA Tactician",
+            class: "technical",
             align: "right",
-            border: "rgba(239, 68, 68, 0.25)",
-            bg: "rgba(239, 68, 68, 0.04)"
+            content: `Technically, the structure is in a **${trend}** structure relative to its 50-day SMA (**Rs. ${sma50.toFixed(1)}**) and 200-day SMA (**Rs. ${sma200.toFixed(1)}**). Momentum is **${rsiStatus}** with RSI (14) at **${rsi.toFixed(1)}**. The price is **${distHigh52w.toFixed(1)}%** below its 52w High of **Rs. ${high52w.toFixed(1)}** and **${distLow52w.toFixed(1)}%** above its 52w Low of **Rs. ${low52w.toFixed(1)}**. Volatility squeeze width is **${squeeze.toFixed(1)}%** with ATR volatility at **Rs. ${atr.toFixed(1)}** (stop floor at **Rs. ${atrStop.toFixed(1)}**). MACD hist reports **${macdVal.toFixed(2)}** (${macdStatus}). Volume Price Trend (VPT) is at **${vptVal.toFixed(0)}** (${vptStatus}), and Point of Control (POC) liquidity support sits at **Rs. ${poc.toFixed(1)}**.`
         },
         {
-            role: "⚖️ Moderator CIO",
-            content: modSpeech,
+            role: "🛡️ Sentiment & Smart Money Auditor",
+            class: "sentiment",
             align: "left",
-            border: "rgba(245, 158, 11, 0.25)",
-            bg: "rgba(245, 158, 11, 0.04)"
+            content: `Promoter pledging is at **${pledge.toFixed(1)}%**. Smart money delivers a Z-Score of **${delivZ.toFixed(2)}**, showing institutional ${delivZ >= 1.0 ? 'accumulation' : delivZ <= -1.0 ? 'distribution' : 'churn'}. Volume Spread Analysis (VSA) setup shows: **${vsaPattern}** (${vsaDesc}). Benchmark capture ratios report Upside Capture of **${upCapture.toFixed(1)}%** and Downside Capture of **${downCapture.toFixed(1)}%** under systematic Nifty 50 risk (Beta: **${niftyBeta.toFixed(2)}**, Alpha: **${niftyAlpha.toFixed(2)}%**, Corr: **${niftyCorr.toFixed(2)}**). Maximum historical drawdown is **${maxDd.toFixed(1)}%** with a recovery time of **${worstDdDays} days**.`
+        },
+        {
+            role: "⚖️ Lead CIO Referee (Consensus Moderator)",
+            class: "cio",
+            align: "right",
+            content: `Synthesizing the panel's debate, **${ticker}** displays a classic interplay between its solvency profile, valuation premiums, and technical timing. Considering these factors, we declare a consensus **${action}** verdict for the specified horizon. The overall Composite AI Score is **${score}/100**. Actionable Buy/Entry price range is suggested at **${p.analysis && p.analysis.suggested_buy_price_range ? p.analysis.suggested_buy_price_range : 'Rs. ' + (curPrice * 0.95).toFixed(0) + ' - Rs. ' + (curPrice * 1.02).toFixed(0)}**, and Sell/Exit target range is suggested at **${p.analysis && p.analysis.suggested_sell_price_range ? p.analysis.suggested_sell_price_range : 'Rs. ' + (curPrice * 1.15).toFixed(0) + ' - Rs. ' + (curPrice * 1.25).toFixed(0)}**.`
         }
     ];
     
     speeches.forEach(speech => {
         const bubble = document.createElement('div');
-        bubble.style.padding = '10px 12px';
-        bubble.style.borderRadius = '8px';
-        bubble.style.border = `1px solid ${speech.border}`;
-        bubble.style.background = speech.bg;
+        bubble.className = `agent-debate-block ${speech.class}`;
         bubble.style.alignSelf = speech.align === 'left' ? 'flex-start' : 'flex-end';
         bubble.style.maxWidth = '90%';
         bubble.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
@@ -11492,19 +11493,13 @@ function renderAIDebate(p) {
         bubble.style.gap = '4px';
         
         const sender = document.createElement('span');
-        sender.style.fontSize = '9px';
-        sender.style.fontWeight = '700';
-        sender.style.textTransform = 'uppercase';
-        sender.style.letterSpacing = '0.04em';
-        sender.style.color = speech.align === 'left' ? 'var(--text-primary)' : 'var(--neon-blue)';
+        sender.className = 'agent-header';
         sender.innerText = speech.role;
         
         const message = document.createElement('p');
-        message.style.fontSize = '11.5px';
-        message.style.color = 'var(--text-secondary)';
-        message.style.lineHeight = '1.5';
+        message.className = 'agent-comment';
         message.style.margin = '0';
-        message.innerHTML = speech.content;
+        message.innerHTML = speech.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         
         bubble.appendChild(sender);
         bubble.appendChild(message);
