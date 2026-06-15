@@ -6332,10 +6332,91 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
     const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
     const textColor = isLightMode ? '#374151' : '#d1d5db';
 
-    let chartType = 'radar';
-    let chartLabels = ['Value (P/E)', 'Efficiency (ROCE)', 'Return (ROE)', 'Solvency (D/E)', 'Safety Margin'];
-    let chartDatasets = [];
-    let chartScales = {
+    let chartLabels = [];
+    if (selectedMetric === 'all') {
+        chartLabels = ['Value (P/E)', 'Efficiency (ROCE)', 'Return (ROE)', 'Solvency (D/E)', 'Safety Margin'];
+    } else if (selectedMetric === 'valuation') {
+        chartLabels = ['P/E Multiple Score', 'Intrinsic Discount', 'Valuation Rating', 'AI Advisory Score'];
+    } else if (selectedMetric === 'quality') {
+        chartLabels = ['ROCE Strength', 'ROE Strength', 'Capital Efficiency', 'AI Advisory Score'];
+    } else if (selectedMetric === 'solvency') {
+        chartLabels = ['Solvency (D/E)', 'Margin of Safety', 'Financial Cushion', 'AI Advisory Score'];
+    } else if (selectedMetric === 'momentum') {
+        chartLabels = ['RSI-14 Momentum', 'Trend Alignment', 'Momentum Strength', 'AI Advisory Score'];
+    } else {
+        chartLabels = ['Value (P/E)', 'Efficiency (ROCE)', 'Return (ROE)', 'Solvency (D/E)', 'Safety Margin'];
+    }
+
+    const colors = [
+        { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
+        { border: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
+        { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
+        { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)' },
+        { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)' }
+    ];
+
+    const chartDatasets = matrix.map((item, idx) => {
+        const color = colors[idx % colors.length];
+        
+        const peVal = typeof item.pe === 'number' ? item.pe : 30;
+        const peScore = Math.max(0, Math.min(100, (100 - peVal * 1.5)));
+        
+        const roceVal = typeof item.roce === 'number' ? item.roce : 0;
+        const roceScore = Math.max(0, Math.min(100, roceVal * 2.5));
+        
+        const roeVal = typeof item.roe === 'number' ? item.roe : 0;
+        const roeScore = Math.max(0, Math.min(100, roeVal * 2.5));
+
+        const mosVal = typeof item.margin_of_safety === 'number' ? item.margin_of_safety : 0;
+        const mosScore = Math.max(0, Math.min(100, mosVal + 50));
+
+        const deVal = typeof item.debt_eq === 'number' ? item.debt_eq : 0;
+        const deScore = Math.max(0, Math.min(100, (2 - deVal) * 50));
+
+        const scoreVal = typeof item.score === 'number' ? item.score : 50;
+        const rsiVal = typeof item.rsi === 'number' ? item.rsi : 50;
+
+        let dataValues = [];
+        if (selectedMetric === 'all') {
+            dataValues = [peScore, roceScore, roeScore, deScore, mosScore];
+        } else if (selectedMetric === 'valuation') {
+            let valRatingScore = 60;
+            const valRatingStr = (item.valuation_rating || '').toLowerCase();
+            if (valRatingStr.includes('under')) valRatingScore = 100;
+            else if (valRatingStr.includes('over')) valRatingScore = 20;
+
+            dataValues = [peScore, mosScore, valRatingScore, scoreVal];
+        } else if (selectedMetric === 'quality') {
+            const capEff = (roceScore + roeScore) / 2;
+            dataValues = [roceScore, roeScore, capEff, scoreVal];
+        } else if (selectedMetric === 'solvency') {
+            const finCushion = (deScore + mosScore) / 2;
+            dataValues = [deScore, mosScore, finCushion, scoreVal];
+        } else if (selectedMetric === 'momentum') {
+            let trendScore = 60;
+            const trendStr = (item.trend || '').toLowerCase();
+            if (trendStr.includes('bullish') || trendStr.includes('bull')) trendScore = 100;
+            else if (trendStr.includes('bearish') || trendStr.includes('bear')) trendScore = 20;
+
+            dataValues = [rsiVal, trendScore, trendScore, scoreVal];
+        } else {
+            dataValues = [peScore, roceScore, roeScore, deScore, mosScore];
+        }
+
+        return {
+            label: item.company_name,
+            data: dataValues,
+            borderColor: color.border,
+            backgroundColor: color.bg,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointBackgroundColor: color.border,
+            pointBorderColor: '#fff',
+            pointHoverRadius: 5
+        };
+    });
+
+    const chartScales = {
         r: {
             angleLines: { color: gridColor },
             grid: { color: gridColor },
@@ -6349,96 +6430,8 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
         }
     };
 
-    if (selectedMetric === 'all') {
-        const datasets = matrix.map((item, idx) => {
-            const peVal = typeof item.pe === 'number' ? item.pe : 30;
-            const peScore = Math.max(0, Math.min(100, (100 - peVal * 1.5)));
-            const roceScore = Math.max(0, Math.min(100, typeof item.roce === 'number' ? item.roce : 0));
-            const roeScore = Math.max(0, Math.min(100, typeof item.roe === 'number' ? item.roe : 0));
-            const mosScore = Math.max(0, Math.min(100, (typeof item.margin_of_safety === 'number' ? item.margin_of_safety : 0) + 50));
-            const deVal = typeof item.debt_eq === 'number' ? item.debt_eq : 0;
-            const deScore = Math.max(0, Math.min(100, (2 - deVal) * 50));
-
-            const colors = [
-                { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
-                { border: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
-                { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
-                { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)' },
-                { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)' }
-            ];
-            const color = colors[idx % colors.length];
-
-            return {
-                label: item.company_name,
-                data: [peScore, roceScore, roeScore, deScore, mosScore],
-                borderColor: color.border,
-                backgroundColor: color.bg,
-                borderWidth: 2,
-                pointRadius: 3,
-                pointBackgroundColor: color.border,
-                pointBorderColor: '#fff',
-                pointHoverRadius: 5
-            };
-        });
-        chartDatasets = datasets;
-    } else {
-        chartType = 'bar';
-        chartLabels = matrix.map(item => item.company_name);
-        
-        const dataValues = matrix.map(item => {
-            if (selectedMetric === 'pe') return typeof item.pe === 'number' ? item.pe : 0;
-            if (selectedMetric === 'roce') return typeof item.roce === 'number' ? item.roce : 0;
-            if (selectedMetric === 'roe') return typeof item.roe === 'number' ? item.roe : 0;
-            if (selectedMetric === 'de') return typeof item.debt_eq === 'number' ? item.debt_eq : 0;
-            if (selectedMetric === 'mos') return typeof item.margin_of_safety === 'number' ? item.margin_of_safety : 0;
-            return 0;
-        });
-
-        const metricLabels = {
-            pe: 'Price-to-Earnings (P/E) Ratio',
-            roce: 'Return on Capital Employed (ROCE) %',
-            roe: 'Return on Equity (ROE) %',
-            de: 'Debt-to-Equity (D/E) Ratio',
-            mos: 'Margin of Safety %'
-        };
-
-        const barColors = [
-            { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.65)' },
-            { border: '#10b981', bg: 'rgba(16, 185, 129, 0.65)' },
-            { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.65)' },
-            { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.65)' },
-            { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.65)' }
-        ];
-
-        chartDatasets = [{
-            label: metricLabels[selectedMetric] || '',
-            data: dataValues,
-            backgroundColor: matrix.map((_, idx) => barColors[idx % barColors.length].bg),
-            borderColor: matrix.map((_, idx) => barColors[idx % barColors.length].border),
-            borderWidth: 1.5,
-            borderRadius: 4
-        }];
-
-        chartScales = {
-            x: {
-                grid: { color: gridColor },
-                ticks: {
-                    color: textColor,
-                    font: { family: "'Outfit', sans-serif", size: 9, weight: '600' }
-                }
-            },
-            y: {
-                grid: { color: gridColor },
-                ticks: {
-                    color: textColor,
-                    font: { family: "'Outfit', sans-serif", size: 9 }
-                }
-            }
-        };
-    }
-
     activeCompareRadarChart = new Chart(canvas, {
-        type: chartType,
+        type: 'radar',
         data: {
             labels: chartLabels,
             datasets: chartDatasets
@@ -6448,7 +6441,7 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    display: selectedMetric === 'all',
+                    display: true,
                     position: 'bottom',
                     labels: {
                         color: textColor,
