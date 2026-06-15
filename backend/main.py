@@ -1721,6 +1721,13 @@ async def get_synthesis(
         sma_50 = technicals.get("sma_50", 0.0)
         sma_200 = technicals.get("sma_200", 0.0)
         
+        # Double decimal point formatting variables for prompts and fallback synthesis
+        sma_50_str = f"{sma_50:.2f}" if isinstance(sma_50, (int, float)) else "0.00"
+        sma_200_str = f"{sma_200:.2f}" if isinstance(sma_200, (int, float)) else "0.00"
+        
+        cfo_to_pat = fundamentals.get("cfo_to_pat", 0.88)
+        cfo_to_pat_str = f"{cfo_to_pat:.2f}" if isinstance(cfo_to_pat, (int, float)) else "0.88"
+        
         # Advanced Volatility & Momentum Indicators
         bb_lower = technicals.get("bb_lower", 0.0)
         bb_upper = technicals.get("bb_upper", 0.0)
@@ -2104,7 +2111,7 @@ async def get_synthesis(
         - Altman Z-Score: {altman_z_score:.2f} ({altman_zone})
         - Debt-to-Equity: {fundamentals.get('debt_to_equity', 'N/A')}
         - Current Ratio: {fundamentals.get('current_ratio', 'N/A')}
-        - CFO to PAT Ratio: {fundamentals.get('cfo_to_pat', 'N/A')}
+        - CFO to PAT Ratio: {cfo_to_pat_str}
         
         2. Valuation & Sector Peer Benchmarking:
         - Current Price: Rs. {current_price}
@@ -2115,7 +2122,7 @@ async def get_synthesis(
         
         3. Technical Timing, Volatility & Momentum:
         - 14-day RSI: {rsi:.1f} ({technicals.get('rsi_status', 'Neutral')})
-        - 50-day SMA: Rs. {sma_50} | 200-day SMA: Rs. {sma_200} (Trend: {technicals.get('trend_50_vs_200', 'N/A')})
+        - 50-day SMA: Rs. {sma_50_str} | 200-day SMA: Rs. {sma_200_str} (Trend: {technicals.get('trend_50_vs_200', 'N/A')})
         - Breakout Status: {technicals.get('breakout_status', 'N/A')} ({technicals.get('breakout_desc', 'N/A')})
         - Fibonacci Levels: {json.dumps(fib_levels)}
         - Current Fibonacci Retracement Zone: {fib_zone}
@@ -2145,16 +2152,16 @@ async def get_synthesis(
         - Exact Strategic Investment Verdict Matrix Markdown Table (print this EXACT table at the end of Section V):
 {verdict_matrix_md}
         """
-
+ 
         synthesis_text = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
-
+ 
         # Failsafe programmatic fallback if LLM is unavailable or errors
         if "ERROR" in synthesis_text or not synthesis_text.strip():
             p1 = (
                 f"### I. Operational Quality & Solvency Scorecard\n"
                 f"<div class=\"agent-debate-block fundamental\">\n"
                 f"  <div class=\"agent-header\">📊 Fundamental & Valuation Analyst</div>\n"
-                f"  <div class=\"agent-comment\">Financial audits of **{profile.get('company_name', symbol)}** show a Piotroski F-Score of **{piotroski_score}/9** ({piotroski_label}) and an Altman Z-Score of **{altman_z_score:.2f}** ({altman_zone}). Leverage is comfortable with a Debt-to-Equity of **{fundamentals.get('debt_to_equity', 0.0):.2f}x** and conversion cash quality is strong at a CFO to PAT ratio of **{fundamentals.get('cfo_to_pat', 0.88):.2f}x**. Solvency remains secure.</div>\n"
+                f"  <div class=\"agent-comment\">Financial audits of **{profile.get('company_name', symbol)}** show a Piotroski F-Score of **{piotroski_score}/9** ({piotroski_label}) and an Altman Z-Score of **{altman_z_score:.2f}** ({altman_zone}). Leverage is comfortable with a Debt-to-Equity of **{fundamentals.get('debt_to_equity', 0.0):.2f}x** and conversion cash quality is strong at a CFO to PAT ratio of **{cfo_to_pat_str}x**. Solvency remains secure.</div>\n"
                 f"</div>\n"
                 f"<div class=\"agent-debate-block sentiment\">\n"
                 f"  <div class=\"agent-header\">🛡️ Sentiment & Smart Money Auditor</div>\n"
@@ -2176,7 +2183,7 @@ async def get_synthesis(
                 f"### III. Technical Timing & Fibonacci Zones\n"
                 f"<div class=\"agent-debate-block technical\">\n"
                 f"  <div class=\"agent-header\">📈 Technical & VSA Tactician</div>\n"
-                f"  <div class=\"agent-comment\">The daily chart shows the price **{fib_zone}**. SMA parameters: 50-day SMA is at **Rs. {sma_50}** and 200-day SMA is at **Rs. {sma_200}** (**{technicals.get('trend_50_vs_200', 'Neutral')}** trend). RSI (14) is at **{rsi:.1f}** ({technicals.get('rsi_status', 'Neutral')}). Bollinger Squeeze width is **{squeeze_pct:.1f}%**, volatility is **{vol_level}** with ATR of **Rs. {atr:.2f}**, and volatility stop floor is at **Rs. {atr_stop_loss:.2f}**. MACD reports **{macd:.2f}** (Signal: **{macd_signal:.2f}** | **{macd_status}**). VPT is at **{vpt:.0f}**. smart money Deliverable Z-Score is **{delivery_z_score:+.2f}** with VSA Pattern diagnosis: **{vsa_pattern}** ({vsa_desc}). Liquidity POC support sits at **Rs. {poc_price:.2f}**.</div>\n"
+                f"  <div class=\"agent-comment\">The daily chart shows the price **{fib_zone}**. SMA parameters: 50-day SMA is at **Rs. {sma_50_str}** and 200-day SMA is at **Rs. {sma_200_str}** (**{technicals.get('trend_50_vs_200', 'Neutral')}** trend). RSI (14) is at **{rsi:.1f}** ({technicals.get('rsi_status', 'Neutral')}). Bollinger Squeeze width is **{squeeze_pct:.1f}%**, volatility is **{vol_level}** with ATR of **Rs. {atr:.2f}**, and volatility stop floor is at **Rs. {atr_stop_loss:.2f}**. MACD reports **{macd:.2f}** (Signal: **{macd_signal:.2f}** | **{macd_status}**). VPT is at **{vpt:.0f}**. smart money Deliverable Z-Score is **{delivery_z_score:+.2f}** with VSA Pattern diagnosis: **{vsa_pattern}** ({vsa_desc}). Liquidity POC support sits at **Rs. {poc_price:.2f}**.</div>\n"
                 f"</div>\n"
                 f"<div class=\"agent-debate-block fundamental\">\n"
                 f"  <div class=\"agent-header\">📊 Fundamental & Valuation Analyst</div>\n"

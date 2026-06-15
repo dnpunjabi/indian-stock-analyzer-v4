@@ -4269,14 +4269,14 @@ function compilePeerPerformanceAISummary(series, benchmarkSymbol) {
     const targetReturn = returns[targetTicker] !== undefined ? returns[targetTicker] : 0.0;
     
     // Core default colors
-    const colorsList = ['#10b981', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#38bdf8'];
+    const colorsList = ['#3b82f6', '#f59e0b', '#a855f7', '#ec4899', '#14b8a6', '#ef4444'];
     let colorIdx = 0;
     const seriesColors = {};
     Object.keys(series).forEach(key => {
         if (key === targetTicker) {
-            seriesColors[key] = '#00e5ff';
+            seriesColors[key] = 'var(--color-primary)';
         } else if (key === benchmarkSymbol) {
-            seriesColors[key] = '#94a3b8';
+            seriesColors[key] = 'var(--text-secondary)';
         } else {
             seriesColors[key] = colorsList[colorIdx % colorsList.length];
             colorIdx++;
@@ -4299,28 +4299,28 @@ function compilePeerPerformanceAISummary(series, benchmarkSymbol) {
     summaryHtml += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; align-items: start; margin-top: 5px;">';
     
     // Column 1: Standing
-    summaryHtml += '  <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04);">';
-    summaryHtml += '    <div style="font-size: 10px; font-weight: 700; color: #ffffff; letter-spacing: 0.04em; margin-bottom: 8px; text-transform: uppercase;">Momentum Standing Table</div>';
+    summaryHtml += '  <div style="background: var(--bg-card-sub); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass);">';
+    summaryHtml += '    <div style="font-size: 10px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em; margin-bottom: 8px; text-transform: uppercase;">Momentum Standing Table</div>';
     
     allReturns.forEach((item, index) => {
         const isTarget = item.ticker === targetTicker;
-        const color = seriesColors[item.ticker] || '#ffffff';
+        const color = seriesColors[item.ticker] || 'var(--text-primary)';
         const boldStyle = isTarget ? 'font-weight: 700;' : 'font-weight: 500;';
-        const bgStyle = isTarget ? 'background: rgba(0, 229, 255, 0.05);' : '';
+        const bgStyle = isTarget ? 'background: rgba(59, 130, 246, 0.08);' : '';
         const rankMedal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `[${index + 1}]`;
         const cleanTicker = item.ticker.replace('.NS', '').replace('.BO', '');
         
         summaryHtml += `    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 10.5px; padding: 4px 8px; border-radius: 4px; margin-bottom: 4px; ${bgStyle}">`;
         summaryHtml += `      <span style="color: ${color}; ${boldStyle}">${rankMedal} ${cleanTicker} ${isTarget ? '(Target)' : ''}</span>`;
-        summaryHtml += `      <strong style="color: ${item.ret >= 0 ? '#10b981' : '#ef4444'};">${item.ret >= 0 ? '+' : ''}${item.ret.toFixed(2)}%</strong>`;
+        summaryHtml += `      <strong style="color: ${item.ret >= 0 ? 'var(--neon-green)' : 'var(--color-crimson)'};">${item.ret >= 0 ? '+' : ''}${item.ret.toFixed(2)}%</strong>`;
         summaryHtml += `    </div>`;
     });
     summaryHtml += '  </div>';
     
     // Column 2: Metaphor
-    summaryHtml += '  <div style="background: rgba(0, 0, 0, 0.2); padding: 12px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04); display: flex; flex-direction: column; justify-content: space-between; height: 100%; min-height: 120px;">';
+    summaryHtml += '  <div style="background: var(--bg-card-sub); padding: 12px; border-radius: 8px; border: 1px solid var(--border-glass); display: flex; flex-direction: column; justify-content: space-between; height: 100%; min-height: 120px;">';
     summaryHtml += '    <div>';
-    summaryHtml += '      <div style="font-size: 10px; font-weight: 700; color: #ffffff; letter-spacing: 0.04em; margin-bottom: 6px; text-transform: uppercase;">🚴 PEER RACE SYNOPIS (Layman Metaphor)</div>';
+    summaryHtml += '      <div style="font-size: 10px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em; margin-bottom: 6px; text-transform: uppercase;">🚴 PEER RACE SYNOPIS (Layman Metaphor)</div>';
     
     let raceMetaphor = '';
     const cleanTargetTicker = targetTicker.replace('.NS', '').replace('.BO', '');
@@ -5677,6 +5677,15 @@ async function runDynamicSandboxAI() {
 function setupComparisonArena() {
     document.getElementById('run-comparison-btn').addEventListener('click', runComparisonAnalysis);
 
+    const radarSelect = document.getElementById('radar-metric-select');
+    if (radarSelect) {
+        radarSelect.addEventListener('change', (e) => {
+            if (window.activeCompareMatrix) {
+                drawCompareRadarChart(window.activeCompareMatrix, e.target.value);
+            }
+        });
+    }
+
     // Hook up suggestion pills for quick benchmarks
     const suggestionPills = document.querySelectorAll('#tab-compare .suggestion-tag-pill');
     suggestionPills.forEach(pill => {
@@ -6094,6 +6103,12 @@ function renderComparisonArena(data) {
     }
     
     const matrix = data.matrix;
+    window.activeCompareMatrix = matrix;
+    
+    const radarSelect = document.getElementById('radar-metric-select');
+    if (radarSelect) {
+        radarSelect.value = 'all';
+    }
     
     // Highlight sector champion column (with the highest score)
     let bestScore = -1;
@@ -6304,7 +6319,7 @@ function renderComparisonArena(data) {
     if (compareBox) compareBox.style.display = 'block';
 }
 
-function drawCompareRadarChart(matrix) {
+function drawCompareRadarChart(matrix, selectedMetric = 'all') {
     const canvas = document.getElementById('compare-radar-chart');
     if (!canvas) return;
 
@@ -6317,48 +6332,123 @@ function drawCompareRadarChart(matrix) {
     const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
     const textColor = isLightMode ? '#374151' : '#d1d5db';
 
-    const datasets = matrix.map((item, idx) => {
-        const peVal = typeof item.pe === 'number' ? item.pe : 30;
-        const peScore = Math.max(0, Math.min(100, (100 - peVal * 1.5)));
-        const roceScore = Math.max(0, Math.min(100, typeof item.roce === 'number' ? item.roce : 0));
-        const roeScore = Math.max(0, Math.min(100, typeof item.roe === 'number' ? item.roe : 0));
-        const mosScore = Math.max(0, Math.min(100, (typeof item.margin_of_safety === 'number' ? item.margin_of_safety : 0) + 50));
-        const deVal = typeof item.debt_eq === 'number' ? item.debt_eq : 0;
-        const deScore = Math.max(0, Math.min(100, (2 - deVal) * 50));
+    let chartType = 'radar';
+    let chartLabels = ['Value (P/E)', 'Efficiency (ROCE)', 'Return (ROE)', 'Solvency (D/E)', 'Safety Margin'];
+    let chartDatasets = [];
+    let chartScales = {
+        r: {
+            angleLines: { color: gridColor },
+            grid: { color: gridColor },
+            pointLabels: {
+                color: textColor,
+                font: { family: "'Outfit', sans-serif", size: 9, weight: '600' }
+            },
+            ticks: { display: false, stepSize: 20 },
+            min: 0,
+            max: 100
+        }
+    };
 
-        const colors = [
-            { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
-            { border: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
-            { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
-            { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)' },
-            { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)' }
-        ];
-        const color = colors[idx % colors.length];
+    if (selectedMetric === 'all') {
+        const datasets = matrix.map((item, idx) => {
+            const peVal = typeof item.pe === 'number' ? item.pe : 30;
+            const peScore = Math.max(0, Math.min(100, (100 - peVal * 1.5)));
+            const roceScore = Math.max(0, Math.min(100, typeof item.roce === 'number' ? item.roce : 0));
+            const roeScore = Math.max(0, Math.min(100, typeof item.roe === 'number' ? item.roe : 0));
+            const mosScore = Math.max(0, Math.min(100, (typeof item.margin_of_safety === 'number' ? item.margin_of_safety : 0) + 50));
+            const deVal = typeof item.debt_eq === 'number' ? item.debt_eq : 0;
+            const deScore = Math.max(0, Math.min(100, (2 - deVal) * 50));
 
-        return {
-            label: item.company_name,
-            data: [peScore, roceScore, roeScore, deScore, mosScore],
-            borderColor: color.border,
-            backgroundColor: color.bg,
-            borderWidth: 2,
-            pointRadius: 3,
-            pointBackgroundColor: color.border,
-            pointBorderColor: '#fff',
-            pointHoverRadius: 5
+            const colors = [
+                { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
+                { border: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
+                { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
+                { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)' },
+                { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)' }
+            ];
+            const color = colors[idx % colors.length];
+
+            return {
+                label: item.company_name,
+                data: [peScore, roceScore, roeScore, deScore, mosScore],
+                borderColor: color.border,
+                backgroundColor: color.bg,
+                borderWidth: 2,
+                pointRadius: 3,
+                pointBackgroundColor: color.border,
+                pointBorderColor: '#fff',
+                pointHoverRadius: 5
+            };
+        });
+        chartDatasets = datasets;
+    } else {
+        chartType = 'bar';
+        chartLabels = matrix.map(item => item.company_name);
+        
+        const dataValues = matrix.map(item => {
+            if (selectedMetric === 'pe') return typeof item.pe === 'number' ? item.pe : 0;
+            if (selectedMetric === 'roce') return typeof item.roce === 'number' ? item.roce : 0;
+            if (selectedMetric === 'roe') return typeof item.roe === 'number' ? item.roe : 0;
+            if (selectedMetric === 'de') return typeof item.debt_eq === 'number' ? item.debt_eq : 0;
+            if (selectedMetric === 'mos') return typeof item.margin_of_safety === 'number' ? item.margin_of_safety : 0;
+            return 0;
+        });
+
+        const metricLabels = {
+            pe: 'Price-to-Earnings (P/E) Ratio',
+            roce: 'Return on Capital Employed (ROCE) %',
+            roe: 'Return on Equity (ROE) %',
+            de: 'Debt-to-Equity (D/E) Ratio',
+            mos: 'Margin of Safety %'
         };
-    });
+
+        const barColors = [
+            { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.65)' },
+            { border: '#10b981', bg: 'rgba(16, 185, 129, 0.65)' },
+            { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.65)' },
+            { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.65)' },
+            { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.65)' }
+        ];
+
+        chartDatasets = [{
+            label: metricLabels[selectedMetric] || '',
+            data: dataValues,
+            backgroundColor: matrix.map((_, idx) => barColors[idx % barColors.length].bg),
+            borderColor: matrix.map((_, idx) => barColors[idx % barColors.length].border),
+            borderWidth: 1.5,
+            borderRadius: 4
+        }];
+
+        chartScales = {
+            x: {
+                grid: { color: gridColor },
+                ticks: {
+                    color: textColor,
+                    font: { family: "'Outfit', sans-serif", size: 9, weight: '600' }
+                }
+            },
+            y: {
+                grid: { color: gridColor },
+                ticks: {
+                    color: textColor,
+                    font: { family: "'Outfit', sans-serif", size: 9 }
+                }
+            }
+        };
+    }
 
     activeCompareRadarChart = new Chart(canvas, {
-        type: 'radar',
+        type: chartType,
         data: {
-            labels: ['Value (P/E)', 'Efficiency (ROCE)', 'Return (ROE)', 'Solvency (D/E)', 'Safety Margin'],
-            datasets: datasets
+            labels: chartLabels,
+            datasets: chartDatasets
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: {
+                    display: selectedMetric === 'all',
                     position: 'bottom',
                     labels: {
                         color: textColor,
@@ -6372,35 +6462,12 @@ function drawCompareRadarChart(matrix) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return `${context.dataset.label}: ${context.raw.toFixed(1)}`;
+                            return `${context.dataset.label || context.label || ''}: ${context.raw.toFixed(2)}`;
                         }
                     }
                 }
             },
-            scales: {
-                r: {
-                    angleLines: {
-                        color: gridColor
-                    },
-                    grid: {
-                        color: gridColor
-                    },
-                    pointLabels: {
-                        color: textColor,
-                        font: {
-                            family: "'Outfit', sans-serif",
-                            size: 9,
-                            weight: '600'
-                        }
-                    },
-                    ticks: {
-                        display: false,
-                        stepSize: 20
-                    },
-                    min: 0,
-                    max: 100
-                }
-            }
+            scales: chartScales
         }
     });
 }
