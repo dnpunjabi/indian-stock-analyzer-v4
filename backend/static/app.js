@@ -21466,7 +21466,19 @@ function speakNextSegment() {
     }
     
     currentUtterance.pitch = segment.pitch;
-    currentUtterance.rate = 1.0;
+    
+    // Bind selected speed rate if configured
+    const rateSelect = document.getElementById('audio-rate-select');
+    if (rateSelect) {
+        const selectedRate = parseFloat(rateSelect.value);
+        if (!isNaN(selectedRate)) {
+            currentUtterance.rate = selectedRate;
+        } else {
+            currentUtterance.rate = 1.0;
+        }
+    } else {
+        currentUtterance.rate = 1.0;
+    }
     
     currentUtterance.onend = () => {
         speakNextSegment();
