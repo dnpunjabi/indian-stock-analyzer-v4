@@ -6334,7 +6334,7 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
 
     let chartLabels = [];
     if (selectedMetric === 'all') {
-        chartLabels = ['Value (P/E)', 'Efficiency (ROCE)', 'Return (ROE)', 'Solvency (D/E)', 'Safety Margin'];
+        chartLabels = ['Valuation', 'Quality', 'Growth', 'Momentum', 'Financial Health'];
     } else if (selectedMetric === 'valuation') {
         chartLabels = ['P/E Multiple Score', 'Intrinsic Discount', 'Valuation Rating', 'AI Advisory Score'];
     } else if (selectedMetric === 'quality') {
@@ -6344,15 +6344,15 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
     } else if (selectedMetric === 'momentum') {
         chartLabels = ['RSI-14 Momentum', 'Trend Alignment', 'Momentum Strength', 'AI Advisory Score'];
     } else {
-        chartLabels = ['Value (P/E)', 'Efficiency (ROCE)', 'Return (ROE)', 'Solvency (D/E)', 'Safety Margin'];
+        chartLabels = ['Valuation', 'Quality', 'Growth', 'Momentum', 'Financial Health'];
     }
 
     const colors = [
-        { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.12)' },
-        { border: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
-        { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.12)' },
-        { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.12)' },
-        { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.12)' }
+        { border: '#3b82f6', bg: 'rgba(59, 130, 246, 0.10)' },
+        { border: '#10b981', bg: 'rgba(16, 185, 129, 0.10)' },
+        { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.10)' },
+        { border: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.10)' },
+        { border: '#ec4899', bg: 'rgba(236, 72, 153, 0.10)' }
     ];
 
     const chartDatasets = matrix.map((item, idx) => {
@@ -6378,7 +6378,20 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
 
         let dataValues = [];
         if (selectedMetric === 'all') {
-            dataValues = [peScore, roceScore, roeScore, deScore, mosScore];
+            // Moneycontrol 5-Pillar Score computation
+            const valScore = Math.round(peScore * 0.5 + mosScore * 0.5);
+            const qualScore = Math.round(roceScore * 0.5 + roeScore * 0.5);
+            const growthScore = Math.round(scoreVal * 0.85 + roeScore * 0.15);
+            
+            let trendVal = 50;
+            const trendStr = (item.trend || '').toLowerCase();
+            if (trendStr.includes('bullish') || trendStr.includes('bull')) trendVal = 90;
+            else if (trendStr.includes('bearish') || trendStr.includes('bear')) trendVal = 20;
+            const momScore = Math.round(rsiVal * 0.4 + trendVal * 0.6);
+            
+            const finScore = Math.round(deScore * 0.6 + mosScore * 0.4);
+
+            dataValues = [valScore, qualScore, growthScore, momScore, finScore];
         } else if (selectedMetric === 'valuation') {
             let valRatingScore = 60;
             const valRatingStr = (item.valuation_rating || '').toLowerCase();
@@ -6409,10 +6422,10 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
             borderColor: color.border,
             backgroundColor: color.bg,
             borderWidth: 2,
-            pointRadius: 3,
+            pointRadius: 4,
             pointBackgroundColor: color.border,
             pointBorderColor: '#fff',
-            pointHoverRadius: 5
+            pointHoverRadius: 6
         };
     });
 
@@ -6422,9 +6435,15 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
             grid: { color: gridColor },
             pointLabels: {
                 color: textColor,
-                font: { family: "'Outfit', sans-serif", size: 9, weight: '600' }
+                font: { family: "'Outfit', sans-serif", size: 10, weight: '700' }
             },
-            ticks: { display: false, stepSize: 20 },
+            ticks: { 
+                display: true, 
+                color: textColor,
+                backdropColor: 'transparent',
+                font: { family: "'Outfit', sans-serif", size: 8 },
+                stepSize: 20
+            },
             min: 0,
             max: 100
         }
@@ -6454,8 +6473,53 @@ function drawCompareRadarChart(matrix, selectedMetric = 'all') {
                 },
                 tooltip: {
                     callbacks: {
+                        title: function(context) {
+                            return context[0].dataset.label;
+                        },
                         label: function(context) {
-                            return `${context.dataset.label || context.label || ''}: ${context.raw.toFixed(2)}`;
+                            const companyName = context.dataset.label;
+                            const item = matrix.find(x => x.company_name === companyName);
+                            if (!item) return `${context.label}: ${context.raw.toFixed(1)}`;
+
+                            const index = context.dataIndex;
+                            const label = context.chart.data.labels[index];
+                            const score = context.raw;
+
+                            const pe = typeof item.pe === 'number' ? item.pe.toFixed(1) : 'N/A';
+                            const roe = typeof item.roe === 'number' ? item.roe.toFixed(1) + '%' : 'N/A';
+                            const roce = typeof item.roce === 'number' ? item.roce.toFixed(1) + '%' : 'N/A';
+                            const de = typeof item.debt_eq === 'number' ? item.debt_eq.toFixed(2) : 'N/A';
+                            const mos = typeof item.margin_of_safety === 'number' ? item.margin_of_safety.toFixed(1) + '%' : 'N/A';
+                            const rsi = typeof item.rsi === 'number' ? item.rsi.toFixed(1) : 'N/A';
+
+                            if (selectedMetric === 'all') {
+                                if (index === 0) return `Valuation Score: ${score.toFixed(0)}/100 (P/E: ${pe}, MoS: ${mos})`;
+                                if (index === 1) return `Quality Score: ${score.toFixed(0)}/100 (ROCE: ${roce})`;
+                                if (index === 2) return `Growth Score: ${score.toFixed(0)}/100 (ROE: ${roe})`;
+                                if (index === 3) return `Momentum Score: ${score.toFixed(0)}/100 (RSI: ${rsi})`;
+                                if (index === 4) return `Financial Health Score: ${score.toFixed(0)}/100 (D/E: ${de})`;
+                            } else if (selectedMetric === 'valuation') {
+                                if (index === 0) return `P/E Multiple Score: ${score.toFixed(0)}/100 (P/E: ${pe})`;
+                                if (index === 1) return `Intrinsic Discount Score: ${score.toFixed(0)}/100 (MoS: ${mos})`;
+                                if (index === 2) return `Valuation Rating: ${score.toFixed(0)}/100 (${item.valuation_rating || 'N/A'})`;
+                                if (index === 3) return `AI Advisory Score: ${score.toFixed(0)}/100`;
+                            } else if (selectedMetric === 'quality') {
+                                if (index === 0) return `ROCE Strength: ${score.toFixed(0)}/100 (ROCE: ${roce})`;
+                                if (index === 1) return `ROE Strength: ${score.toFixed(0)}/100 (ROE: ${roe})`;
+                                if (index === 2) return `Capital Efficiency Score: ${score.toFixed(0)}/100`;
+                                if (index === 3) return `AI Advisory Score: ${score.toFixed(0)}/100`;
+                            } else if (selectedMetric === 'solvency') {
+                                if (index === 0) return `Solvency (D/E) Score: ${score.toFixed(0)}/100 (D/E: ${de})`;
+                                if (index === 1) return `Margin of Safety Score: ${score.toFixed(0)}/100 (MoS: ${mos})`;
+                                if (index === 2) return `Solvency Strength: ${score.toFixed(0)}/100`;
+                                if (index === 3) return `AI Advisory Score: ${score.toFixed(0)}/100`;
+                            } else if (selectedMetric === 'momentum') {
+                                if (index === 0) return `RSI-14 Momentum: ${score.toFixed(0)}/100 (RSI: ${rsi})`;
+                                if (index === 1) return `Trend Alignment: ${score.toFixed(0)}/100 (Trend: ${item.trend || 'N/A'})`;
+                                if (index === 2) return `Momentum Strength: ${score.toFixed(0)}/100`;
+                                if (index === 3) return `AI Advisory Score: ${score.toFixed(0)}/100`;
+                            }
+                            return `${label}: ${score.toFixed(1)}`;
                         }
                     }
                 }
