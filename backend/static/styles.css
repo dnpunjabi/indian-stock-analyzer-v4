@@ -9824,12 +9824,13 @@ tr.active-peer-row td:first-child {
     background: var(--bg-card-sub);
     border: 1px solid var(--border-glass);
     border-radius: 8px;
-    padding: 8px 12px;
+    padding: 10px 12px;
     margin-top: 12px;
     margin-bottom: 12px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
@@ -9837,6 +9838,7 @@ tr.active-peer-row td:first-child {
     display: flex;
     align-items: center;
     gap: 8px;
+    width: 100%;
 }
 
 .audio-console-title {
@@ -9856,6 +9858,8 @@ tr.active-peer-row td:first-child {
     display: flex;
     align-items: center;
     gap: 6px;
+    flex-wrap: wrap;
+    width: 100%;
 }
 
 .audio-btn {
@@ -9869,8 +9873,11 @@ tr.active-peer-row td:first-child {
     cursor: pointer;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     transition: all 0.2s ease;
+    flex: 1;
+    min-width: 55px;
 }
 
 .audio-btn:hover {
