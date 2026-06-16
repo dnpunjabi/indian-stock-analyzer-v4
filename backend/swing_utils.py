@@ -300,3 +300,897 @@ def analyze_swing_signals(df, horizon="short"):
                     desc = f"Price is consolidating below the 20-day EMA ({ema_dist:.1f}%), showing short-term index digestion. Await high-volume reversal triggers."
                     
     return setup, desc, stop_loss, tp1, tp2
+
+
+def calculate_trendlines_with_breaks(df, length=14, atr_mult=1.0, calc_method='Atr', backpaint=True):
+    """
+    Implements a custom "Trendlines with Breaks" mathematical engine (similar to LuxAlgo).
+    Identifies Pivot Highs/Lows and connects them with lines, detecting when the Close crosses
+    the projected line by at least atr_mult * ATR.
+    """
+    if len(df) < 2 * length + 1:
+        # Fallback if too few rows
+        return {
+            "resistance": [None] * len(df),
+            "support": [None] * len(df),
+            "bullish_breaks": [False] * len(df),
+            "bearish_breaks": [False] * len(df)
+        }
+    
+    close = df['Close'].values
+    high = df['High'].values
+    low = df['Low'].values
+    n = len(df)
+    
+    # 1. Slope Calculation Method
+    # True range (TR) and ATR (RMA wilder moving average matching TradingView)
+    tr = np.maximum(high - low, np.maximum(np.abs(high - np.roll(close, 1)), np.abs(low - np.roll(close, 1))))
+    tr[0] = high[0] - low[0]
+    
+    atr = np.zeros_like(tr)
+    if len(tr) >= length:
+        atr[length-1] = np.mean(tr[:length])
+        alpha = 1.0 / length
+        for idx in range(length, len(tr)):
+            atr[idx] = alpha * tr[idx] + (1 - alpha) * atr[idx-1]
+        for idx in range(length - 1):
+            atr[idx] = atr[length-1]
+    else:
+        atr[:] = np.mean(tr) if len(tr) > 0 else 0.0
+        
+    # Standard deviation (ddof=0 matching TradingView)
+    std = df['Close'].rolling(window=length).std(ddof=0).values
+    std = np.nan_to_num(std, nan=0.0)
+    
+    # Linear Regression slope
+    n_seq = np.arange(len(df))
+    src_n = close * n_seq
+    sma_src_n = pd.Series(src_n).rolling(window=length).mean().values
+    sma_src = pd.Series(close).rolling(window=length).mean().values
+    sma_n = pd.Series(n_seq).rolling(window=length).mean().values
+    var_n = pd.Series(n_seq).rolling(window=length).var(ddof=0).values
+    
+    slope_linreg = np.zeros(len(df))
+    for i in range(len(df)):
+        if i >= length - 1 and var_n[i] > 0:
+            slope_linreg[i] = abs(sma_src_n[i] - sma_src[i] * sma_n[i]) / var_n[i] / 2.0 * atr_mult
+        else:
+            slope_linreg[i] = 0.0
+            
+    # Resolve slopes based on Pine CalcMethod
+    if calc_method == 'Atr':
+        slopes = (atr / length) * atr_mult
+    elif calc_method == 'Stdev':
+        slopes = (std / length) * atr_mult
+    elif calc_method == 'Linreg':
+        slopes = slope_linreg
+    else:
+        slopes = (atr / length) * atr_mult
+        
+    # 2. Pivot Highs & Lows (ta.pivothigh(length, length))
+    ph = [None] * len(df)
+    pl = [None] * len(df)
+    
+    for i in range(2 * length, len(df)):
+        p_idx = i - length
+        val_h = high[p_idx]
+        val_l = low[p_idx]
+        
+        # Check pivot high
+        is_ph = True
+        for j in range(i - 2 * length, p_idx):
+            if high[j] > val_h:
+                is_ph = False
+                break
+        if is_ph:
+            for j in range(p_idx + 1, i + 1):
+                if high[j] >= val_h:
+                    is_ph = False
+                    break
+        if is_ph:
+            ph[i] = float(val_h)
+            
+        # Check pivot low
+        is_pl = True
+        for j in range(i - 2 * length, p_idx):
+            if low[j] < val_l:
+                is_pl = False
+                break
+        if is_pl:
+            for j in range(p_idx + 1, i + 1):
+                if low[j] <= val_l:
+                    is_pl = False
+                    break
+        if is_pl:
+            pl[i] = float(val_l)
+            
+    # 3. Project lines and check breakouts bar-by-bar
+    resistance = [None] * n
+    support = [None] * n
+    bullish_breaks = [False] * n
+    bearish_breaks = [False] * n
+    
+    upper = 0.0
+    lower = 0.0
+    slope_ph = 0.0
+    slope_pl = 0.0
+    
+    upos = 0
+    dnos = 0
+    
+    upos_prev = 0
+    dnos_prev = 0
+    
+    first_ph_found = False
+    first_pl_found = False
+    
+    for i in range(n):
+        # Update slopes on pivot detection
+        if ph[i] is not None:
+            slope_ph = slopes[i]
+            upper = ph[i]
+            first_ph_found = True
+            upos = 0
+        else:
+            upper = upper - slope_ph
+            
+        if pl[i] is not None:
+            slope_pl = slopes[i]
+            lower = pl[i]
+            first_pl_found = True
+            dnos = 0
+        else:
+            lower = lower + slope_pl
+            
+        # Breakouts are checked on the current Close in real-time
+        # upos := ph ? 0 : close > upper - slope_ph * length ? 1 : upos
+        # dnos := pl ? 0 : close < lower + slope_pl * length ? 1 : dnos
+        if ph[i] is not None:
+            upos = 0
+        elif first_ph_found and close[i] > upper - slope_ph * length:
+            upos = 1
+            
+        if pl[i] is not None:
+            dnos = 0
+        elif first_pl_found and close[i] < lower + slope_pl * length:
+            dnos = 1
+            
+        # Breakout occurs when state flips from 0 to 1
+        if i > 0:
+            if upos > upos_prev:
+                bullish_breaks[i] = True
+            if dnos > dnos_prev:
+                bearish_breaks[i] = True
+                
+        upos_prev = upos
+        dnos_prev = dnos
+        
+        # Save values based on backpainting options
+        if backpaint:
+            if i >= length:
+                target_idx = i - length
+                if first_ph_found and ph[i] is None:
+                    resistance[target_idx] = round(float(upper), 2)
+                if first_pl_found and pl[i] is None:
+                    support[target_idx] = round(float(lower), 2)
+        else:
+            if first_ph_found and ph[i] is None:
+                resistance[i] = round(float(upper - slope_ph * length), 2)
+            if first_pl_found and pl[i] is None:
+                support[i] = round(float(lower + slope_pl * length), 2)
+                
+    # Extend last lines forward up to current index (n-1) to avoid trailing truncation gaps in backpaint mode
+    if backpaint and n > length:
+        for idx in range(n - length, n):
+            if first_ph_found:
+                resistance[idx] = round(float(upper - slope_ph * (idx - (n - 1 - length))), 2)
+            if first_pl_found:
+                support[idx] = round(float(lower + slope_pl * (idx - (n - 1 - length))), 2)
+                
+    return {
+        "resistance": resistance,
+        "support": support,
+        "bullish_breaks": bullish_breaks,
+        "bearish_breaks": bearish_breaks
+    }
+
+def calculate_pivot_points(highs, lows, left_bars=4, right_bars=4):
+    """
+    Identifies pivot highs and lows.
+    A pivot high is a point where the high is greater than or equal to all highs
+    in the window [i - left_bars, i + right_bars].
+    A pivot low is a point where the low is less than or equal to all lows
+    in the window [i - left_bars, i + right_bars].
+    """
+    pivots = []
+    n = len(highs)
+    for i in range(left_bars, n - right_bars):
+        val_h = highs[i]
+        val_l = lows[i]
+        is_h = True
+        is_l = True
+        for j in range(i - left_bars, i + right_bars + 1):
+            if highs[j] > val_h:
+                is_h = False
+            if lows[j] < val_l:
+                is_l = False
+        if is_h:
+            pivots.append({"index": i, "value": float(val_h), "type": "high"})
+        if is_l:
+            pivots.append({"index": i, "value": float(val_l), "type": "low"})
+    return pivots
+
+def calculate_mxwll_suite(df, int_sens=3, ext_sens=25, show_last=10):
+    """
+    Implements calculations for the Mxwll Price Action Suite:
+    - Custom Swing Pivots (Int/Ext)
+    - BOS / CHoCH structural transitions
+    - Auto Fibonacci levels
+    - Fair Value Gaps (FVG) with mitigation checks
+    - Order Blocks (OB) with mitigation checks
+    """
+    if len(df) < max(ext_sens, 50) + 5:
+        return {
+            "fib_levels": {},
+            "order_blocks": [],
+            "fvg": [],
+            "structures": []
+        }
+    
+    highs = df['High'].values
+    lows = df['Low'].values
+    closes = df['Close'].values
+    opens = df['Open'].values
+    times = [str(d.date()) if hasattr(d, 'date') else str(d) for d in df.index]
+    n = len(df)
+    
+    # 1. Custom Pivot helper
+    def get_pivots(length):
+        top_swings = [0.0] * n
+        bot_swings = [0.0] * n
+        intra_calc = 0
+        
+        for i in range(length + 2, n):
+            up = max(highs[i - length + 1 : i + 1])
+            dn = min(lows[i - length + 1 : i + 1])
+            
+            cHi = highs[i - length]
+            cLo = lows[i - length]
+            
+            prev_intra = intra_calc
+            if cHi > up:
+                intra_calc = 0
+            elif cLo < dn:
+                intra_calc = 1
+                
+            if intra_calc == 0 and prev_intra != 0:
+                top_swings[i] = float(cHi)
+            elif intra_calc == 1 and prev_intra != 1:
+                bot_swings[i] = float(cLo)
+                
+        return top_swings, bot_swings
+        
+    big_upper, big_lower = get_pivots(ext_sens)
+    small_upper, small_lower = get_pivots(int_sens)
+    
+    # 2. Market Structure (BOS / CHoCH) and Order Blocks
+    structures = []
+    order_blocks = []
+    
+    moving = 0
+    upaxis = 0.0
+    upaxis2_idx = -1
+    dnaxis = 0.0
+    dnaxis2_idx = -1
+    upside = 1
+    downside = 1
+    
+    ob_counter = 0
+    
+    for i in range(n):
+        if big_upper[i] != 0.0:
+            upside = 1
+            x1_idx = i - ext_sens
+            upaxis = big_upper[i]
+            upaxis2_idx = x1_idx
+            
+            if x1_idx >= 0:
+                ob_counter += 1
+                order_blocks.append({
+                    "id": f"supply_{ob_counter}",
+                    "type": "supply",
+                    "top": float(big_upper[i]),
+                    "bottom": float(big_upper[i] * 0.998),
+                    "left_time": times[x1_idx],
+                    "left_idx": x1_idx,
+                    "mitigated": False
+                })
+                
+        if big_lower[i] != 0.0:
+            downside = 1
+            x1_idx = i - ext_sens
+            dnaxis = big_lower[i]
+            dnaxis2_idx = x1_idx
+            
+            if x1_idx >= 0:
+                ob_counter += 1
+                order_blocks.append({
+                    "id": f"demand_{ob_counter}",
+                    "type": "demand",
+                    "top": float(big_lower[i] * 1.002),
+                    "bottom": float(big_lower[i]),
+                    "left_time": times[x1_idx],
+                    "left_idx": x1_idx,
+                    "mitigated": False
+                })
+                
+        # Breakouts
+        if i > 0 and upaxis > 0.0 and upside != 0:
+            if closes[i-1] <= upaxis and closes[i] > upaxis:
+                struct_type = "CHoCH" if moving < 0 else "BOS"
+                structures.append({
+                    "time": times[i],
+                    "idx": i,
+                    "type": struct_type,
+                    "direction": "bullish",
+                    "price": float(upaxis),
+                    "pivot_time": times[upaxis2_idx] if upaxis2_idx >= 0 else times[i]
+                })
+                upside = 0
+                moving = 1
+                
+        if i > 0 and dnaxis > 0.0 and downside != 0:
+            if closes[i-1] >= dnaxis and closes[i] < dnaxis:
+                struct_type = "CHoCH" if moving > 0 else "BOS"
+                structures.append({
+                    "time": times[i],
+                    "idx": i,
+                    "type": struct_type,
+                    "direction": "bearish",
+                    "price": float(dnaxis),
+                    "pivot_time": times[dnaxis2_idx] if dnaxis2_idx >= 0 else times[i]
+                })
+                downside = 0
+                moving = -1
+                
+        # Mitigations
+        for ob in order_blocks:
+            if not ob["mitigated"] and i > ob["left_idx"]:
+                if ob["type"] == "supply":
+                    if closes[i] >= ob["top"]:
+                        ob["mitigated"] = True
+                elif ob["type"] == "demand":
+                    if closes[i] <= ob["bottom"]:
+                        ob["mitigated"] = True
+                        
+    # 3. Internal Structure
+    moving_small = 0
+    upaxis_small = 0.0
+    upaxis2_small_idx = -1
+    dnaxis_small = 0.0
+    dnaxis_small2_idx = -1
+    upside_small = 1
+    downside_small = 1
+    
+    for i in range(n):
+        if small_upper[i] != 0.0:
+            upside_small = 1
+            upaxis_small = small_upper[i]
+            upaxis2_small_idx = i - int_sens
+            
+        if small_lower[i] != 0.0:
+            downside_small = 1
+            dnaxis_small = small_lower[i]
+            dnaxis_small2_idx = i - int_sens
+            
+        if i > 0 and upaxis_small > 0.0 and upside_small != 0:
+            if closes[i-1] <= upaxis_small and closes[i] > upaxis_small:
+                struct_type = "I-CHoCH" if moving_small < 0 else "I-BOS"
+                structures.append({
+                    "time": times[i],
+                    "idx": i,
+                    "type": struct_type,
+                    "direction": "bullish",
+                    "price": float(upaxis_small),
+                    "pivot_time": times[upaxis2_small_idx] if upaxis2_small_idx >= 0 else times[i]
+                })
+                upside_small = 0
+                moving_small = 1
+                
+        if i > 0 and dnaxis_small > 0.0 and downside_small != 0:
+            if closes[i-1] >= dnaxis_small and closes[i] < dnaxis_small:
+                struct_type = "I-CHoCH" if moving_small > 0 else "I-BOS"
+                structures.append({
+                    "time": times[i],
+                    "idx": i,
+                    "type": struct_type,
+                    "direction": "bearish",
+                    "price": float(dnaxis_small),
+                    "pivot_time": times[dnaxis_small2_idx] if dnaxis_small2_idx >= 0 else times[i]
+                })
+                downside_small = 0
+                moving_small = -1
+                
+    # 4. Fair Value Gaps (FVG)
+    fvg = []
+    for i in range(2, n):
+        if lows[i] > highs[i-2]:
+            fvg.append({
+                "type": "bullish",
+                "top": float(lows[i]),
+                "bottom": float(highs[i-2]),
+                "left_time": times[i-2],
+                "left_idx": i-2,
+                "mitigated": False
+            })
+        elif highs[i] < lows[i-2]:
+            fvg.append({
+                "type": "bearish",
+                "top": float(lows[i-2]),
+                "bottom": float(highs[i]),
+                "left_time": times[i-2],
+                "left_idx": i-2,
+                "mitigated": False
+            })
+            
+        for g in fvg:
+            if not g["mitigated"] and i > g["left_idx"]:
+                if g["type"] == "bullish":
+                    if lows[i] <= g["bottom"]:
+                        g["mitigated"] = True
+                elif g["type"] == "bearish":
+                    if highs[i] >= g["top"]:
+                        g["mitigated"] = True
+
+    # Filter unmitigated Order Blocks and FVGs
+    active_obs = [ob for ob in order_blocks if not ob["mitigated"]]
+    active_fvgs = [g for g in fvg if not g["mitigated"]]
+    
+    # Slice to showLast elements
+    if show_last > 0:
+        active_obs = active_obs[-show_last:]
+        active_fvgs = active_fvgs[-show_last:]
+        
+    # 5. Auto Fibonacci Retracements
+    last_high_idx = -1
+    last_high_val = 0.0
+    last_low_idx = -1
+    last_low_val = 0.0
+    
+    for i in range(n-1, -1, -1):
+        if last_high_idx == -1 and big_upper[i] != 0.0:
+            last_high_idx = i
+            last_high_val = big_upper[i]
+        if last_low_idx == -1 and big_lower[i] != 0.0:
+            last_low_idx = i
+            last_low_val = big_lower[i]
+        if last_high_idx != -1 and last_low_idx != -1:
+            break
+            
+    fib_levels = {}
+    if last_high_idx != -1 and last_low_idx != -1:
+        diff = last_high_val - last_low_val
+        is_uptrend = last_low_idx < last_high_idx
+        
+        ratios = [0.236, 0.382, 0.500, 0.618, 0.786]
+        for r in ratios:
+            if is_uptrend:
+                fib_levels[str(r)] = round(float(last_high_val - r * diff), 2)
+            else:
+                fib_levels[str(r)] = round(float(last_low_val + r * diff), 2)
+                
+        fib_levels["0.0"] = round(float(last_high_val if is_uptrend else last_low_val), 2)
+        fib_levels["1.0"] = round(float(last_low_val if is_uptrend else last_high_val), 2)
+        fib_levels["anchor_start_time"] = times[min(last_high_idx, last_low_idx)]
+        fib_levels["anchor_end_time"] = times[max(last_high_idx, last_low_idx)]
+        
+        fib_levels["anchor_end_time"] = times[max(last_high_idx, last_low_idx)]
+        
+    return {
+        "fib_levels": fib_levels,
+        "order_blocks": active_obs,
+        "fvg": active_fvgs,
+        "structures": structures
+    }
+
+def get_smc_pivots(highs, lows, size):
+    n = len(highs)
+    leg_series = [0] * n
+    leg = 0
+    confirmed_highs = [0.0] * n
+    confirmed_lows = [0.0] * n
+    
+    for i in range(size, n):
+        sub_highs = highs[i - size + 1 : i + 1]
+        sub_lows = lows[i - size + 1 : i + 1]
+        
+        new_leg_high = highs[i - size] > max(sub_highs) if len(sub_highs) > 0 else False
+        new_leg_low = lows[i - size] < min(sub_lows) if len(sub_lows) > 0 else False
+        
+        if new_leg_high:
+            leg = 0
+        elif new_leg_low:
+            leg = 1
+            
+        leg_series[i] = leg
+        
+        if leg_series[i] == 1 and leg_series[i-1] == 0:
+            confirmed_lows[i - size] = float(lows[i - size])
+        elif leg_series[i] == 0 and leg_series[i-1] == 1:
+            confirmed_highs[i - size] = float(highs[i - size])
+            
+    return confirmed_highs, confirmed_lows
+
+def calculate_structures_and_ob(df, ext_highs, ext_lows, is_internal=False):
+    n = len(df)
+    highs = df['High'].values
+    lows = df['Low'].values
+    closes = df['Close'].values
+    times = [str(d.date()) if hasattr(d, 'date') else str(d) for d in df.index]
+    
+    structures = []
+    order_blocks = []
+    
+    active_high_val = None
+    active_high_idx = -1
+    active_high_crossed = True
+    
+    active_low_val = None
+    active_low_idx = -1
+    active_low_crossed = True
+    
+    trend_bias = None
+    
+    for i in range(n):
+        if ext_highs[i] != 0.0:
+            active_high_val = ext_highs[i]
+            active_high_idx = i
+            active_high_crossed = False
+            
+        if ext_lows[i] != 0.0:
+            active_low_val = ext_lows[i]
+            active_low_idx = i
+            active_low_crossed = False
+            
+        if active_high_val is not None and not active_high_crossed:
+            if closes[i] > active_high_val and closes[i-1] <= active_high_val:
+                direction = 'bullish'
+                struct_type = 'CHoCH' if trend_bias == 'bearish' else 'BOS'
+                structures.append({
+                    "time": times[i],
+                    "type": f"I-{struct_type}" if is_internal else struct_type,
+                    "direction": direction,
+                    "price": active_high_val,
+                    "level_idx": active_high_idx
+                })
+                active_high_crossed = True
+                trend_bias = 'bullish'
+                
+                start_idx = active_high_idx
+                end_idx = i
+                if start_idx <= end_idx:
+                    min_low_val = min(lows[start_idx : end_idx + 1])
+                    min_low_idx = start_idx + list(lows[start_idx : end_idx + 1]).index(min_low_val)
+                    order_blocks.append({
+                        "type": "demand",
+                        "top": float(highs[min_low_idx]),
+                        "bottom": float(lows[min_low_idx]),
+                        "left_time": times[min_low_idx],
+                        "left_idx": min_low_idx,
+                        "mitigated": False,
+                        "mitigated_time": None
+                    })
+                    
+        if active_low_val is not None and not active_low_crossed:
+            if closes[i] < active_low_val and closes[i-1] >= active_low_val:
+                direction = 'bearish'
+                struct_type = 'BOS' if trend_bias == 'bearish' else 'CHoCH'
+                structures.append({
+                    "time": times[i],
+                    "type": f"I-{struct_type}" if is_internal else struct_type,
+                    "direction": direction,
+                    "price": active_low_val,
+                    "level_idx": active_low_idx
+                })
+                active_low_crossed = True
+                trend_bias = 'bearish'
+                
+                start_idx = active_low_idx
+                end_idx = i
+                if start_idx <= end_idx:
+                    max_high_val = max(highs[start_idx : end_idx + 1])
+                    max_high_idx = start_idx + list(highs[start_idx : end_idx + 1]).index(max_high_val)
+                    order_blocks.append({
+                        "type": "supply",
+                        "top": float(highs[max_high_idx]),
+                        "bottom": float(lows[max_high_idx]),
+                        "left_time": times[max_high_idx],
+                        "left_idx": max_high_idx,
+                        "mitigated": False,
+                        "mitigated_time": None
+                    })
+                    
+    return structures, order_blocks
+
+def calculate_equal_high_low(df, length=3, threshold=0.1):
+    highs = df['High'].values
+    lows = df['Low'].values
+    times = [str(d.date()) if hasattr(d, 'date') else str(d) for d in df.index]
+    n = len(df)
+    
+    h_l = highs - lows
+    atr = [h_l[0]] * n
+    for i in range(1, n):
+        atr[i] = (atr[i-1] * 13 + h_l[i]) / 14.0
+        
+    p_highs, p_lows = get_smc_pivots(highs, lows, length)
+    
+    equal_highs = []
+    equal_lows = []
+    
+    last_high_val = None
+    last_high_time = None
+    last_low_val = None
+    last_low_time = None
+    
+    for i in range(n):
+        if p_highs[i] != 0.0:
+            val = p_highs[i]
+            if last_high_val is not None:
+                diff = abs(last_high_val - val)
+                if diff < threshold * atr[i]:
+                    equal_highs.append({
+                        "time": times[i],
+                        "price": float(round((last_high_val + val) / 2.0, 2)),
+                        "left_time": last_high_time,
+                        "right_time": times[i]
+                    })
+            last_high_val = val
+            last_high_time = times[i]
+            
+        if p_lows[i] != 0.0:
+            val = p_lows[i]
+            if last_low_val is not None:
+                diff = abs(last_low_val - val)
+                if diff < threshold * atr[i]:
+                    equal_lows.append({
+                        "time": times[i],
+                        "price": float(round((last_low_val + val) / 2.0, 2)),
+                        "left_time": last_low_time,
+                        "right_time": times[i]
+                    })
+            last_low_val = val
+            last_low_time = times[i]
+            
+    return equal_highs, equal_lows
+
+def calculate_fvg(df):
+    highs = df['High'].values
+    lows = df['Low'].values
+    closes = df['Close'].values
+    times = [str(d.date()) if hasattr(d, 'date') else str(d) for d in df.index]
+    n = len(df)
+    
+    fvg = []
+    for i in range(2, n):
+        if lows[i] > highs[i-2] and closes[i-1] > highs[i-2]:
+            fvg.append({
+                "type": "bullish",
+                "top": float(lows[i]),
+                "bottom": float(highs[i-2]),
+                "left_time": times[i-2],
+                "left_idx": i-2,
+                "mitigated": False,
+                "mitigated_time": None
+            })
+        elif highs[i] < lows[i-2] and closes[i-1] < lows[i-2]:
+            fvg.append({
+                "type": "bearish",
+                "top": float(lows[i-2]),
+                "bottom": float(highs[i]),
+                "left_time": times[i-2],
+                "left_idx": i-2,
+                "mitigated": False,
+                "mitigated_time": None
+            })
+            
+    for g in fvg:
+        start_idx = g["left_idx"] + 2
+        for j in range(start_idx, n):
+            if g["type"] == "bullish":
+                if lows[j] < g["bottom"]:
+                    g["mitigated"] = True
+                    g["mitigated_time"] = times[j]
+                    break
+            elif g["type"] == "bearish":
+                if highs[j] > g["top"]:
+                    g["mitigated"] = True
+                    g["mitigated_time"] = times[j]
+                    break
+                    
+    return fvg
+
+def calculate_mtf_levels(df):
+    highs = df['High'].values
+    lows = df['Low'].values
+    times = [str(d.date()) if hasattr(d, 'date') else str(d) for d in df.index]
+    n = len(df)
+    
+    daily_levels = []
+    weekly_levels = []
+    monthly_levels = []
+    
+    for i in range(1, n):
+        daily_levels.append({
+            "time": times[i],
+            "high": float(highs[i-1]),
+            "low": float(lows[i-1])
+        })
+        
+        curr_date = df.index[i]
+        prev_week_end = curr_date - pd.Timedelta(days=curr_date.weekday() + 1)
+        prev_week_rows = df[df.index <= prev_week_end]
+        if len(prev_week_rows) > 0:
+            last_week_rows = prev_week_rows[prev_week_rows.index >= prev_week_end - pd.Timedelta(days=6)]
+            if len(last_week_rows) > 0:
+                weekly_levels.append({
+                    "time": times[i],
+                    "high": float(last_week_rows['High'].max()),
+                    "low": float(last_week_rows['Low'].min())
+                })
+            else:
+                weekly_levels.append({"time": times[i], "high": float(highs[i-1]), "low": float(lows[i-1])})
+        else:
+            weekly_levels.append({"time": times[i], "high": float(highs[i-1]), "low": float(lows[i-1])})
+            
+        curr_year = curr_date.year
+        curr_month = curr_date.month
+        if curr_month == 1:
+            prev_year = curr_year - 1
+            prev_month = 12
+        else:
+            prev_year = curr_year
+            prev_month = curr_month - 1
+            
+        prev_month_rows = df[(df.index.year == prev_year) & (df.index.month == prev_month)]
+        if len(prev_month_rows) > 0:
+            monthly_levels.append({
+                "time": times[i],
+                "high": float(prev_month_rows['High'].max()),
+                "low": float(prev_month_rows['Low'].min())
+            })
+        else:
+            monthly_levels.append({"time": times[i], "high": float(highs[i-1]), "low": float(lows[i-1])})
+            
+    if len(daily_levels) > 0:
+        daily_levels.insert(0, daily_levels[0])
+    else:
+        daily_levels.append({"time": times[0], "high": float(highs[0]), "low": float(lows[0])})
+        
+    if len(weekly_levels) > 0:
+        weekly_levels.insert(0, weekly_levels[0])
+    else:
+        weekly_levels.append({"time": times[0], "high": float(highs[0]), "low": float(lows[0])})
+        
+    if len(monthly_levels) > 0:
+        monthly_levels.insert(0, monthly_levels[0])
+    else:
+        monthly_levels.append({"time": times[0], "high": float(highs[0]), "low": float(lows[0])})
+        
+    return daily_levels, weekly_levels, monthly_levels
+
+def calculate_lux_smc(df, int_sens=5, ext_sens=50, equal_len=3, equal_thresh=0.1, fvg_extend=1, show_last=15):
+    """
+    Implements LuxAlgo - Smart Money Concepts:
+    - Real Time Swing Structure (ext_sens = 50)
+    - Real Time Internal Structure (int_sens = 5)
+    - Equal Highs / Equal Lows (equal_len = 3, equal_thresh = 0.1)
+    - Order Blocks (Supply & Demand, Internal & Swing)
+    - Fair Value Gaps (FVG)
+    - Premium & Discount Zones
+    - Daily, Weekly, Monthly Levels
+    """
+    if len(df) < max(ext_sens, 50) + 5:
+        return {
+            "structures": [],
+            "order_blocks": [],
+            "fvg": [],
+            "equal_high_low": {"equal_highs": [], "equal_lows": []},
+            "premium_discount": {},
+            "daily_levels": [],
+            "weekly_levels": [],
+            "monthly_levels": []
+        }
+        
+    highs = df['High'].values
+    lows = df['Low'].values
+    closes = df['Close'].values
+    times = [str(d.date()) if hasattr(d, 'date') else str(d) for d in df.index]
+    n = len(df)
+    
+    swing_highs, swing_lows = get_smc_pivots(highs, lows, ext_sens)
+    int_highs, int_lows = get_smc_pivots(highs, lows, int_sens)
+    
+    structures = []
+    order_blocks = []
+    
+    # Swing Structure
+    swing_structs, swing_obs = calculate_structures_and_ob(df, swing_highs, swing_lows, is_internal=False)
+    for ob in swing_obs:
+        ob["class"] = "swing"
+    structures.extend(swing_structs)
+    order_blocks.extend(swing_obs)
+    
+    # Internal Structure
+    int_structs, int_obs = calculate_structures_and_ob(df, int_highs, int_lows, is_internal=True)
+    for ob in int_obs:
+        ob["class"] = "internal"
+    structures.extend(int_structs)
+    order_blocks.extend(int_obs)
+    
+    # Check mitigations
+    for ob in order_blocks:
+        start_idx = ob["left_idx"]
+        for j in range(start_idx + 1, n):
+            if ob["type"] == "supply":
+                if highs[j] > ob["top"]:
+                    ob["mitigated"] = True
+                    ob["mitigated_time"] = times[j]
+                    break
+            elif ob["type"] == "demand":
+                if lows[j] < ob["bottom"]:
+                    ob["mitigated"] = True
+                    ob["mitigated_time"] = times[j]
+                    break
+                    
+    active_obs = [ob for ob in order_blocks if not ob["mitigated"]]
+    
+    # Equal Highs / Equal Lows
+    equal_highs, equal_lows = calculate_equal_high_low(df, length=equal_len, threshold=equal_thresh)
+    
+    # Fair Value Gaps
+    fvgs = calculate_fvg(df)
+    active_fvgs = [g for g in fvgs if not g["mitigated"]]
+    
+    # Premium & Discount Zones
+    lookback = min(150, n)
+    recent_highs = [val for val in swing_highs[-lookback:] if val != 0.0]
+    recent_lows = [val for val in swing_lows[-lookback:] if val != 0.0]
+    
+    if len(recent_highs) > 0 and len(recent_lows) > 0:
+        max_high = max(recent_highs)
+        min_low = min(recent_lows)
+    else:
+        max_high = float(max(highs[-lookback:]))
+        min_low = float(min(lows[-lookback:]))
+        
+    premium_discount = {
+        "top": round(max_high, 2),
+        "bottom": round(min_low, 2),
+        "equilibrium": round((max_high + min_low) / 2.0, 2)
+    }
+    
+    # Daily, Weekly, Monthly Levels
+    daily_levels, weekly_levels, monthly_levels = calculate_mtf_levels(df)
+    
+    if show_last > 0:
+        active_obs = active_obs[-show_last:]
+        active_fvgs = active_fvgs[-show_last:]
+        structures = structures[-show_last*2:]
+        equal_highs = equal_highs[-show_last:]
+        equal_lows = equal_lows[-show_last:]
+        
+    return {
+        "structures": structures,
+        "order_blocks": active_obs,
+        "fvg": active_fvgs,
+        "equal_high_low": {
+            "equal_highs": equal_highs,
+            "equal_lows": equal_lows
+        },
+        "premium_discount": premium_discount,
+        "daily_levels": daily_levels[-show_last:],
+        "weekly_levels": weekly_levels[-show_last:],
+        "monthly_levels": monthly_levels[-show_last:]
+    }
+

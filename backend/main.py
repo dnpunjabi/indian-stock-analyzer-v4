@@ -1606,6 +1606,96 @@ async def get_chart_data(ticker: str, period: str = "1y", interval: str = "1d"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Price series could not be retrieved from Yahoo Chart API: {str(e)}")
 
+
+@app.get("/api/chart/tv-chart-data")
+async def get_tv_chart_data(
+    ticker: str,
+    period: str = "1y",
+    interval: str = "1d",
+    length: int = 14,
+    mult: float = 1.0,
+    int_sens: int = 3,
+    ext_sens: int = 25,
+    show_last: int = 10
+):
+    """
+    Exposes raw candlestick data, EMAs, volume, custom Trendlines with Breaks,
+    and Mxwll Price Action Suite calculations for high-fidelity TradingView Lightweight Charts overlays.
+    """
+    if not ticker:
+        raise HTTPException(status_code=400, detail="Ticker parameter is required.")
+    try:
+        fetch_range = "2y"
+        if interval == "1wk":
+            fetch_range = "5y"
+        elif interval == "1mo":
+            fetch_range = "max"
+            
+        df = await fetch_history_df(ticker, fetch_range, interval)
+        if df.empty:
+            raise HTTPException(status_code=404, detail="No price data returned from Yahoo Chart endpoint.")
+            
+        df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
+        df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
+        
+        from backend.swing_utils import calculate_trendlines_with_breaks, calculate_mxwll_suite, calculate_lux_smc
+        breaks_data = calculate_trendlines_with_breaks(df, length=length, atr_mult=mult)
+        mxwll_data = calculate_mxwll_suite(df, int_sens=int_sens, ext_sens=ext_sens, show_last=show_last)
+        lux_smc_data = calculate_lux_smc(df, int_sens=int_sens, ext_sens=ext_sens, show_last=show_last)
+        
+        df['Resistance'] = breaks_data["resistance"]
+        df['Support'] = breaks_data["support"]
+        df['Bullish_Break'] = breaks_data["bullish_breaks"]
+        df['Bearish_Break'] = breaks_data["bearish_breaks"]
+        
+        period_days = {
+            "1mo": 30,
+            "3mo": 90,
+            "6mo": 180,
+            "1y": 365,
+            "2y": 365 * 2,
+            "3y": 365 * 3,
+            "5y": 365 * 5
+        }
+        days = period_days.get(period, 365)
+        cutoff_date = datetime.now() - timedelta(days=days)
+        
+        df_sliced = df[df.index >= cutoff_date]
+        if len(df_sliced) < 5:
+            df_sliced = df.tail(60)
+            
+        candlesticks = []
+        for idx in range(len(df_sliced)):
+            row_idx = df_sliced.index[idx]
+            candlesticks.append({
+                "time": row_idx.strftime("%Y-%m-%d"),
+                "open": round(float(df_sliced["Open"].iloc[idx]), 2),
+                "high": round(float(df_sliced["High"].iloc[idx]), 2),
+                "low": round(float(df_sliced["Low"].iloc[idx]), 2),
+                "close": round(float(df_sliced["Close"].iloc[idx]), 2),
+                "volume": round(float(df_sliced["Volume"].iloc[idx]), 2),
+                "ema_20": round(float(df_sliced["EMA_20"].iloc[idx]), 2) if not pd.isna(df_sliced["EMA_20"].iloc[idx]) else None,
+                "ema_50": round(float(df_sliced["EMA_50"].iloc[idx]), 2) if not pd.isna(df_sliced["EMA_50"].iloc[idx]) else None,
+                "resistance": round(float(df_sliced["Resistance"].iloc[idx]), 2) if not pd.isna(df_sliced["Resistance"].iloc[idx]) else None,
+                "support": round(float(df_sliced["Support"].iloc[idx]), 2) if not pd.isna(df_sliced["Support"].iloc[idx]) else None,
+                "bullish_break": bool(df_sliced["Bullish_Break"].iloc[idx]),
+                "bearish_break": bool(df_sliced["Bearish_Break"].iloc[idx])
+            })
+            
+        return {
+            "symbol": ticker,
+            "period": period,
+            "interval": interval,
+            "length": length,
+            "mult": mult,
+            "candlesticks": candlesticks,
+            "mxwll": mxwll_data,
+            "lux_smc": lux_smc_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"TradingView chart data calculation error: {str(e)}")
+
+
 @app.get("/api/compare")
 async def compare_rivals(tickers: str, generate_thesis: bool = False):
     """Benchmarks rivals side-by-side."""

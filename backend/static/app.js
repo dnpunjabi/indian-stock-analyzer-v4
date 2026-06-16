@@ -5152,8 +5152,14 @@ function drawStockChartCanvas(data) {
     // Trigger Resize Handler
     const resizeObserver = new ResizeObserver(entries => {
         for (let entry of entries) {
-            const newHeight = window.innerWidth <= 768 ? 250 : 380;
-            chart.resize(entry.contentRect.width, newHeight);
+            const isFullscreen = container.closest('.fullscreen-card-active') !== null;
+            const targetHeight = isFullscreen 
+                ? Math.max(container.clientHeight || 0, window.innerHeight - 250) 
+                : (window.innerWidth <= 768 ? 250 : 380);
+            const targetWidth = entry.contentRect.width || container.clientWidth;
+            if (targetWidth > 50 && targetHeight > 50) {
+                chart.resize(targetWidth, targetHeight);
+            }
         }
     });
     resizeObserver.observe(container);
@@ -9300,7 +9306,14 @@ function drawFibonacciChart(p) {
     // Resize Observer
     const resizeObserver = new ResizeObserver(entries => {
         for (let entry of entries) {
-            chart.resize(entry.contentRect.width, 250);
+            const isFullscreen = container.closest('.fullscreen-card-active') !== null;
+            const targetHeight = isFullscreen 
+                ? Math.max(container.clientHeight || 0, window.innerHeight - 320) 
+                : 250;
+            const targetWidth = entry.contentRect.width || container.clientWidth;
+            if (targetWidth > 50 && targetHeight > 50) {
+                chart.resize(targetWidth, targetHeight);
+            }
         }
     });
     resizeObserver.observe(container);
@@ -11548,6 +11561,7 @@ function updateLightweightChartsThemeColors() {
     applyToLightweightChart(window.activeLightweightPeerChart);
     applyToLightweightChart(window.activeLightweightChart);
     applyToLightweightChart(window.activeFibLightweightChart);
+    applyToLightweightChart(activeTVWorkstationChart);
 
     if (window.activeVolatilityLightweightCharts) {
         applyToLightweightChart(window.activeVolatilityLightweightCharts.bb);
@@ -14311,6 +14325,14 @@ function setupAnalyzerSubtabs() {
             if (activeSubtab === 'volume') {
                 if (activeStockProfile && activeStockProfile.ticker) {
                     loadPriceVolumeDynamics(activeStockProfile.ticker);
+                } else {
+                    showToast("Please load a stock analyzer profile first.", "warning");
+                }
+            }
+
+            if (activeSubtab === 'tv-chart') {
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    renderTVWorkstationChart(activeStockProfile.ticker);
                 } else {
                     showToast("Please load a stock analyzer profile first.", "warning");
                 }
@@ -18265,6 +18287,15 @@ let activeSwingCandidate = null;
 let activeSwingTimeframe = '1D';
 let activeSwingHorizon = 'short';
 
+// ==================== INTERACTIVE WORKSTATION CHART ====================
+let activeTVWorkstationChart = null;
+let activeTVCandleSeries = null;
+let activeTVEma20Series = null;
+let activeTVEma50Series = null;
+let activeTVResistanceSeries = null;
+let activeTVSupportSeries = null;
+let activeTVVolumeSeries = null;
+
 function setupSwingWorkspace() {
     // Horizon Switch Syncing & Binding
     const scanHorizonShortBtn = document.getElementById('swing-scan-horizon-short-btn');
@@ -22032,4 +22063,820 @@ function setupAudioConsoleBindings() {
 document.addEventListener('DOMContentLoaded', () => {
     setupRuleScanner();
     setupAudioConsoleBindings();
+    setupTVWorkstationChartControls();
 });
+
+// ==================== INTERACTIVE WORKSTATION CHART CONTROLS & RENDERER ====================
+async function renderTVWorkstationChart(symbol) {
+    if (!symbol) return;
+    
+    const container = document.getElementById('tv-chart-container');
+    if (!container) return;
+    
+    // Check if LightweightCharts is loaded
+    if (typeof LightweightCharts === 'undefined') {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">TradingView Lightweight Charts is offline. Please check your internet connection.</div>';
+        return;
+    }
+    
+    const indicator = document.getElementById('tv-active-indicator')?.value || 'lux-algo';
+    const length = parseInt(document.getElementById('tv-length')?.value || '14', 10);
+    const mult = parseFloat(document.getElementById('tv-mult')?.value || '1.0');
+    
+    const showLines = document.getElementById('tv-show-lines')?.checked ?? true;
+    const showBreaks = document.getElementById('tv-show-breaks')?.checked ?? true;
+    const showVolume = document.getElementById('tv-show-volume')?.checked ?? true;
+    
+    const showFibs = document.getElementById('tv-show-fibs')?.checked ?? true;
+    const showOBs = document.getElementById('tv-show-obs')?.checked ?? true;
+    const showFVGs = document.getElementById('tv-show-fvgs')?.checked ?? true;
+    const showStructs = document.getElementById('tv-show-structs')?.checked ?? true;
+    
+    // LuxAlgo SMC Controls
+    const showSMCSwing = document.getElementById('tv-smc-swing')?.checked ?? true;
+    const showSMCInternal = document.getElementById('tv-smc-internal')?.checked ?? true;
+    const showSMCOBs = document.getElementById('tv-smc-obs')?.checked ?? true;
+    const showSMCFVGs = document.getElementById('tv-smc-fvgs')?.checked ?? true;
+    const showSMCEqhl = document.getElementById('tv-smc-eqhl')?.checked ?? true;
+    const showSMCMtf = document.getElementById('tv-smc-mtf')?.checked ?? false;
+    const showSMCZones = document.getElementById('tv-smc-zones')?.checked ?? false;
+    
+    // Show/hide parameter controls based on active indicator
+    const legendLegends = document.querySelectorAll('.tv-indicator-legend');
+    const luxAlgoCtrls = document.querySelectorAll('.lux-algo-control-element');
+    const mxwllCtrls = document.querySelectorAll('.mxwll-control-element');
+    const luxSMCCtrls = document.querySelectorAll('.lux-smc-control-element');
+    
+    if (indicator === 'none') {
+        if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = true;
+        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = true;
+        legendLegends.forEach(el => el.style.display = 'none');
+        luxAlgoCtrls.forEach(el => el.style.display = 'none');
+        mxwllCtrls.forEach(el => el.style.display = 'none');
+        luxSMCCtrls.forEach(el => el.style.display = 'none');
+    } else if (indicator === 'lux-algo') {
+        if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = false;
+        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = false;
+        legendLegends.forEach(el => el.style.display = 'flex');
+        luxAlgoCtrls.forEach(el => el.style.display = 'flex');
+        mxwllCtrls.forEach(el => el.style.display = 'none');
+        luxSMCCtrls.forEach(el => el.style.display = 'none');
+    } else if (indicator === 'mxwll') {
+        if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = false;
+        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = true;
+        legendLegends.forEach(el => el.style.display = 'none');
+        luxAlgoCtrls.forEach(el => el.style.display = 'none');
+        mxwllCtrls.forEach(el => el.style.display = 'flex');
+        luxSMCCtrls.forEach(el => el.style.display = 'none');
+    } else if (indicator === 'lux-smc') {
+        if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = false;
+        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = true;
+        legendLegends.forEach(el => el.style.display = 'none');
+        luxAlgoCtrls.forEach(el => el.style.display = 'none');
+        mxwllCtrls.forEach(el => el.style.display = 'none');
+        luxSMCCtrls.forEach(el => el.style.display = 'flex');
+    }
+    
+    try {
+        // Fetch data (ext_sens corresponds to the Length parameter selected)
+        const res = await fetch(`/api/chart/tv-chart-data?ticker=${encodeURIComponent(symbol)}&length=${length}&mult=${mult}&ext_sens=${length}&int_sens=5`);
+        if (!res.ok) throw new Error("Failed to fetch interactive chart indicators.");
+        const data = await res.json();
+        
+        // Clean up previous instance
+        if (activeTVWorkstationChart) {
+            activeTVWorkstationChart.remove();
+            activeTVWorkstationChart = null;
+        }
+        
+        container.innerHTML = ''; // Clear contents
+        
+        const isDarkTheme = document.documentElement.getAttribute('data-mode') !== 'light';
+        
+        // Create Chart
+        const chart = LightweightCharts.createChart(container, {
+            width: container.clientWidth || 600,
+            height: 420,
+            layout: {
+                background: { type: 'solid', color: 'transparent' },
+                textColor: isDarkTheme ? '#94a3b8' : '#334155',
+                fontFamily: 'Inter, sans-serif',
+            },
+            grid: {
+                vertLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+                horzLines: { color: isDarkTheme ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.03)' },
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            },
+            timeScale: {
+                borderColor: isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            },
+        });
+        activeTVWorkstationChart = chart;
+        
+        // Candlesticks Series
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+        });
+        activeTVCandleSeries = candleSeries;
+        
+        const candleData = data.candlesticks.map(c => ({
+            time: c.time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close
+        }));
+        candleSeries.setData(candleData);
+        
+        // Volume Series (Optional overlay)
+        if (showVolume) {
+            const volumeSeries = chart.addHistogramSeries({
+                color: '#26a69a',
+                priceFormat: {
+                    type: 'volume',
+                },
+                priceScaleId: '', // Overlay mode
+            });
+            volumeSeries.priceScale().applyOptions({
+                scaleMargins: {
+                    top: 0.8, // highest point of the series will be 80% from top (bottom 20% of chart)
+                    bottom: 0,
+                },
+            });
+            const volumeData = data.candlesticks.map(c => {
+                const isUp = c.close >= c.open;
+                return {
+                    time: c.time,
+                    value: c.volume,
+                    color: isUp ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)',
+                };
+            }).filter(d => d.value !== undefined && d.value !== null);
+            volumeSeries.setData(volumeData);
+            activeTVVolumeSeries = volumeSeries;
+        } else {
+            activeTVVolumeSeries = null;
+        }
+        
+        // EMA 20
+        const ema20Series = chart.addLineSeries({
+            color: '#3b82f6',
+            lineWidth: 1.5,
+            title: 'EMA 20',
+            axisLabelVisible: false,
+            priceLineVisible: false
+        });
+        const ema20Data = data.candlesticks
+            .map(c => ({ time: c.time, value: c.ema_20 }))
+            .filter(d => d.value !== null && d.value !== undefined);
+        ema20Series.setData(ema20Data);
+        activeTVEma20Series = ema20Series;
+        
+        // EMA 50
+        const ema50Series = chart.addLineSeries({
+            color: '#f59e0b',
+            lineWidth: 1.5,
+            title: 'EMA 50',
+            axisLabelVisible: false,
+            priceLineVisible: false
+        });
+        const ema50Data = data.candlesticks
+            .map(c => ({ time: c.time, value: c.ema_50 }))
+            .filter(d => d.value !== null && d.value !== undefined);
+        ema50Series.setData(ema50Data);
+        activeTVEma50Series = ema50Series;
+        
+        // LuxAlgo Trendlines
+        if (indicator === 'lux-algo' && showLines) {
+            // Resistance Line
+            const resSeries = chart.addLineSeries({
+                color: '#ef4444',
+                lineWidth: 1.5,
+                lineStyle: LightweightCharts.LineStyle.Dashed,
+                title: 'Resistance',
+                axisLabelVisible: false,
+                priceLineVisible: false
+            });
+            const resData = data.candlesticks
+                .map(c => ({ time: c.time, value: c.resistance }))
+                .filter(d => d.value !== null && d.value !== undefined);
+            resSeries.setData(resData);
+            activeTVResistanceSeries = resSeries;
+            
+            // Support Line
+            const supSeries = chart.addLineSeries({
+                color: '#10b981',
+                lineWidth: 1.5,
+                lineStyle: LightweightCharts.LineStyle.Dashed,
+                title: 'Support',
+                axisLabelVisible: false,
+                priceLineVisible: false
+            });
+            const supData = data.candlesticks
+                .map(c => ({ time: c.time, value: c.support }))
+                .filter(d => d.value !== null && d.value !== undefined);
+            supSeries.setData(supData);
+            activeTVSupportSeries = supSeries;
+        }
+        
+        // Breakout Markers
+        if (indicator === 'lux-algo' && showBreaks) {
+            const markers = [];
+            data.candlesticks.forEach(c => {
+                if (c.bullish_break) {
+                    markers.push({
+                        time: c.time,
+                        position: 'belowBar',
+                        color: '#10b981',
+                        shape: 'arrowUp',
+                        text: 'B',
+                        size: 1.5
+                    });
+                } else if (c.bearish_break) {
+                    markers.push({
+                        time: c.time,
+                        position: 'aboveBar',
+                        color: '#ef4444',
+                        shape: 'arrowDown',
+                        text: 'S',
+                        size: 1.5
+                    });
+                }
+            });
+            candleSeries.setMarkers(markers);
+        }
+        
+        // Mxwll Price Action Suite Rendering
+        if (indicator === 'mxwll' && data.mxwll) {
+            const mxwll = data.mxwll;
+            
+            // 1. Fibonacci Levels
+            if (showFibs && mxwll.fib_levels) {
+                const fibs = mxwll.fib_levels;
+                const fibColors = {
+                    "0.236": "#9ca3af",
+                    "0.382": "#22c55e",
+                    "0.5": "#eab308",
+                    "0.618": "#f97316",
+                    "0.786": "#ef4444",
+                    "0.0": "#06b6d4",
+                    "1.0": "#06b6d4"
+                };
+                for (const lvl in fibColors) {
+                    if (fibs[lvl] !== undefined && fibs[lvl] !== null) {
+                        candleSeries.createPriceLine({
+                            price: fibs[lvl],
+                            color: fibColors[lvl],
+                            lineWidth: 1.5,
+                            lineStyle: LightweightCharts.LineStyle.Dashed,
+                            axisLabelVisible: true,
+                            title: `Fib ${lvl} (Rs. ${fibs[lvl]})`
+                        });
+                    }
+                }
+            }
+            
+            // 2. Order Blocks (Supply/Demand Zones)
+            if (showOBs && mxwll.order_blocks) {
+                mxwll.order_blocks.forEach(ob => {
+                    const color = ob.type === 'supply' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)';
+                    const obTopSeries = chart.addLineSeries({
+                        color: color,
+                        lineWidth: 1.5,
+                        lineStyle: LightweightCharts.LineStyle.Dotted,
+                        axisLabelVisible: false,
+                        priceLineVisible: false
+                    });
+                    const obBottomSeries = chart.addLineSeries({
+                        color: color,
+                        lineWidth: 1.5,
+                        lineStyle: LightweightCharts.LineStyle.Dotted,
+                        axisLabelVisible: false,
+                        priceLineVisible: false
+                    });
+                    
+                    const obDataTop = [];
+                    const obDataBottom = [];
+                    let startAdding = false;
+                    data.candlesticks.forEach(c => {
+                        if (c.time === ob.left_time) startAdding = true;
+                        if (startAdding) {
+                            obDataTop.push({ time: c.time, value: ob.top });
+                            obDataBottom.push({ time: c.time, value: ob.bottom });
+                        }
+                    });
+                    if (obDataTop.length === 0) {
+                        const lastC = data.candlesticks[data.candlesticks.length - 1];
+                        obDataTop.push({ time: lastC.time, value: ob.top });
+                        obDataBottom.push({ time: lastC.time, value: ob.bottom });
+                    }
+                    obTopSeries.setData(obDataTop);
+                    obBottomSeries.setData(obDataBottom);
+                });
+            }
+            
+            // 3. Fair Value Gaps (FVG)
+            if (showFVGs && mxwll.fvg) {
+                mxwll.fvg.forEach(g => {
+                    const color = 'rgba(242, 184, 7, 0.35)';
+                    const fvgTopSeries = chart.addLineSeries({
+                        color: color,
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: false,
+                        priceLineVisible: false
+                    });
+                    const fvgBottomSeries = chart.addLineSeries({
+                        color: color,
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: false,
+                        priceLineVisible: false
+                    });
+                    
+                    const fvgDataTop = [];
+                    const fvgDataBottom = [];
+                    let startAdding = false;
+                    data.candlesticks.forEach(c => {
+                        if (c.time === g.left_time) startAdding = true;
+                        if (startAdding) {
+                            fvgDataTop.push({ time: c.time, value: g.top });
+                            fvgDataBottom.push({ time: c.time, value: g.bottom });
+                        }
+                    });
+                    if (fvgDataTop.length === 0) {
+                        const lastC = data.candlesticks[data.candlesticks.length - 1];
+                        fvgDataTop.push({ time: lastC.time, value: g.top });
+                        fvgDataBottom.push({ time: lastC.time, value: g.bottom });
+                    }
+                    fvgTopSeries.setData(fvgDataTop);
+                    fvgBottomSeries.setData(fvgDataBottom);
+                });
+            }
+            
+            // 4. BOS/CHoCH Structures Markers
+            if (showStructs && mxwll.structures) {
+                const markers = [];
+                mxwll.structures.forEach(s => {
+                    const candleExists = data.candlesticks.some(c => c.time === s.time);
+                    if (candleExists) {
+                        const color = s.direction === 'bullish' ? '#10b981' : '#ef4444';
+                        const position = s.direction === 'bullish' ? 'aboveBar' : 'belowBar';
+                        const shape = s.direction === 'bullish' ? 'arrowUp' : 'arrowDown';
+                        markers.push({
+                            time: s.time,
+                            position: position,
+                            color: color,
+                            shape: shape,
+                            text: s.type,
+                            size: 1.2
+                        });
+                    }
+                });
+                markers.sort((a, b) => new Date(a.time) - new Date(b.time));
+                candleSeries.setMarkers(markers);
+            }
+        }
+        
+        // LuxAlgo SMC Concepts Rendering
+        if (indicator === 'lux-smc' && data.lux_smc) {
+            const smc = data.lux_smc;
+            
+            // 1. Swing & Internal Structures
+            const smcMarkers = [];
+            if (smc.structures) {
+                smc.structures.forEach(s => {
+                    const isInt = s.type.startsWith('I-');
+                    if (isInt && !showSMCInternal) return;
+                    if (!isInt && !showSMCSwing) return;
+                    
+                    const color = s.direction === 'bullish' ? '#10b981' : '#ef4444';
+                    const position = s.direction === 'bullish' ? 'aboveBar' : 'belowBar';
+                    const shape = s.direction === 'bullish' ? 'arrowUp' : 'arrowDown';
+                    
+                    smcMarkers.push({
+                        time: s.time,
+                        position: position,
+                        color: color,
+                        shape: shape,
+                        text: s.type,
+                        size: isInt ? 1.0 : 1.3
+                    });
+                });
+                smcMarkers.sort((a, b) => new Date(a.time) - new Date(b.time));
+                candleSeries.setMarkers(smcMarkers);
+            }
+            
+            // 2. Order Blocks
+            if (showSMCOBs && smc.order_blocks) {
+                smc.order_blocks.forEach(ob => {
+                    const isSwing = ob.class === 'swing';
+                    const color = ob.type === 'supply' 
+                        ? (isSwing ? 'rgba(239, 68, 68, 0.45)' : 'rgba(247, 124, 128, 0.35)') 
+                        : (isSwing ? 'rgba(16, 185, 129, 0.45)' : 'rgba(49, 121, 245, 0.35)');
+                        
+                    const topSeries = chart.addLineSeries({
+                        color: color,
+                        lineWidth: isSwing ? 1.5 : 1,
+                        lineStyle: isSwing ? LightweightCharts.LineStyle.Dotted : LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: false,
+                        priceLineVisible: false
+                    });
+                    const bottomSeries = chart.addLineSeries({
+                        color: color,
+                        lineWidth: isSwing ? 1.5 : 1,
+                        lineStyle: isSwing ? LightweightCharts.LineStyle.Dotted : LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: false,
+                        priceLineVisible: false
+                    });
+                    
+                    const obDataTop = [];
+                    const obDataBottom = [];
+                    let startAdding = false;
+                    data.candlesticks.forEach(c => {
+                        if (c.time === ob.left_time) startAdding = true;
+                        if (startAdding) {
+                            obDataTop.push({ time: c.time, value: ob.top });
+                            obDataBottom.push({ time: c.time, value: ob.bottom });
+                        }
+                    });
+                    if (obDataTop.length === 0) {
+                        const lastC = data.candlesticks[data.candlesticks.length - 1];
+                        obDataTop.push({ time: lastC.time, value: ob.top });
+                        obDataBottom.push({ time: lastC.time, value: ob.bottom });
+                    }
+                    topSeries.setData(obDataTop);
+                    bottomSeries.setData(obDataBottom);
+                });
+            }
+            
+            // 3. Fair Value Gaps (FVG)
+            if (showSMCFVGs && smc.fvg) {
+                smc.fvg.forEach(g => {
+                    const color = g.type === 'bullish' ? 'rgba(0, 255, 104, 0.25)' : 'rgba(255, 0, 8, 0.25)';
+                    const topSeries = chart.addLineSeries({
+                        color: color,
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: false,
+                        priceLineVisible: false
+                    });
+                    const bottomSeries = chart.addLineSeries({
+                        color: color,
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: false,
+                        priceLineVisible: false
+                    });
+                    
+                    const fvgDataTop = [];
+                    const fvgDataBottom = [];
+                    let startAdding = false;
+                    data.candlesticks.forEach(c => {
+                        if (c.time === g.left_time) startAdding = true;
+                        if (startAdding) {
+                            fvgDataTop.push({ time: c.time, value: g.top });
+                            fvgDataBottom.push({ time: c.time, value: g.bottom });
+                        }
+                    });
+                    if (fvgDataTop.length === 0) {
+                        const lastC = data.candlesticks[data.candlesticks.length - 1];
+                        fvgDataTop.push({ time: lastC.time, value: g.top });
+                        fvgDataBottom.push({ time: lastC.time, value: g.bottom });
+                    }
+                    topSeries.setData(fvgDataTop);
+                    bottomSeries.setData(fvgDataBottom);
+                });
+            }
+            
+            // 4. Equal Highs / Equal Lows (EQH/EQL)
+            if (showSMCEqhl && smc.equal_high_low) {
+                const eq = smc.equal_high_low;
+                const drawEqualLines = (list, tag, color) => {
+                    list.forEach(item => {
+                        const series = chart.addLineSeries({
+                            color: color,
+                            lineWidth: 1.5,
+                            lineStyle: LightweightCharts.LineStyle.Dotted,
+                            axisLabelVisible: true,
+                            priceLineVisible: false
+                        });
+                        
+                        const lineData = [];
+                        let startAdding = false;
+                        data.candlesticks.forEach(c => {
+                            if (c.time === item.left_time) startAdding = true;
+                            if (startAdding) {
+                                lineData.push({ time: c.time, value: item.price });
+                            }
+                            if (c.time === item.right_time) startAdding = false;
+                        });
+                        if (lineData.length === 0) {
+                            lineData.push({ time: item.left_time, value: item.price });
+                            lineData.push({ time: item.right_time, value: item.price });
+                        }
+                        series.setData(lineData);
+                    });
+                };
+                drawEqualLines(eq.equal_highs, 'EQH', '#ef4444');
+                drawEqualLines(eq.equal_lows, 'EQL', '#10b981');
+            }
+            
+            // 5. Daily, Weekly, Monthly MTF Levels
+            if (showSMCMtf) {
+                if (smc.daily_levels && smc.daily_levels.length > 0) {
+                    const d = smc.daily_levels[smc.daily_levels.length - 1];
+                    candleSeries.createPriceLine({
+                        price: d.high,
+                        color: '#3b82f6',
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Solid,
+                        title: 'PDH'
+                    });
+                    candleSeries.createPriceLine({
+                        price: d.low,
+                        color: '#3b82f6',
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Solid,
+                        title: 'PDL'
+                    });
+                }
+                if (smc.weekly_levels && smc.weekly_levels.length > 0) {
+                    const w = smc.weekly_levels[smc.weekly_levels.length - 1];
+                    candleSeries.createPriceLine({
+                        price: w.high,
+                        color: '#3b82f6',
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        title: 'PWH'
+                    });
+                    candleSeries.createPriceLine({
+                        price: w.low,
+                        color: '#3b82f6',
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        title: 'PWL'
+                    });
+                }
+                if (smc.monthly_levels && smc.monthly_levels.length > 0) {
+                    const m = smc.monthly_levels[smc.monthly_levels.length - 1];
+                    candleSeries.createPriceLine({
+                        price: m.high,
+                        color: '#3b82f6',
+                        lineWidth: 1.5,
+                        lineStyle: LightweightCharts.LineStyle.Dotted,
+                        title: 'PMH'
+                    });
+                    candleSeries.createPriceLine({
+                        price: m.low,
+                        color: '#3b82f6',
+                        lineWidth: 1.5,
+                        lineStyle: LightweightCharts.LineStyle.Dotted,
+                        title: 'PML'
+                    });
+                }
+            }
+            
+            // 6. Premium/Discount Zones
+            if (showSMCZones && smc.premium_discount) {
+                const zd = smc.premium_discount;
+                candleSeries.createPriceLine({
+                    price: zd.top,
+                    color: '#ef4444',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    title: 'Premium (Top)'
+                });
+                candleSeries.createPriceLine({
+                    price: zd.equilibrium,
+                    color: '#9ca3af',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Equilibrium'
+                });
+                candleSeries.createPriceLine({
+                    price: zd.bottom,
+                    color: '#10b981',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    title: 'Discount (Bottom)'
+                });
+            }
+        }
+        
+    } catch (err) {
+        console.error("Error drawing Interactive Chart Terminal: ", err);
+        container.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">Failed to load and calculate indicators for ${symbol}. Please try again.</div>`;
+    }
+}
+
+function setupTVWorkstationChartControls() {
+    const activeInd = document.getElementById('tv-active-indicator');
+    const lengthSelect = document.getElementById('tv-length');
+    const multSelect = document.getElementById('tv-mult');
+    const showVolume = document.getElementById('tv-show-volume');
+    const showLines = document.getElementById('tv-show-lines');
+    const showBreaks = document.getElementById('tv-show-breaks');
+    
+    const showFibs = document.getElementById('tv-show-fibs');
+    const showOBs = document.getElementById('tv-show-obs');
+    const showFVGs = document.getElementById('tv-show-fvgs');
+    const showStructs = document.getElementById('tv-show-structs');
+    
+    // LuxAlgo SMC Controls
+    const smcSwing = document.getElementById('tv-smc-swing');
+    const smcInternal = document.getElementById('tv-smc-internal');
+    const smcOBs = document.getElementById('tv-smc-obs');
+    const smcFVGs = document.getElementById('tv-smc-fvgs');
+    const smcEqhl = document.getElementById('tv-smc-eqhl');
+    const smcMtf = document.getElementById('tv-smc-mtf');
+    const smcZones = document.getElementById('tv-smc-zones');
+    
+    // Set default Length when choosing indicator
+    if (activeInd) {
+        activeInd.addEventListener('change', () => {
+            if (activeInd.value === 'lux-smc') {
+                if (lengthSelect) lengthSelect.value = '50';
+            } else if (activeInd.value === 'mxwll') {
+                if (lengthSelect) lengthSelect.value = '14';
+            }
+        });
+    }
+    
+    const elements = [
+        activeInd, lengthSelect, multSelect, showVolume, showLines, showBreaks, 
+        showFibs, showOBs, showFVGs, showStructs,
+        smcSwing, smcInternal, smcOBs, smcFVGs, smcEqhl, smcMtf, smcZones
+    ];
+    elements.forEach(el => {
+        if (el) {
+            el.addEventListener('change', () => {
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    renderTVWorkstationChart(activeStockProfile.ticker);
+                }
+            });
+        }
+    });
+}
+
+window.renderTVWorkstationChart = renderTVWorkstationChart;
+
+// ==================== FULLSCREEN WORKSTATION CHART OVERLAYS ====================
+(function() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .fullscreen-card-active {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 999999 !important;
+            background: var(--bg-card, #0f172a) !important;
+            padding: 20px !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 15px !important;
+        }
+        /* Stretch nested wrapper div of TV chart to remove empty bottom spacing */
+        #tv-chart-card.fullscreen-card-active > div:nth-child(2) {
+            flex: 1 !important;
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 0 !important;
+        }
+        .fullscreen-card-active #tv-chart-container {
+            flex: 1 !important;
+            height: auto !important;
+            min-height: 0 !important;
+        }
+        .fullscreen-card-active #fibonacci-chart-container {
+            flex: 1 !important;
+            height: auto !important;
+            min-height: 0 !important;
+        }
+        .fullscreen-card-active .price-chart-container {
+            flex: 1 !important;
+            height: auto !important;
+            min-height: 0 !important;
+        }
+        .fullscreen-card-active .card-header {
+            margin-bottom: 0 !important;
+            border-bottom: 1px solid var(--border-glass) !important;
+            padding-bottom: 10px !important;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        // Helper to setup card-level fullscreen toggle in capture phase
+        function setupFullscreenToggle(cardId, containerSelector, minHeight, resizeCallback) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+            const container = card.querySelector(containerSelector);
+            if (!container) return;
+            
+            container.style.cursor = 'zoom-in';
+            
+            // Listen on the card itself using capture phase (true)
+            card.addEventListener('dblclick', (e) => {
+                // Ignore if clicked on input/select/button controls, labels, legends, summary blocks, or headers
+                if (e.target.closest('input, select, option, button, label, a, .chart-controls, .card-header, #fibonacci-chart-hud, #tv-chart-legend-panel, .fib-summary-block, #price-trend-summary-block')) {
+                    return;
+                }
+                
+                const isFullscreen = card.classList.contains('fullscreen-card-active');
+                if (isFullscreen) {
+                    card.classList.remove('fullscreen-card-active');
+                    container.style.cursor = 'zoom-in';
+                    setTimeout(() => {
+                        const targetWidth = container.clientWidth || 300;
+                        resizeCallback(targetWidth, minHeight);
+                    }, 50);
+                } else {
+                    card.classList.add('fullscreen-card-active');
+                    container.style.cursor = 'zoom-out';
+                    setTimeout(() => {
+                        const targetHeight = Math.max(container.clientHeight || 0, window.innerHeight - 320);
+                        const targetWidth = container.clientWidth || (window.innerWidth - 40);
+                        if (targetWidth > 50 && targetHeight > 50) {
+                            resizeCallback(targetWidth, targetHeight);
+                        }
+                    }, 50);
+                }
+            }, true);
+        }
+
+        // 1. TradingView Workstation Chart
+        setupFullscreenToggle('tv-chart-card', '#tv-chart-container', 420, (width, height) => {
+            if (activeTVWorkstationChart && width > 50 && height > 50) {
+                activeTVWorkstationChart.resize(width, height);
+            }
+        });
+        
+        // 2. Fibonacci Retracements Chart
+        setupFullscreenToggle('tech-fib-card', '#fibonacci-chart-container', 250, (width, height) => {
+            if (window.activeFibLightweightChart && width > 50 && height > 50) {
+                window.activeFibLightweightChart.resize(width, height);
+            }
+            if (activeFibChartInstance) {
+                activeFibChartInstance.resize();
+            }
+        });
+        
+        // 3. Historical Price & Trend Analysis Chart
+        setupFullscreenToggle('price-trend-chart-card', '.price-chart-container', 350, (width, height) => {
+            if (activeChartInstance) {
+                activeChartInstance.resize();
+            }
+        });
+        
+        // Escape key to exit fullscreen (for any active fullscreen card)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const activeFullscreenCard = document.querySelector('.fullscreen-card-active');
+                if (activeFullscreenCard) {
+                    activeFullscreenCard.classList.remove('fullscreen-card-active');
+                    
+                    const tvContainer = document.getElementById('tv-chart-container');
+                    const fibContainer = document.getElementById('fibonacci-chart-container');
+                    const priceCard = document.getElementById('price-trend-chart-card');
+                    const priceContainer = priceCard ? priceCard.querySelector('.price-chart-container') : null;
+                    
+                    // Restore cursors
+                    if (tvContainer) tvContainer.style.cursor = 'zoom-in';
+                    if (fibContainer) fibContainer.style.cursor = 'zoom-in';
+                    if (priceContainer) priceContainer.style.cursor = 'zoom-in';
+                    
+                    // Resize matching charts
+                    setTimeout(() => {
+                        if (activeFullscreenCard.id === 'tv-chart-card' && activeTVWorkstationChart && tvContainer) {
+                            const targetWidth = tvContainer.clientWidth || 300;
+                            activeTVWorkstationChart.resize(targetWidth, 420);
+                        } else if (activeFullscreenCard.id === 'tech-fib-card') {
+                            if (window.activeFibLightweightChart && fibContainer) {
+                                const targetWidth = fibContainer.clientWidth || 300;
+                                window.activeFibLightweightChart.resize(targetWidth, 250);
+                            }
+                            if (activeFibChartInstance) {
+                                activeFibChartInstance.resize();
+                            }
+                        } else if (activeFullscreenCard.id === 'price-trend-chart-card' && activeChartInstance) {
+                            activeChartInstance.resize();
+                        }
+                    }, 50);
+                }
+            }
+        });
+    });
+})();
+

@@ -15,10 +15,78 @@ from backend.swing_utils import (
     clean_float,
     calculate_volume_profile,
     calculate_swing_indicators,
-    analyze_swing_signals
+    analyze_swing_signals,
+    calculate_pivot_points,
+    calculate_trendlines_with_breaks,
+    calculate_mxwll_suite
 )
 
 class TestSwingUtils(unittest.TestCase):
+    
+    def test_calculate_pivot_points(self):
+        """Verifies detection of swing high and low pivot points."""
+        highs = [10.0] * 10
+        lows = [5.0] * 10
+        # Create a swing high at index 5
+        highs[5] = 15.0
+        # Create a swing low at index 3
+        lows[3] = 2.0
+        
+        pivots = calculate_pivot_points(highs, lows, left_bars=2, right_bars=2)
+        
+        # We expect to find the swing high at index 5 and swing low at index 3
+        high_pivots = [p for p in pivots if p["type"] == "high"]
+        low_pivots = [p for p in pivots if p["type"] == "low"]
+        
+        self.assertTrue(any(p["index"] == 5 for p in high_pivots))
+        self.assertTrue(any(p["index"] == 3 for p in low_pivots))
+        
+        self.assertEqual(next(p for p in high_pivots if p["index"] == 5)["value"], 15.0)
+        self.assertEqual(next(p for p in low_pivots if p["index"] == 3)["value"], 2.0)
+
+    def test_calculate_trendlines_with_breaks(self):
+        """Verifies calculation of trendlines (Support/Resistance) and breakout signals."""
+        dates = pd.date_range(end="2026-06-07", periods=30)
+        prices = [100.0] * 30
+        df = pd.DataFrame({
+            "Open": prices,
+            "High": prices,
+            "Low": prices,
+            "Close": prices,
+            "Volume": [1000] * 30
+        }, index=dates)
+        
+        # Since price is completely flat, we can test calculations run without error
+        res = calculate_trendlines_with_breaks(df, length=3, atr_mult=1.0)
+        self.assertIn("resistance", res)
+        self.assertIn("support", res)
+        self.assertIn("bullish_breaks", res)
+        self.assertIn("bearish_breaks", res)
+
+    def test_calculate_mxwll_suite(self):
+        """Verifies calculation of Mxwll Price Action Suite metrics."""
+        dates = pd.date_range(end="2026-06-07", periods=65)
+        prices = [100.0 + i * 0.1 for i in range(65)]
+        highs = [p + 0.5 for p in prices]
+        lows = [p - 0.5 for p in prices]
+        
+        # Introduce a gap for FVG: Low[30] > High[28]
+        highs[28] = 102.0
+        lows[30] = 103.5
+        
+        df = pd.DataFrame({
+            "Open": prices,
+            "High": highs,
+            "Low": lows,
+            "Close": prices,
+            "Volume": [1000] * 65
+        }, index=dates)
+        
+        res = calculate_mxwll_suite(df, int_sens=3, ext_sens=10, show_last=5)
+        self.assertIn("fib_levels", res)
+        self.assertIn("order_blocks", res)
+        self.assertIn("fvg", res)
+        self.assertIn("structures", res)
     
     def test_clean_float(self):
         """Verifies clean_float converts values and handles NaN/Inf properly."""
@@ -304,6 +372,58 @@ class TestSwingAPIRoutes(unittest.TestCase):
         self.assertIn("caps the total absolute risk on the trade to **Rs. 1,950.00**", data["synthesis"])
         self.assertIn("reward potential of **Rs. 5,200.00**", data["synthesis"])
         self.assertIn("risk-reward ratio of **1:2.67**", data["synthesis"])
+
+    @patch("requests.get")
+    def test_get_tv_chart_data(self, mock_get):
+        """Verifies interactive chart data endpoint and swing indicator calculations."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        
+        timestamps = [int((datetime.now() - timedelta(days=i)).timestamp()) for i in range(100, 0, -1)]
+        mock_json_data = {
+            "chart": {
+                "result": [{
+                    "timestamp": timestamps,
+                    "indicators": {
+                        "quote": [{
+                            "open": [100.0 + i * 0.1 for i in range(100)],
+                            "high": [102.0 + i * 0.1 for i in range(100)],
+                            "low": [98.0 + i * 0.1 for i in range(100)],
+                            "close": [101.0 + i * 0.1 for i in range(100)],
+                            "volume": [5000 + i * 10 for i in range(100)]
+                        }]
+                    }
+                }]
+            }
+        }
+        mock_response.json.return_value = mock_json_data
+        mock_get.return_value = mock_response
+
+        # Request with params
+        response = self.client.get("/api/chart/tv-chart-data?ticker=RELIANCE.NS&length=10&mult=1.5")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        
+        self.assertIn("candlesticks", data)
+        self.assertGreater(len(data["candlesticks"]), 0)
+        first_candle = data["candlesticks"][0]
+        self.assertIn("time", first_candle)
+        self.assertIn("open", first_candle)
+        self.assertIn("high", first_candle)
+        self.assertIn("low", first_candle)
+        self.assertIn("close", first_candle)
+        self.assertIn("ema_20", first_candle)
+        self.assertIn("ema_50", first_candle)
+        self.assertIn("resistance", first_candle)
+        self.assertIn("support", first_candle)
+        self.assertIn("bullish_break", first_candle)
+        self.assertIn("bearish_break", first_candle)
+        
+        self.assertIn("mxwll", data)
+        self.assertIn("fib_levels", data["mxwll"])
+        self.assertIn("order_blocks", data["mxwll"])
+        self.assertIn("fvg", data["mxwll"])
+        self.assertIn("structures", data["mxwll"])
 
 
 class TestQuantScoring(unittest.TestCase):

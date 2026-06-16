@@ -695,6 +695,7 @@
                             <button class="subtab-btn active" data-subtab="summary">📋 Executive Summary</button>
                             <button class="subtab-btn" data-subtab="valuation">📊 Valuation & DCF</button>
                             <button class="subtab-btn" data-subtab="technical">📉 Technical Timing</button>
+                            <button class="subtab-btn" data-subtab="tv-chart">📈 Interactive Chart</button>
                             <button class="subtab-btn" data-subtab="fundamental">🩺 Ratios & Earnings</button>
                             <button class="subtab-btn" data-subtab="peers">👥 Peers & Ownership</button>
                             <button class="subtab-btn" data-subtab="audit">🔬 Agent Strategy Audit</button>
@@ -2221,6 +2222,122 @@
                                         </tr>
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+
+                        <!-- Interactive TradingView Chart Subtab (Generic advanced indicators host) -->
+                        <div class="card col-span-4 card-hidden" id="tv-chart-card" data-subtab="tv-chart" style="min-height: 580px;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                                    <span>📈</span> INTERACTIVE WORKSTATION CHART
+                                </h3>
+                                <div class="chart-controls no-print" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        Indicator: 
+                                        <select id="tv-active-indicator" style="padding: 4px 8px; border-radius: 4px; font-size:11px; background: var(--bg-select-input); color: var(--text-primary); border: 1px solid var(--border-glass); cursor:pointer;">
+                                            <option value="lux-algo" selected>LuxAlgo: Trendlines with Breaks</option>
+                                            <option value="mxwll">Mxwll Price Action Suite</option>
+                                            <option value="lux-smc">LuxAlgo: Smart Money Concepts</option>
+                                            <option value="none">None (Price Only)</option>
+                                        </select>
+                                    </label>
+                                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary);">
+                                        Length: 
+                                        <select id="tv-length" style="padding: 2px 6px; border-radius: 4px; font-size:11px; background: var(--bg-select-input); color: var(--text-primary); border: 1px solid var(--border-glass); cursor:pointer;">
+                                            <option value="5">5</option>
+                                            <option value="10">10</option>
+                                            <option value="14" selected>14</option>
+                                            <option value="20">20</option>
+                                            <option value="30">30</option>
+                                            <option value="50">50</option>
+                                        </select>
+                                    </label>
+                                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary);">
+                                        ATR Mult: 
+                                        <select id="tv-mult" style="padding: 2px 6px; border-radius: 4px; font-size:11px; background: var(--bg-select-input); color: var(--text-primary); border: 1px solid var(--border-glass); cursor:pointer;">
+                                            <option value="0.0">0.0</option>
+                                            <option value="0.5">0.5</option>
+                                            <option value="1.0" selected>1.0</option>
+                                            <option value="1.5">1.5</option>
+                                            <option value="2.0">2.0</option>
+                                        </select>
+                                    </label>
+                                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-show-volume" checked style="cursor: pointer;"> Show Volume
+                                    </label>
+                                    <label class="lux-algo-control-element" style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-show-lines" checked style="cursor: pointer;"> Show lines
+                                    </label>
+                                    <label class="lux-algo-control-element" style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-show-breaks" checked style="cursor: pointer;"> Show breaks
+                                    </label>
+                                    <label class="mxwll-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-show-fibs" checked style="cursor: pointer;"> Show Fibs
+                                    </label>
+                                    <label class="mxwll-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-show-obs" checked style="cursor: pointer;"> Show OBs
+                                    </label>
+                                    <label class="mxwll-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-show-fvgs" checked style="cursor: pointer;"> Show FVGs
+                                    </label>
+                                    <label class="mxwll-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-show-structs" checked style="cursor: pointer;"> Show Structures
+                                    </label>
+                                    
+                                    <!-- LuxAlgo SMC Controls -->
+                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-smc-swing" checked style="cursor: pointer;"> Swing Struct
+                                    </label>
+                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-smc-internal" checked style="cursor: pointer;"> Internal Struct
+                                    </label>
+                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-smc-obs" checked style="cursor: pointer;"> Order Blocks
+                                    </label>
+                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-smc-fvgs" checked style="cursor: pointer;"> FVGs
+                                    </label>
+                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-smc-eqhl" checked style="cursor: pointer;"> Equal H/L
+                                    </label>
+                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-smc-mtf" style="cursor: pointer;"> MTF Levels
+                                    </label>
+                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-smc-zones" style="cursor: pointer;"> Prem/Disc Zones
+                                    </label>
+                                </div>
+                            </div>
+                            <div style="padding: 15px; display: flex; flex-direction: column; gap: 15px;">
+                                <!-- Chart Canvas Container -->
+                                <div id="tv-chart-container" style="width: 100%; height: 420px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-glass); background: transparent; position: relative;">
+                                    <!-- Loaded dynamically via Lightweight Charts -->
+                                </div>
+                                <!-- Legend & Indicators Panel -->
+                                <div id="tv-chart-legend-panel" style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: space-between; align-items: center; background: var(--bg-card-sub); padding: 10px 15px; border-radius: 6px; border: 1px solid var(--border-glass); font-size: 11px;">
+                                    <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <span style="display: inline-block; width: 12px; height: 3px; background: #3b82f6; border-radius: 1px;"></span>
+                                            <span style="color: var(--text-secondary);">EMA 20</span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <span style="display: inline-block; width: 12px; height: 3px; background: #f59e0b; border-radius: 1px;"></span>
+                                            <span style="color: var(--text-secondary);">EMA 50</span>
+                                        </div>
+                                        <div class="tv-indicator-legend" style="display: flex; align-items: center; gap: 6px;">
+                                            <span style="display: inline-block; width: 12px; height: 2px; border-top: 1px dashed #ef4444;"></span>
+                                            <span style="color: var(--text-secondary);">Resistance Line</span>
+                                        </div>
+                                        <div class="tv-indicator-legend" style="display: flex; align-items: center; gap: 6px;">
+                                            <span style="display: inline-block; width: 12px; height: 2px; border-top: 1px dashed #10b981;"></span>
+                                            <span style="color: var(--text-secondary);">Support Line</span>
+                                        </div>
+                                    </div>
+                                    <div class="tv-indicator-legend" style="display: flex; gap: 10px; align-items: center;">
+                                        <span style="font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 2px 6px; border-radius: 4px;">🟢 B = Bullish Breakout</span>
+                                        <span style="font-weight: 700; color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px;">🔴 S = Bearish Breakout</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -4654,7 +4771,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=1.0.7"></script>
+    <script src="app.js?v=1.0.8"></script>
 </body>
 </html>
 
