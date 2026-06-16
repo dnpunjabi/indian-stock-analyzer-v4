@@ -425,6 +425,52 @@ class TestSwingAPIRoutes(unittest.TestCase):
         self.assertIn("fvg", data["mxwll"])
         self.assertIn("structures", data["mxwll"])
 
+    @patch("requests.get")
+    @patch("backend.agent.call_groq_llm")
+    def test_get_indicator_synthesis(self, mock_groq, mock_get):
+        """Verifies custom indicator AI synthesis endpoints and LLM prompts compilation."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        
+        timestamps = [int((datetime.now() - timedelta(days=i)).timestamp()) for i in range(100, 0, -1)]
+        mock_json_data = {
+            "chart": {
+                "result": [{
+                    "timestamp": timestamps,
+                    "indicators": {
+                        "quote": [{
+                            "open": [100.0 + i * 0.1 for i in range(100)],
+                            "high": [102.0 + i * 0.1 for i in range(100)],
+                            "low": [98.0 + i * 0.1 for i in range(100)],
+                            "close": [101.0 + i * 0.1 for i in range(100)],
+                            "volume": [5000 + i * 10 for i in range(100)]
+                        }]
+                    }
+                }]
+            }
+        }
+        mock_response.json.return_value = mock_json_data
+        mock_get.return_value = mock_response
+        
+        mock_groq.return_value = "### Technical Analysis Summary\n- Support active at 100.0\n- Resistance active at 110.0"
+        
+        # Test default (lux-algo)
+        response = self.client.get("/api/chart/indicator-synthesis?ticker=RELIANCE.NS&indicator=lux-algo&length=10&mult=1.5")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["symbol"], "RELIANCE.NS")
+        self.assertEqual(data["indicator"], "lux-algo")
+        self.assertIn("synthesis", data)
+        self.assertIn("Support active at 100.0", data["synthesis"])
+        
+        # Test lux-smc
+        response_smc = self.client.get("/api/chart/indicator-synthesis?ticker=RELIANCE.NS&indicator=lux-smc&length=10&mult=1.5")
+        self.assertEqual(response_smc.status_code, 200)
+        
+        # Test mxwll
+        response_mxwll = self.client.get("/api/chart/indicator-synthesis?ticker=RELIANCE.NS&indicator=mxwll&length=10&mult=1.5")
+        self.assertEqual(response_mxwll.status_code, 200)
+
 
 class TestQuantScoring(unittest.TestCase):
     

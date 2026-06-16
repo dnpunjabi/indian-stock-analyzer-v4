@@ -1696,6 +1696,197 @@ async def get_tv_chart_data(
         raise HTTPException(status_code=500, detail=f"TradingView chart data calculation error: {str(e)}")
 
 
+@app.get("/api/chart/indicator-synthesis")
+async def get_indicator_synthesis(
+    ticker: str,
+    indicator: str = "lux-algo",
+    period: str = "1y",
+    interval: str = "1d",
+    length: int = 14,
+    mult: float = 1.0,
+    int_sens: int = 3,
+    ext_sens: int = 25,
+    show_last: int = 10
+):
+    """
+    Synthesizes custom technical indicator calculations (LuxAlgo SMC, Trendlines with Breaks, or Mxwll)
+    into a structured tactical summary using Groq LLM.
+    """
+    if not ticker:
+        raise HTTPException(status_code=400, detail="Ticker parameter is required.")
+        
+    try:
+        fetch_range = "2y"
+        if interval == "1wk":
+            fetch_range = "5y"
+        elif interval == "1mo":
+            fetch_range = "max"
+            
+        df = await fetch_history_df(ticker, fetch_range, interval)
+        if df.empty:
+            raise HTTPException(status_code=404, detail="No price data returned from Yahoo Chart endpoint.")
+            
+        # Get latest price details
+        curr_price = round(float(df["Close"].iloc[-1]), 2)
+        prev_price = round(float(df["Close"].iloc[-2]), 2) if len(df) > 1 else curr_price
+        price_change = round(curr_price - prev_price, 2)
+        pct_change = round((price_change / prev_price) * 100, 2) if prev_price > 0 else 0.0
+        
+        # Calculate standard ATR
+        highs = df['High'].values
+        lows = df['Low'].values
+        closes = df['Close'].values
+        tr = np.maximum(highs - lows, np.maximum(np.abs(highs - np.roll(closes, 1)), np.abs(lows - np.roll(closes, 1))))
+        tr[0] = highs[0] - lows[0]
+        atr_val = round(float(np.mean(tr[-14:])), 2)
+        
+        from backend.swing_utils import calculate_trendlines_with_breaks, calculate_mxwll_suite, calculate_lux_smc
+        from backend.agent import call_groq_llm
+        
+        system_prompt = (
+            "You are a professional Technical Analyst and Senior Market Strategist specializing in the Indian Stock Markets.\n"
+            "Your objective is to provide a highly detailed, concise, and structured tactical analysis of the stock based *only* on the provided custom indicator calculations.\n"
+            "Format your response in structured Markdown. Start directly with the analysis. Avoid conversational preambles (like 'Here is the analysis...').\n"
+            "Use clear bullet points and bold styling. Do not hallucinate prices; rely only on the structured indicators values provided in the prompt."
+        )
+        
+        user_prompt = ""
+        
+        if indicator == "lux-algo":
+            # Trendlines with Breaks
+            breaks_data = calculate_trendlines_with_breaks(df, length=length, atr_mult=mult)
+            last_res = next((x for x in reversed(breaks_data["resistance"]) if x is not None), None)
+            last_sup = next((x for x in reversed(breaks_data["support"]) if x is not None), None)
+            recent_bull_break = any(breaks_data["bullish_breaks"][-15:])
+            recent_bear_break = any(breaks_data["bearish_breaks"][-15:])
+            
+            res_str = f"Rs. {last_res}" if last_res else "None identified"
+            sup_str = f"Rs. {last_sup}" if last_sup else "None identified"
+            
+            user_prompt = (
+                f"Perform a technical analysis for the stock ticker: {ticker}\n"
+                f"Current Price: Rs. {curr_price} ({price_change:+.2f}, {pct_change:+.2f}%)\n"
+                f"Active Indicator: LuxAlgo Trendlines with Breaks (Lookback: {length}, Slope Multiplier: {mult})\n\n"
+                f"Calculated Metrics:\n"
+                f"- Volatility (ATR-14): {atr_val}\n"
+                f"- Active Support Trendline Price: {sup_str}\n"
+                f"- Active Resistance Trendline Price: {res_str}\n"
+                f"- Recent Bullish Breakout (last 15 bars): {'YES' if recent_bull_break else 'NO'}\n"
+                f"- Recent Bearish Breakout (last 15 bars): {'YES' if recent_bear_break else 'NO'}\n\n"
+                f"Based on these Trendlines with Breaks metrics, draft a brief, professional summary explaining the support and resistance structure, "
+                f"the implications of any recent breakout, and set logical tactical stop loss and target bounds using the current ATR."
+            )
+            
+        elif indicator == "lux-smc":
+            # Smart Money Concepts (Note that length is used as ext_sens)
+            smc = calculate_lux_smc(df, int_sens=int_sens, ext_sens=length, show_last=show_last)
+            
+            # Extract structures
+            struct_list = []
+            if smc.get("structures"):
+                for s in smc["structures"][-5:]:
+                    struct_list.append(f"{s['time']}: {s['type']} ({s['direction']}, Level: Rs. {s.get('price', 'N/A')})")
+            struct_str = "\n".join(struct_list) if struct_list else "No recent structures detected"
+            
+            # Extract active OBs
+            demand_obs = [ob for ob in smc.get("order_blocks", []) if ob["type"] == "demand"]
+            supply_obs = [ob for ob in smc.get("order_blocks", []) if ob["type"] == "supply"]
+            
+            demand_str = ", ".join([f"Rs. {ob['bottom']}-{ob['top']}" for ob in demand_obs[-3:]]) if demand_obs else "None active"
+            supply_str = ", ".join([f"Rs. {ob['bottom']}-{ob['top']}" for ob in supply_obs[-3:]]) if supply_obs else "None active"
+            
+            # Premium/Discount
+            pd = smc.get("premium_discount", {})
+            pd_str = f"Range: Rs. {pd.get('bottom')}-{pd.get('top')} (Equilibrium: Rs. {pd.get('equilibrium')})" if pd else "Unknown"
+            
+            pd_zone = "Neutral"
+            if pd:
+                eq = pd.get("equilibrium", 0)
+                if curr_price > eq:
+                    pd_zone = f"Premium Zone (above equilibrium of Rs. {eq})"
+                elif curr_price < eq:
+                    pd_zone = f"Discount Zone (below equilibrium of Rs. {eq})"
+                    
+            # MTF levels
+            daily = smc.get("daily_levels", [])
+            last_daily = daily[-1] if daily else None
+            daily_str = f"High: Rs. {last_daily['high']}, Low: Rs. {last_daily['low']}" if last_daily else "N/A"
+            
+            user_prompt = (
+                f"Perform a technical analysis for the stock ticker: {ticker}\n"
+                f"Current Price: Rs. {curr_price} ({price_change:+.2f}, {pct_change:+.2f}%)\n"
+                f"Active Indicator: LuxAlgo Smart Money Concepts (Internal Sens: {int_sens}, Swing Sens: {length})\n\n"
+                f"Calculated Metrics:\n"
+                f"- Volatility (ATR-14): {atr_val}\n"
+                f"- Recent Structural Transitions (BOS/CHoCH):\n{struct_str}\n"
+                f"- Unmitigated Demand Order Blocks (Buy Zone): {demand_str}\n"
+                f"- Unmitigated Supply Order Blocks (Sell Zone): {supply_str}\n"
+                f"- Premium / Discount Zones: {pd_str}\n"
+                f"- Current Price Position: Sits in the {pd_zone}\n"
+                f"- Prev Day High/Low (Daily levels): {daily_str}\n\n"
+                f"Draft a tactical Smart Money report. Explain if the market bias is bullish or bearish based on the BOS/CHoCH structure, "
+                f"identify the key order blocks to monitor for pullbacks or reversals, and note whether the current price is in the premium or discount zone."
+            )
+            
+        elif indicator == "mxwll":
+            # Mxwll Suite (Note that length is used as ext_sens)
+            mxwll = calculate_mxwll_suite(df, int_sens=int_sens, ext_sens=length, show_last=show_last)
+            
+            # Extract structures
+            struct_list = []
+            if mxwll.get("structures"):
+                for s in mxwll["structures"][-5:]:
+                    struct_list.append(f"{s['time']}: {s['type']} ({s['direction']}, Price: Rs. {s.get('price', 'N/A')})")
+            struct_str = "\n".join(struct_list) if struct_list else "No recent structures detected"
+            
+            # OBs and FVGs
+            demand_obs = [ob for ob in mxwll.get("order_blocks", []) if ob["type"] == "demand"]
+            supply_obs = [ob for ob in mxwll.get("order_blocks", []) if ob["type"] == "supply"]
+            demand_str = ", ".join([f"Rs. {ob['bottom']:.2f}-{ob['top']:.2f}" for ob in demand_obs[-3:]]) if demand_obs else "None active"
+            supply_str = ", ".join([f"Rs. {ob['bottom']:.2f}-{ob['top']:.2f}" for ob in supply_obs[-3:]]) if supply_obs else "None active"
+            
+            fvgs = mxwll.get("fvg", [])
+            fvg_str = ", ".join([f"{g['type']} (Rs. {g['bottom']:.2f}-{g['top']:.2f})" for g in fvgs[-3:]]) if fvgs else "None active"
+            
+            # Fib levels
+            fibs = mxwll.get("fib_levels", {})
+            fibs_str = ", ".join([f"{k}: Rs. {v}" for k, v in fibs.items() if k not in ["anchor_start_time", "anchor_end_time"]]) if fibs else "N/A"
+            
+            user_prompt = (
+                f"Perform a technical analysis for the stock ticker: {ticker}\n"
+                f"Current Price: Rs. {curr_price} ({price_change:+.2f}, {pct_change:+.2f}%)\n"
+                f"Active Indicator: Mxwll Price Action Suite (Int Sens: {int_sens}, Ext Sens: {length})\n\n"
+                f"Calculated Metrics:\n"
+                f"- Volatility (ATR-14): {atr_val}\n"
+                f"- Market Structures (BOS/CHoCH):\n{struct_str}\n"
+                f"- Active Demand Zones (OBs): {demand_str}\n"
+                f"- Active Supply Zones (OBs): {supply_str}\n"
+                f"- Unmitigated Fair Value Gaps (FVGs): {fvg_str}\n"
+                f"- Auto-Fibonacci Retracement Levels: {fibs_str}\n\n"
+                f"Synthesize this price action report. Detail how the market structural transitions compare, analyze any unmitigated Fair Value Gaps (FVG) or Order Blocks, "
+                f"and explain where key Fibonacci support levels lie for planning exit/entry points."
+            )
+            
+        else:
+            user_prompt = (
+                f"Perform a technical analysis for the stock ticker: {ticker}\n"
+                f"Current Price: Rs. {curr_price} ({price_change:+.2f}, {pct_change:+.2f}%)\n"
+                f"Active Indicator: Price and Volatility Only\n\n"
+                f"Calculated Metrics:\n"
+                f"- Volatility (ATR-14): {atr_val}\n"
+                f"Write a standard short-term volatility and trend structure overview based on the price action."
+            )
+            
+        synthesis = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
+        return {
+            "symbol": ticker,
+            "indicator": indicator,
+            "synthesis": synthesis
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Indicator LLM synthesis failure: {str(e)}")
+
+
 @app.get("/api/compare")
 async def compare_rivals(tickers: str, generate_thesis: bool = False):
     """Benchmarks rivals side-by-side."""

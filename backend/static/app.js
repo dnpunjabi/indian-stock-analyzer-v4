@@ -22073,6 +22073,12 @@ async function renderTVWorkstationChart(symbol) {
     const container = document.getElementById('tv-chart-container');
     if (!container) return;
     
+    // Reset AI Indicator Insights panel text on ticker changes
+    const synthesisContent = document.getElementById('tv-ai-synthesis-content');
+    if (synthesisContent) {
+        synthesisContent.innerHTML = `Select an indicator and click <strong>Generate AI Analysis</strong> to compile a professional technical interpretation report tailored to the active chart's calculated metrics.`;
+    }
+    
     // Check if LightweightCharts is loaded
     if (typeof LightweightCharts === 'undefined') {
         container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">TradingView Lightweight Charts is offline. Please check your internet connection.</div>';
@@ -22725,6 +22731,78 @@ function setupTVWorkstationChartControls() {
             });
         }
     });
+
+    const generateBtn = document.getElementById('tv-btn-generate-synthesis');
+    if (generateBtn) {
+        generateBtn.addEventListener('click', triggerTVIndicatorSynthesis);
+    }
+}
+
+async function triggerTVIndicatorSynthesis() {
+    const btn = document.getElementById('tv-btn-generate-synthesis');
+    const content = document.getElementById('tv-ai-synthesis-content');
+    if (!btn || !content) return;
+    
+    if (!activeStockProfile || !activeStockProfile.ticker) {
+        content.innerHTML = `<span style="color: var(--text-muted);">Please load a stock ticker profile first.</span>`;
+        return;
+    }
+    
+    const ticker = activeStockProfile.ticker;
+    const indicator = document.getElementById('tv-active-indicator')?.value || 'lux-algo';
+    const length = parseInt(document.getElementById('tv-length')?.value || '14', 10);
+    const mult = parseFloat(document.getElementById('tv-mult')?.value || '1.0');
+    
+    // Set loading state
+    btn.disabled = true;
+    btn.innerHTML = `<span>⏳ Analyzing...</span>`;
+    content.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 0;">
+            <div class="skeleton-pulse" style="height: 14px; width: 60%; background: rgba(255,255,255,0.05); border-radius: 4px;"></div>
+            <div class="skeleton-pulse" style="height: 14px; width: 85%; background: rgba(255,255,255,0.05); border-radius: 4px;"></div>
+            <div class="skeleton-pulse" style="height: 14px; width: 75%; background: rgba(255,255,255,0.05); border-radius: 4px;"></div>
+            <div class="skeleton-pulse" style="height: 14px; width: 40%; background: rgba(255,255,255,0.05); border-radius: 4px;"></div>
+        </div>
+    `;
+    
+    try {
+        const url = `/api/chart/indicator-synthesis?ticker=${encodeURIComponent(ticker)}&indicator=${indicator}&length=${length}&mult=${mult}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Server returned error status.");
+        const data = await res.json();
+        
+        content.innerHTML = formatMarkdownToHTML(data.synthesis);
+    } catch (e) {
+        console.error("AI indicator synthesis error: ", e);
+        content.innerHTML = `<span style="color: #ef4444;">Failed to compile AI insights: ${e.message}. Please verify the backend LLM configurations.</span>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span>⚡ Generate AI Analysis</span>`;
+    }
+}
+
+function formatMarkdownToHTML(text) {
+    if (!text) return "";
+    let formatted = text;
+    // Replace headers
+    formatted = formatted.replace(/^### (.*$)/gim, '<h4 style="margin: 12px 0 6px 0; color: var(--text-primary); font-weight: 600; font-size: 13px;">$1</h4>');
+    formatted = formatted.replace(/^## (.*$)/gim, '<h3 style="margin: 15px 0 8px 0; color: var(--text-primary); font-weight: 600; font-size: 14px;">$1</h3>');
+    formatted = formatted.replace(/^# (.*$)/gim, '<h2 style="margin: 18px 0 10px 0; color: var(--text-primary); font-weight: 700; font-size: 15px;">$1</h2>');
+    
+    // Replace bold text
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--text-primary); font-weight: 700;">$1</strong>');
+    
+    // Replace bullet points
+    formatted = formatted.replace(/^\s*-\s+(.*$)/gim, '<li style="margin-left: 15px; margin-bottom: 4px; list-style-type: disc;">$1</li>');
+    
+    // Convert line breaks to clean HTML paragraphs
+    formatted = formatted.split('\n\n').map(p => {
+        const trimmed = p.trim();
+        if (trimmed.startsWith('<li') || trimmed.startsWith('<h')) return trimmed;
+        return `<p style="margin-bottom: 8px;">${trimmed.replace(/\n/g, '<br>')}</p>`;
+    }).join('');
+    
+    return formatted;
 }
 
 window.renderTVWorkstationChart = renderTVWorkstationChart;
@@ -22773,6 +22851,14 @@ window.renderTVWorkstationChart = renderTVWorkstationChart;
             margin-bottom: 0 !important;
             border-bottom: 1px solid var(--border-glass) !important;
             padding-bottom: 10px !important;
+        }
+        @keyframes skeletonPulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1.0; }
+            100% { opacity: 0.5; }
+        }
+        .skeleton-pulse {
+            animation: skeletonPulse 1.5s infinite ease-in-out;
         }
     `;
     document.head.appendChild(style);
