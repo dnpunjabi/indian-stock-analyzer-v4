@@ -22734,7 +22734,26 @@ function setupTVWorkstationChartControls() {
 
     const generateBtn = document.getElementById('tv-btn-generate-synthesis');
     if (generateBtn) {
-        generateBtn.addEventListener('click', triggerTVIndicatorSynthesis);
+        generateBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerTVIndicatorSynthesis();
+        });
+    }
+
+    const header = document.getElementById('tv-ai-insights-header');
+    const wrapper = document.getElementById('tv-ai-synthesis-content-wrapper');
+    const icon = document.getElementById('tv-ai-insights-toggle-icon');
+    if (header && wrapper && icon) {
+        header.addEventListener('click', () => {
+            const isCollapsed = wrapper.style.display === 'none';
+            if (isCollapsed) {
+                wrapper.style.display = 'block';
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                wrapper.style.display = 'none';
+                icon.style.transform = 'rotate(-90deg)';
+            }
+        });
     }
 }
 
