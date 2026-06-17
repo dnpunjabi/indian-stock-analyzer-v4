@@ -9745,7 +9745,7 @@ tr.active-peer-row td:first-child {
     color: var(--text-primary);
 }
 
-/* Responsive: hide Day High/Low on smaller screens for table readability */
+/* Responsive: progressively hide less-critical columns on smaller screens */
 @media (max-width: 1100px) {
     .wl-day-high,
     .wl-day-low,
@@ -9756,6 +9756,23 @@ tr.active-peer-row td:first-child {
 }
 
 @media (max-width: 850px) {
+    /* Hide Sector and Company Name on tablets/large phones to keep price columns visible */
+    th[data-sort="sector"],
+    #watchlist-table-body td:nth-child(3) {
+        display: none;
+    }
+}
+
+@media (max-width: 600px) {
+    /* On small phones also hide Company Name to make room for price action */
+    th[data-sort="name"],
+    #watchlist-table-body td:nth-child(2) {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    /* On very narrow screens hide absolute Change, keep Change % */
     .wl-change,
     th[data-sort="change"] {
         display: none;
