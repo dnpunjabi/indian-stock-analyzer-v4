@@ -10596,10 +10596,14 @@ function renderWatchlistItems() {
         pagContainer.style.display = 'flex';
     }
 
-    // Fetch live quotes asynchronously and populate the price columns
-    const symbolsOnPage = pageData.map(item => item.symbol);
-    if (symbolsOnPage.length > 0) {
-        fetchWatchlistLiveQuotes(symbolsOnPage);
+    // Fetch live quotes for ALL watchlist items (not just current page) so sorting works across pages
+    const allItemsNeedQuotes = activeWatch.items.filter(item => item.live_price === undefined || item.live_price === null);
+    const allSymbols = allItemsNeedQuotes.map(item => item.symbol);
+    if (allSymbols.length > 0) {
+        fetchWatchlistLiveQuotes(allSymbols);
+    } else {
+        // All items already have quote data — just update the visible DOM cells
+        fetchWatchlistLiveQuotes(pageData.map(item => item.symbol));
     }
 }
 
