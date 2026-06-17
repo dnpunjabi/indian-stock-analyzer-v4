@@ -9723,7 +9723,44 @@ tr.active-peer-row td:first-child {
     }
 }
 
+/* Shimmer loading animation for watchlist live price placeholders */
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
 
+/* --- WATCHLIST LIVE PRICE COLUMNS --- */
+.wl-live-price,
+.wl-change,
+.wl-change-pct,
+.wl-day-high,
+.wl-day-low {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+[data-theme="light"] .wl-live-price span,
+[data-theme="light"] .wl-day-high span,
+[data-theme="light"] .wl-day-low span {
+    color: var(--text-primary);
+}
+
+/* Responsive: hide Day High/Low on smaller screens for table readability */
+@media (max-width: 1100px) {
+    .wl-day-high,
+    .wl-day-low,
+    th[data-sort="day_high"],
+    th[data-sort="day_low"] {
+        display: none;
+    }
+}
+
+@media (max-width: 850px) {
+    .wl-change,
+    th[data-sort="change"] {
+        display: none;
+    }
+}
 
 /* AI Multi-Agent Verdict Debate Styling */
 .agent-debate-block {

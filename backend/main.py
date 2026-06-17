@@ -3459,6 +3459,96 @@ async def analyze_watchlist(watchlist_id: int):
     results = sorted(results, key=lambda x: x["score"], reverse=True)
     return {"results": results}
 
+
+class BatchQuotesRequest(BaseModel):
+    symbols: List[str]
+
+@app.post("/api/batch-quotes")
+async def batch_quotes(data: BatchQuotesRequest):
+    """
+    Lightweight batch endpoint to fetch live market quotes for a list of symbols.
+    Returns current price, change, change%, day high, and day low using yfinance batch download.
+    Auto-appends .NS suffix for Indian stock symbols that lack an exchange suffix.
+    """
+    raw_symbols = [s.strip().upper() for s in data.symbols if s.strip()]
+    if not raw_symbols:
+        return {"quotes": {}}
+
+    # Cap at 100 symbols max to prevent abuse
+    raw_symbols = raw_symbols[:100]
+
+    # Map original symbols to yfinance tickers (.NS suffix for NSE)
+    sym_to_yf = {}
+    yf_symbols = []
+    for sym in raw_symbols:
+        if '.' in sym:
+            yf_sym = sym  # Already has exchange suffix
+        else:
+            yf_sym = f"{sym}.NS"  # Default to NSE
+        sym_to_yf[sym] = yf_sym
+        yf_symbols.append(yf_sym)
+
+    quotes = {}
+    try:
+        # Use yfinance batch download for efficiency (2d period for prev close comparison)
+        df = await asyncio.to_thread(
+            yf.download,
+            yf_symbols,
+            period="2d",
+            interval="1d",
+            progress=False,
+            threads=True
+        )
+
+        if df.empty:
+            return {"quotes": quotes}
+
+        is_multi = isinstance(df.columns, pd.MultiIndex)
+
+        for orig_sym, yf_sym in sym_to_yf.items():
+            try:
+                if is_multi:
+                    if yf_sym not in df.columns.get_level_values(1):
+                        continue
+                    close_series = df['Close'][yf_sym].dropna()
+                    high_series = df['High'][yf_sym].dropna()
+                    low_series = df['Low'][yf_sym].dropna()
+                else:
+                    # Single symbol case — no multi-level columns
+                    close_series = df['Close'].dropna()
+                    high_series = df['High'].dropna()
+                    low_series = df['Low'].dropna()
+
+                if close_series.empty:
+                    continue
+
+                current_price = float(close_series.iloc[-1])
+                day_high = float(high_series.iloc[-1]) if not high_series.empty else current_price
+                day_low = float(low_series.iloc[-1]) if not low_series.empty else current_price
+
+                # Calculate change from previous close
+                prev_close = float(close_series.iloc[-2]) if len(close_series) >= 2 else current_price
+                change = current_price - prev_close
+                change_pct = (change / prev_close * 100.0) if prev_close > 0 else 0.0
+
+                # Map back to original symbol key (e.g., "TCS" not "TCS.NS")
+                quotes[orig_sym] = {
+                    "price": round(current_price, 2),
+                    "change": round(change, 2),
+                    "change_pct": round(change_pct, 2),
+                    "high": round(day_high, 2),
+                    "low": round(day_low, 2)
+                }
+            except Exception as sym_err:
+                print(f"Batch quote error for {orig_sym} ({yf_sym}): {sym_err}")
+                continue
+
+    except Exception as e:
+        print(f"Batch quotes download error: {e}")
+
+    return {"quotes": quotes}
+
+
 class PortfolioItemInput(BaseModel):
     symbol: str
     quantity: float

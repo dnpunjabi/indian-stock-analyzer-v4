@@ -10317,7 +10317,7 @@ function renderWatchlistItems() {
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
         if (inlineAddContainer) inlineAddContainer.style.display = 'none';
         if (resultsContainer) resultsContainer.style.display = 'none';
-        tbody.innerHTML = '<tr><td colspan="4" class="center-text text-muted">Select or create a watchlist on the left to display its constituents.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">Select or create a watchlist on the left to display its constituents.</td></tr>';
         return;
     }
     
@@ -10327,7 +10327,7 @@ function renderWatchlistItems() {
         if (deleteBtn) deleteBtn.style.display = 'none';
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
         if (inlineAddContainer) inlineAddContainer.style.display = 'none';
-        tbody.innerHTML = '<tr><td colspan="4" class="center-text text-muted">Watchlist data is loading...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">Watchlist data is loading...</td></tr>';
         return;
     }
     
@@ -10339,7 +10339,7 @@ function renderWatchlistItems() {
     const pagContainer = document.getElementById('watchlist-table-pagination');
     
     if (activeWatch.items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="center-text text-muted">This watchlist is empty. Load a stock inside the Analyzer and add it.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">This watchlist is empty. Load a stock inside the Analyzer and add it.</td></tr>';
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
         if (resultsContainer) resultsContainer.style.display = 'none';
         if (pagContainer) pagContainer.style.display = 'none';
@@ -10496,12 +10496,20 @@ function renderWatchlistItems() {
     }
     
     // --- SORT CONSTITUENTS ---
+    const numericSortFields = ['live_price', 'change', 'change_pct', 'day_high', 'day_low'];
     let sortedItems = [...activeWatch.items];
     sortedItems.sort((a, b) => {
-        let valA = a[watchlistSortCol] || '';
-        let valB = b[watchlistSortCol] || '';
-        if (typeof valA === 'string') valA = valA.toLowerCase();
-        if (typeof valB === 'string') valB = valB.toLowerCase();
+        let valA, valB;
+        if (numericSortFields.includes(watchlistSortCol)) {
+            // Numeric sort for live price columns — treat missing/NaN as -Infinity so they sink to the bottom
+            valA = (typeof a[watchlistSortCol] === 'number' && !isNaN(a[watchlistSortCol])) ? a[watchlistSortCol] : -Infinity;
+            valB = (typeof b[watchlistSortCol] === 'number' && !isNaN(b[watchlistSortCol])) ? b[watchlistSortCol] : -Infinity;
+        } else {
+            valA = a[watchlistSortCol] || '';
+            valB = b[watchlistSortCol] || '';
+            if (typeof valA === 'string') valA = valA.toLowerCase();
+            if (typeof valB === 'string') valB = valB.toLowerCase();
+        }
         
         if (valA < valB) return watchlistSortAsc ? -1 : 1;
         if (valA > valB) return watchlistSortAsc ? 1 : -1;
@@ -10523,6 +10531,7 @@ function renderWatchlistItems() {
             : `<span class="badge-rec rec-hold click-to-warm" data-symbol="${item.symbol}" style="font-size: 8px; padding: 2px 5px; border-radius: 4px; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: var(--text-muted);" title="Uncached database profile. Click to pre-warm cache.">COLD ⚪</span>`;
             
         const tr = document.createElement('tr');
+        tr.setAttribute('data-wl-symbol', item.symbol);
         tr.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -10538,6 +10547,21 @@ function renderWatchlistItems() {
                 </div>
             </td>
             <td><span class="text-muted" style="font-size:11px;">${item.sector}</span></td>
+            <td class="wl-live-price" style="text-align: right; font-weight: 700; font-size: 12px; color: var(--text-primary);">
+                <span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+            </td>
+            <td class="wl-change" style="text-align: right; font-size: 11.5px; font-weight: 600;">
+                <span style="display:inline-block; width:45px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+            </td>
+            <td class="wl-change-pct" style="text-align: right; font-size: 11.5px; font-weight: 600;">
+                <span style="display:inline-block; width:45px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+            </td>
+            <td class="wl-day-high" style="text-align: right; font-size: 11.5px; color: var(--text-secondary);">
+                <span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+            </td>
+            <td class="wl-day-low" style="text-align: right; font-size: 11.5px; color: var(--text-secondary);">
+                <span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+            </td>
             <td>
                 <button class="btn-secondary remove-watchlist-item-btn" data-ticker="${item.symbol}" style="font-size: 11px; padding: 4px 10px; cursor:pointer;">Remove 🗑️</button>
             </td>
@@ -10570,6 +10594,82 @@ function renderWatchlistItems() {
         document.getElementById('watchlist-table-prev-btn').disabled = (activeWatchlistPage === 1);
         document.getElementById('watchlist-table-next-btn').disabled = (activeWatchlistPage === totalPages);
         pagContainer.style.display = 'flex';
+    }
+
+    // Fetch live quotes asynchronously and populate the price columns
+    const symbolsOnPage = pageData.map(item => item.symbol);
+    if (symbolsOnPage.length > 0) {
+        fetchWatchlistLiveQuotes(symbolsOnPage);
+    }
+}
+
+async function fetchWatchlistLiveQuotes(symbols) {
+    try {
+        const response = await fetch('/api/batch-quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbols: symbols })
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const quotes = data.quotes || {};
+
+        // Persist quote data onto watchlist item objects so sorting works on these columns
+        const activeWatch = watchlistsList.find(w => w.id === activeWatchlistId);
+        if (activeWatch && activeWatch.items) {
+            activeWatch.items.forEach(item => {
+                const q = quotes[item.symbol];
+                if (q) {
+                    item.live_price = q.price;
+                    item.change = q.change;
+                    item.change_pct = q.change_pct;
+                    item.day_high = q.high;
+                    item.day_low = q.low;
+                } else {
+                    item.live_price = null;
+                    item.change = null;
+                    item.change_pct = null;
+                    item.day_high = null;
+                    item.day_low = null;
+                }
+            });
+        }
+
+        const tbody = document.getElementById('watchlist-table-body');
+        if (!tbody) return;
+
+        const rows = tbody.querySelectorAll('tr[data-wl-symbol]');
+        rows.forEach(row => {
+            const sym = row.getAttribute('data-wl-symbol');
+            const q = quotes[sym];
+
+            const priceCell = row.querySelector('.wl-live-price');
+            const changeCell = row.querySelector('.wl-change');
+            const changePctCell = row.querySelector('.wl-change-pct');
+            const highCell = row.querySelector('.wl-day-high');
+            const lowCell = row.querySelector('.wl-day-low');
+
+            if (q) {
+                const isPositive = q.change >= 0;
+                const changeColor = isPositive ? 'var(--neon-green, #10b981)' : 'var(--neon-red, #ef4444)';
+                const changeArrow = isPositive ? '▲' : '▼';
+
+                if (priceCell) priceCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+                if (changeCell) changeCell.innerHTML = `<span style="color: ${changeColor};">${changeArrow} ${isPositive ? '+' : ''}${q.change.toFixed(2)}</span>`;
+                if (changePctCell) changePctCell.innerHTML = `<span style="color: ${changeColor}; padding: 1px 6px; border-radius: 4px; background: ${isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; font-size: 10.5px;">${isPositive ? '+' : ''}${q.change_pct.toFixed(2)}%</span>`;
+                if (highCell) highCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.high.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+                if (lowCell) lowCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.low.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+            } else {
+                // No quote data available
+                if (priceCell) priceCell.innerHTML = '<span class="text-muted" style="font-size:10px;">N/A</span>';
+                if (changeCell) changeCell.innerHTML = '<span class="text-muted" style="font-size:10px;">--</span>';
+                if (changePctCell) changePctCell.innerHTML = '<span class="text-muted" style="font-size:10px;">--</span>';
+                if (highCell) highCell.innerHTML = '<span class="text-muted" style="font-size:10px;">--</span>';
+                if (lowCell) lowCell.innerHTML = '<span class="text-muted" style="font-size:10px;">--</span>';
+            }
+        });
+    } catch (err) {
+        console.error('Failed to fetch watchlist live quotes:', err);
     }
 }
 
@@ -19479,7 +19579,7 @@ async function generateSwingAiSummary() {
         let formattedText = data.synthesis;
         formattedText = formattedText
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/### (.*?)\n/g, '<h3 style="font-size:12px; color:#ffffff; border-bottom: 1px dashed var(--border-glass); padding-bottom: 4px; margin-top: 15px; text-transform:uppercase;">$1</h3>')
+            .replace(/### (.*?)\n/g, '<h3 style="font-size:12px; color:var(--text-primary); border-bottom: 1px dashed var(--border-glass); padding-bottom: 4px; margin-top: 15px; text-transform:uppercase;">$1</h3>')
             .replace(/\* (.*?)\n/g, '<li style="margin-left: 14px;">$1</li>')
             .replace(/\n\n/g, '</p><p>');
 
