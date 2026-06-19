@@ -107,6 +107,83 @@ function handleLiveTickMessage(ticksData) {
         });
     }
 
+    // Update active stock profile in Equity Research Terminal if it's currently loaded
+    if (activeStockProfile && activeStockProfile.ticker) {
+        const activeTicker = activeStockProfile.ticker;
+        const q = ticksData[activeTicker] || ticksData[activeTicker.replace('.NS', '')] || ticksData[activeTicker.split('.')[0]];
+        if (q && q.price > 0) {
+            // Update activeStockProfile fundamentals & technicals so calculations stay updated
+            if (activeStockProfile.fundamentals) {
+                activeStockProfile.fundamentals.current_price = q.price;
+            }
+            if (activeStockProfile.technicals) {
+                activeStockProfile.technicals.price_change_pct = q.change_pct;
+                if (q.high > 0) activeStockProfile.technicals.daily_high = q.high;
+                if (q.low > 0) activeStockProfile.technicals.daily_low = q.low;
+            }
+
+            // Update top meta banner price & change in DOM
+            const priceEl = document.getElementById('meta-price');
+            const changeEl = document.getElementById('meta-change');
+            if (priceEl) {
+                const oldPriceText = priceEl.getAttribute('data-last-price');
+                const priceChanged = oldPriceText && parseFloat(oldPriceText) !== q.price;
+                priceEl.innerText = safeFormatRupees(q.price, 2);
+                priceEl.setAttribute('data-last-price', q.price);
+
+                // Add tick flash animation to the banner price
+                if (priceChanged) {
+                    const isPositive = q.change >= 0;
+                    priceEl.classList.add(isPositive ? 'tick-flash-green' : 'tick-flash-red');
+                    setTimeout(() => {
+                        priceEl.classList.remove('tick-flash-green', 'tick-flash-red');
+                    }, 600);
+                }
+            }
+
+            if (changeEl) {
+                const isPositive = q.change_pct >= 0;
+                const sign = isPositive ? '+' : '';
+                const isBullish = activeStockProfile.technicals && activeStockProfile.technicals.trend_50_vs_200 === "Bullish";
+                const trendLabel = isBullish ? 'Bullish trend' : 'Consolidating';
+                changeEl.innerText = `${sign}${q.change_pct.toFixed(2)}% (${trendLabel})`;
+                changeEl.className = isPositive ? "meta-change green-text" : "meta-change red-text";
+            }
+
+            // Update daily high/low displays on Technical tab if currently active
+            const dailyHighEl = document.getElementById('tech-daily-high');
+            const dailyLowEl = document.getElementById('tech-daily-low');
+            if (dailyHighEl && q.high > 0) dailyHighEl.innerText = safeFormatRupees(q.high, 2);
+            if (dailyLowEl && q.low > 0) dailyLowEl.innerText = safeFormatRupees(q.low, 2);
+
+            // Dynamically update SMA alignment stack if currently rendered in DOM
+            const stackContainer = document.getElementById('tech-sma-stack-container');
+            if (stackContainer && activeStockProfile.technicals) {
+                const sma50Val = activeStockProfile.technicals.sma_50 || 0.0;
+                const sma200Val = activeStockProfile.technicals.sma_200 || 0.0;
+                const stackItems = [
+                    { label: 'Current Price', val: q.price, bg: 'rgba(59, 130, 246, 0.08)', border: 'var(--color-primary-glow)', textCol: 'var(--text-primary)' },
+                    { label: '50-Day SMA', val: sma50Val, bg: 'rgba(16, 185, 129, 0.04)', border: 'rgba(16, 185, 129, 0.2)', textCol: 'var(--text-secondary)' },
+                    { label: '200-Day SMA', val: sma200Val, bg: 'rgba(239, 68, 68, 0.04)', border: 'rgba(239, 68, 68, 0.2)', textCol: 'var(--text-secondary)' }
+                ];
+                stackItems.sort((a, b) => b.val - a.val);
+                let stackHtml = '';
+                stackItems.forEach((item, index) => {
+                    stackHtml += `
+                        <div style="background: ${item.bg}; border: 1px solid ${item.border}; padding: 6px 12px; border-radius: 6px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; width: 100%;">
+                            <span style="color: ${item.textCol}; font-weight: 500; font-family: 'Outfit', sans-serif;">${item.label}</span>
+                            <strong style="color: var(--text-primary); font-family: 'Outfit', sans-serif;">${safeFormatRupees(item.val, 2)}</strong>
+                        </div>
+                    `;
+                    if (index < 2) {
+                        stackHtml += `<div style="text-align: center; font-size: 8px; color: var(--text-muted); margin: 1px 0;">▼</div>`;
+                    }
+                });
+                stackContainer.innerHTML = stackHtml;
+            }
+        }
+    }
+
     // Update visible DOM cells with flash animation
     const tbody = document.getElementById('watchlist-table-body');
     if (!tbody) return;
@@ -459,6 +536,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Always default to 'analyzer' (home page) on page load/refresh
     switchTab('analyzer');
+    
+    // Connect to Backend WebSocket
+    connectWebSocket();
 });
 
 // Collapsible Sidebar Workstation Manager
@@ -762,6 +842,14 @@ function setupBrandReset() {
 }
 
 function resetWorkspace() {
+    if (activeStockProfile && activeStockProfile.ticker) {
+        const oldTicker = activeStockProfile.ticker;
+        const activeWatch = (typeof watchlistsList !== 'undefined') ? watchlistsList.find(w => w.id === activeWatchlistId) : null;
+        const inWatchlist = activeWatch && activeWatch.items && activeWatch.items.some(item => item.symbol.toUpperCase() === oldTicker.toUpperCase());
+        if (!inWatchlist) {
+            wsUnsubscribeSymbols([oldTicker]);
+        }
+    }
     activeStockProfile = null;
     chatHistory = [];
     
@@ -2973,7 +3061,17 @@ async function loadStockAnalyzer(query) {
         if (!response.ok) throw new Error("Analysis failed.");
         const profile = await response.json();
         
+        const oldTicker = activeStockProfile ? activeStockProfile.ticker : null;
         activeStockProfile = profile;
+        if (oldTicker && oldTicker !== profile.ticker) {
+            // Unsubscribe from old ticker if it's not in the watchlist
+            const activeWatch = (typeof watchlistsList !== 'undefined') ? watchlistsList.find(w => w.id === activeWatchlistId) : null;
+            const inWatchlist = activeWatch && activeWatch.items && activeWatch.items.some(item => item.symbol.toUpperCase() === oldTicker.toUpperCase());
+            if (!inWatchlist) {
+                wsUnsubscribeSymbols([oldTicker]);
+            }
+        }
+        wsSubscribeSymbols([profile.ticker]);
         chatHistory = [];
         
         // Reset dynamic chart select values to default when loading a new stock
