@@ -154,7 +154,7 @@ function handleLiveTickMessage(ticksData) {
             const dailyHighEl = document.getElementById('tech-daily-high');
             const dailyLowEl = document.getElementById('tech-daily-low');
             if (dailyHighEl && q.high > 0) dailyHighEl.innerText = safeFormatRupees(q.high, 2);
-            if (dailyLowEl && q.low > 0) dailyLowEl.innerText = safeFormatRupees(q.low, 2);
+            if (dailyLowEl && q.low > 0) dailyLowEl.innerText = safeFormatRupees(q.low, 2);\n            \n            // Update day range in meta banner\n            const metaDayLowEl = document.getElementById('meta-day-low');\n            const metaDayHighEl = document.getElementById('meta-day-high');\n            if (metaDayLowEl && q.low > 0) metaDayLowEl.innerText = `Low: ₹${q.low.toFixed(2)}`;\n            if (metaDayHighEl && q.high > 0) metaDayHighEl.innerText = `High: ₹${q.high.toFixed(2)}`;
 
             // Dynamically update SMA alignment stack if currently rendered in DOM
             const stackContainer = document.getElementById('tech-sma-stack-container');
@@ -3142,6 +3142,40 @@ function renderStockDashboard(p) {
     if (industryEl) industryEl.innerText = p.industry;
     const priceEl = document.getElementById('meta-price');
     if (priceEl) priceEl.innerText = safeFormatRupees(p.fundamentals.current_price, 2);
+    
+    // Update day range
+    const dayLowEl = document.getElementById('meta-day-low');
+    const dayHighEl = document.getElementById('meta-day-high');
+    if (dayLowEl && p.fundamentals.day_low) dayLowEl.innerText = `Low: ₹${p.fundamentals.day_low.toFixed(2)}`;
+    if (dayHighEl && p.fundamentals.day_high) dayHighEl.innerText = `High: ₹${p.fundamentals.day_high.toFixed(2)}`;
+    
+    // Update 52-week range
+    const low52El = document.getElementById('meta-52w-low');
+    const high52El = document.getElementById('meta-52w-high');
+    if (low52El && p.fundamentals.low_52week) low52El.innerText = `Low: ₹${p.fundamentals.low_52week.toFixed(2)}`;
+    if (high52El && p.fundamentals.high_52week) high52El.innerText = `High: ₹${p.fundamentals.high_52week.toFixed(2)}`;
+    
+    // Update valuation targets (Buy & Sell prices)
+    const buyTargetEl = document.getElementById('meta-buy-target');
+    const sellTargetEl = document.getElementById('meta-sell-target');
+    if (p.analysis && p.analysis.suggested_buy_price_range && p.analysis.suggested_sell_price_range) {
+        const buyRanges = p.analysis.suggested_buy_price_range.split('-').map(v => parseFloat(v.trim()));
+        const sellRanges = p.analysis.suggested_sell_price_range.split('-').map(v => parseFloat(v.trim()));
+        const buyTarget = buyRanges[0];
+        const sellTarget = sellRanges[1];
+        if (buyTargetEl && !isNaN(buyTarget)) buyTargetEl.innerText = `Buy: ₹${buyTarget.toFixed(0)}`;
+        if (sellTargetEl && !isNaN(sellTarget)) sellTargetEl.innerText = `Sell: ₹${sellTarget.toFixed(0)}`;
+    }
+    
+    // Start 3-second price refresh cycle for equity research terminal
+    if (!window.stockPriceRefreshInterval) {
+        window.stockPriceRefreshInterval = setInterval(() => {
+            if (activeStockProfile && activeStockProfile.fundamentals && activeStockProfile.fundamentals.symbol) {
+                fetch(`/api/stock-profile/${activeStockProfile.fundamentals.symbol}?cache=false`)
+                    .catch(e => console.log('Periodic price refresh failed:', e));
+            }
+        }, 3000);
+    }
     
     // Populate Corporate Business Summary Collapsible Card (Two-Column Layout)
     const sectorVal = p.sector || 'N/A';
