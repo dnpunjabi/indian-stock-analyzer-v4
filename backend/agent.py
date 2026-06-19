@@ -1130,11 +1130,17 @@ def run_conversational_chat(chat_history: list, user_message: str, profile: dict
                 f"- **Volume Price Trend (VPT)**: The cumulative volume-weighted momentum index is **{vpt_val:,.0f}**, indicating **{vpt_status}** as institutional volume matches price changes."
             )
         elif "peer" in u_msg_low or "sector" in u_msg_low or "valuation" in u_msg_low:
+            # Ensure numeric values are floats (fix for cached profile string conversion)
+            pe_ratio = float(profile['fundamentals']['pe_ratio'])
+            median_pe = float(profile['pe_bands']['median_pe'])
+            roe_pct = float(profile['fundamentals']['roe_pct'])
+            roce_pct = float(profile['fundamentals']['roce_pct'])
+            
             reply = (
-                f"In terms of relative valuations, {name} trades at a trailing P/E multiple of **{profile['fundamentals']['pe_ratio']:.1f}x**. "
-                f"Comparing this to its 5-year historical median PE of **{profile['pe_bands']['median_pe']:.1f}x**, the stock trades at a "
-                f"**{((profile['fundamentals']['pe_ratio'] - profile['pe_bands']['median_pe']) / profile['pe_bands']['median_pe'] * 100.0):.1f}%** premium/discount to its historical norms. "
-                f"Its return on capital (ROE: **{profile['fundamentals']['roe_pct']:.1f}%**, ROCE: **{profile['fundamentals']['roce_pct']:.1f}%**) compares favorably to sector peers."
+                f"In terms of relative valuations, {name} trades at a trailing P/E multiple of **{pe_ratio:.1f}x**. "
+                f"Comparing this to its 5-year historical median PE of **{median_pe:.1f}x**, the stock trades at a "
+                f"**{((pe_ratio - median_pe) / median_pe * 100.0):.1f}%** premium/discount to its historical norms. "
+                f"Its return on capital (ROE: **{roe_pct:.1f}%**, ROCE: **{roce_pct:.1f}%**) compares favorably to sector peers."
             )
         elif "governance" in u_msg_low or "pledg" in u_msg_low or "insider" in u_msg_low or "shareholding" in u_msg_low:
             pledge_val = profile["shareholding"].get("Promoter Pledging %", 0.0)

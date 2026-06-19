@@ -29,9 +29,10 @@ DATABASE_PATH = os.path.join(DATABASE_DIR, "watchlist_database.db")
 @contextmanager
 def get_db():
     """Context manager for safe SQLite connections with row factory."""
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=30.0)  # 30-second timeout for locked database
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")  # Enable Write-Ahead Logging to reduce locks
     try:
         yield conn
     finally:
@@ -641,23 +642,29 @@ async def run_background_cache_warmer():
             
             for sym in symbols:
                 try:
+                    # Check if profile needs refresh
                     with get_db() as conn:
                         cursor = conn.cursor()
                         cursor.execute("SELECT updated_at FROM cached_profiles WHERE symbol = ?", (sym,))
                         row = cursor.fetchone()
-                        
+                    
+                    needs_update = True
                     if row and row["updated_at"]:
                         try:
                             cached_time = datetime.strptime(row["updated_at"][:19], "%Y-%m-%d %H:%M:%S")
                             if (datetime.now() - cached_time).total_seconds() < 24 * 3600:
-                                continue
+                                needs_update = False
                         except Exception:
-                            # If date format is weird, force refresh
-                            pass
+                            pass  # Force refresh if date parsing fails
+                    
+                    if not needs_update:
+                        await asyncio.sleep(1)  # Reduced sleep to speed up sweep
+                        continue
                             
                     print(f"Background cache warmer: fetching profile for {sym}...")
                     profile = await asyncio.to_thread(get_complete_financial_profile, sym)
                     
+                    # Cache the profile
                     with get_db() as conn:
                         conn.execute(
                             "INSERT OR REPLACE INTO cached_profiles (symbol, profile_json, updated_at) VALUES (?, ?, ?)",
@@ -665,10 +672,10 @@ async def run_background_cache_warmer():
                         )
                         conn.commit()
                     print(f"Background cache warmer: successfully cached {sym}")
-                    await asyncio.sleep(4)
+                    await asyncio.sleep(2)  # Reduced sleep between updates
                 except Exception as e:
                     print(f"Background warming error for {sym}: {e}")
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(5)  # Reduced error sleep
             
             print("Background cache warmer: sweep complete. Sleeping for 1 hour.")
         except Exception as e:
