@@ -996,16 +996,19 @@ function setupSidebarAccordions() {
 function setupEnterpriseHeader() {
     const bellBtn = document.getElementById('header-bell-btn');
     const settingsBtn = document.getElementById('header-settings-btn');
+    const linksBtn = document.getElementById('header-links-btn');
     const notifDropdown = document.getElementById('notification-dropdown-panel');
     const settingsDropdown = document.getElementById('settings-dropdown-panel');
+    const linksDropdown = document.getElementById('links-dropdown-panel');
 
-    if (!bellBtn || !settingsBtn || !notifDropdown || !settingsDropdown) return;
+    if (!bellBtn || !settingsBtn || !notifDropdown || !settingsDropdown || !linksBtn || !linksDropdown) return;
 
     // Toggle Notification panel
     bellBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         notifDropdown.style.display = notifDropdown.style.display === 'none' ? 'block' : 'none';
         settingsDropdown.style.display = 'none'; // Close other dropdown
+        linksDropdown.style.display = 'none'; // Close other dropdown
     });
 
     // Toggle Settings panel
@@ -1013,6 +1016,15 @@ function setupEnterpriseHeader() {
         e.stopPropagation();
         settingsDropdown.style.display = settingsDropdown.style.display === 'none' ? 'block' : 'none';
         notifDropdown.style.display = 'none'; // Close other dropdown
+        linksDropdown.style.display = 'none'; // Close other dropdown
+    });
+
+    // Toggle Links panel
+    linksBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        linksDropdown.style.display = linksDropdown.style.display === 'none' ? 'block' : 'none';
+        notifDropdown.style.display = 'none'; // Close other dropdown
+        settingsDropdown.style.display = 'none'; // Close other dropdown
     });
 
     // Prevent auto-closing when clicking inside dropdowns
@@ -1020,6 +1032,9 @@ function setupEnterpriseHeader() {
         e.stopPropagation();
     });
     settingsDropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+    linksDropdown.addEventListener('click', (e) => {
         e.stopPropagation();
     });
 
@@ -1030,6 +1045,9 @@ function setupEnterpriseHeader() {
         }
         if (!settingsBtn.contains(e.target) && !settingsDropdown.contains(e.target)) {
             settingsDropdown.style.display = 'none';
+        }
+        if (!linksBtn.contains(e.target) && !linksDropdown.contains(e.target)) {
+            linksDropdown.style.display = 'none';
         }
     });
 

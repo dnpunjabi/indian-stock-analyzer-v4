@@ -4556,7 +4556,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     gap: 12px;
 }
 
-.header-bell-wrapper, .header-settings-wrapper {
+.header-bell-wrapper, .header-settings-wrapper, .header-links-wrapper {
     position: relative;
     width: 32px;
     height: 32px;
@@ -4572,7 +4572,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     user-select: none;
 }
 
-.header-bell-wrapper:hover, .header-settings-wrapper:hover {
+.header-bell-wrapper:hover, .header-settings-wrapper:hover, .header-links-wrapper:hover {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.15);
     transform: translateY(-1px);
@@ -4708,6 +4708,23 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .setting-row:last-child {
     border-bottom: none;
+}
+
+/* Links Dropdown Custom Styling */
+.links-dropdown .setting-row {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    transition: background 0.2s ease;
+}
+.links-dropdown .setting-row:last-child {
+    border-bottom: none;
+}
+.links-dropdown .setting-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
 }
 
 .setting-row label {
