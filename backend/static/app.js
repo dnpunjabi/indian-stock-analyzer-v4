@@ -1,7 +1,255 @@
 /* 
-   Indian Stock Analysis AI Workstation
-   Unified Client-side State Machine & Dashboard Controller (Updated)
+   Indian Stock Analysis AI Workstation v2.0
+   Unified Client-side State Machine & Dashboard Controller
+   Real-time WebSocket Streaming via Angel One SmartAPI
 */
+
+// ==================== LIVE TICKS WEBSOCKET MANAGER ====================
+let liveTicksWS = null;
+let liveTicksReconnectTimer = null;
+let liveTicksConnected = false;
+let _wsSubscribedSymbols = new Set();
+
+function connectLiveTicksWS() {
+    if (liveTicksWS && (liveTicksWS.readyState === WebSocket.CONNECTING || liveTicksWS.readyState === WebSocket.OPEN)) {
+        return; // Already connected or connecting
+    }
+
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${location.host}/ws/live-ticks`;
+
+    try {
+        liveTicksWS = new WebSocket(wsUrl);
+    } catch (e) {
+        console.warn('WebSocket connection failed:', e);
+        updateConnectionIndicator('offline');
+        scheduleWsReconnect();
+        return;
+    }
+
+    liveTicksWS.onopen = () => {
+        console.log('🟢 Live Ticks WebSocket connected');
+        liveTicksConnected = true;
+        updateConnectionIndicator('live');
+        // Re-subscribe to previously subscribed symbols
+        if (_wsSubscribedSymbols.size > 0) {
+            liveTicksWS.send(JSON.stringify({ action: 'subscribe', symbols: Array.from(_wsSubscribedSymbols) }));
+        }
+    };
+
+    liveTicksWS.onmessage = (event) => {
+        try {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'ticks') {
+                handleLiveTickMessage(msg.data);
+            } else if (msg.type === 'alert_triggered') {
+                handleWsAlertTriggered(msg.alert);
+            }
+        } catch (e) {
+            console.warn('Failed to parse WS message:', e);
+        }
+    };
+
+    liveTicksWS.onclose = (event) => {
+        console.warn('🔴 Live Ticks WebSocket closed:', event.code, event.reason);
+        liveTicksConnected = false;
+        updateConnectionIndicator('polling');
+        scheduleWsReconnect();
+    };
+
+    liveTicksWS.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        liveTicksConnected = false;
+        updateConnectionIndicator('offline');
+    };
+}
+
+function scheduleWsReconnect() {
+    if (liveTicksReconnectTimer) clearTimeout(liveTicksReconnectTimer);
+    liveTicksReconnectTimer = setTimeout(() => {
+        console.log('Attempting WebSocket reconnection...');
+        connectLiveTicksWS();
+    }, 3000);
+}
+
+function wsSubscribeSymbols(symbols) {
+    if (!symbols || symbols.length === 0) return;
+    symbols.forEach(s => _wsSubscribedSymbols.add(s.toUpperCase()));
+    if (liveTicksWS && liveTicksWS.readyState === WebSocket.OPEN) {
+        liveTicksWS.send(JSON.stringify({ action: 'subscribe', symbols: symbols }));
+    }
+}
+
+function wsUnsubscribeSymbols(symbols) {
+    if (!symbols || symbols.length === 0) return;
+    symbols.forEach(s => _wsSubscribedSymbols.delete(s.toUpperCase()));
+    if (liveTicksWS && liveTicksWS.readyState === WebSocket.OPEN) {
+        liveTicksWS.send(JSON.stringify({ action: 'unsubscribe', symbols: symbols }));
+    }
+}
+
+function handleLiveTickMessage(ticksData) {
+    // ticksData = { "TCS": { price, change, change_pct, high, low }, ... }
+    if (!ticksData || typeof ticksData !== 'object') return;
+
+    // Update in-memory watchlist item data for sorting
+    const activeWatch = (typeof watchlistsList !== 'undefined') ? watchlistsList.find(w => w.id === activeWatchlistId) : null;
+    if (activeWatch && activeWatch.items) {
+        activeWatch.items.forEach(item => {
+            const q = ticksData[item.symbol] || ticksData[item.symbol.replace('.NS', '')];
+            if (q && q.price > 0) {
+                item.live_price = q.price;
+                item.change = q.change;
+                item.change_pct = q.change_pct;
+                item.day_high = q.high;
+                item.day_low = q.low;
+            }
+        });
+    }
+
+    // Update visible DOM cells with flash animation
+    const tbody = document.getElementById('watchlist-table-body');
+    if (!tbody) return;
+
+    const rows = tbody.querySelectorAll('tr[data-wl-symbol]');
+    rows.forEach(row => {
+        const sym = row.getAttribute('data-wl-symbol');
+        const q = ticksData[sym] || ticksData[sym.replace('.NS', '')];
+        if (!q || !q.price) return;
+
+        const priceCell = row.querySelector('.wl-live-price');
+        const changeCell = row.querySelector('.wl-change');
+        const changePctCell = row.querySelector('.wl-change-pct');
+        const highCell = row.querySelector('.wl-day-high');
+        const lowCell = row.querySelector('.wl-day-low');
+
+        const isPositive = q.change >= 0;
+        const changeColor = isPositive ? 'var(--neon-green, #10b981)' : 'var(--neon-red, #ef4444)';
+        const changeArrow = isPositive ? '▲' : '▼';
+
+        // Check if price changed to trigger flash
+        const oldPrice = priceCell ? priceCell.getAttribute('data-last-price') : null;
+        const priceChanged = oldPrice && parseFloat(oldPrice) !== q.price;
+
+        if (priceCell) {
+            priceCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+            priceCell.setAttribute('data-last-price', q.price);
+            if (priceChanged) {
+                priceCell.classList.add(isPositive ? 'tick-flash-green' : 'tick-flash-red');
+                setTimeout(() => {
+                    priceCell.classList.remove('tick-flash-green', 'tick-flash-red');
+                }, 600);
+            }
+        }
+        if (changeCell) changeCell.innerHTML = `<span style="color: ${changeColor};">${changeArrow} ${isPositive ? '+' : ''}${q.change.toFixed(2)}</span>`;
+        if (changePctCell) changePctCell.innerHTML = `<span style="color: ${changeColor}; padding: 1px 6px; border-radius: 4px; background: ${isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; font-size: 10.5px;">${isPositive ? '+' : ''}${q.change_pct.toFixed(2)}%</span>`;
+        if (highCell) highCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.high.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+        if (lowCell) lowCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.low.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+    });
+}
+
+function handleWsAlertTriggered(alertData) {
+    // alertData = { id, ticker, condition_type, operator, value, triggered_price, triggered_time }
+    if (!alertData) return;
+
+    const msg = `ALERT TRIGGERED: ${alertData.ticker} price ₹${alertData.triggered_price} (Target: ${alertData.operator} ${alertData.value})`;
+
+    // 1. Play alert sound
+    if (typeof playAlertSound === 'function') playAlertSound();
+
+    // 2. Show Emergency HUD
+    if (typeof showEmergencyHUD === 'function') showEmergencyHUD(msg);
+
+    // 3. Toast notification
+    if (typeof showToast === 'function') showToast(`🚨 REAL-TIME ALERT: ${msg}`, 'warning');
+
+    // 4. Shake bell icon
+    const bellIcon = document.querySelector('#header-bell-btn .bell-icon');
+    if (bellIcon) {
+        bellIcon.classList.add('bell-shake-active');
+        setTimeout(() => bellIcon.classList.remove('bell-shake-active'), 800);
+    }
+
+    // 5. Add to notification list
+    const notifBody = document.getElementById('notification-list-body');
+    const badge = document.getElementById('bell-badge-count');
+    if (notifBody) {
+        if (notifBody.innerText.includes('No new system notifications')) {
+            notifBody.innerHTML = '';
+        }
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        const item = document.createElement('div');
+        item.className = 'notification-item';
+        item.style.borderLeft = '3px solid var(--neon-red, #ef4444)';
+        item.innerHTML = `
+            <div class="notif-header">
+                <span class="notif-badge badge-red">⚡ REAL-TIME</span>
+                <span class="notif-time">Just Now (${timeStr})</span>
+            </div>
+            <div class="notif-text" style="color: var(--text-primary); font-weight: 500;">
+                ${msg}
+            </div>
+        `;
+        notifBody.prepend(item);
+    }
+    if (badge) {
+        badge.textContent = parseInt(badge.textContent || '0') + 1;
+        badge.style.display = 'flex';
+    }
+
+    // 6. Refresh alerts list if visible
+    if (typeof fetchAlertsList === 'function') fetchAlertsList();
+}
+
+function updateConnectionIndicator(status) {
+    let indicator = document.getElementById('ws-connection-indicator');
+    if (!indicator) {
+        // Create the indicator in the header area
+        const header = document.querySelector('.main-header') || document.querySelector('header');
+        if (header) {
+            indicator = document.createElement('div');
+            indicator.id = 'ws-connection-indicator';
+            indicator.style.cssText = 'position:fixed;bottom:12px;right:12px;padding:4px 10px;border-radius:12px;font-size:10px;font-weight:600;z-index:9999;display:flex;align-items:center;gap:4px;font-family:Inter,sans-serif;cursor:default;transition:all 0.3s ease;';
+            document.body.appendChild(indicator);
+        }
+    }
+    if (!indicator) return;
+
+    if (status === 'live') {
+        indicator.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span> LIVE';
+        indicator.style.background = 'rgba(16,185,129,0.15)';
+        indicator.style.color = '#10b981';
+        indicator.style.border = '1px solid rgba(16,185,129,0.3)';
+        indicator.title = 'Angel One WebSocket: Connected — Real-time streaming active';
+    } else if (status === 'polling') {
+        indicator.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;"></span> POLLING';
+        indicator.style.background = 'rgba(245,158,11,0.15)';
+        indicator.style.color = '#f59e0b';
+        indicator.style.border = '1px solid rgba(245,158,11,0.3)';
+        indicator.title = 'Using yfinance polling — WebSocket disconnected';
+    } else {
+        indicator.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ef4444;"></span> OFFLINE';
+        indicator.style.background = 'rgba(239,68,68,0.15)';
+        indicator.style.color = '#ef4444';
+        indicator.style.border = '1px solid rgba(239,68,68,0.3)';
+        indicator.title = 'No data connection available';
+    }
+}
+
+// Initialize WebSocket on page load
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if Angel One is configured before connecting WS
+    fetch('/api/angel/status').then(r => r.json()).then(status => {
+        if (status.connected || status.authenticated) {
+            connectLiveTicksWS();
+        } else {
+            updateConnectionIndicator('polling');
+        }
+    }).catch(() => {
+        updateConnectionIndicator('polling');
+    });
+});
 
 // Safe formatting helpers to prevent "Cannot read properties of null (reading 'toLocaleString')" errors
 function safeFormatRupees(val, decimals = 2) {
@@ -6981,95 +7229,103 @@ async function generateNLAlertRule() {
     }
 }
 
-// Start Real-Time Alert Engine background scanner
-function startRealTimeAlertScanner() {
-    // Run a background scanner every 30 seconds
-    setInterval(async () => {
-        try {
-            const response = await fetch('/api/alerts/check');
-            if (!response.ok) return;
-            const data = await response.json();
-            
-            // Check if there are any new triggers in this sweep
-            if (data.triggers && data.triggers.length > 0) {
-                // 1. Play premium institutional alert sound
-                playAlertSound();
-                
-                // 2. Display Emergency HUD
-                const hudMsg = data.triggers.join("<br>");
-                showEmergencyHUD(hudMsg);
-                
-                // 3. Display a toast notification for each trigger
-                data.triggers.forEach(msg => {
-                    showToast(`🚨 SYSTEM ALERT: ${msg}`, 'warning');
-                });
-                
-                // Shake the bell icon dynamically
-                const bellIcon = document.querySelector('#header-bell-btn .bell-icon');
-                if (bellIcon) {
-                    bellIcon.classList.add('bell-shake-active');
-                    setTimeout(() => {
-                        bellIcon.classList.remove('bell-shake-active');
-                    }, 800);
-                }
-
-                // 4. Append triggers dynamically to the header notifications list
-                const notifBody = document.getElementById('notification-list-body');
-                const badge = document.getElementById('bell-badge-count');
-                
-                if (notifBody) {
-                    if (notifBody.innerText.includes("No new system notifications")) {
-                        notifBody.innerHTML = '';
-                    }
-                    
-                    data.triggers.forEach(msg => {
-                        const now = new Date();
-                        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-                        
-                        const item = document.createElement('div');
-                        item.className = 'notification-item';
-                        item.style.borderLeft = '3px solid var(--color-primary, #3b82f6)';
-                        item.innerHTML = `
-                            <div class="notif-header">
-                                <span class="notif-badge badge-red">TRIGGERED</span>
-                                <span class="notif-time">Just Now (${timeStr})</span>
-                            </div>
-                            <div class="notif-text" style="color: var(--text-primary); font-weight: 500;">
-                                ${msg}
-                            </div>
-                        `;
-                        notifBody.insertBefore(item, notifBody.firstChild);
-                    });
-                }
-                
-                // 5. Update the badge count
-                if (badge) {
-                    let currentCount = 0;
-                    if (badge.style.display !== 'none' && badge.innerText !== '') {
-                        currentCount = parseInt(badge.innerText) || 0;
-                    }
-                    currentCount += data.triggers.length;
-                    badge.innerText = currentCount;
-                    badge.style.display = 'flex';
-
-                    const sidebarBadge = document.getElementById('sidebar-alerts-badge');
-                    if (sidebarBadge) {
-                        sidebarBadge.innerText = currentCount;
-                        sidebarBadge.style.display = 'flex';
-                    }
-                }
-                
-                // 6. If user is currently looking at the alert center tab, update the list automatically!
-                const alertsTab = document.getElementById('tab-alerts');
-                if (alertsTab && alertsTab.style.display !== 'none') {
-                    renderAlertsList(data.alerts);
-                }
-            }
-        } catch (e) {
-            console.warn("Silent alert background scanner failed:", e);
-        }
-    }, 30000); // 30 seconds interval
-}
+// Start Real-Time Alert Engine background scanner\r
+function startRealTimeAlertScanner() {\r
+    // If WebSocket is connected, poll less frequently (5 min) for technical alerts only\r
+    // If not connected, keep 30-second polling as before\r
+    const getInterval = () => liveTicksConnected ? 300000 : 30000; // 5 min or 30s\r
+    \r
+    const runScan = async () => {\r
+        try {\r
+            const response = await fetch('/api/alerts/check');\r
+            if (!response.ok) return;\r
+            const data = await response.json();\r
+            \r
+            // Check if there are any new triggers in this sweep\r
+            if (data.triggers && data.triggers.length > 0) {\r
+                // 1. Play premium institutional alert sound\r
+                playAlertSound();\r
+                \r
+                // 2. Display Emergency HUD\r
+                const hudMsg = data.triggers.join("<br>");\r
+                showEmergencyHUD(hudMsg);\r
+                \r
+                // 3. Display a toast notification for each trigger\r
+                data.triggers.forEach(msg => {\r
+                    showToast(`🚨 SYSTEM ALERT: ${msg}`, 'warning');\r
+                });\r
+                \r
+                // Shake the bell icon dynamically\r
+                const bellIcon = document.querySelector('#header-bell-btn .bell-icon');\r
+                if (bellIcon) {\r
+                    bellIcon.classList.add('bell-shake-active');\r
+                    setTimeout(() => {\r
+                        bellIcon.classList.remove('bell-shake-active');\r
+                    }, 800);\r
+                }\r
+\r
+                // 4. Append triggers dynamically to the header notifications list\r
+                const notifBody = document.getElementById('notification-list-body');\r
+                const badge = document.getElementById('bell-badge-count');\r
+                \r
+                if (notifBody) {\r
+                    if (notifBody.innerText.includes("No new system notifications")) {\r
+                        notifBody.innerHTML = '';\r
+                    }\r
+                    \r
+                    data.triggers.forEach(msg => {\r
+                        const now = new Date();\r
+                        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });\r
+                        \r
+                        const item = document.createElement('div');\r
+                        item.className = 'notification-item';\r
+                        item.style.borderLeft = '3px solid var(--color-primary, #3b82f6)';\r
+                        item.innerHTML = `\r
+                            <div class="notif-header">\r
+                                <span class="notif-badge badge-red">TRIGGERED</span>\r
+                                <span class="notif-time">Just Now (${timeStr})</span>\r
+                            </div>\r
+                            <div class="notif-text" style="color: var(--text-primary); font-weight: 500;">\r
+                                ${msg}\r
+                            </div>\r
+                        `;\r
+                        notifBody.insertBefore(item, notifBody.firstChild);\r
+                    });\r
+                }\r
+                \r
+                // 5. Update the badge count\r
+                if (badge) {\r
+                    let currentCount = 0;\r
+                    if (badge.style.display !== 'none' && badge.innerText !== '') {\r
+                        currentCount = parseInt(badge.innerText) || 0;\r
+                    }\r
+                    currentCount += data.triggers.length;\r
+                    badge.innerText = currentCount;\r
+                    badge.style.display = 'flex';\r
+\r
+                    const sidebarBadge = document.getElementById('sidebar-alerts-badge');\r
+                    if (sidebarBadge) {\r
+                        sidebarBadge.innerText = currentCount;\r
+                        sidebarBadge.style.display = 'flex';\r
+                    }\r
+                }\r
+                \r
+                // 6. If user is currently looking at the alert center tab, update the list automatically!\r
+                const alertsTab = document.getElementById('tab-alerts');\r
+                if (alertsTab && alertsTab.style.display !== 'none') {\r
+                    renderAlertsList(data.alerts);\r
+                }\r
+            }\r
+        } catch (e) {\r
+            console.warn("Silent alert background scanner failed:", e);\r
+        }\r
+        // Schedule next scan with dynamic interval\r
+        setTimeout(runScan, getInterval());\r
+    };\r
+\r
+    // Start first scan after initial interval\r
+    setTimeout(runScan, getInterval());\r
+}\r
 
 function playAlertSound(style = null) {
     const audioSelect = document.getElementById('hud-audio-select');
@@ -10596,13 +10852,24 @@ function renderWatchlistItems() {
         pagContainer.style.display = 'flex';
     }
 
-    // Fetch live quotes for ALL watchlist items (not just current page) so sorting works across pages
+    // Fetch live quotes: prefer WebSocket, fallback to HTTP polling
     const allItemsNeedQuotes = activeWatch.items.filter(item => item.live_price === undefined || item.live_price === null);
     const allSymbols = allItemsNeedQuotes.map(item => item.symbol);
     if (allSymbols.length > 0) {
-        fetchWatchlistLiveQuotes(allSymbols);
+        if (liveTicksConnected && liveTicksWS && liveTicksWS.readyState === WebSocket.OPEN) {
+            // WebSocket: subscribe for continuous real-time updates
+            wsSubscribeSymbols(allSymbols);
+            // Also do one HTTP fetch for initial data while WS warms up
+            fetchWatchlistLiveQuotes(allSymbols);
+        } else {
+            // Fallback: HTTP polling
+            fetchWatchlistLiveQuotes(allSymbols);
+        }
     } else {
         // All items already have quote data — just update the visible DOM cells
+        if (liveTicksConnected) {
+            wsSubscribeSymbols(pageData.map(item => item.symbol));
+        }
         fetchWatchlistLiveQuotes(pageData.map(item => item.symbol));
     }
 }

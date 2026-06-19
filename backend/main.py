@@ -477,6 +477,17 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 from backend.financial_utils import get_complete_financial_profile, resolve_company_ticker, calculate_portfolio_backtest
 from backend.agent import run_cio_parent_agent, run_ai_stock_screener, run_comparison_synthesizer, run_conversational_chat, run_portfolio_doctor, call_groq_llm, run_single_stock_audit, generate_backtest_synthesis, calculate_portfolio_taxes
 
+# Angel One SmartAPI — Real-time WebSocket streaming (optional)
+from backend.angel_connect import AngelOneConnector
+from backend.websocket_server import (
+    angel_ws_router, start_angel_upstream, stop_angel_upstream,
+    get_feed_status, tick_store, subscribe_symbols, alert_evaluator as ws_alert_evaluator
+)
+import logging
+
+angel_connector = None  # Initialized at startup if Angel One credentials are configured
+logger = logging.getLogger("apex_main")
+
 def sanitize_nan_values(x):
     """Recursively replaces float('nan'), inf, and -inf with None for JSON compliance."""
     if isinstance(x, dict):
@@ -995,6 +1006,8 @@ def check_nifty_regime():
 
 @app.on_event("startup")
 async def startup_warm_caching():
+    global angel_connector
+
     # 1. Initialize universe seeds if empty
     with get_db() as conn:
         cursor = conn.cursor()
@@ -1014,6 +1027,47 @@ async def startup_warm_caching():
     asyncio.create_task(asyncio.to_thread(update_nse_delivery_data))
     asyncio.create_task(asyncio.to_thread(update_nse_bulk_block_deals))
     asyncio.create_task(asyncio.to_thread(update_sector_regime_stats))
+
+    # 5. Initialize Angel One real-time WebSocket feed (optional)
+    angel_api_key = os.environ.get("ANGEL_API_KEY", "")
+    angel_client_code = os.environ.get("ANGEL_CLIENT_CODE", "")
+    angel_password = os.environ.get("ANGEL_PASSWORD", "")
+    angel_totp_key = os.environ.get("ANGEL_TOTP_KEY", "")
+
+    if angel_api_key and angel_client_code and angel_password and angel_totp_key:
+        logger.info("Angel One credentials detected. Initializing SmartAPI...")
+        angel_connector = AngelOneConnector(
+            api_key=angel_api_key,
+            client_code=angel_client_code,
+            password=angel_password,
+            totp_key=angel_totp_key,
+        )
+        auth_ok = await asyncio.to_thread(angel_connector.authenticate)
+        if auth_ok:
+            await asyncio.to_thread(angel_connector.load_instrument_master)
+            # Collect watchlist symbols for initial subscription
+            extra_symbols = []
+            try:
+                with get_db() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT DISTINCT symbol FROM watchlist_items")
+                    extra_symbols = [row["symbol"] for row in cursor.fetchall()]
+            except Exception:
+                pass
+            start_angel_upstream(angel_connector, DATABASE_PATH, extra_symbols=extra_symbols)
+            logger.info(f"Angel One WebSocket streaming started with {len(extra_symbols)} watchlist symbols.")
+        else:
+            logger.warning("Angel One authentication failed. Falling back to yfinance only.")
+            angel_connector = None
+    else:
+        logger.info("Angel One credentials not configured. Using yfinance only.")
+
+
+@app.on_event("shutdown")
+async def shutdown_cleanup():
+    """Gracefully close Angel One WebSocket on app shutdown."""
+    stop_angel_upstream()
+    logger.info("Application shutdown: Angel One WebSocket stopped.")
 
 @app.post("/api/admin/rebalance")
 async def trigger_index_rebalance():
@@ -2591,6 +2645,21 @@ async def set_alert(data: AlertRequest):
                 (alert_id, data.ticker.upper(), data.condition_type.upper(), data.operator, data.value)
             )
             conn.commit()
+
+        # Register with real-time AlertEvaluator if Angel One is active
+        from backend.websocket_server import alert_evaluator as _ae
+        if _ae is not None:
+            _ae.register_alert({
+                "id": alert_id,
+                "ticker": data.ticker.upper(),
+                "condition_type": data.condition_type.upper(),
+                "operator": data.operator,
+                "value": data.value,
+            })
+            # Subscribe to this symbol on Angel One upstream
+            plain_sym = data.ticker.upper().replace(".NS", "")
+            subscribe_symbols([plain_sym])
+
         return {
             "id": alert_id,
             "ticker": data.ticker.upper(),
@@ -2803,6 +2872,12 @@ async def delete_alert(alert_id: str):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM alerts WHERE id = ?", (alert_id,))
         conn.commit()
+
+    # Unregister from real-time AlertEvaluator
+    from backend.websocket_server import alert_evaluator as _ae
+    if _ae is not None:
+        _ae.unregister_alert(alert_id)
+
     return {"status": "success"}
 
 @app.get("/api/alerts/check")
@@ -3467,7 +3542,7 @@ class BatchQuotesRequest(BaseModel):
 async def batch_quotes(data: BatchQuotesRequest):
     """
     Lightweight batch endpoint to fetch live market quotes for a list of symbols.
-    Returns current price, change, change%, day high, and day low using yfinance batch download.
+    Hybrid: Uses Angel One tick store if available, falls back to yfinance batch download.
     Auto-appends .NS suffix for Indian stock symbols that lack an exchange suffix.
     """
     raw_symbols = [s.strip().upper() for s in data.symbols if s.strip()]
@@ -3477,74 +3552,98 @@ async def batch_quotes(data: BatchQuotesRequest):
     # Cap at 100 symbols max to prevent abuse
     raw_symbols = raw_symbols[:100]
 
-    # Map original symbols to yfinance tickers (.NS suffix for NSE)
-    sym_to_yf = {}
-    yf_symbols = []
-    for sym in raw_symbols:
-        if '.' in sym:
-            yf_sym = sym  # Already has exchange suffix
-        else:
-            yf_sym = f"{sym}.NS"  # Default to NSE
-        sym_to_yf[sym] = yf_sym
-        yf_symbols.append(yf_sym)
-
     quotes = {}
-    try:
-        # Use yfinance batch download for efficiency (2d period for prev close comparison)
-        df = await asyncio.to_thread(
-            yf.download,
-            yf_symbols,
-            period="2d",
-            interval="1d",
-            progress=False,
-            threads=True
-        )
 
-        if df.empty:
+    # ── Strategy 1: Angel One Tick Store (instant, real-time) ──
+    if angel_connector and angel_connector.is_authenticated() and tick_store.count > 0:
+        found_symbols = []
+        for sym in raw_symbols:
+            plain = sym.replace(".NS", "").replace(".BO", "")
+            tick = tick_store.get(plain)
+            if tick and tick.get("price", 0) > 0:
+                quotes[sym] = {
+                    "price": tick["price"],
+                    "change": tick.get("change", 0),
+                    "change_pct": tick.get("change_pct", 0),
+                    "high": tick.get("high", tick["price"]),
+                    "low": tick.get("low", tick["price"]),
+                }
+                found_symbols.append(sym)
+
+        # If we got all symbols from tick store, return immediately
+        if len(found_symbols) == len(raw_symbols):
             return {"quotes": quotes}
 
-        is_multi = isinstance(df.columns, pd.MultiIndex)
+        # Remove found symbols — only fetch missing ones from yfinance
+        raw_symbols = [s for s in raw_symbols if s not in found_symbols]
 
-        for orig_sym, yf_sym in sym_to_yf.items():
-            try:
-                if is_multi:
-                    if yf_sym not in df.columns.get_level_values(1):
+    # ── Strategy 2: yfinance batch download (fallback) ──
+    if raw_symbols:
+        # Map original symbols to yfinance tickers (.NS suffix for NSE)
+        sym_to_yf = {}
+        yf_symbols = []
+        for sym in raw_symbols:
+            if '.' in sym:
+                yf_sym = sym  # Already has exchange suffix
+            else:
+                yf_sym = f"{sym}.NS"  # Default to NSE
+            sym_to_yf[sym] = yf_sym
+            yf_symbols.append(yf_sym)
+
+        try:
+            # Use yfinance batch download for efficiency (2d period for prev close comparison)
+            df = await asyncio.to_thread(
+                yf.download,
+                yf_symbols,
+                period="2d",
+                interval="1d",
+                progress=False,
+                threads=True
+            )
+
+            if not df.empty:
+                is_multi = isinstance(df.columns, pd.MultiIndex)
+
+                for orig_sym, yf_sym in sym_to_yf.items():
+                    try:
+                        if is_multi:
+                            if yf_sym not in df.columns.get_level_values(1):
+                                continue
+                            close_series = df['Close'][yf_sym].dropna()
+                            high_series = df['High'][yf_sym].dropna()
+                            low_series = df['Low'][yf_sym].dropna()
+                        else:
+                            # Single symbol case — no multi-level columns
+                            close_series = df['Close'].dropna()
+                            high_series = df['High'].dropna()
+                            low_series = df['Low'].dropna()
+
+                        if close_series.empty:
+                            continue
+
+                        current_price = float(close_series.iloc[-1])
+                        day_high = float(high_series.iloc[-1]) if not high_series.empty else current_price
+                        day_low = float(low_series.iloc[-1]) if not low_series.empty else current_price
+
+                        # Calculate change from previous close
+                        prev_close = float(close_series.iloc[-2]) if len(close_series) >= 2 else current_price
+                        change = current_price - prev_close
+                        change_pct = (change / prev_close * 100.0) if prev_close > 0 else 0.0
+
+                        # Map back to original symbol key (e.g., "TCS" not "TCS.NS")
+                        quotes[orig_sym] = {
+                            "price": round(current_price, 2),
+                            "change": round(change, 2),
+                            "change_pct": round(change_pct, 2),
+                            "high": round(day_high, 2),
+                            "low": round(day_low, 2)
+                        }
+                    except Exception as sym_err:
+                        print(f"Batch quote error for {orig_sym} ({yf_sym}): {sym_err}")
                         continue
-                    close_series = df['Close'][yf_sym].dropna()
-                    high_series = df['High'][yf_sym].dropna()
-                    low_series = df['Low'][yf_sym].dropna()
-                else:
-                    # Single symbol case — no multi-level columns
-                    close_series = df['Close'].dropna()
-                    high_series = df['High'].dropna()
-                    low_series = df['Low'].dropna()
 
-                if close_series.empty:
-                    continue
-
-                current_price = float(close_series.iloc[-1])
-                day_high = float(high_series.iloc[-1]) if not high_series.empty else current_price
-                day_low = float(low_series.iloc[-1]) if not low_series.empty else current_price
-
-                # Calculate change from previous close
-                prev_close = float(close_series.iloc[-2]) if len(close_series) >= 2 else current_price
-                change = current_price - prev_close
-                change_pct = (change / prev_close * 100.0) if prev_close > 0 else 0.0
-
-                # Map back to original symbol key (e.g., "TCS" not "TCS.NS")
-                quotes[orig_sym] = {
-                    "price": round(current_price, 2),
-                    "change": round(change, 2),
-                    "change_pct": round(change_pct, 2),
-                    "high": round(day_high, 2),
-                    "low": round(day_low, 2)
-                }
-            except Exception as sym_err:
-                print(f"Batch quote error for {orig_sym} ({yf_sym}): {sym_err}")
-                continue
-
-    except Exception as e:
-        print(f"Batch quotes download error: {e}")
+        except Exception as e:
+            print(f"Batch quotes download error: {e}")
 
     return {"quotes": quotes}
 
@@ -6818,6 +6917,39 @@ async def delete_custom_screen(screen_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete screen: {str(e)}")
 
+
+# ==================== ANGEL ONE STATUS & HEALTH ====================
+
+@app.get("/api/angel/status")
+async def angel_status():
+    """Returns the current Angel One WebSocket connection health and status."""
+    import datetime as _dt
+    # Determine market status (NSE: Mon-Fri 9:15-15:30 IST)
+    now_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    is_weekday = now_ist.weekday() < 5
+    market_open = now_ist.replace(hour=9, minute=15, second=0)
+    market_close = now_ist.replace(hour=15, minute=30, second=0)
+    is_market_hours = is_weekday and market_open <= now_ist <= market_close
+
+    status = {
+        "connected": angel_connector is not None and angel_connector.is_authenticated(),
+        "authenticated": angel_connector.is_authenticated() if angel_connector else False,
+        "market_status": "OPEN" if is_market_hours else "CLOSED",
+    }
+
+    # Merge feed status from WebSocket server
+    feed = get_feed_status()
+    status.update(feed)
+
+    # Add connector-level status if available
+    if angel_connector:
+        status.update(angel_connector.get_status())
+
+    return status
+
+
+# Include Angel One WebSocket router
+app.include_router(angel_ws_router)
 
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")
