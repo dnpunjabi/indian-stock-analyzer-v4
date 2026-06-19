@@ -317,11 +317,6 @@ def _on_data(wsapp, message):
         else:
             return
 
-        # SmartWebSocketV2 sends data in different formats based on mode
-        # Mode 1 (LTP): {token, ltp}
-        # Mode 2 (Quote): {token, ltp, open, high, low, close, ...}
-        # Mode 3 (Snap Quote): full depth
-
         token = str(data.get("token", ""))
         if not token or not _angel_connector:
             return
@@ -330,18 +325,28 @@ def _on_data(wsapp, message):
         if not symbol:
             return
 
-        ltp = data.get("last_traded_price", data.get("ltp", 0))
-        # Angel One sends prices in paise (×100) for some modes
-        if isinstance(ltp, (int, float)) and ltp > 100000:
-            ltp = ltp / 100.0
+        # Prices from Angel One binary format are in paise (divided by 100 for actual value)
+        ltp = float(data.get("last_traded_price", 0)) / 100.0
+        close_price = float(data.get("closed_price", 0)) / 100.0
+        high_price = float(data.get("high_price_of_the_day", 0)) / 100.0
+        low_price = float(data.get("low_price_of_the_day", 0)) / 100.0
+
+        # If values are missing (e.g. if subscribed to LTP mode instead of Quote), fallback to LTP
+        if close_price == 0:
+            if ltp > 100000:
+                ltp = ltp / 100.0
+            close_price = ltp
+
+        change = ltp - close_price
+        change_pct = (change / close_price * 100.0) if close_price > 0 else 0.0
 
         tick = {
-            "price": round(float(ltp), 2) if ltp else 0.0,
-            "change": round(float(data.get("change", 0)), 2),
-            "change_pct": round(float(data.get("change_percent", 0)), 2),
-            "high": round(float(data.get("high_price", data.get("high", 0))) / 100.0, 2) if data.get("high_price", data.get("high", 0)) and float(data.get("high_price", data.get("high", 0))) > 100000 else round(float(data.get("high_price", data.get("high", 0)) or 0), 2),
-            "low": round(float(data.get("low_price", data.get("low", 0))) / 100.0, 2) if data.get("low_price", data.get("low", 0)) and float(data.get("low_price", data.get("low", 0))) > 100000 else round(float(data.get("low_price", data.get("low", 0)) or 0), 2),
-            "volume": int(data.get("volume_trade_for_the_day", data.get("volume", 0)) or 0),
+            "price": round(ltp, 2),
+            "change": round(change, 2),
+            "change_pct": round(change_pct, 2),
+            "high": round(high_price, 2) if high_price > 0 else round(ltp, 2),
+            "low": round(low_price, 2) if low_price > 0 else round(ltp, 2),
+            "volume": int(data.get("volume_trade_for_the_day", 0)),
             "timestamp": time.time(),
         }
 

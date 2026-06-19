@@ -205,13 +205,13 @@ function handleWsAlertTriggered(alertData) {
 function updateConnectionIndicator(status) {
     let indicator = document.getElementById('ws-connection-indicator');
     if (!indicator) {
-        // Create the indicator in the header area
-        const header = document.querySelector('.main-header') || document.querySelector('header');
-        if (header) {
+        // Create the indicator inside the header-utils section
+        const headerUtils = document.querySelector('.header-utils');
+        if (headerUtils) {
             indicator = document.createElement('div');
             indicator.id = 'ws-connection-indicator';
-            indicator.style.cssText = 'position:fixed;bottom:12px;right:12px;padding:4px 10px;border-radius:12px;font-size:10px;font-weight:600;z-index:9999;display:flex;align-items:center;gap:4px;font-family:Inter,sans-serif;cursor:default;transition:all 0.3s ease;';
-            document.body.appendChild(indicator);
+            indicator.style.cssText = 'padding:4px 10px;border-radius:12px;font-size:10px;font-weight:600;display:flex;align-items:center;gap:4px;font-family:Inter,sans-serif;cursor:default;transition:all 0.3s ease;white-space:nowrap;';
+            headerUtils.insertBefore(indicator, headerUtils.firstChild);
         }
     }
     if (!indicator) return;
@@ -7229,103 +7229,103 @@ async function generateNLAlertRule() {
     }
 }
 
-// Start Real-Time Alert Engine background scanner\r
-function startRealTimeAlertScanner() {\r
-    // If WebSocket is connected, poll less frequently (5 min) for technical alerts only\r
-    // If not connected, keep 30-second polling as before\r
-    const getInterval = () => liveTicksConnected ? 300000 : 30000; // 5 min or 30s\r
-    \r
-    const runScan = async () => {\r
-        try {\r
-            const response = await fetch('/api/alerts/check');\r
-            if (!response.ok) return;\r
-            const data = await response.json();\r
-            \r
-            // Check if there are any new triggers in this sweep\r
-            if (data.triggers && data.triggers.length > 0) {\r
-                // 1. Play premium institutional alert sound\r
-                playAlertSound();\r
-                \r
-                // 2. Display Emergency HUD\r
-                const hudMsg = data.triggers.join("<br>");\r
-                showEmergencyHUD(hudMsg);\r
-                \r
-                // 3. Display a toast notification for each trigger\r
-                data.triggers.forEach(msg => {\r
-                    showToast(`🚨 SYSTEM ALERT: ${msg}`, 'warning');\r
-                });\r
-                \r
-                // Shake the bell icon dynamically\r
-                const bellIcon = document.querySelector('#header-bell-btn .bell-icon');\r
-                if (bellIcon) {\r
-                    bellIcon.classList.add('bell-shake-active');\r
-                    setTimeout(() => {\r
-                        bellIcon.classList.remove('bell-shake-active');\r
-                    }, 800);\r
-                }\r
-\r
-                // 4. Append triggers dynamically to the header notifications list\r
-                const notifBody = document.getElementById('notification-list-body');\r
-                const badge = document.getElementById('bell-badge-count');\r
-                \r
-                if (notifBody) {\r
-                    if (notifBody.innerText.includes("No new system notifications")) {\r
-                        notifBody.innerHTML = '';\r
-                    }\r
-                    \r
-                    data.triggers.forEach(msg => {\r
-                        const now = new Date();\r
-                        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });\r
-                        \r
-                        const item = document.createElement('div');\r
-                        item.className = 'notification-item';\r
-                        item.style.borderLeft = '3px solid var(--color-primary, #3b82f6)';\r
-                        item.innerHTML = `\r
-                            <div class="notif-header">\r
-                                <span class="notif-badge badge-red">TRIGGERED</span>\r
-                                <span class="notif-time">Just Now (${timeStr})</span>\r
-                            </div>\r
-                            <div class="notif-text" style="color: var(--text-primary); font-weight: 500;">\r
-                                ${msg}\r
-                            </div>\r
-                        `;\r
-                        notifBody.insertBefore(item, notifBody.firstChild);\r
-                    });\r
-                }\r
-                \r
-                // 5. Update the badge count\r
-                if (badge) {\r
-                    let currentCount = 0;\r
-                    if (badge.style.display !== 'none' && badge.innerText !== '') {\r
-                        currentCount = parseInt(badge.innerText) || 0;\r
-                    }\r
-                    currentCount += data.triggers.length;\r
-                    badge.innerText = currentCount;\r
-                    badge.style.display = 'flex';\r
-\r
-                    const sidebarBadge = document.getElementById('sidebar-alerts-badge');\r
-                    if (sidebarBadge) {\r
-                        sidebarBadge.innerText = currentCount;\r
-                        sidebarBadge.style.display = 'flex';\r
-                    }\r
-                }\r
-                \r
-                // 6. If user is currently looking at the alert center tab, update the list automatically!\r
-                const alertsTab = document.getElementById('tab-alerts');\r
-                if (alertsTab && alertsTab.style.display !== 'none') {\r
-                    renderAlertsList(data.alerts);\r
-                }\r
-            }\r
-        } catch (e) {\r
-            console.warn("Silent alert background scanner failed:", e);\r
-        }\r
-        // Schedule next scan with dynamic interval\r
-        setTimeout(runScan, getInterval());\r
-    };\r
-\r
-    // Start first scan after initial interval\r
-    setTimeout(runScan, getInterval());\r
-}\r
+// Start Real-Time Alert Engine background scanner
+function startRealTimeAlertScanner() {
+    // If WebSocket is connected, poll less frequently (5 min) for technical alerts only
+    // If not connected, keep 30-second polling as before
+    const getInterval = () => liveTicksConnected ? 300000 : 30000; // 5 min or 30s
+    
+    const runScan = async () => {
+        try {
+            const response = await fetch('/api/alerts/check');
+            if (!response.ok) return;
+            const data = await response.json();
+            
+            // Check if there are any new triggers in this sweep
+            if (data.triggers && data.triggers.length > 0) {
+                // 1. Play premium institutional alert sound
+                playAlertSound();
+                
+                // 2. Display Emergency HUD
+                const hudMsg = data.triggers.join("<br>");
+                showEmergencyHUD(hudMsg);
+                
+                // 3. Display a toast notification for each trigger
+                data.triggers.forEach(msg => {
+                    showToast(`🚨 SYSTEM ALERT: ${msg}`, 'warning');
+                });
+                
+                // Shake the bell icon dynamically
+                const bellIcon = document.querySelector('#header-bell-btn .bell-icon');
+                if (bellIcon) {
+                    bellIcon.classList.add('bell-shake-active');
+                    setTimeout(() => {
+                        bellIcon.classList.remove('bell-shake-active');
+                    }, 800);
+                }
+
+                // 4. Append triggers dynamically to the header notifications list
+                const notifBody = document.getElementById('notification-list-body');
+                const badge = document.getElementById('bell-badge-count');
+                
+                if (notifBody) {
+                    if (notifBody.innerText.includes("No new system notifications")) {
+                        notifBody.innerHTML = '';
+                    }
+                    
+                    data.triggers.forEach(msg => {
+                        const now = new Date();
+                        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                        
+                        const item = document.createElement('div');
+                        item.className = 'notification-item';
+                        item.style.borderLeft = '3px solid var(--color-primary, #3b82f6)';
+                        item.innerHTML = `
+                            <div class="notif-header">
+                                <span class="notif-badge badge-red">TRIGGERED</span>
+                                <span class="notif-time">Just Now (${timeStr})</span>
+                            </div>
+                            <div class="notif-text" style="color: var(--text-primary); font-weight: 500;">
+                                ${msg}
+                            </div>
+                        `;
+                        notifBody.insertBefore(item, notifBody.firstChild);
+                    });
+                }
+                
+                // 5. Update the badge count
+                if (badge) {
+                    let currentCount = 0;
+                    if (badge.style.display !== 'none' && badge.innerText !== '') {
+                        currentCount = parseInt(badge.innerText) || 0;
+                    }
+                    currentCount += data.triggers.length;
+                    badge.innerText = currentCount;
+                    badge.style.display = 'flex';
+
+                    const sidebarBadge = document.getElementById('sidebar-alerts-badge');
+                    if (sidebarBadge) {
+                        sidebarBadge.innerText = currentCount;
+                        sidebarBadge.style.display = 'flex';
+                    }
+                }
+                
+                // 6. If user is currently looking at the alert center tab, update the list automatically!
+                const alertsTab = document.getElementById('tab-alerts');
+                if (alertsTab && alertsTab.style.display !== 'none') {
+                    renderAlertsList(data.alerts);
+                }
+            }
+        } catch (e) {
+            console.warn("Silent alert background scanner failed:", e);
+        }
+        // Schedule next scan with dynamic interval
+        setTimeout(runScan, getInterval());
+    };
+
+    // Start first scan after initial interval
+    setTimeout(runScan, getInterval());
+}
 
 function playAlertSound(style = null) {
     const audioSelect = document.getElementById('hud-audio-select');
