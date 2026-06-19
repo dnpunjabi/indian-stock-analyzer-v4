@@ -150,7 +150,8 @@ class AngelOneConnector:
         
         # 1. Try reading from SQLite cache first
         try:
-            conn = sqlite3.connect(DATABASE_PATH)
+            conn = sqlite3.connect(DATABASE_PATH, timeout=30.0)
+            conn.execute("PRAGMA journal_mode = WAL")
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
@@ -287,7 +288,8 @@ class AngelOneConnector:
         # Save the filtered records to SQLite in a single transaction
         if filtered_records:
             try:
-                conn = sqlite3.connect(DATABASE_PATH)
+                conn = sqlite3.connect(DATABASE_PATH, timeout=30.0)
+                conn.execute("PRAGMA journal_mode = WAL")
                 cursor = conn.cursor()
                 # Clear stale records
                 cursor.execute("DELETE FROM angel_instruments")
