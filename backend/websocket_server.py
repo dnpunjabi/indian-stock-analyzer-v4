@@ -520,12 +520,44 @@ def unsubscribe_symbols(symbols: List[str]):
 # Public API — Called by main.py
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+_last_watchdog_time = 0.0
+
+def _recover_upstream_connection():
+    global alert_evaluator
+    try:
+        logger.info("Watchdog recovery: Re-initializing connection...")
+        if not _angel_connector:
+            return
+        if not _angel_connector.is_authenticated():
+            logger.info("Watchdog recovery: session stale. Re-authenticating...")
+            if not _angel_connector.re_authenticate():
+                logger.error("Watchdog recovery: Re-authentication failed.")
+                return
+        
+        # Start the upstream thread
+        _start_upstream_thread()
+        
+        # Delay subscription slightly to let WS connect
+        time.sleep(3)
+        active_symbols = []
+        if alert_evaluator:
+            active_symbols.extend(alert_evaluator.get_alert_symbols())
+        active_symbols.extend(connection_manager.get_all_subscribed_symbols())
+        active_symbols = list(set(active_symbols))
+        
+        if active_symbols:
+            logger.info(f"Watchdog recovery: Re-subscribing to {len(active_symbols)} symbols.")
+            subscribe_symbols(active_symbols)
+    except Exception as e:
+        logger.error(f"Watchdog recovery routine failed: {e}")
+
+
 def start_angel_upstream(connector, db_path: str, extra_symbols: List[str] = None):
     """
     Initialize and start the Angel One upstream WebSocket.
     Called at FastAPI startup.
     """
-    global _angel_connector, _angel_running, alert_evaluator
+    global _angel_connector, _angel_running, alert_evaluator, _broadcast_loop_task
 
     _angel_connector = connector
     _angel_running = True
@@ -550,6 +582,15 @@ def start_angel_upstream(connector, db_path: str, extra_symbols: List[str] = Non
             subscribe_symbols(initial_symbols)
 
         threading.Thread(target=delayed_subscribe, daemon=True).start()
+
+    # Automatically start the watchdog and broadcast loop task at server startup
+    if _broadcast_loop_task is None or _broadcast_loop_task.done():
+        try:
+            loop = asyncio.get_running_loop()
+            _broadcast_loop_task = loop.create_task(_broadcast_loop())
+            logger.info("Watchdog broadcast loop started successfully at startup.")
+        except RuntimeError:
+            pass
 
 
 def stop_angel_upstream():
@@ -586,10 +627,21 @@ async def _broadcast_loop():
     """
     Async loop that runs every 1 second, broadcasting tick updates
     and alert triggers to all connected browser clients.
+    Also acts as a watchdog to auto-recover dead upstream connections.
     """
+    global _last_watchdog_time
     while True:
         try:
             await asyncio.sleep(1)
+
+            # Watchdog check: Auto-recover if upstream connection thread is dead
+            now = time.time()
+            if _angel_running and _angel_connector and (now - _last_watchdog_time > 15):
+                _last_watchdog_time = now
+                is_alive = _angel_thread is not None and _angel_thread.is_alive()
+                if not is_alive:
+                    logger.warning("Watchdog: Angel One upstream thread is dead. Re-initializing...")
+                    await asyncio.to_thread(_recover_upstream_connection)
 
             if connection_manager.client_count == 0:
                 continue
