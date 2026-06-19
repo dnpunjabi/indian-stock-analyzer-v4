@@ -15617,22 +15617,22 @@ async function loadPortfolioDoctorLedger(forceRefresh = false) {
                 <td style="padding: 10px; text-align: center; vertical-align: middle;">
                     ${drawInlineRangeBar(currentPrice, item.suggested_buy_price_range, item.suggested_sell_price_range)}
                 </td>
-                <td style="padding: 10px; text-align: right; font-weight: 600; color: var(--text-primary);">
+                <td class="port-live-price" style="padding: 10px; text-align: right; font-weight: 600; color: var(--text-primary);">
                     ${safeFormatRupees(currentPrice, 2)}
                 </td>
-                <td style="padding: 10px; text-align: right; font-weight: 700; color: ${netChgColor};">
+                <td class="port-net-change" style="padding: 10px; text-align: right; font-weight: 700; color: ${netChgColor};">
                     ${netChgSign}${netChgPct.toFixed(2)}%
                 </td>
-                <td style="padding: 10px; text-align: right; font-weight: 700; color: ${dayChgColor};">
+                <td class="port-day-change" style="padding: 10px; text-align: right; font-weight: 700; color: ${dayChgColor};">
                     ${dayChgSign}${dayChangePct.toFixed(2)}%
                 </td>
                 <td style="padding: 10px; text-align: right; color: var(--text-secondary);">
                     ${safeFormatRupees(investedVal, 2)}
                 </td>
-                <td style="padding: 10px; text-align: right; font-weight: 600; color: var(--text-primary);">
+                <td class="port-current-value" style="padding: 10px; text-align: right; font-weight: 600; color: var(--text-primary);">
                     ${safeFormatRupees(currentVal, 2)}
                 </td>
-                <td style="padding: 10px; text-align: right; font-weight: 700; color: ${plColor};">
+                <td class="port-net-pl" style="padding: 10px; text-align: right; font-weight: 700; color: ${plColor};">
                     ${plSign}${safeFormatRupees(plVal, 2)}<br>
                     <span style="font-size: 10px; color: ${plColor};">${plSign}${plPct.toFixed(2)}%</span>
                 </td>
