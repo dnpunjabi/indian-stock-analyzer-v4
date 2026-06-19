@@ -794,6 +794,8 @@ def calculate_technical_indicators(ticker_symbol: str, stock_obj=None) -> dict:
         result["vpt"] = float(df['VPT'].iloc[-1]) if not pd.isna(df['VPT'].iloc[-1]) else 0.0
         result["adx"] = float(df['ADX'].iloc[-1]) if not pd.isna(df['ADX'].iloc[-1]) else 22.0
         result["volume_vs_avg20"] = float(volume_vs_avg20)
+        result["volume"] = float(latest_vol)
+        result["volume_avg20"] = float(latest_vol_avg)
 
         # Calculate ATR% (14-day ATR / Close)
         df['ATR_pct'] = (df['ATR'] / df['Close']) * 100.0
@@ -1813,6 +1815,21 @@ def get_complete_financial_profile(ticker_query: str, bypass_db_cache: bool = Fa
                             )
                         except Exception as clean_err:
                             print(f"Error self-healing cached peers: {clean_err}")
+                            
+                    # Self-heal missing day/52w ranges from technicals if present
+                    fundamentals = profile.get("fundamentals", {})
+                    technicals = profile.get("technicals", {})
+                    if fundamentals and technicals:
+                        curr_p = fundamentals.get("current_price") or technicals.get("current_price") or 100.0
+                        if "day_low" not in fundamentals or not fundamentals.get("day_low"):
+                            fundamentals["day_low"] = technicals.get("daily_low") or technicals.get("low_52w") or curr_p
+                        if "day_high" not in fundamentals or not fundamentals.get("day_high"):
+                            fundamentals["day_high"] = technicals.get("daily_high") or technicals.get("high_52w") or curr_p
+                        if "low_52week" not in fundamentals or not fundamentals.get("low_52week"):
+                            fundamentals["low_52week"] = technicals.get("low_52w") or curr_p
+                        if "high_52week" not in fundamentals or not fundamentals.get("high_52week"):
+                            fundamentals["high_52week"] = technicals.get("high_52w") or curr_p
+                    
                     
                     # Save to 5-minute memory cache
                     with _cache_lock:
@@ -2639,7 +2656,15 @@ def _build_financial_profile(ticker_query: str) -> dict:
             "insider_buying_pct": float(insider_buying),
             "roice_pct": float(roice),
             "revenue_market_share_pct": float(rev_market_share),
-            "pricing_power_proxy": str(pricing_power_proxy)
+            "pricing_power_proxy": str(pricing_power_proxy),
+            "open": float(info.get("open") or info.get("regularMarketOpen") or tech.get("daily_open") or current_price) if info else float(tech.get("daily_open") or current_price),
+            "previous_close": float(info.get("previousClose") or info.get("regularMarketPreviousClose") or tech.get("daily_close") or current_price) if info else float(tech.get("daily_close") or current_price),
+            "volume": float(info.get("volume") or info.get("regularMarketVolume") or tech.get("volume") or 0.0) if info else float(tech.get("volume") or 0.0),
+            "average_volume": float(info.get("averageVolume") or info.get("averageVolume10Days") or tech.get("volume_avg20") or 1.0) if info else float(tech.get("volume_avg20") or 1.0),
+            "day_low": float(tech.get("daily_low") or current_price) if tech else float(current_price),
+            "day_high": float(tech.get("daily_high") or current_price) if tech else float(current_price),
+            "low_52week": float(tech.get("low_52w") or current_price) if tech else float(current_price),
+            "high_52week": float(tech.get("high_52w") or current_price) if tech else float(current_price)
         },
         "technicals": tech,
         "capture_ratios": capture,

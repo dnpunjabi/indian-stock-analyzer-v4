@@ -261,9 +261,10 @@ class ConnectionManager:
     async def broadcast_ticks(self, ticks: Dict[str, Dict]):
         """Send tick updates to each client, filtered by their subscription set."""
         disconnected = []
+        indices = {"^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO"}
         for ws, subscribed_symbols in list(self._connections.items()):
-            # Filter ticks to only those the client cares about
-            client_ticks = {s: t for s, t in ticks.items() if s in subscribed_symbols}
+            # Filter ticks to only those the client cares about, plus index tickers
+            client_ticks = {s: t for s, t in ticks.items() if s in subscribed_symbols or s in indices}
             if not client_ticks:
                 continue
             try:
@@ -623,13 +624,78 @@ def get_feed_status() -> Dict[str, Any]:
 angel_ws_router = APIRouter()
 
 
+async def fetch_yfinance_ticks(symbols: List[str]) -> Dict[str, Dict]:
+    """
+    Helper to fetch quotes from yfinance in the background.
+    Returns Dict[symbol, tick_data_dict].
+    """
+    if not symbols:
+        return {}
+    try:
+        import yfinance as yf
+        import pandas as pd
+        df = await asyncio.to_thread(
+            yf.download,
+            symbols,
+            period="2d",
+            interval="1d",
+            progress=False,
+            threads=True
+        )
+        ticks = {}
+        if not df.empty:
+            is_multi = isinstance(df.columns, pd.MultiIndex)
+            for sym in symbols:
+                try:
+                    if is_multi:
+                        if sym not in df.columns.get_level_values(1):
+                            continue
+                        close_series = df['Close'][sym].dropna()
+                        high_series = df['High'][sym].dropna()
+                        low_series = df['Low'][sym].dropna()
+                        volume_series = df['Volume'][sym].dropna() if 'Volume' in df.columns.get_level_values(0) else pd.Series()
+                    else:
+                        close_series = df['Close'].dropna()
+                        high_series = df['High'].dropna()
+                        low_series = df['Low'].dropna()
+                        volume_series = df['Volume'].dropna() if 'Volume' in df.columns else pd.Series()
+                    
+                    if len(close_series) >= 1:
+                        price = float(close_series.iloc[-1])
+                        prev_close = float(close_series.iloc[-2]) if len(close_series) >= 2 else price
+                        change = price - prev_close
+                        change_pct = (change / prev_close * 100.0) if prev_close > 0 else 0.0
+                        high = float(high_series.iloc[-1]) if len(high_series) >= 1 else price
+                        low = float(low_series.iloc[-1]) if len(low_series) >= 1 else price
+                        volume = int(volume_series.iloc[-1]) if len(volume_series) >= 1 else 0
+                        
+                        ticks[sym] = {
+                            "price": round(price, 2),
+                            "change": round(change, 2),
+                            "change_pct": round(change_pct, 2),
+                            "high": round(high, 2),
+                            "low": round(low, 2),
+                            "volume": volume,
+                            "timestamp": time.time(),
+                        }
+                except Exception as e:
+                    logger.debug(f"Error parsing yfinance tick for {sym}: {e}")
+        return ticks
+    except Exception as e:
+        logger.error(f"Error fetching yfinance ticks: {e}")
+        return {}
+
+
+_last_fallback_poll_time = 0.0
+
+
 async def _broadcast_loop():
     """
     Async loop that runs every 1 second, broadcasting tick updates
     and alert triggers to all connected browser clients.
     Also acts as a watchdog to auto-recover dead upstream connections.
     """
-    global _last_watchdog_time
+    global _last_watchdog_time, _last_fallback_poll_time
     while True:
         try:
             await asyncio.sleep(1)
@@ -642,6 +708,39 @@ async def _broadcast_loop():
                 if not is_alive:
                     logger.warning("Watchdog: Angel One upstream thread is dead. Re-initializing...")
                     await asyncio.to_thread(_recover_upstream_connection)
+
+            # Run yfinance poll for indices and fallback for active subscriptions
+            if now - _last_fallback_poll_time > 3.0:
+                _last_fallback_poll_time = now
+                
+                symbols_to_fetch = set()
+                # Always fetch index tickers
+                indices = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO"]
+                symbols_to_fetch.update(indices)
+                
+                # If Angel One is not authenticated or not active, fetch active subscriptions as fallback
+                is_angel_active = (
+                    _angel_connector 
+                    and _angel_connector.is_authenticated() 
+                    and _angel_thread is not None 
+                    and _angel_thread.is_alive()
+                )
+                
+                if not is_angel_active:
+                    all_subs = connection_manager.get_all_subscribed_symbols()
+                    for s in all_subs:
+                        if '.' not in s and not s.startswith('^'):
+                            symbols_to_fetch.add(f"{s}.NS")
+                        else:
+                            symbols_to_fetch.add(s)
+                            
+                if symbols_to_fetch:
+                    yf_ticks = await fetch_yfinance_ticks(list(symbols_to_fetch))
+                    for yf_sym, tick in yf_ticks.items():
+                        tick_store.update(yf_sym, tick)
+                        # Also map base symbol (e.g. TCS) for clients subscribing to plain ticker
+                        base_sym = yf_sym.replace(".NS", "").replace(".BO", "")
+                        tick_store.update(base_sym, tick)
 
             if connection_manager.client_count == 0:
                 continue
@@ -701,6 +800,15 @@ async def websocket_live_ticks(websocket: WebSocket):
                     if new_symbols and _angel_sws:
                         subscribe_symbols(new_symbols)
                     logger.info(f"Client subscribed to {len(symbols)} symbols")
+                    # Immediately send any cached ticks for the subscribed symbols
+                    cached_ticks = tick_store.get_batch(symbols)
+                    # Also send indices immediately
+                    indices = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO"]
+                    cached_indices = tick_store.get_batch(indices)
+                    if cached_indices:
+                        cached_ticks.update(cached_indices)
+                    if cached_ticks:
+                        await websocket.send_json({"type": "ticks", "data": cached_ticks})
 
                 elif action == "unsubscribe" and symbols:
                     await connection_manager.unsubscribe(websocket, symbols)

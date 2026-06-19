@@ -9,6 +9,28 @@ let liveTicksWS = null;
 let liveTicksReconnectTimer = null;
 let liveTicksConnected = false;
 let _wsSubscribedSymbols = new Set();
+let activePortfolioLedgerItems = [];
+
+async function fetchRealtimeIndices() {
+    if (liveTicksConnected && liveTicksWS && liveTicksWS.readyState === WebSocket.OPEN) {
+        return;
+    }
+    const indexSymbols = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO"];
+    try {
+        const response = await fetch('/api/batch-quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbols: indexSymbols })
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const quotes = data.quotes || {};
+        
+        handleLiveTickMessage(quotes);
+    } catch (e) {
+        console.warn('Failed to fetch real-time indices:', e);
+    }
+}
 
 function connectLiveTicksWS() {
     if (liveTicksWS && (liveTicksWS.readyState === WebSocket.CONNECTING || liveTicksWS.readyState === WebSocket.OPEN)) {
@@ -31,6 +53,11 @@ function connectLiveTicksWS() {
         console.log('🟢 Live Ticks WebSocket connected');
         liveTicksConnected = true;
         updateConnectionIndicator('live');
+        
+        // Ensure index symbols are subscribed
+        const indices = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO"];
+        indices.forEach(s => _wsSubscribedSymbols.add(s));
+
         // Re-subscribe to previously subscribed symbols
         if (_wsSubscribedSymbols.size > 0) {
             liveTicksWS.send(JSON.stringify({ action: 'subscribe', symbols: Array.from(_wsSubscribedSymbols) }));
@@ -92,6 +119,53 @@ function handleLiveTickMessage(ticksData) {
     // ticksData = { "TCS": { price, change, change_pct, high, low }, ... }
     if (!ticksData || typeof ticksData !== 'object') return;
 
+    // Update marquee elements dynamically from live index ticks
+    const indexMappings = {
+        '^NSEI': { textElId: 'ticker-nifty', label: 'NIFTY 50' },
+        '^BSESN': { textElId: 'ticker-sensex', label: 'SENSEX' },
+        '^NSEBANK': { textElId: 'ticker-banknifty', label: 'BANK NIFTY' },
+        '^CNXIT': { textElId: 'ticker-niftyit', label: 'NIFTY IT' },
+        '^CNXINFRA': { textElId: 'ticker-niftyinfra', label: 'NIFTY INFRA' },
+        '^CNXAUTO': { textElId: 'ticker-niftyauto', label: 'NIFTY AUTO' }
+    };
+
+    for (const [sym, cfg] of Object.entries(indexMappings)) {
+        const q = ticksData[sym];
+        if (q && q.price > 0) {
+            const els = document.querySelectorAll(`[id="${cfg.textElId}"]`);
+            els.forEach(el => {
+                const isPositive = q.change >= 0;
+                const sign = isPositive ? '+' : '';
+                const changeClass = isPositive ? 'change green-text' : 'change red-text';
+                const changeArrow = isPositive ? '▲' : '▼';
+                const formattedPrice = q.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                el.innerHTML = `${cfg.label}: <strong class="val">${formattedPrice}</strong> <span class="${changeClass}">${changeArrow} ${sign}${q.change_pct.toFixed(2)}%</span>`;
+            });
+        }
+    }
+
+    // Update top meta banner benchmarks in the Equity Research Terminal
+    const niftyTick = ticksData['^NSEI'];
+    if (niftyTick && niftyTick.price > 0) {
+        const el = document.getElementById('meta-nifty-bench');
+        if (el) {
+            const isPositive = niftyTick.change >= 0;
+            const sign = isPositive ? '+' : '';
+            const changeColor = isPositive ? 'var(--neon-green, #10b981)' : 'var(--neon-red, #ef4444)';
+            el.innerHTML = `Nifty: <span style="font-family: 'Inter', monospace; color: var(--text-primary);">${niftyTick.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> <span style="color: ${changeColor}; font-size: 9px;">(${sign}${niftyTick.change_pct.toFixed(2)}%)</span>`;
+        }
+    }
+    const sensexTick = ticksData['^BSESN'];
+    if (sensexTick && sensexTick.price > 0) {
+        const el = document.getElementById('meta-sensex-bench');
+        if (el) {
+            const isPositive = sensexTick.change >= 0;
+            const sign = isPositive ? '+' : '';
+            const changeColor = isPositive ? 'var(--neon-green, #10b981)' : 'var(--neon-red, #ef4444)';
+            el.innerHTML = `Sensex: <span style="font-family: 'Inter', monospace; color: var(--text-primary);">${sensexTick.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span> <span style="color: ${changeColor}; font-size: 9px;">(${sign}${sensexTick.change_pct.toFixed(2)}%)</span>`;
+        }
+    }
+
     // Update in-memory watchlist item data for sorting
     const activeWatch = (typeof watchlistsList !== 'undefined') ? watchlistsList.find(w => w.id === activeWatchlistId) : null;
     if (activeWatch && activeWatch.items) {
@@ -109,8 +183,19 @@ function handleLiveTickMessage(ticksData) {
 
     // Update active stock profile in Equity Research Terminal if it's currently loaded
     if (activeStockProfile && activeStockProfile.ticker) {
-        const activeTicker = activeStockProfile.ticker;
-        const q = ticksData[activeTicker] || ticksData[activeTicker.replace('.NS', '')] || ticksData[activeTicker.split('.')[0]];
+        const activeTicker = activeStockProfile.ticker.toUpperCase();
+        const baseTicker = activeTicker.replace('.NS', '').replace('.BO', '');
+        const plainTicker = activeTicker.split('.')[0];
+        
+        let q = null;
+        for (const [key, val] of Object.entries(ticksData)) {
+            const uKey = key.toUpperCase();
+            if (uKey === activeTicker || uKey === baseTicker || uKey === plainTicker) {
+                q = val;
+                break;
+            }
+        }
+
         if (q && q.price > 0) {
             // Update activeStockProfile fundamentals & technicals so calculations stay updated
             if (activeStockProfile.fundamentals) {
@@ -144,10 +229,7 @@ function handleLiveTickMessage(ticksData) {
             if (changeEl) {
                 const isPositive = q.change_pct >= 0;
                 const sign = isPositive ? '+' : '';
-                const isBullish = activeStockProfile.technicals && activeStockProfile.technicals.trend_50_vs_200 === "Bullish";
-                const trendLabel = isBullish ? 'Bullish trend' : 'Consolidating';
-                changeEl.innerText = `${sign}${q.change_pct.toFixed(2)}% (${trendLabel})`;
-                changeEl.className = isPositive ? "meta-change green-text" : "meta-change red-text";
+                changeEl.innerHTML = `<span style="padding: 2px 6px; border-radius: 4px; background: ${isPositive ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)'}; color: ${isPositive ? 'var(--neon-green)' : 'var(--neon-red)'}; font-weight: 700; font-size: 11px;">${sign}${q.change_pct.toFixed(2)}%</span>`;
             }
 
             // Update daily high/low displays on Technical tab if currently active
@@ -159,8 +241,15 @@ function handleLiveTickMessage(ticksData) {
             // Update day range in meta banner
             const metaDayLowEl = document.getElementById('meta-day-low');
             const metaDayHighEl = document.getElementById('meta-day-high');
-            if (metaDayLowEl && q.low > 0) metaDayLowEl.innerText = `Low: ₹${q.low.toFixed(2)}`;
-            if (metaDayHighEl && q.high > 0) metaDayHighEl.innerText = `High: ₹${q.high.toFixed(2)}`;
+            if (metaDayLowEl && q.low > 0) metaDayLowEl.innerText = `L: ₹${q.low.toFixed(2)}`;
+            if (metaDayHighEl && q.high > 0) metaDayHighEl.innerText = `H: ₹${q.high.toFixed(2)}`;
+
+            if (q.low > 0 && q.high > 0) {
+                updateMetaRangeProgress(q.price, q.low, q.high, 'meta-day-bar');
+            }
+            if (activeStockProfile.fundamentals) {
+                updateMetaRangeProgress(q.price, activeStockProfile.fundamentals.low_52week, activeStockProfile.fundamentals.high_52week, 'meta-52w-bar');
+            }
 
             // Dynamically update SMA alignment stack if currently rendered in DOM
             const stackContainer = document.getElementById('tech-sma-stack-container');
@@ -210,6 +299,14 @@ function handleLiveTickMessage(ticksData) {
         const changeColor = isPositive ? 'var(--neon-green, #10b981)' : 'var(--neon-red, #ef4444)';
         const changeArrow = isPositive ? '▲' : '▼';
 
+        const statusDot = row.querySelector('.wl-status-dot');
+        if (statusDot) {
+            const color = isPositive ? '#10b981' : '#ef4444';
+            statusDot.style.backgroundColor = color;
+            statusDot.style.boxShadow = `0 0 6px ${color}`;
+            statusDot.title = isPositive ? 'Bullish daily momentum' : 'Bearish daily momentum';
+        }
+
         // Check if price changed to trigger flash
         const oldPrice = priceCell ? priceCell.getAttribute('data-last-price') : null;
         const priceChanged = oldPrice && parseFloat(oldPrice) !== q.price;
@@ -229,6 +326,9 @@ function handleLiveTickMessage(ticksData) {
         if (highCell) highCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.high.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
         if (lowCell) lowCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.low.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
     });
+
+    // Update Portfolio Ledger Real-time
+    updatePortfolioLedgerRealtime(ticksData);
 }
 
 function handleWsAlertTriggered(alertData) {
@@ -285,6 +385,17 @@ function handleWsAlertTriggered(alertData) {
     if (typeof fetchAlertsList === 'function') fetchAlertsList();
 }
 
+function updateMetaRangeProgress(current, low, high, barId) {
+    const bar = document.getElementById(barId);
+    if (!bar) return;
+    if (low === null || low === undefined || high === null || high === undefined || low >= high || current === null || current === undefined) {
+        bar.style.width = '0%';
+        return;
+    }
+    const pct = Math.max(0, Math.min(100, ((current - low) / (high - low)) * 100));
+    bar.style.width = `${pct}%`;
+}
+
 function updateConnectionIndicator(status) {
     let indicator = document.getElementById('ws-connection-indicator');
     if (!indicator) {
@@ -318,6 +429,235 @@ function updateConnectionIndicator(status) {
         indicator.style.border = '1px solid rgba(239,68,68,0.3)';
         indicator.title = 'No data connection available';
     }
+}
+
+function updatePortfolioLedgerRealtime(ticksData) {
+    if (!activePortfolioLedgerItems || activePortfolioLedgerItems.length === 0) return;
+
+    let updatedAny = false;
+    activePortfolioLedgerItems.forEach(item => {
+        const plainSym = item.symbol.replace('.NS', '').replace('.BO', '');
+        const q = ticksData[item.symbol] || ticksData[plainSym];
+        if (q && q.price > 0) {
+            item.current_price = q.price;
+            item.day_change_pct = q.change_pct;
+            updatedAny = true;
+        }
+    });
+
+    if (!updatedAny) return;
+
+    // Recalculate totals
+    let totalInvestment = 0.0;
+    let totalValue = 0.0;
+    let totalDayPL = 0.0;
+
+    activePortfolioLedgerItems.forEach(item => {
+        const qty = item.quantity || 0;
+        const avgPrice = item.purchase_price || 0;
+        const currentPrice = item.current_price || avgPrice || 0;
+        const dayChangePct = item.day_change_pct || 0.0;
+
+        const investedVal = qty * avgPrice;
+        const currentVal = qty * currentPrice;
+        const dayPL = qty * (currentPrice - (currentPrice / (1 + dayChangePct / 100)));
+
+        totalInvestment += investedVal;
+        totalValue += currentVal;
+        totalDayPL += dayPL;
+    });
+
+    // Update DOM totals
+    const totalInvEl = document.getElementById('port-total-investment');
+    const totalValEl = document.getElementById('port-total-value');
+    if (totalInvEl) totalInvEl.innerText = `₹${totalInvestment.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    if (totalValEl) totalValEl.innerText = `₹${totalValue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    const netPL = totalValue - totalInvestment;
+    const netPLPct = totalInvestment > 0 ? (netPL / totalInvestment) * 100 : 0.0;
+    const netPLColor = netPL >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+    const netPLSign = netPL >= 0 ? '+' : '';
+    const plTextEl = document.getElementById('port-total-pl');
+    if (plTextEl) {
+        plTextEl.innerText = `₹${netPL.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits:2})} (${netPLSign}${netPLPct.toFixed(2)}%)`;
+        plTextEl.style.color = netPLColor;
+    }
+
+    const dayPLPct = (totalValue - totalDayPL) > 0 ? (totalDayPL / (totalValue - totalDayPL)) * 100 : 0.0;
+    const dayPLSign = totalDayPL >= 0 ? '+' : '';
+    const dayPLColor = totalDayPL >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+    const dayPLTextEl = document.getElementById('port-day-pl');
+    if (dayPLTextEl) {
+        dayPLTextEl.innerText = `₹${totalDayPL.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits:2})} (${dayPLSign}${dayPLPct.toFixed(2)}%)`;
+        dayPLTextEl.style.color = dayPLColor;
+    }
+
+    // Local weighted score sum & sector calculations
+    let localWeightedScoreSum = 0.0;
+    let localSectorExposure = {};
+    activePortfolioLedgerItems.forEach(item => {
+        const qty = item.quantity || 0;
+        const currentPrice = item.current_price || item.purchase_price || 0;
+        const score = item.score !== undefined ? item.score : 50;
+        const sector = item.sector || 'Other';
+        const currentVal = qty * currentPrice;
+
+        localWeightedScoreSum += score * currentVal;
+        localSectorExposure[sector] = (localSectorExposure[sector] || 0.0) + currentVal;
+    });
+
+    let localPortfolioScore = 50;
+    let localHhi = 0.0;
+    if (totalValue > 0) {
+        localPortfolioScore = Math.round(localWeightedScoreSum / totalValue);
+        for (const sector in localSectorExposure) {
+            const pct = (localSectorExposure[sector] / totalValue) * 100.0;
+            localHhi += Math.pow(pct / 100.0, 2);
+        }
+    }
+
+    let localDivBonus = 5;
+    let localConcentrationLabel = "Well Diversified";
+    if (localHhi > 0.4) {
+        localConcentrationLabel = "Highly Concentrated (Undiversified)";
+        localDivBonus = -15;
+    } else if (localHhi > 0.25) {
+        localConcentrationLabel = "Moderately Concentrated";
+        localDivBonus = -5;
+    }
+    const localHealthScore = Math.max(10, Math.min(100, localPortfolioScore + localDivBonus));
+
+    if (typeof animateDiagnosticsGauge === 'function') {
+        animateDiagnosticsGauge(localHealthScore);
+    }
+    
+    // Update Sector Exposure Chart
+    let localSectorExposurePcts = {};
+    if (totalValue > 0) {
+        for (const sector in localSectorExposure) {
+            localSectorExposurePcts[sector] = (localSectorExposure[sector] / totalValue) * 100.0;
+        }
+    }
+    if (typeof renderSectorExposureChart === 'function') {
+        renderSectorExposureChart(localSectorExposurePcts);
+    }
+
+    const concEl = document.getElementById('port-concentration-label');
+    if (concEl) {
+        concEl.innerText = localConcentrationLabel;
+        if (localConcentrationLabel.toLowerCase().includes('well')) {
+            concEl.style.color = 'var(--color-emerald)';
+        } else if (localConcentrationLabel.toLowerCase().includes('highly') || localConcentrationLabel.toLowerCase().includes('poor')) {
+            concEl.style.color = 'var(--neon-red)';
+        } else {
+            concEl.style.color = 'var(--color-amber)';
+        }
+    }
+
+    // Update individual table rows
+    const aggregatedItemsMap = {};
+    activePortfolioLedgerItems.forEach(item => {
+        const sym = item.symbol;
+        if (!aggregatedItemsMap[sym]) {
+            aggregatedItemsMap[sym] = {
+                ...item,
+                quantity: 0,
+                total_invested_cost: 0
+            };
+        }
+        const agg = aggregatedItemsMap[sym];
+        agg.quantity += item.quantity || 0;
+        agg.total_invested_cost += (item.quantity || 0) * (item.purchase_price || 0);
+    });
+
+    const aggregatedItems = Object.values(aggregatedItemsMap).map(agg => {
+        if (agg.quantity > 0) {
+            agg.purchase_price = agg.total_invested_cost / agg.quantity;
+        } else {
+            agg.purchase_price = 0;
+        }
+        return agg;
+    });
+
+    const ledgerBody = document.getElementById('portfolio-ledger-body');
+    if (!ledgerBody) return;
+
+    aggregatedItems.forEach(item => {
+        const row = ledgerBody.querySelector(`tr[data-symbol="${item.symbol}"]`);
+        if (!row) return;
+
+        const qty = item.quantity || 0;
+        const avgPrice = item.purchase_price || 0;
+        const currentPrice = item.current_price || avgPrice || 0;
+        const dayChangePct = item.day_change_pct || 0.0;
+
+        const investedVal = qty * avgPrice;
+        const currentVal = qty * currentPrice;
+        const plVal = currentVal - investedVal;
+        const plPct = investedVal > 0 ? (plVal / investedVal) * 100 : 0.0;
+
+        const plColor = plVal >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+        const plSign = plVal >= 0 ? '+' : '';
+
+        const netChgPct = plPct;
+        const netChgColor = netChgPct >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+        const netChgSign = netChgPct >= 0 ? '+' : '';
+
+        const dayChgColor = dayChangePct >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+        const dayChgSign = dayChangePct >= 0 ? '+' : '';
+
+        row.setAttribute('data-qty', qty);
+        row.setAttribute('data-price', avgPrice);
+
+        // Update range bar cell
+        const rangeBarCell = row.cells[3];
+        if (rangeBarCell) {
+            rangeBarCell.innerHTML = drawInlineRangeBar(currentPrice, item.suggested_buy_price_range, item.suggested_sell_price_range);
+        }
+
+        // Live price
+        const livePriceCell = row.querySelector('.port-live-price');
+        if (livePriceCell) {
+            const oldPrice = livePriceCell.getAttribute('data-last-price');
+            const priceChanged = oldPrice && parseFloat(oldPrice) !== currentPrice;
+            livePriceCell.innerHTML = safeFormatRupees(currentPrice, 2);
+            livePriceCell.setAttribute('data-last-price', currentPrice);
+            if (priceChanged) {
+                const isPositive = dayChangePct >= 0;
+                livePriceCell.classList.add(isPositive ? 'tick-flash-green' : 'tick-flash-red');
+                setTimeout(() => {
+                    livePriceCell.classList.remove('tick-flash-green', 'tick-flash-red');
+                }, 600);
+            }
+        }
+
+        // Net change
+        const netChgCell = row.querySelector('.port-net-change');
+        if (netChgCell) {
+            netChgCell.innerHTML = `${netChgSign}${netChgPct.toFixed(2)}%`;
+            netChgCell.style.color = netChgColor;
+        }
+
+        // Day change
+        const dayChgCell = row.querySelector('.port-day-change');
+        if (dayChgCell) {
+            dayChgCell.innerHTML = `${dayChgSign}${dayChangePct.toFixed(2)}%`;
+            dayChgCell.style.color = dayChgColor;
+        }
+
+        // Current Value
+        const currentValCell = row.querySelector('.port-current-value');
+        if (currentValCell) {
+            currentValCell.innerHTML = safeFormatRupees(currentVal, 2);
+        }
+
+        // Net PL
+        const netPlCell = row.querySelector('.port-net-pl');
+        if (netPlCell) {
+            netPlCell.innerHTML = `${plSign}${safeFormatRupees(plVal, 2)}<br><span style="font-size: 10px; color: ${plColor};">${plSign}${plPct.toFixed(2)}%</span>`;
+            netPlCell.style.color = plColor;
+        }
+    });
 }
 
 // Initialize WebSocket on page load
@@ -544,7 +884,7 @@ document.addEventListener('DOMContentLoaded', () => {
     switchTab('analyzer');
 
     // Connect to Backend WebSocket
-    connectWebSocket();
+    connectLiveTicksWS();
 });
 
 // Collapsible Sidebar Workstation Manager
@@ -713,7 +1053,7 @@ function setupEnterpriseHeader() {
         });
     }
 
-    // Dynamic indices rate fluctuations (Simulating live Bloomberg terminal)
+    // Dynamic indices update
     const marquee = document.getElementById('indices-marquee');
     if (marquee) {
         // Clone marquee content to make it a seamless, infinite loop!
@@ -721,34 +1061,15 @@ function setupEnterpriseHeader() {
         clone.id = 'indices-marquee-clone';
         marquee.parentElement.appendChild(clone);
 
+        // Fetch initial indices
+        fetchRealtimeIndices();
+
+        // Periodically refresh if WebSocket is not streaming live data
         setInterval(() => {
-            const items = document.querySelectorAll('.ticker-item');
-            items.forEach(item => {
-                const valEl = item.querySelector('strong.val');
-                const changeEl = item.querySelector('span.change');
-                if (!valEl || !changeEl) return;
-
-                // Fluctuates value realistically
-                let val = parseFloat(valEl.innerText.replace(/,/g, ''));
-                const factor = (Math.random() - 0.5) * 4; // delta change
-                val += factor;
-
-                // Format back to locale string
-                valEl.innerText = val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-                // Calculate a simulated percentage
-                let pct = (factor / val) * 100;
-                if (Math.abs(pct) < 0.01) pct = (Math.random() - 0.5) * 0.05;
-
-                if (pct >= 0) {
-                    changeEl.innerText = `▲ +${pct.toFixed(2)}%`;
-                    changeEl.className = 'change green-text';
-                } else {
-                    changeEl.innerText = `▼ ${pct.toFixed(2)}%`;
-                    changeEl.className = 'change red-text';
-                }
-            });
-        }, 4000);
+            if (!liveTicksConnected) {
+                fetchRealtimeIndices();
+            }
+        }, 3000);
     }
 }
 
@@ -3149,23 +3470,37 @@ function renderStockDashboard(p) {
     const priceEl = document.getElementById('meta-price');
     if (priceEl) priceEl.innerText = safeFormatRupees(p.fundamentals.current_price, 2);
 
+    const trendEl = document.getElementById('meta-trend');
+    if (trendEl) {
+        const isBullish = p.technicals && p.technicals.trend_50_vs_200 === "Bullish";
+        trendEl.innerText = isBullish ? 'BULLISH' : 'CONSOLIDATING';
+        trendEl.className = isBullish ? 'badge-rec rec-buy' : 'badge-rec rec-hold';
+        trendEl.style.fontSize = '9px';
+        trendEl.style.padding = '1px 5px';
+        trendEl.style.borderRadius = '3px';
+        trendEl.style.fontWeight = '700';
+    }
+
     // Update day range
     const dayLowEl = document.getElementById('meta-day-low');
     const dayHighEl = document.getElementById('meta-day-high');
-    if (dayLowEl && p.fundamentals.day_low) dayLowEl.innerText = `Low: ₹${p.fundamentals.day_low.toFixed(2)}`;
-    if (dayHighEl && p.fundamentals.day_high) dayHighEl.innerText = `High: ₹${p.fundamentals.day_high.toFixed(2)}`;
+    if (dayLowEl && p.fundamentals.day_low) dayLowEl.innerText = `L: ₹${p.fundamentals.day_low.toFixed(2)}`;
+    if (dayHighEl && p.fundamentals.day_high) dayHighEl.innerText = `H: ₹${p.fundamentals.day_high.toFixed(2)}`;
+    updateMetaRangeProgress(p.fundamentals.current_price, p.fundamentals.day_low, p.fundamentals.day_high, 'meta-day-bar');
 
     // Update 52-week range
     const low52El = document.getElementById('meta-52w-low');
     const high52El = document.getElementById('meta-52w-high');
-    if (low52El && p.fundamentals.low_52week) low52El.innerText = `Low: ₹${p.fundamentals.low_52week.toFixed(2)}`;
-    if (high52El && p.fundamentals.high_52week) high52El.innerText = `High: ₹${p.fundamentals.high_52week.toFixed(2)}`;
+    if (low52El && p.fundamentals.low_52week) low52El.innerText = `L: ₹${p.fundamentals.low_52week.toFixed(2)}`;
+    if (high52El && p.fundamentals.high_52week) high52El.innerText = `H: ₹${p.fundamentals.high_52week.toFixed(2)}`;
+    updateMetaRangeProgress(p.fundamentals.current_price, p.fundamentals.low_52week, p.fundamentals.high_52week, 'meta-52w-bar');
 
-    // Start 3-second price refresh cycle for equity research terminal
+    // Start 2-second price refresh cycle for equity research terminal
     if (!window.stockPriceRefreshInterval) {
         window.stockPriceRefreshInterval = setInterval(() => {
-            if (activeStockProfile && activeStockProfile.fundamentals && activeStockProfile.fundamentals.symbol) {
-                fetch(`/api/stock-profile/${activeStockProfile.fundamentals.symbol}?cache=false`)
+            // Poll if the terminal tab is active
+            if (activeTab === 'analyzer' && activeStockProfile && activeStockProfile.ticker) {
+                fetch(`/api/stock-profile/${activeStockProfile.ticker}?cache=false`)
                     .then(res => res.json())
                     .then(updatedProfile => {
                         if (updatedProfile && updatedProfile.fundamentals) {
@@ -3176,18 +3511,20 @@ function renderStockDashboard(p) {
                             // Update day range
                             const dayLowEl = document.getElementById('meta-day-low');
                             const dayHighEl = document.getElementById('meta-day-high');
-                            if (dayLowEl && updatedProfile.fundamentals.day_low) dayLowEl.innerText = `Low: ₹${updatedProfile.fundamentals.day_low.toFixed(2)}`;
-                            if (dayHighEl && updatedProfile.fundamentals.day_high) dayHighEl.innerText = `High: ₹${updatedProfile.fundamentals.day_high.toFixed(2)}`;
+                            if (dayLowEl && updatedProfile.fundamentals.day_low) dayLowEl.innerText = `L: ₹${updatedProfile.fundamentals.day_low.toFixed(2)}`;
+                            if (dayHighEl && updatedProfile.fundamentals.day_high) dayHighEl.innerText = `H: ₹${updatedProfile.fundamentals.day_high.toFixed(2)}`;
+                            updateMetaRangeProgress(updatedProfile.fundamentals.current_price, updatedProfile.fundamentals.day_low, updatedProfile.fundamentals.day_high, 'meta-day-bar');
                             // Update 52-week range
                             const low52El = document.getElementById('meta-52w-low');
                             const high52El = document.getElementById('meta-52w-high');
-                            if (low52El && updatedProfile.fundamentals.low_52week) low52El.innerText = `Low: ₹${updatedProfile.fundamentals.low_52week.toFixed(2)}`;
-                            if (high52El && updatedProfile.fundamentals.high_52week) high52El.innerText = `High: ₹${updatedProfile.fundamentals.high_52week.toFixed(2)}`;
+                            if (low52El && updatedProfile.fundamentals.low_52week) low52El.innerText = `L: ₹${updatedProfile.fundamentals.low_52week.toFixed(2)}`;
+                            if (high52El && updatedProfile.fundamentals.high_52week) high52El.innerText = `H: ₹${updatedProfile.fundamentals.high_52week.toFixed(2)}`;
+                            updateMetaRangeProgress(updatedProfile.fundamentals.current_price, updatedProfile.fundamentals.low_52week, updatedProfile.fundamentals.high_52week, 'meta-52w-bar');
                         }
                     })
                     .catch(e => console.log('Periodic price refresh failed:', e));
             }
-        }, 3000);
+        }, 2000);
     }
 
     // Populate Corporate Business Summary Collapsible Card (Two-Column Layout)
@@ -10372,7 +10709,6 @@ async function setupWatchlistControls() {
             if (activeWatchlistId === null) return;
             const activeWatch = watchlistsList.find(w => w.id === activeWatchlistId);
             if (activeWatch && activeWatch.items.length > 0) {
-                showToast("Refreshing watchlist market prices...", "info");
                 try {
                     const symbols = activeWatch.items.map(item => item.symbol);
                     await fetchWatchlistLiveQuotes(symbols);
@@ -10738,7 +11074,7 @@ function renderWatchlistItems() {
         if (watchlistRefreshBtn) watchlistRefreshBtn.style.display = 'none';
         if (inlineAddContainer) inlineAddContainer.style.display = 'none';
         if (resultsContainer) resultsContainer.style.display = 'none';
-        tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">Select or create a watchlist on the left to display its constituents.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="center-text text-muted">Select or create a watchlist on the left to display its constituents.</td></tr>';
         return;
     }
 
@@ -10749,7 +11085,7 @@ function renderWatchlistItems() {
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
         if (watchlistRefreshBtn) watchlistRefreshBtn.style.display = 'none';
         if (inlineAddContainer) inlineAddContainer.style.display = 'none';
-        tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">Watchlist data is loading...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="center-text text-muted">Watchlist data is loading...</td></tr>';
         return;
     }
 
@@ -10761,7 +11097,7 @@ function renderWatchlistItems() {
     const pagContainer = document.getElementById('watchlist-table-pagination');
 
     if (activeWatch.items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">This watchlist is empty. Load a stock inside the Analyzer and add it.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="center-text text-muted">This watchlist is empty. Load a stock inside the Analyzer and add it.</td></tr>';
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
         if (watchlistRefreshBtn) watchlistRefreshBtn.style.display = 'none';
         if (resultsContainer) resultsContainer.style.display = 'none';
@@ -10951,8 +11287,8 @@ function renderWatchlistItems() {
     pageData.forEach(item => {
         const isCached = item.is_cached === 1 ? 1 : 0;
         const cacheBadgeHTML = isCached === 1
-            ? `<span class="badge-rec rec-buy" style="font-size: 8px; padding: 2px 5px; border-radius: 4px; font-weight: 700; cursor: default; border: 1px solid rgba(16,185,129,0.2);" title="Database cache warmed. Analysis loads instantly.">WARMED 🟢</span>`
-            : `<span class="badge-rec rec-hold click-to-warm" data-symbol="${item.symbol}" style="font-size: 8px; padding: 2px 5px; border-radius: 4px; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: var(--text-muted);" title="Uncached database profile. Click to pre-warm cache.">COLD ⚪</span>`;
+            ? `<span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #10b981; box-shadow: 0 0 6px #10b981;" title="Database cache warmed. Analysis loads instantly."></span>`
+            : `<span class="click-to-warm" data-symbol="${item.symbol}" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: rgba(255,255,255,0.25); cursor: pointer;" title="Uncached database profile. Click to pre-warm cache."></span>`;
 
         const priceHTML = (item.live_price !== undefined && item.live_price !== null)
             ? `<span style="font-family: 'Inter', monospace;">₹${item.live_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
@@ -10961,6 +11297,13 @@ function renderWatchlistItems() {
         const isPositive = (item.change || 0) >= 0;
         const changeColor = isPositive ? 'var(--neon-green, #10b981)' : 'var(--neon-red, #ef4444)';
         const changeArrow = isPositive ? '▲' : '▼';
+
+        const hasLivePrice = (item.live_price !== undefined && item.live_price !== null);
+        const trendDotColor = isPositive ? '#10b981' : '#ef4444';
+        const trendDotTitle = isPositive ? 'Bullish daily momentum' : 'Bearish daily momentum';
+        const trendDotHTML = hasLivePrice
+            ? `<span class="wl-status-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${trendDotColor}; box-shadow: 0 0 6px ${trendDotColor};" title="${trendDotTitle}"></span>`
+            : `<span class="wl-status-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: rgba(255,255,255,0.25);" title="Awaiting live market data"></span>`;
 
         const changeHTML = (item.change !== undefined && item.change !== null)
             ? `<span style="color: ${changeColor};">${changeArrow} ${isPositive ? '+' : ''}${item.change.toFixed(2)}</span>`
@@ -10982,16 +11325,17 @@ function renderWatchlistItems() {
         tr.setAttribute('data-wl-symbol', item.symbol);
         tr.innerHTML = `
             <td>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div class="watchlist-symbol-link" style="cursor: pointer;" title="Click to load research workspace">
-                        <strong style="color: var(--color-primary); text-decoration: underline;">${item.symbol}</strong>
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <div class="watchlist-symbol-link" style="cursor: pointer;" title="Click to load research workspace">
+                            <strong style="color: var(--color-primary); text-decoration: underline; font-weight: 700;">${item.symbol}</strong>
+                        </div>
+                        ${trendDotHTML}
+                        ${cacheBadgeHTML}
                     </div>
-                    ${cacheBadgeHTML}
-                </div>
-            </td>
-            <td>
-                <div class="watchlist-symbol-link" style="cursor: pointer;" title="Click to load research workspace">
-                    <strong style="color: var(--color-primary); text-decoration: underline;">${item.name}</strong>
+                    <div class="watchlist-symbol-link" style="cursor: pointer; font-size: 11px; color: var(--text-secondary);" title="Click to load research workspace">
+                        ${item.name}
+                    </div>
                 </div>
             </td>
             <td><span class="text-muted" style="font-size:11px;">${item.sector}</span></td>
@@ -12952,9 +13296,14 @@ async function runWatchlistBatchAnalysis() {
             if (res.action.toUpperCase().includes("BUY")) recClass = 'badge-buy';
             if (res.action.toUpperCase().includes("SELL") || res.action.toUpperCase().includes("AVOID") || res.action.toUpperCase().includes("UNDERPERFORM")) recClass = 'badge-sell';
 
-            let trendClass = "yellow-text";
-            if (res.trend === 'Bullish') trendClass = "green-text";
-            if (res.trend === 'Bearish') trendClass = "red-text";
+            let trendDotHTML = '';
+            if (res.trend === 'Bullish') {
+                trendDotHTML = `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:#10b981; box-shadow:0 0 6px #10b981; margin: 0 auto;" title="Bullish"></span>`;
+            } else if (res.trend === 'Bearish') {
+                trendDotHTML = `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:#ef4444; box-shadow:0 0 6px #ef4444; margin: 0 auto;" title="Bearish"></span>`;
+            } else {
+                trendDotHTML = `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:rgba(255,255,255,0.4); margin: 0 auto;" title="Neutral/Other"></span>`;
+            }
 
             let peClass = '';
             if (res.pe > 0 && stdPE > 0) {
@@ -12986,7 +13335,7 @@ async function runWatchlistBatchAnalysis() {
                 <td class="${roeClass}">${formattedROE}</td>
                 <td class="${marginClass}">${formattedMargin}</td>
                 <td>${formattedRSI}</td>
-                <td><span class="${trendClass} font-weight-bold" style="font-size:10px;">${res.trend}</span></td>
+                <td><div style="display: flex; justify-content: center; align-items: center; width: 100%;">${trendDotHTML}</div></td>
             `;
             tbody.appendChild(tr);
         });
@@ -13340,8 +13689,8 @@ function filterAndRenderUniverse() {
 
         // Cache status badge
         const cacheBadge = item.is_cached === 1
-            ? '<span class="badge-rec rec-buy" style="font-size:9.5px; font-weight:700; padding:3px 8px; border-radius: 5px; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16,185,129,0.35);">WARMED 🟢</span>'
-            : '<span class="badge-rec rec-hold cache-cold-badge" style="font-size:9.5px; font-weight:500; padding:3px 8px; border-radius: 5px;">COLD ⚪</span>';
+            ? '<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:#10b981; box-shadow:0 0 6px #10b981;" title="Database cache warmed."></span>'
+            : '<span class="cache-cold-badge" style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:rgba(255,255,255,0.25); cursor:pointer;" title="Uncached database profile. Click to pre-warm cache."></span>';
 
         // Build watchlist selection options
         let watchlistOptions = '<option value="">Select Watchlist...</option>';
@@ -15592,8 +15941,8 @@ function drawInlineRangeBar(current, suggestedBuy, suggestedSell) {
     }
 
     // Parse range like "1200 - 1300"
-    const buyParts = suggestedBuy.split('-').map(x => parseFloat(x.replace(/[^\d\.]/g, '')));
-    const sellParts = suggestedSell.split('-').map(x => parseFloat(x.replace(/[^\d\.]/g, '')));
+    const buyParts = suggestedBuy.split('-').map(x => parseFloat(x.replace(/Rs\.?/gi, '').replace(/[^\d\.]/g, '')));
+    const sellParts = suggestedSell.split('-').map(x => parseFloat(x.replace(/Rs\.?/gi, '').replace(/[^\d\.]/g, '')));
 
     if (buyParts.length < 2 || sellParts.length < 2 || isNaN(buyParts[0]) || isNaN(sellParts[0])) {
         return `<span style="color:var(--text-muted); font-size:10px;">Buy: ${suggestedBuy}<br>Sell: ${suggestedSell}</span>`;
@@ -15680,6 +16029,15 @@ async function loadPortfolioDoctorLedger(forceRefresh = false) {
         const response = await fetch(url);
         if (!response.ok) throw new Error("Failed to load portfolio.");
         const portfolioItems = await response.json();
+
+        // Store globally for real-time WebSocket updates
+        activePortfolioLedgerItems = JSON.parse(JSON.stringify(portfolioItems));
+
+        // Subscribe to portfolio symbols on WebSocket
+        const portfolioSymbols = portfolioItems.map(item => item.symbol);
+        if (portfolioSymbols.length > 0) {
+            wsSubscribeSymbols(portfolioSymbols);
+        }
 
         // 2. Fetch watchlist stocks not in portfolio
         const wlResponse = await fetch('/api/portfolio/watchlist-stocks');

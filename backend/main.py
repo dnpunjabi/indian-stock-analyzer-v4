@@ -1306,6 +1306,94 @@ async def discover_stocks(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Screener engine failed: {str(e)}")
 
+@app.get("/api/stock-profile/{symbol}")
+async def get_stock_profile_endpoint(symbol: str, cache: bool = True):
+    """
+    Lightweight endpoint to fetch the latest price and fundamentals for a symbol.
+    Checks tick store first, then cached profiles, and falls back to yfinance.
+    """
+    from backend.websocket_server import tick_store
+    symbol = symbol.strip().upper()
+    plain = symbol.replace(".NS", "").replace(".BO", "")
+    
+    # Try tick store first
+    tick = tick_store.get(plain) or tick_store.get(symbol)
+    
+    # Try cached profiles if cache is True
+    profile = None
+    if cache:
+        try:
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (symbol,))
+                row = cursor.fetchone()
+                if row:
+                    profile = json.loads(row["profile_json"])
+        except Exception as e:
+            logger.error(f"Error reading cached profile: {e}")
+        
+    # If not cached, fetch complete profile
+    if not profile:
+        try:
+            profile = await asyncio.to_thread(get_complete_financial_profile, symbol, bypass_db_cache=not cache)
+        except Exception:
+            profile = {}
+            
+    # Update fundamentals with live tick price if available
+    fundamentals = profile.get("fundamentals", {}) if profile else {}
+    if tick:
+        fundamentals["current_price"] = tick["price"]
+        if tick.get("high", 0) > 0:
+            fundamentals["day_high"] = tick["high"]
+        if tick.get("low", 0) > 0:
+            fundamentals["day_low"] = tick["low"]
+            
+    # Self-heal missing day/52w ranges from technicals if present
+    technicals = profile.get("technicals", {}) if profile else {}
+    if technicals:
+        if "day_low" not in fundamentals or not fundamentals.get("day_low"):
+            fundamentals["day_low"] = technicals.get("daily_low") or technicals.get("low_52w")
+        if "day_high" not in fundamentals or not fundamentals.get("day_high"):
+            fundamentals["day_high"] = technicals.get("daily_high") or technicals.get("high_52w")
+        if "low_52week" not in fundamentals or not fundamentals.get("low_52week"):
+            fundamentals["low_52week"] = technicals.get("low_52w")
+        if "high_52week" not in fundamentals or not fundamentals.get("high_52week"):
+            fundamentals["high_52week"] = technicals.get("high_52w")
+
+    # If cache=False OR current_price or any ranges are still missing, fetch fresh quote from yfinance
+    if (not cache or 
+        not fundamentals.get("current_price") or 
+        not fundamentals.get("day_low") or 
+        not fundamentals.get("day_high") or 
+        not fundamentals.get("low_52week") or 
+        not fundamentals.get("high_52week") or
+        "open" not in fundamentals or not fundamentals.get("open")):
+        try:
+            import yfinance as yf
+            ticker_obj = yf.Ticker(symbol if '.' in symbol or symbol.startswith('^') else f"{symbol}.NS")
+            info = ticker_obj.info
+            if info:
+                fundamentals["current_price"] = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice") or fundamentals.get("current_price")
+                fundamentals["day_high"] = info.get("dayHigh") or info.get("regularMarketDayHigh") or fundamentals.get("current_price")
+                fundamentals["day_low"] = info.get("dayLow") or info.get("regularMarketDayLow") or fundamentals.get("current_price")
+                fundamentals["low_52week"] = info.get("fiftyTwoWeekLow") or info.get("regularMarketFiftyTwoWeekLow") or fundamentals.get("current_price")
+                fundamentals["high_52week"] = info.get("fiftyTwoWeekHigh") or info.get("regularMarketFiftyTwoWeekHigh") or fundamentals.get("current_price")
+                
+                # Fetch new metrics for the enterprise meta banner
+                fundamentals["open"] = info.get("open") or info.get("regularMarketOpen")
+                fundamentals["previous_close"] = info.get("previousClose") or info.get("regularMarketPreviousClose")
+                fundamentals["volume"] = info.get("volume") or info.get("regularMarketVolume")
+                fundamentals["average_volume"] = info.get("averageVolume") or info.get("averageVolume10Days")
+        except Exception as e:
+            print(f"Error fetching yfinance fallback quote for {symbol}: {e}")
+            
+    return {
+        "fundamentals": fundamentals,
+        "technicals": profile.get("technicals", {}) if profile else {},
+        "analysis": profile.get("analysis", {}) if profile else {}
+    }
+
+
 @app.get("/api/stock/audit")
 async def audit_stock(
     symbol: str,
@@ -3590,8 +3678,8 @@ async def batch_quotes(data: BatchQuotesRequest):
         sym_to_yf = {}
         yf_symbols = []
         for sym in raw_symbols:
-            if '.' in sym:
-                yf_sym = sym  # Already has exchange suffix
+            if '.' in sym or sym.startswith('^'):
+                yf_sym = sym  # Already has exchange suffix or is an index
             else:
                 yf_sym = f"{sym}.NS"  # Default to NSE
             sym_to_yf[sym] = yf_sym
@@ -3943,9 +4031,12 @@ async def get_portfolio(refresh: bool = False):
         rows = compute_active_holdings(all_txs)
         
         # Hydrate target ranges and current price from cached_profiles if available
+        from backend.websocket_server import tick_store
         hydrated_rows = []
         for row in rows:
             sym = row["symbol"]
+            plain_sym = sym.replace(".NS", "").replace(".BO", "")
+            
             cursor.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (sym,))
             cache_row = cursor.fetchone()
             
@@ -3959,6 +4050,12 @@ async def get_portfolio(refresh: bool = False):
             row["day_change_pct"] = None
             row["score"] = 50
             
+            # Try to resolve live quotes from WebSocket tick store first
+            live_tick = tick_store.get(plain_sym) or tick_store.get(sym)
+            if live_tick:
+                row["current_price"] = live_tick.get("price")
+                row["day_change_pct"] = live_tick.get("change_pct")
+            
             if cache_row:
                 try:
                     profile = json.loads(cache_row["profile_json"])
@@ -3968,11 +4065,37 @@ async def get_portfolio(refresh: bool = False):
                     row["suggested_sell_price_range"] = analysis.get("suggested_sell_price_range", "N/A")
                     row["target_12m"] = analysis.get("target_12m")
                     row["stop_loss_12m"] = analysis.get("stop_loss_12m")
-                    row["current_price"] = profile.get("fundamentals", {}).get("current_price")
-                    row["day_change_pct"] = profile.get("technicals", {}).get("price_change_pct")
+                    if not row["current_price"]:
+                        row["current_price"] = profile.get("fundamentals", {}).get("current_price")
+                    if not row["day_change_pct"]:
+                        row["day_change_pct"] = profile.get("technicals", {}).get("price_change_pct")
                     row["score"] = profile.get("score_metrics", {}).get("final_score", 50)
                 except Exception as e:
                     print(f"Error parsing cached profile for {sym}: {e}")
+            
+            # yfinance fallback if price is still missing
+            if not row["current_price"]:
+                try:
+                    import yfinance as yf
+                    yf_sym = sym if '.' in sym or sym.startswith('^') else f"{sym}.NS"
+                    ticker_obj = yf.Ticker(yf_sym)
+                    info = ticker_obj.info
+                    if info:
+                        row["current_price"] = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice")
+                        if not row["day_change_pct"]:
+                            pc = info.get("previousClose") or info.get("regularMarketPreviousClose")
+                            if pc and row["current_price"]:
+                                row["day_change_pct"] = ((row["current_price"] - pc) / pc) * 100
+                except Exception as yf_err:
+                    print(f"Error resolving fallback quote for portfolio item {sym}: {yf_err}")
+
+            # Autocomplete empty target valuation ranges if we have current_price to ensure the slider is populated
+            if row["current_price"]:
+                cur_p = row["current_price"]
+                if not row["suggested_buy_price_range"] or row["suggested_buy_price_range"] == "N/A":
+                    row["suggested_buy_price_range"] = f"Rs. {int(cur_p * 0.95)} - Rs. {int(cur_p * 1.02)}"
+                if not row["suggested_sell_price_range"] or row["suggested_sell_price_range"] == "N/A":
+                    row["suggested_sell_price_range"] = f"Rs. {int(cur_p * 1.15)} - Rs. {int(cur_p * 1.25)}"
             
             hydrated_rows.append(row)
         return hydrated_rows

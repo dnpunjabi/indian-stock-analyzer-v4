@@ -10130,3 +10130,63 @@ tr.active-peer-row td:first-child {
     display: inline-block;
 }
 
+/* Inline Valuation target spectrum range bar styles */
+.inline-range-track {
+    position: relative;
+    width: 110px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    margin: 4px auto;
+    overflow: visible;
+}
+
+.inline-range-fill {
+    position: absolute;
+    height: 100%;
+    border-radius: 3px;
+    opacity: 0.6;
+}
+
+.inline-range-fill.buy {
+    background: var(--neon-green, #10b981);
+}
+
+.inline-range-fill.sell {
+    background: var(--neon-red, #ef4444);
+}
+
+.inline-range-pointer {
+    position: absolute;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    background: #ffffff;
+    border: 2px solid var(--color-primary, #6366f1);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 4px rgba(99, 102, 241, 0.8);
+    z-index: 2;
+}
+
+/* Light Mode visibility contrast overrides */
+[data-mode="light"] .inline-range-track,
+[data-theme="light"] .inline-range-track {
+    background: rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-mode="light"] .inline-range-pointer,
+[data-theme="light"] .inline-range-pointer {
+    background: var(--color-primary, #2563eb) !important;
+    border-color: #ffffff !important;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.25) !important;
+}
+
+[data-mode="light"] .meta-range-track,
+[data-theme="light"] .meta-range-track {
+    background: rgba(0, 0, 0, 0.15) !important;
+}
+
+
+
+
