@@ -10786,6 +10786,30 @@ function renderWatchlistItems() {
             ? `<span class="badge-rec rec-buy" style="font-size: 8px; padding: 2px 5px; border-radius: 4px; font-weight: 700; cursor: default; border: 1px solid rgba(16,185,129,0.2);" title="Database cache warmed. Analysis loads instantly.">WARMED 🟢</span>`
             : `<span class="badge-rec rec-hold click-to-warm" data-symbol="${item.symbol}" style="font-size: 8px; padding: 2px 5px; border-radius: 4px; font-weight: 700; cursor: pointer; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02); color: var(--text-muted);" title="Uncached database profile. Click to pre-warm cache.">COLD ⚪</span>`;
             
+        const priceHTML = (item.live_price !== undefined && item.live_price !== null)
+            ? `<span style="font-family: 'Inter', monospace;">₹${item.live_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
+            : `<span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>`;
+            
+        const isPositive = (item.change || 0) >= 0;
+        const changeColor = isPositive ? 'var(--neon-green, #10b981)' : 'var(--neon-red, #ef4444)';
+        const changeArrow = isPositive ? '▲' : '▼';
+        
+        const changeHTML = (item.change !== undefined && item.change !== null)
+            ? `<span style="color: ${changeColor};">${changeArrow} ${isPositive ? '+' : ''}${item.change.toFixed(2)}</span>`
+            : `<span style="display:inline-block; width:45px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>`;
+
+        const changePctHTML = (item.change_pct !== undefined && item.change_pct !== null)
+            ? `<span style="color: ${changeColor}; padding: 1px 6px; border-radius: 4px; background: ${isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; font-size: 10.5px;">${isPositive ? '+' : ''}${item.change_pct.toFixed(2)}%</span>`
+            : `<span style="display:inline-block; width:45px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>`;
+
+        const highHTML = (item.day_high !== undefined && item.day_high !== null)
+            ? `<span style="font-family: 'Inter', monospace;">₹${item.day_high.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
+            : `<span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>`;
+
+        const lowHTML = (item.day_low !== undefined && item.day_low !== null)
+            ? `<span style="font-family: 'Inter', monospace;">₹${item.day_low.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
+            : `<span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>`;
+
         const tr = document.createElement('tr');
         tr.setAttribute('data-wl-symbol', item.symbol);
         tr.innerHTML = `
@@ -10804,19 +10828,19 @@ function renderWatchlistItems() {
             </td>
             <td><span class="text-muted" style="font-size:11px;">${item.sector}</span></td>
             <td class="wl-live-price" style="text-align: right; font-weight: 700; font-size: 12px; color: var(--text-primary);">
-                <span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+                ${priceHTML}
             </td>
             <td class="wl-change" style="text-align: right; font-size: 11.5px; font-weight: 600;">
-                <span style="display:inline-block; width:45px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+                ${changeHTML}
             </td>
             <td class="wl-change-pct" style="text-align: right; font-size: 11.5px; font-weight: 600;">
-                <span style="display:inline-block; width:45px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+                ${changePctHTML}
             </td>
             <td class="wl-day-high" style="text-align: right; font-size: 11.5px; color: var(--text-secondary);">
-                <span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+                ${highHTML}
             </td>
             <td class="wl-day-low" style="text-align: right; font-size: 11.5px; color: var(--text-secondary);">
-                <span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>
+                ${lowHTML}
             </td>
             <td style="white-space: nowrap;">
                 <button class="btn-secondary remove-watchlist-item-btn" data-ticker="${item.symbol}" style="font-size: 10px; padding: 3px 8px; cursor:pointer; white-space: nowrap;" title="Remove ${item.symbol}">🗑️</button>
@@ -10896,12 +10920,6 @@ async function fetchWatchlistLiveQuotes(symbols) {
                     item.change_pct = q.change_pct;
                     item.day_high = q.high;
                     item.day_low = q.low;
-                } else {
-                    item.live_price = null;
-                    item.change = null;
-                    item.change_pct = null;
-                    item.day_high = null;
-                    item.day_low = null;
                 }
             });
         }
@@ -10913,6 +10931,14 @@ async function fetchWatchlistLiveQuotes(symbols) {
         rows.forEach(row => {
             const sym = row.getAttribute('data-wl-symbol');
             const q = quotes[sym];
+            
+            // Retrieve stored data as fallback
+            const item = activeWatch ? activeWatch.items.find(it => it.symbol === sym) : null;
+            const price = q ? q.price : (item ? item.live_price : null);
+            const change = q ? q.change : (item ? item.change : null);
+            const change_pct = q ? q.change_pct : (item ? item.change_pct : null);
+            const high = q ? q.high : (item ? item.day_high : null);
+            const low = q ? q.low : (item ? item.day_low : null);
 
             const priceCell = row.querySelector('.wl-live-price');
             const changeCell = row.querySelector('.wl-change');
@@ -10920,16 +10946,16 @@ async function fetchWatchlistLiveQuotes(symbols) {
             const highCell = row.querySelector('.wl-day-high');
             const lowCell = row.querySelector('.wl-day-low');
 
-            if (q) {
-                const isPositive = q.change >= 0;
+            if (price !== null && price !== undefined) {
+                const isPositive = change >= 0;
                 const changeColor = isPositive ? 'var(--neon-green, #10b981)' : 'var(--neon-red, #ef4444)';
                 const changeArrow = isPositive ? '▲' : '▼';
 
-                if (priceCell) priceCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
-                if (changeCell) changeCell.innerHTML = `<span style="color: ${changeColor};">${changeArrow} ${isPositive ? '+' : ''}${q.change.toFixed(2)}</span>`;
-                if (changePctCell) changePctCell.innerHTML = `<span style="color: ${changeColor}; padding: 1px 6px; border-radius: 4px; background: ${isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; font-size: 10.5px;">${isPositive ? '+' : ''}${q.change_pct.toFixed(2)}%</span>`;
-                if (highCell) highCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.high.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
-                if (lowCell) lowCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${q.low.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+                if (priceCell) priceCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+                if (changeCell) changeCell.innerHTML = `<span style="color: ${changeColor};">${changeArrow} ${isPositive ? '+' : ''}${change.toFixed(2)}</span>`;
+                if (changePctCell) changePctCell.innerHTML = `<span style="color: ${changeColor}; padding: 1px 6px; border-radius: 4px; background: ${isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}; font-size: 10.5px;">${isPositive ? '+' : ''}${change_pct.toFixed(2)}%</span>`;
+                if (highCell) highCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${high.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+                if (lowCell) lowCell.innerHTML = `<span style="font-family: 'Inter', monospace;">₹${low.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
             } else {
                 // No quote data available
                 if (priceCell) priceCell.innerHTML = '<span class="text-muted" style="font-size:10px;">N/A</span>';
