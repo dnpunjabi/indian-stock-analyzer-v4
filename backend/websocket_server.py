@@ -442,13 +442,39 @@ def subscribe_symbols(symbols: List[str]):
         return
 
     try:
-        # Mode 2 = Quote (LTP + OHLC + volume)
-        _angel_sws.subscribe("apex_live_feed", mode=2, token_list=token_list)
+        # Check if the connection is active
+        is_connected = (
+            hasattr(_angel_sws, "wsapp")
+            and _angel_sws.wsapp
+            and hasattr(_angel_sws.wsapp, "sock")
+            and _angel_sws.wsapp.sock
+            and _angel_sws.wsapp.sock.connected
+        )
+
+        if is_connected:
+            _angel_sws.subscribe("apex_live_feed", mode=2, token_list=token_list)
+            logger.info(f"Subscribed to {len(symbols)} symbols. Total tokens: {len(_subscribed_tokens) + sum(len(g['tokens']) for g in token_list)}")
+        else:
+            # If not connected yet, register directly into request dict for auto-resubscription on open
+            logger.info(f"WebSocket not connected. Registering {len(symbols)} symbols for auto-resubscription.")
+            _angel_sws.RESUBSCRIBE_FLAG = True
+            if 2 not in _angel_sws.input_request_dict:
+                _angel_sws.input_request_dict[2] = {}
+            for token in token_list:
+                exch = token['exchangeType']
+                if exch in _angel_sws.input_request_dict[2]:
+                    # Avoid duplicates
+                    existing = set(_angel_sws.input_request_dict[2][exch])
+                    for t in token["tokens"]:
+                        if t not in existing:
+                            _angel_sws.input_request_dict[2][exch].append(t)
+                else:
+                    _angel_sws.input_request_dict[2][exch] = list(token["tokens"])
+
         for group in token_list:
             _subscribed_tokens.update(group["tokens"])
-        logger.info(f"Subscribed to {len(symbols)} symbols. Total tokens: {len(_subscribed_tokens)}")
     except Exception as e:
-        logger.error(f"Failed to subscribe to symbols: {e}")
+        logger.warning(f"Error subscribing (will retry or auto-resubscribe): {e}")
 
 
 def unsubscribe_symbols(symbols: List[str]):
@@ -462,12 +488,32 @@ def unsubscribe_symbols(symbols: List[str]):
         return
 
     try:
-        _angel_sws.unsubscribe("apex_unsubscribe", mode=2, token_list=token_list)
+        is_connected = (
+            hasattr(_angel_sws, "wsapp")
+            and _angel_sws.wsapp
+            and hasattr(_angel_sws.wsapp, "sock")
+            and _angel_sws.wsapp.sock
+            and _angel_sws.wsapp.sock.connected
+        )
+
+        if is_connected:
+            _angel_sws.unsubscribe("apex_unsubscribe", mode=2, token_list=token_list)
+        
+        # Remove from request dict so they don't resubscribe on reconnect
+        if 2 in _angel_sws.input_request_dict:
+            for token in token_list:
+                exch = token['exchangeType']
+                if exch in _angel_sws.input_request_dict[2]:
+                    tokens_to_remove = set(token["tokens"])
+                    _angel_sws.input_request_dict[2][exch] = [
+                        t for t in _angel_sws.input_request_dict[2][exch] if t not in tokens_to_remove
+                    ]
+
         for group in token_list:
             _subscribed_tokens -= set(group["tokens"])
         logger.info(f"Unsubscribed {len(symbols)} symbols. Remaining: {len(_subscribed_tokens)}")
     except Exception as e:
-        logger.error(f"Failed to unsubscribe: {e}")
+        logger.warning(f"Error unsubscribing: {e}")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
