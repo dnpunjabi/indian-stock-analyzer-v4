@@ -10048,3 +10048,85 @@ tr.active-peer-row td:first-child {
 #ws-connection-indicator span:first-child {
     animation: livePulse 2s ease-in-out infinite;
 }
+
+/* ==========================================================
+   REFRESH BUTTONS & SPIN ANIMATION
+   ========================================================== */
+
+/* Spin animation for refresh loader */
+@keyframes spin-loader {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+.spin-loader-active {
+    display: inline-block !important;
+    animation: spin-loader 1s linear infinite;
+}
+
+/* Mobile responsiveness for watchlist and portfolio refresh controls */
+@media (max-width: 600px) {
+    /* Wrap watchlist card header actions */
+    #watchlist-items-card .card-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+    #watchlist-items-card .card-header > div {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        gap: 8px !important;
+    }
+    #watchlist-inline-add-container {
+        margin-right: 0 !important;
+        width: 100% !important;
+    }
+    #watchlist-inline-add-input {
+        width: 100% !important;
+    }
+    #watchlist-refresh-btn,
+    #analyze-watchlist-btn,
+    #delete-watchlist-btn {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+
+    /* Wrap portfolio card header actions */
+    #portfolio-doctor-card .card-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+    #portfolio-doctor-card .card-header > div {
+        width: 100% !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+    }
+    #portfolio-refresh-controls-group {
+        width: 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+    }
+    #portfolio-refresh-time-select,
+    #portfolio-refresh-btn,
+    #run-portfolio-doctor-btn {
+        width: 100% !important;
+        justify-content: center !important;
+        height: 34px !important;
+    }
+}
+
+/* Spin keyframes and utility for refresh buttons */
+@keyframes rotate-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin-loader-active {
+    animation: rotate-spin 1s linear infinite;
+    display: inline-block;
+}
+

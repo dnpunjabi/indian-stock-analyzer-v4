@@ -3612,6 +3612,7 @@
                                     <button class="btn-primary" id="watchlist-inline-add-btn" style="font-size: 11px; padding: 5px 10px; height: auto;">+ Add Stock</button>
                                 </div>
                                 <button class="btn-primary" id="analyze-watchlist-btn" style="font-size: 11px; padding: 6px 12px; display: none;">Analyze All</button>
+                                <button class="btn-secondary" id="watchlist-refresh-btn" style="font-size: 11px; padding: 6px 12px; display: none; align-items: center; gap: 4px;">🔄 Refresh Prices</button>
                                 <button class="btn-secondary" id="delete-watchlist-btn" style="font-size: 11px; padding: 6px 12px; border-color: var(--color-crimson); color: var(--color-crimson); background: rgba(239,68,68,0.05); display: none;">Delete Watchlist</button>
                             </div>
                         </div>
@@ -3780,7 +3781,24 @@
                                 <span>🩺 Standalone AI Portfolio Doctor</span>
                                 <span class="badge-rec" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">Advisor Active</span>
                             </h3>
-                            <button class="btn-primary" id="run-portfolio-doctor-btn" style="display: none;">Analyze Portfolio Health</button>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <button class="btn-primary" id="run-portfolio-doctor-btn" style="display: none;">Analyze Portfolio Health</button>
+                                <div id="portfolio-refresh-controls-group" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;" class="no-print">
+                                    <span style="font-size: 10.5px; color: var(--text-secondary); font-weight: 600;">Auto-Refresh:</span>
+                                    <select id="portfolio-refresh-time-select" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 4px 8px; font-size: 10.5px; cursor: pointer; outline: none; height: 28px;">
+                                        <option value="manual" selected>Manual</option>
+                                        <option value="180">3 min</option>
+                                        <option value="300">5 min</option>
+                                        <option value="600">10 min</option>
+                                        <option value="900">15 min</option>
+                                        <option value="1800">30 min</option>
+                                        <option value="3600">60 min</option>
+                                    </select>
+                                    <button class="btn-secondary" id="portfolio-refresh-btn" style="font-size: 11px; padding: 4px 10px; height: 28px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600;">
+                                        <span class="refresh-icon">🔄</span> Refresh Prices
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                         <p style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.4;">
                             Build your comprehensive investment ledger below by selecting stocks from your custom watchlists or searching any stock online directly. Input your acquisition quantities and average buy prices to run your active diagnostics.

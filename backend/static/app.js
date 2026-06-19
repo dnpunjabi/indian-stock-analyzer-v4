@@ -10319,6 +10319,24 @@ async function setupWatchlistControls() {
     if (analyzeBtn) {
         analyzeBtn.addEventListener('click', runWatchlistBatchAnalysis);
     }
+    const watchlistRefreshBtn = document.getElementById('watchlist-refresh-btn');
+    if (watchlistRefreshBtn) {
+        watchlistRefreshBtn.addEventListener('click', async () => {
+            if (activeWatchlistId === null) return;
+            const activeWatch = watchlistsList.find(w => w.id === activeWatchlistId);
+            if (activeWatch && activeWatch.items.length > 0) {
+                showToast("Refreshing watchlist market prices...", "info");
+                try {
+                    const symbols = activeWatch.items.map(item => item.symbol);
+                    await fetchWatchlistLiveQuotes(symbols);
+                    showToast("Watchlist market prices refreshed.", "success");
+                } catch (e) {
+                    console.error("Watchlist refresh failed:", e);
+                    showToast("Failed to refresh watchlist prices.", "error");
+                }
+            }
+        });
+    }
     const inlineAddBtn = document.getElementById('watchlist-inline-add-btn');
     const inlineAddInput = document.getElementById('watchlist-inline-add-input');
     
@@ -10645,6 +10663,7 @@ function renderWatchlistItems() {
     const titleEl = document.getElementById('active-watchlist-title');
     const deleteBtn = document.getElementById('delete-watchlist-btn');
     const analyzeWatchlistBtn = document.getElementById('analyze-watchlist-btn');
+    const watchlistRefreshBtn = document.getElementById('watchlist-refresh-btn');
     const tbody = document.getElementById('watchlist-table-body');
     
     if (!tbody) return;
@@ -10669,6 +10688,7 @@ function renderWatchlistItems() {
         if (titleEl) titleEl.innerText = "SELECT A WATCHLIST";
         if (deleteBtn) deleteBtn.style.display = 'none';
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
+        if (watchlistRefreshBtn) watchlistRefreshBtn.style.display = 'none';
         if (inlineAddContainer) inlineAddContainer.style.display = 'none';
         if (resultsContainer) resultsContainer.style.display = 'none';
         tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">Select or create a watchlist on the left to display its constituents.</td></tr>';
@@ -10680,6 +10700,7 @@ function renderWatchlistItems() {
         if (titleEl) titleEl.innerText = "SELECT A WATCHLIST";
         if (deleteBtn) deleteBtn.style.display = 'none';
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
+        if (watchlistRefreshBtn) watchlistRefreshBtn.style.display = 'none';
         if (inlineAddContainer) inlineAddContainer.style.display = 'none';
         tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">Watchlist data is loading...</td></tr>';
         return;
@@ -10695,12 +10716,14 @@ function renderWatchlistItems() {
     if (activeWatch.items.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="center-text text-muted">This watchlist is empty. Load a stock inside the Analyzer and add it.</td></tr>';
         if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'none';
+        if (watchlistRefreshBtn) watchlistRefreshBtn.style.display = 'none';
         if (resultsContainer) resultsContainer.style.display = 'none';
         if (pagContainer) pagContainer.style.display = 'none';
         return;
     }
     
     if (analyzeWatchlistBtn) analyzeWatchlistBtn.style.display = 'inline-block';
+    if (watchlistRefreshBtn) watchlistRefreshBtn.style.display = 'inline-block';
     
     // --- WATCHLIST TELEMETRY & SECTOR CONCENTRATION ---
     const totalItems = activeWatch.items.length;
@@ -14866,6 +14889,74 @@ function setupPortfolioDoctor() {
             } else {
                 ledgerContent.style.display = 'none';
                 ledgerToggle.classList.add('collapsed');
+            }
+        });
+    }
+
+    // Portfolio Doctor manual refresh button
+    const portfolioRefreshBtn = document.getElementById('portfolio-refresh-btn');
+    if (portfolioRefreshBtn) {
+        portfolioRefreshBtn.addEventListener('click', async () => {
+            showToast("Refreshing Portfolio Ledger...", "info");
+            const icon = portfolioRefreshBtn.querySelector('.refresh-icon') || portfolioRefreshBtn;
+            icon.classList.add('spin-loader-active');
+            try {
+                await loadPortfolioDoctorLedger(true);
+                showToast("Portfolio Ledger refreshed.", "success");
+            } catch (e) {
+                console.error("Portfolio refresh failed:", e);
+                showToast("Failed to refresh Portfolio Ledger.", "error");
+            } finally {
+                icon.classList.remove('spin-loader-active');
+            }
+        });
+    }
+
+    // Portfolio Doctor automatic auto-refresh interval select
+    const portfolioRefreshSelect = document.getElementById('portfolio-refresh-time-select');
+    
+    function startPortfolioAutoRefresh(minutes) {
+        if (window.portfolioRefreshIntervalId) {
+            clearInterval(window.portfolioRefreshIntervalId);
+            window.portfolioRefreshIntervalId = null;
+        }
+        if (minutes > 0) {
+            const ms = minutes * 60 * 1000;
+            window.portfolioRefreshIntervalId = setInterval(async () => {
+                // Only refresh if the portfolio tab is active/visible
+                const activeTab = document.querySelector('.nav-btn.active');
+                if (activeTab && activeTab.id === 'tab-portfolio-btn') {
+                    console.log(`Auto-refreshing Portfolio Doctor (${minutes} min interval)...`);
+                    const icon = portfolioRefreshBtn ? (portfolioRefreshBtn.querySelector('.refresh-icon') || portfolioRefreshBtn) : null;
+                    if (icon) icon.classList.add('spin-loader-active');
+                    try {
+                        await loadPortfolioDoctorLedger(true);
+                    } catch (e) {
+                        console.error("Auto-refresh Portfolio Doctor failed:", e);
+                    } finally {
+                        if (icon) icon.classList.remove('spin-loader-active');
+                    }
+                }
+            }, ms);
+            console.log(`Portfolio Doctor auto-refresh scheduled every ${minutes} minute(s).`);
+        }
+    }
+
+    if (portfolioRefreshSelect) {
+        // Read initial value or default to "0" (manual)
+        const savedVal = localStorage.getItem('portfolio_auto_refresh_minutes') || "0";
+        portfolioRefreshSelect.value = savedVal;
+        startPortfolioAutoRefresh(parseInt(savedVal));
+
+        portfolioRefreshSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            localStorage.setItem('portfolio_auto_refresh_minutes', val);
+            const mins = parseInt(val);
+            startPortfolioAutoRefresh(mins);
+            if (mins > 0) {
+                showToast(`Auto-refresh set to every ${mins} minute(s).`, "success");
+            } else {
+                showToast("Auto-refresh disabled.", "info");
             }
         });
     }
