@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=ubuntu
 WorkingDirectory=/home/ubuntu/indian-stock-analyzer
-ExecStart=/home/ubuntu/indian-stock-analyzer/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000 --workers 2
+ExecStart=/home/ubuntu/indian-stock-analyzer/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=always
 RestartSec=5
 Environment=PORT=8000
