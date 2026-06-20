@@ -86,6 +86,9 @@
                 <button class="nav-btn" id="tab-rule-scanner-btn" data-title="Rule Scanner">
                     <span class="btn-icon">📡</span> <span class="btn-text">Rule Scanner</span>
                 </button>
+                <button class="nav-btn" id="tab-sector-radar-btn" data-title="Sector Momentum Radar">
+                    <span class="btn-icon">🔥</span> <span class="btn-text">Sector Momentum Radar</span>
+                </button>
 
                 <div class="nav-category-header">💼 Portfolio & Alerts</div>
                 <button class="nav-btn" id="tab-watchlist-btn" data-title="Watchlist Registry">
@@ -200,6 +203,8 @@
                     </div>
                 </div>
             </div>
+
+
 
             <div class="sidebar-footer">
                 <span class="status-indicator"></span> Connected to Groq Llama 3 70B
@@ -350,6 +355,43 @@
                 </div>
             </header>
 
+            <!-- SECTION: SECTOR MOMENTUM RADAR -->
+            <section class="workspace-tab" id="tab-sector-radar" style="display: none; font-family: 'Inter', sans-serif;">
+                <div class="section-header">
+                    <h2>Sector Momentum Radar</h2>
+                    <p>Track relative strength standings, rotational shifts, and tactical outperformance regimes across NSE industry sectors.</p>
+                </div>
+
+                <div class="card" style="padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 15px;">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.03em;">🔥 SECTOR STANDINGS</h3>
+                            <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;">Relative strength rotational sweep</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-secondary);">
+                                <label for="sector-radar-lookback" style="font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Lookback Period:</label>
+                                <select id="sector-radar-lookback" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); border-radius: 6px; color: #fff; font-size: 11px; padding: 4px 10px; font-family: 'Inter'; outline: none; cursor: pointer;">
+                                    <option value="1m" selected>1 Month (20D)</option>
+                                    <option value="3m">3 Months</option>
+                                    <option value="6m">6 Months</option>
+                                    <option value="1y">1 Year</option>
+                                    <option value="ytd">Year-To-Date (YTD)</option>
+                                </select>
+                            </div>
+                            <button id="sector-radar-refresh-btn" class="btn-secondary" title="Refresh Sector Relative Strength Stats" style="font-family: 'Outfit'; font-weight: 600; font-size: 11.5px; height: 32px; padding: 0 14px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
+                                <span id="sector-radar-refresh-spinner" style="display: none; animation: spin 1s linear infinite;">↻</span>
+                                <span id="sector-radar-refresh-icon">↻</span> Sync Sector Rotations
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="sector-radar-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </section>
+
             <!-- SECTION 1: AI SCREENER (DISCOVERY) -->
             <section class="workspace-tab" id="tab-screener" style="display: none; font-family: 'Inter', sans-serif;">
                 <div class="section-header">
@@ -444,24 +486,13 @@
                                 <!-- Populated dynamically -->
                             </div>
                         </div>
-                        <div class="screener-chart-card" style="display: flex; flex-direction: column; gap: 15px;">
-                            <div style="flex: 1;">
-                                <h4 style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 10px; display: flex; justify-content: space-between;">
-                                    <span>📈 AI Score Distribution</span>
-                                    <span style="color: var(--text-muted); font-weight: 500; font-size: 8px;">Score counts</span>
-                                </h4>
-                                <div style="height: 130px; position: relative; width: 100%;">
-                                    <canvas id="screener-score-histogram"></canvas>
-                                </div>
-                            </div>
-                            <div style="flex: 1; border-top: 1px dashed var(--border-glass); padding-top: 12px;">
-                                <h4 style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 10px; display: flex; justify-content: space-between;">
-                                    <span>⚡ Match Count Historical Trend</span>
-                                    <span style="color: var(--text-muted); font-weight: 500; font-size: 8px;">90-Day scan trajectory</span>
-                                </h4>
-                                <div style="height: 130px; position: relative; width: 100%;">
-                                    <canvas id="screener-match-trend"></canvas>
-                                </div>
+                        <div class="screener-chart-card" style="display: flex; flex-direction: column;">
+                            <h4 style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; margin-bottom: 10px; display: flex; justify-content: space-between;">
+                                <span>📈 AI Score Distribution</span>
+                                <span style="color: var(--text-muted); font-weight: 500; font-size: 8px;">Score counts</span>
+                            </h4>
+                            <div style="height: 250px; position: relative; width: 100%;">
+                                <canvas id="screener-score-histogram"></canvas>
                             </div>
                         </div>
                     </div>
@@ -703,11 +734,14 @@
                     <div class="stock-meta-banner" style="display: flex; justify-content: space-between; align-items: center; gap: 20px;">
                         <div class="meta-left">
                             <h2 id="meta-company-name">Tata Consultancy Services Ltd.</h2>
-                            <div class="meta-sub">
+                            <div class="meta-sub" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                 <span id="meta-ticker" class="badge-ticker">TCS.NS</span>
                                 <span id="meta-sector">Technology (IT)</span>
                                 <span id="meta-industry">Software Services</span>
                                 <span id="meta-trend" class="badge-rec rec-buy" style="font-size: 9px; font-weight: 700; border-radius: 3px; padding: 1px 5px;">BULLISH</span>
+                                <button id="meta-banner-toggle-btn" style="font-size: 9px; padding: 2px 6px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-secondary); display: inline-flex; align-items: center; gap: 3px; font-weight: 600; outline: none; transition: all 0.2s;">
+                                    <span id="meta-banner-toggle-icon">▲</span> <span id="meta-banner-toggle-text">Collapse Banner</span>
+                                </button>
                             </div>
                         </div>
                         <div class="meta-right" style="display: flex; align-items: center; gap: 20px; flex-grow: 1; justify-content: flex-end;">
@@ -719,7 +753,7 @@
                                 </div>
                                 
                                 <!-- Day Range -->
-                                <div class="meta-stat-card" title="The high and low prices at which the stock traded during today's session.">
+                                <div class="meta-stat-card collapse-target" title="The high and low prices at which the stock traded during today's session.">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>📊</span> Day Range
                                     </div>
@@ -733,7 +767,7 @@
                                 </div>
 
                                 <!-- 52-Week Range -->
-                                <div class="meta-stat-card" title="The highest and lowest prices at which the stock traded over the last 52 weeks (1 year).">
+                                <div class="meta-stat-card collapse-target" title="The highest and lowest prices at which the stock traded over the last 52 weeks (1 year).">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>📈</span> 52-W Range
                                     </div>
@@ -747,7 +781,7 @@
                                 </div>
 
                                 <!-- Financial Health -->
-                                <div class="meta-stat-card" title="Overall fundamental quality: Piotroski F-Score (0-9) and Altman Z-Score solvency indicator.">
+                                <div class="meta-stat-card collapse-target" title="Overall fundamental quality: Piotroski F-Score (0-9) and Altman Z-Score solvency indicator.">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>🩺</span> Financial Health
                                     </div>
@@ -756,7 +790,7 @@
                                 </div>
 
                                 <!-- Momentum (RSI) -->
-                                <div class="meta-stat-card" title="Relative Strength Index (RSI-14). Over 70 is overbought (potentially overvalued), below 30 is oversold (potentially undervalued).">
+                                <div class="meta-stat-card collapse-target" title="Relative Strength Index (RSI-14). Over 70 is overbought (potentially overvalued), below 30 is oversold (potentially undervalued).">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>⚡</span> RSI (14)
                                     </div>
@@ -768,7 +802,7 @@
                                 </div>
 
                                 <!-- Liquidity (Volume) -->
-                                <div class="meta-stat-card" title="Today's trading volume compared to the 20-day average. Above 1x indicates heightened market interest and liquidity.">
+                                <div class="meta-stat-card collapse-target" title="Today's trading volume compared to the 20-day average. Above 1x indicates heightened market interest and liquidity.">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>🔊</span> Vol Ratio
                                     </div>
@@ -777,7 +811,7 @@
                                 </div>
 
                                 <!-- Benchmarks -->
-                                <div class="meta-stat-card" style="min-width: 175px;" title="Real-time performance of benchmark indices: Nifty 50 (^NSEI) and Sensex (^BSESN).">
+                                <div class="meta-stat-card collapse-target" style="min-width: 175px;" title="Real-time performance of benchmark indices: Nifty 50 (^NSEI) and Sensex (^BSESN).">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; width: 100%;">
                                         <span>🎯</span> Benchmarks
                                     </div>
@@ -788,7 +822,7 @@
                                 </div>
 
                                 <!-- Systemic Risk -->
-                                <div class="meta-stat-card" title="Systematic market risk parameters: Beta volatility sensitivity and Correlation coefficient relative to Nifty 50 Index.">
+                                <div class="meta-stat-card collapse-target" title="Systematic market risk parameters: Beta volatility sensitivity and Correlation coefficient relative to Nifty 50 Index.">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>⚖️</span> Systemic Risk
                                     </div>
@@ -797,7 +831,7 @@
                                 </div>
 
                                 <!-- All Time High/Low -->
-                                <div class="meta-stat-card" title="All-Time High and All-Time Low historical stock price limits.">
+                                <div class="meta-stat-card collapse-target" title="All-Time High and All-Time Low historical stock price limits.">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>🏔️</span> All-Time High/Low
                                     </div>
@@ -806,7 +840,7 @@
                                 </div>
 
                                 <!-- Technical Indicators Dropdown Card -->
-                                <div class="meta-stat-card technical-indicators-card" title="Hover to view full Technical Indicators breakdown.">
+                                <div class="meta-stat-card technical-indicators-card collapse-target" title="Hover to view full Technical Indicators breakdown.">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>📊</span> Tech Oscillators
                                     </div>
@@ -831,7 +865,7 @@
                                 </div>
 
                                 <!-- Moving Average Crossovers Card -->
-                                <div class="meta-stat-card crossovers-card" title="Hover to view Moving Average Crossovers details.">
+                                <div class="meta-stat-card crossovers-card collapse-target" title="Hover to view Moving Average Crossovers details.">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>🔄</span> MA Crossovers
                                     </div>
@@ -856,7 +890,7 @@
                                 </div>
 
                                 <!-- Valuation & Consensus Card -->
-                                <div class="meta-stat-card valuation-consensus-card" title="Hover to view Valuation Multiples & Analyst Consensus details.">
+                                <div class="meta-stat-card valuation-consensus-card collapse-target" title="Hover to view Valuation Multiples & Analyst Consensus details.">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>💎</span> Valuation & Targets
                                     </div>
@@ -881,7 +915,7 @@
                                 </div>
 
                                 <!-- Fibonacci Retracements Card -->
-                                <div class="meta-stat-card fibonacci-card" title="Hover to view key Fibonacci Retracement levels.">
+                                <div class="meta-stat-card fibonacci-card collapse-target" title="Hover to view key Fibonacci Retracement levels.">
                                     <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">
                                         <span>📐</span> Fibonacci Levels
                                     </div>
@@ -1319,7 +1353,7 @@
                                 </div>
 
                                 <!-- Row 4: Moving Average Crossovers & Oscillators (2 Columns) -->
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; box-sizing: border-box; margin-top: 15px;">
+                                <div class="tech-crossover-oscillators-grid" style="gap: 12px; width: 100%; box-sizing: border-box; margin-top: 15px;">
                                     <!-- Column 1: Moving Average Crossovers -->
                                     <div style="background: var(--bg-card-sub); border: 1px solid var(--border-sub); border-radius: 8px; padding: 12px; box-sizing: border-box;">
                                         <h4 style="font-family: 'Outfit', sans-serif; font-size: 10px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 10px 0; display: flex; align-items: center; gap: 6px;">

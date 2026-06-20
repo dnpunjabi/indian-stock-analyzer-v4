@@ -829,7 +829,8 @@ const tabs = {
     watchlist: document.getElementById('tab-watchlist'),
     portfolio: document.getElementById('tab-portfolio'),
     'swing-scan': document.getElementById('tab-swing-scan'),
-    swing: document.getElementById('tab-swing')
+    swing: document.getElementById('tab-swing'),
+    'sector-radar': document.getElementById('tab-sector-radar')
 };
 
 const tabBtns = {
@@ -842,7 +843,8 @@ const tabBtns = {
     watchlist: document.getElementById('tab-watchlist-btn'),
     portfolio: document.getElementById('tab-portfolio-btn'),
     'swing-scan': document.getElementById('tab-swing-scan-btn'),
-    swing: document.getElementById('tab-swing-btn')
+    swing: document.getElementById('tab-swing-btn'),
+    'sector-radar': document.getElementById('tab-sector-radar-btn')
 };
 
 // Initialize Application
@@ -878,6 +880,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupWatchlistSummary(); // Initialize Watchlist AI Summary & Print Exporter
     setupRiskAnalytics(); // CAPM Risk Analytics
     setupSwingWorkspace(); // Swing Trading Workspace
+    setupSectorRadarControls(); // Sector Radar Controls
     setupBrandReset(); // Initialize brand logo reset button events
 
     // Always default to 'analyzer' (home page) on page load/refresh
@@ -981,6 +984,8 @@ function setupSidebarAccordions() {
                 }
             });
 
+
+
             // Recalculate height dynamically when content inside shifts (e.g. NSE status loading)
             const observer = new MutationObserver(() => {
                 if (content.style.maxHeight !== '0px' && content.style.maxHeight !== '') {
@@ -1082,12 +1087,92 @@ function setupEnterpriseHeader() {
         // Fetch initial indices
         fetchRealtimeIndices();
 
-        // Periodically refresh if WebSocket is not streaming live data
         setInterval(() => {
             if (!liveTicksConnected) {
                 fetchRealtimeIndices();
             }
         }, 3000);
+
+        // Initialize Meta Banner Dropdowns & Collapse controls
+        setupMetaBannerToggles();
+        setupMetaBannerCollapse();
+    }
+}
+
+function setupMetaBannerToggles() {
+    const cards = document.querySelectorAll('.meta-stat-card');
+    cards.forEach(card => {
+        const dropdown = card.querySelector('.meta-dropdown-panel');
+        if (!dropdown) return;
+
+        card.addEventListener('click', (e) => {
+            // Prevent close-on-click-outside from firing immediately
+            e.stopPropagation();
+
+            const isActive = card.classList.contains('active');
+
+            // Close all other dropdowns
+            cards.forEach(c => c.classList.remove('active'));
+
+            if (!isActive) {
+                card.classList.add('active');
+            }
+        });
+
+        dropdown.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    });
+
+    // Close when clicking anywhere outside
+    document.addEventListener('click', () => {
+        cards.forEach(card => card.classList.remove('active'));
+    });
+}
+
+function setupMetaBannerCollapse() {
+    const btn = document.getElementById('meta-banner-toggle-btn');
+    const header = document.querySelector('.stock-meta-banner .meta-left');
+    if (!btn) return;
+
+    // Load initial state from localStorage
+    const isCollapsed = localStorage.getItem('meta-banner-collapsed') === 'true';
+    if (isCollapsed) {
+        setBannerState(true);
+    }
+
+    // Single unified click listener on the header container
+    // Clicks on the button will naturally bubble up to the header and toggle it once
+    if (header) {
+        header.style.cursor = 'pointer';
+        header.title = 'Click to Collapse / Expand Banner details';
+        header.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const currentlyCollapsed = localStorage.getItem('meta-banner-collapsed') === 'true';
+            setBannerState(!currentlyCollapsed);
+        });
+    }
+
+    function setBannerState(collapsed) {
+        const banner = document.querySelector('.stock-meta-banner');
+        const icon = document.getElementById('meta-banner-toggle-icon');
+        const text = document.getElementById('meta-banner-toggle-text');
+        
+        if (!banner) return;
+        
+        if (collapsed) {
+            banner.classList.add('collapsed');
+            // Remove active dropdowns when collapsing
+            document.querySelectorAll('.meta-stat-card').forEach(c => c.classList.remove('active'));
+            if (icon) icon.innerText = '▼';
+            if (text) text.innerText = 'Expand Banner';
+            localStorage.setItem('meta-banner-collapsed', 'true');
+        } else {
+            banner.classList.remove('collapsed');
+            if (icon) icon.innerText = '▲';
+            if (text) text.innerText = 'Collapse Banner';
+            localStorage.setItem('meta-banner-collapsed', 'false');
+        }
     }
 }
 
@@ -1154,6 +1239,10 @@ function switchTab(tabKey) {
             }
         }
     });
+
+    if (tabKey === 'sector-radar') {
+        if (window.loadScreenerSectorRegime) window.loadScreenerSectorRegime();
+    }
 
     // Auto-resize TradingView Lightweight Charts on tab activation to prevent collapsed canvas sizing
     if (tabKey === 'swing') {
@@ -1392,6 +1481,8 @@ function setupScreenerControls() {
             runAIScreener();
         });
     }
+
+
 
     setupScreenerSorting();
     setupScreenerPagination();
@@ -2027,70 +2118,8 @@ function renderScreenerResults(results, isSorted = false) {
             });
         }
 
-        // 3. Render Historical Match Count Trend using Chart.js with stable deterministic hash data
-        const generateStableMatchTrend = (strategy, style, length = 12) => {
-            const str = strategy + style;
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = str.charCodeAt(i) + ((hash << 5) - hash);
-            }
-
-            const data = [];
-            let currentVal = 8 + Math.abs(hash % 16);
-
-            for (let i = 0; i < length; i++) {
-                const seed = Math.sin(hash + i) * 3.5;
-                currentVal = Math.max(1, Math.round(currentVal + seed));
-                data.push(currentVal);
-            }
-            return data;
-        };
-
-        const trendData = generateStableMatchTrend(activeScreenerStrategy, activeScreenerStyle, 12);
-        const ctxTrend = document.getElementById('screener-match-trend');
-        if (ctxTrend) {
-            if (activeScreenerTrendChart) activeScreenerTrendChart.destroy();
-
-            const chartColor = activeScreenerStyle === 'contra' ? 'rgba(239, 68, 68, 0.7)' : (activeScreenerStyle === 'growth' ? 'rgba(16, 185, 129, 0.7)' : 'rgba(59, 130, 246, 0.7)');
-            const fillColor = activeScreenerStyle === 'contra' ? 'rgba(239, 68, 68, 0.05)' : (activeScreenerStyle === 'growth' ? 'rgba(16, 185, 129, 0.05)' : 'rgba(59, 130, 246, 0.05)');
-
-            const labels = Array.from({length: 12}, (_, i) => `W${i+1}`);
-
-            activeScreenerTrendChart = new Chart(ctxTrend, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Match Count',
-                        data: trendData,
-                        borderColor: chartColor,
-                        backgroundColor: fillColor,
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.35,
-                        pointRadius: 2,
-                        pointHoverRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: textColor, font: { size: 9, family: 'Inter' } }
-                        },
-                        y: {
-                            grid: { color: gridColor },
-                            ticks: { color: textColor, font: { size: 9, family: 'Inter' }, precision: 0 }
-                        }
-                    }
-                }
-            });
-        }
+        // 3. Load and render Sector Relative Strength Leaderboard
+        loadScreenerSectorRegime();
     }
 
     const resultsBox = document.getElementById('screener-results-box');
@@ -24765,5 +24794,122 @@ window.renderTVWorkstationChart = renderTVWorkstationChart;
             }
         });
     });
+
+    window.activeSectorRegimeData = null;
+
+    async function loadScreenerSectorRegime(forceRefresh = false) {
+        const listEl = document.getElementById('sector-radar-list');
+        const refreshBtn = document.getElementById('sector-radar-refresh-btn');
+        const spinner = document.getElementById('sector-radar-refresh-spinner');
+        const icon = document.getElementById('sector-radar-refresh-icon');
+
+        if (!listEl) return;
+
+        if (forceRefresh) {
+            if (spinner) spinner.style.display = 'inline-block';
+            if (icon) icon.style.display = 'none';
+            if (refreshBtn) refreshBtn.setAttribute('disabled', 'true');
+        }
+
+        try {
+            const url = forceRefresh ? '/api/screener/sector-regime/refresh' : '/api/screener/sector-regime';
+            const method = forceRefresh ? 'POST' : 'GET';
+            const response = await fetch(url, { method: method });
+            if (!response.ok) throw new Error("Fetch failed.");
+            const data = await response.json();
+            
+            // If it was a manual refresh, data is returned under a "data" wrapper key
+            window.activeSectorRegimeData = forceRefresh && data.data ? data.data : data;
+
+            window.renderSectorRegimeList();
+        } catch (e) {
+            console.error("Failed to load sector regime stats:", e);
+            listEl.innerHTML = '<div style="font-size:10px; color:var(--neon-red); text-align:center; padding:15px;">Failed to load sector standings.</div>';
+        } finally {
+            if (spinner) spinner.style.display = 'none';
+            if (icon) icon.style.display = 'inline-block';
+            if (refreshBtn) refreshBtn.removeAttribute('disabled');
+        }
+    }
+
+    window.renderSectorRegimeList = function() {
+        const listEl = document.getElementById('sector-radar-list');
+        const lookbackSelect = document.getElementById('sector-radar-lookback');
+        if (!listEl || !window.activeSectorRegimeData) return;
+
+        const period = lookbackSelect ? lookbackSelect.value : '1m';
+        const colName = `return_${period}`; // return_1m, return_3m, return_6m, return_1y, return_ytd
+
+        // Make a copy and sort by the selected period return descending
+        const sectors = [...window.activeSectorRegimeData].sort((a, b) => {
+            const valA = a[colName] || 0.0;
+            const valB = b[colName] || 0.0;
+            return valB - valA;
+        });
+
+        listEl.innerHTML = '';
+        if (sectors.length === 0) {
+            listEl.innerHTML = '<div style="font-size:10px; color:var(--text-muted); text-align:center; padding:15px;">No sector relative strength data available.</div>';
+            return;
+        }
+
+        // Find max return value for scaling
+        const maxVal = Math.max(...sectors.map(s => Math.abs(s[colName] || 0.1)));
+
+        sectors.forEach(s => {
+            const ret = s[colName] || 0.0;
+            const absPct = maxVal > 0 ? (Math.abs(ret) / maxVal) * 100 : 0;
+            const sign = ret >= 0 ? '+' : '';
+            const barColor = ret >= 0 ? 'linear-gradient(90deg, rgba(16,185,129,0.1) 0%, rgba(16,185,129,0.7) 100%)' : 'linear-gradient(90deg, rgba(239,68,68,0.1) 0%, rgba(239,68,68,0.7) 100%)';
+            const valueColor = ret >= 0 ? 'var(--neon-green)' : 'var(--neon-red)';
+            const borderStyle = ret >= 0 ? '1px solid rgba(16,185,129,0.25)' : '1px solid rgba(239,68,68,0.25)';
+
+            const row = document.createElement('div');
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.justifyContent = 'space-between';
+            row.style.padding = '8px 12px';
+            row.style.borderRadius = '6px';
+            row.style.background = 'rgba(255,255,255,0.01)';
+            row.style.border = borderStyle;
+            row.style.boxSizing = 'border-box';
+            row.title = `Last calculated: ${s.updated_at}`;
+
+            row.innerHTML = `
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 11.5px; font-weight: 600; color: var(--text-secondary); font-family: 'Inter', sans-serif;">${s.sector}</span>
+                </div>
+                <div style="flex: 1.5; display: flex; align-items: center; gap: 15px; justify-content: flex-end;">
+                    <div style="width: 150px; height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden; display: block;">
+                        <div style="height: 100%; width: ${absPct}%; background: ${barColor}; border-radius: 3px; transition: width 0.5s ease;"></div>
+                    </div>
+                    <span style="color: ${valueColor}; font-family: 'Outfit'; font-weight: 700; font-size: 12.5px; min-width: 60px; text-align: right;">${sign}${ret.toFixed(2)}%</span>
+                </div>
+            `;
+            listEl.appendChild(row);
+        });
+    };
+
+    window.setupSectorRadarControls = function() {
+        const lookbackSelect = document.getElementById('sector-radar-lookback');
+        if (lookbackSelect) {
+            lookbackSelect.addEventListener('change', () => {
+                if (window.renderSectorRegimeList && window.activeSectorRegimeData) {
+                    window.renderSectorRegimeList();
+                }
+            });
+        }
+        const refreshBtn = document.getElementById('sector-radar-refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                if (window.loadScreenerSectorRegime) {
+                    window.loadScreenerSectorRegime(true);
+                }
+            });
+        }
+    };
+
+    // Expose to window for tab switching triggers
+    window.loadScreenerSectorRegime = loadScreenerSectorRegime;
 })();
 

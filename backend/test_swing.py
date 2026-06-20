@@ -553,6 +553,50 @@ class TestSwingAPIRoutes(unittest.TestCase):
         ))
         self.assertTrue(triggered)
 
+    @patch("backend.main.get_db")
+    def test_get_sector_regime_endpoint(self, mock_db):
+        """Verifies sector regime stats endpoint returned records."""
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_db.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cursor
+
+        # Mock updated_at select, and then values select
+        mock_cursor.fetchone.return_value = {"min_ts": "2026-06-20 15:30:00"}
+        mock_cursor.fetchall.return_value = [
+            {"sector": "Technology", "return_1m": 5.4, "return_3m": 12.0, "return_6m": 22.0, "return_1y": 45.0, "return_ytd": 15.0, "updated_at": "2026-06-20 15:30:00"},
+            {"sector": "Financial Services", "return_1m": -2.1, "return_3m": 5.0, "return_6m": 10.0, "return_1y": 18.0, "return_ytd": 3.0, "updated_at": "2026-06-20 15:30:00"}
+        ]
+
+        response = self.client.get("/api/screener/sector-regime")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0]["sector"], "Technology")
+        self.assertEqual(data[0]["return_1m"], 5.4)
+        self.assertEqual(data[0]["return_3m"], 12.0)
+
+    @patch("backend.main.update_sector_regime_stats")
+    @patch("backend.main.get_db")
+    def test_post_sector_regime_refresh_endpoint(self, mock_db, mock_update):
+        """Verifies manual refresh updates database and returns values."""
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_db.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cursor
+
+        mock_cursor.fetchall.return_value = [
+            {"sector": "Technology", "return_1m": 6.2, "return_3m": 14.0, "return_6m": 25.0, "return_1y": 50.0, "return_ytd": 18.0, "updated_at": "2026-06-20 16:30:00"}
+        ]
+
+        response = self.client.post("/api/screener/sector-regime/refresh")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["data"][0]["sector"], "Technology")
+        self.assertEqual(data["data"][0]["return_1m"], 6.2)
+        mock_update.assert_called_once()
+
 
 class TestQuantScoring(unittest.TestCase):
     

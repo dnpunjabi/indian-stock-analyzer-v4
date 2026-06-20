@@ -160,10 +160,15 @@ def init_db():
         )
         """)
         # Persistent sector regime stats table
+        cursor.execute("DROP TABLE IF EXISTS sector_regime_stats")
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS sector_regime_stats (
             sector TEXT PRIMARY KEY,
-            avg_20d_return REAL,
+            return_1m REAL,
+            return_3m REAL,
+            return_6m REAL,
+            return_1y REAL,
+            return_ytd REAL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
@@ -916,13 +921,14 @@ def update_nse_bulk_block_deals():
 
 def update_sector_regime_stats():
     """
-    Computes the average 20-day price return of each sector in the universe
-    and saves the stats to the sector_regime_stats table.
+    Computes the average sector returns for 1m, 3m, 6m, 1y, and YTD lookbacks
+    and saves them to the sector_regime_stats table.
     """
     import yfinance as yf
     import pandas as pd
+    from datetime import datetime
     try:
-        print("Computing sector relative strength regime stats...")
+        print("Computing sector relative strength regime stats (1m, 3m, 6m, 1y, YTD)...")
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT symbol, sector FROM screener_universe WHERE symbol NOT LIKE '%DUMMY%'")
@@ -933,10 +939,17 @@ def update_sector_regime_stats():
             
         tickers = [s["symbol"] for s in stocks]
         
-        # Download 1 month history in batch
-        data = yf.download(tickers, period="1mo", progress=False)
+        # Download 1 year history in batch to cover all lookback periods
+        data = yf.download(tickers, period="1y", progress=False)
         
-        returns = {}
+        returns_1m = {}
+        returns_3m = {}
+        returns_6m = {}
+        returns_1y = {}
+        returns_ytd = {}
+        
+        now = datetime.now()
+        
         for s in stocks:
             sym = s["symbol"]
             try:
@@ -948,35 +961,65 @@ def update_sector_regime_stats():
                 else:
                     close_col = data['Close'].dropna()
                 
-                if len(close_col) >= 10:
-                    p_start = float(close_col.iloc[0])
+                length = len(close_col)
+                if length >= 10:
                     p_end = float(close_col.iloc[-1])
-                    ret = ((p_end - p_start) / p_start) * 100.0 if p_start > 0 else 0.0
-                    returns[sym] = ret
+                    
+                    # 1 Month (approx 20 trading days)
+                    p_1m = float(close_col.iloc[-21]) if length >= 21 else float(close_col.iloc[0])
+                    returns_1m[sym] = ((p_end - p_1m) / p_1m) * 100.0 if p_1m > 0 else 0.0
+                    
+                    # 3 Month (approx 63 trading days)
+                    p_3m = float(close_col.iloc[-64]) if length >= 64 else float(close_col.iloc[0])
+                    returns_3m[sym] = ((p_end - p_3m) / p_3m) * 100.0 if p_3m > 0 else 0.0
+                    
+                    # 6 Month (approx 126 trading days)
+                    p_6m = float(close_col.iloc[-127]) if length >= 127 else float(close_col.iloc[0])
+                    returns_6m[sym] = ((p_end - p_6m) / p_6m) * 100.0 if p_6m > 0 else 0.0
+                    
+                    # 1 Year (all database points)
+                    p_1y = float(close_col.iloc[0])
+                    returns_1y[sym] = ((p_end - p_1y) / p_1y) * 100.0 if p_1y > 0 else 0.0
+                    
+                    # YTD (from first day of current calendar year)
+                    ytd_start_series = close_col[close_col.index >= f"{now.year}-01-01"]
+                    p_ytd = float(ytd_start_series.iloc[0]) if not ytd_start_series.empty else float(close_col.iloc[0])
+                    returns_ytd[sym] = ((p_end - p_ytd) / p_ytd) * 100.0 if p_ytd > 0 else 0.0
             except Exception:
                 continue
                 
+        # Group by sector and compute averages
         sector_returns = {}
         for s in stocks:
             sec = s["sector"]
-            ret = returns.get(s["symbol"])
-            if ret is not None:
+            sym = s["symbol"]
+            if sym in returns_1m:
                 if sec not in sector_returns:
-                    sector_returns[sec] = []
-                sector_returns[sec].append(ret)
+                    sector_returns[sec] = {"1m": [], "3m": [], "6m": [], "1y": [], "ytd": []}
+                sector_returns[sec]["1m"].append(returns_1m[sym])
+                sector_returns[sec]["3m"].append(returns_3m[sym])
+                sector_returns[sec]["6m"].append(returns_6m[sym])
+                sector_returns[sec]["1y"].append(returns_1y[sym])
+                sector_returns[sec]["ytd"].append(returns_ytd[sym])
                 
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with get_db() as conn:
             cursor = conn.cursor()
-            for sec, rets in sector_returns.items():
-                avg_ret = sum(rets) / len(rets) if rets else 0.0
+            for sec, vals in sector_returns.items():
+                avg_1m = sum(vals["1m"]) / len(vals["1m"]) if vals["1m"] else 0.0
+                avg_3m = sum(vals["3m"]) / len(vals["3m"]) if vals["3m"] else 0.0
+                avg_6m = sum(vals["6m"]) / len(vals["6m"]) if vals["6m"] else 0.0
+                avg_1y = sum(vals["1y"]) / len(vals["1y"]) if vals["1y"] else 0.0
+                avg_ytd = sum(vals["ytd"]) / len(vals["ytd"]) if vals["ytd"] else 0.0
+                
                 cursor.execute("""
-                    INSERT OR REPLACE INTO sector_regime_stats (sector, avg_20d_return, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                """, (sec, round(avg_ret, 2)))
+                    INSERT OR REPLACE INTO sector_regime_stats (sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (sec, round(avg_1m, 2), round(avg_3m, 2), round(avg_6m, 2), round(avg_1y, 2), round(avg_ytd, 2), now_str))
             conn.commit()
-        print("Sector regime stats computed successfully.")
+        print("Sector relative strength regime stats computed successfully.")
     except Exception as e:
-        print(f"Error computing sector regime stats: {e}")
+        print(f"Error computing sector relative strength regime stats: {e}")
         
     with get_db() as conn:
         cursor = conn.cursor()
@@ -988,11 +1031,16 @@ def update_sector_regime_stats():
             sectors = [r["sector"] for r in cursor.fetchall()]
             import random
             for sec in sectors:
-                avg_ret = round(random.uniform(-3.0, 12.0), 2)
+                ret_1m = round(random.uniform(-3.0, 12.0), 2)
+                ret_3m = round(random.uniform(-5.0, 20.0), 2)
+                ret_6m = round(random.uniform(-10.0, 35.0), 2)
+                ret_1y = round(random.uniform(-15.0, 60.0), 2)
+                ret_ytd = round(random.uniform(-5.0, 25.0), 2)
+                now_str_def = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 cursor.execute("""
-                    INSERT OR REPLACE INTO sector_regime_stats (sector, avg_20d_return, updated_at)
-                    VALUES (?, ?, CURRENT_TIMESTAMP)
-                """, (sec, avg_ret))
+                    INSERT OR REPLACE INTO sector_regime_stats (sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (sec, ret_1m, ret_3m, ret_6m, ret_1y, ret_ytd, now_str_def))
             conn.commit()
 
 
@@ -1314,6 +1362,69 @@ async def discover_stocks(
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Screener engine failed: {str(e)}")
+
+@app.get("/api/screener/sector-regime")
+async def get_sector_regime_stats():
+    """
+    Returns calculated sector relative strength performance rankings.
+    If the last updated timestamp is older than today's 4:00 PM IST target,
+    spawns a background thread to refresh it once-a-day.
+    """
+    try:
+        from datetime import datetime, time, timedelta
+        
+        # Check last updated timestamp
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT MIN(updated_at) as min_ts FROM sector_regime_stats")
+            row = cursor.fetchone()
+            
+        needs_refresh = True
+        if row and row["min_ts"]:
+            try:
+                last_update = datetime.strptime(row["min_ts"], "%Y-%m-%d %H:%M:%S")
+                now_local = datetime.now()
+                today_4pm = datetime.combine(now_local.date(), time(16, 0))
+                
+                if now_local >= today_4pm:
+                    # After 4:00 PM today, needs refresh if last update was before 4:00 PM today
+                    if last_update >= today_4pm:
+                        needs_refresh = False
+                else:
+                    # Before 4:00 PM today, needs refresh if last update was before 4:00 PM yesterday
+                    yesterday_4pm = today_4pm - timedelta(days=1)
+                    if last_update >= yesterday_4pm:
+                        needs_refresh = False
+            except Exception as parse_err:
+                print(f"Error parsing sector updated_at: {parse_err}")
+                
+        if needs_refresh:
+            print("Sector relative strength data is stale (4:00 PM IST once-daily boundary). Spawning async update task...")
+            asyncio.create_task(asyncio.to_thread(update_sector_regime_stats))
+            
+        # Fetch current standings
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at FROM sector_regime_stats ORDER BY return_1m DESC")
+            rows = [dict(r) for r in cursor.fetchall()]
+        return rows
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch sector regime: {str(e)}")
+
+@app.post("/api/screener/sector-regime/refresh")
+async def refresh_sector_regime_():
+    """
+    Manually forces recalculation of sector relative strength regime stats.
+    """
+    try:
+        await asyncio.to_thread(update_sector_regime_stats)
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at FROM sector_regime_stats ORDER BY return_1m DESC")
+            rows = [dict(r) for r in cursor.fetchall()]
+        return {"status": "success", "data": rows}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Manual sector refresh failed: {str(e)}")
 
 @app.get("/api/stock-profile/{symbol}")
 async def get_stock_profile_endpoint(symbol: str, cache: bool = True):

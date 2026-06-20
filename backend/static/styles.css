@@ -747,6 +747,7 @@ h1, h2, h3, h4, h5 {
     flex-shrink: 0;
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+    overflow-y: auto;
 }
 
 .logo-area {
@@ -1090,6 +1091,7 @@ button:disabled, .btn-secondary:disabled {
 .sidebar.collapsed .profile-card,
 .sidebar.collapsed .rebalancer-status-card,
 .sidebar.collapsed .pdf-config-card,
+.sidebar.collapsed #sector-regime-sidebar-card,
 .sidebar.collapsed .sidebar-footer,
 .sidebar.collapsed .nav-category-header,
 .sidebar.collapsed .btn-text {
@@ -10281,7 +10283,15 @@ tr.active-peer-row td:first-child {
     color: var(--text-primary);
 }
 
-.meta-stat-card:hover .meta-dropdown-panel {
+@media (hover: hover) {
+    .meta-stat-card:hover .meta-dropdown-panel {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+    }
+}
+
+.meta-stat-card.active .meta-dropdown-panel {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0);
@@ -10390,5 +10400,46 @@ tr.active-peer-row td:first-child {
     background: rgba(99, 102, 241, 0.15);
     color: var(--color-primary, #6366f1);
     border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+/* Responsive grid for Moving Average Crossovers & Momentum Oscillators in Technical tab */
+.tech-crossover-oscillators-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 768px) {
+    .tech-crossover-oscillators-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Fixed mobile bottom sheet layout for meta dropdown panels */
+    .meta-dropdown-panel {
+        position: fixed !important;
+        top: auto !important;
+        bottom: 20px !important;
+        left: 15px !important;
+        right: 15px !important;
+        width: auto !important;
+        max-width: calc(100vw - 30px) !important;
+        transform: translateY(150px) !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease !important;
+        border-radius: 16px !important;
+        box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+        z-index: 10000 !important;
+    }
+    
+    .meta-stat-card.active .meta-dropdown-panel {
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        transform: translateY(0) !important;
+    }
+}
+
+/* Collapsible stock meta banner card visibility override */
+.stock-meta-banner.collapsed .collapse-target {
+    display: none !important;
 }
 
