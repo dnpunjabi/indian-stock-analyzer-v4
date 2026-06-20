@@ -986,8 +986,13 @@ def run_comparison_synthesizer(tickers: list, generate_thesis: bool = False) -> 
     }
 
 # 7. Stateful Advisory Chat (Finding 2, 7 resolution!)
-def run_conversational_chat(chat_history: list, user_message: str, profile: dict, custom_dcf: dict = None) -> str:
-    """Stateful follow-up chat engine loaded with the full quantitative financial context."""
+def run_conversational_chat(chat_history: list, user_message: str, profile: dict, custom_dcf: dict = None, watchlists: list = None) -> str:
+    """Stateful follow-up chat engine loaded with the full quantitative financial context and watchlist info."""
+    watchlists_context = ""
+    if watchlists:
+        watchlists_str = ", ".join([f"'{w['name']}' (ID: {w['id']})" for w in watchlists])
+        watchlists_context = f"\nCurrently configured watchlists in system: {watchlists_str}."
+
     system_prompt = (
         "You are an expert AI Stock Advisory Assistant. You are having an interactive Q&A session "
         "with an investor regarding a specific stock they are analyzing.\n"
@@ -995,7 +1000,13 @@ def run_conversational_chat(chat_history: list, user_message: str, profile: dict
         "shareholding pattern, news sentiment, and the CIO parent agent's buy/sell recommendation.\n"
         "Answer the user's questions clearly, concisely, and with high-fidelity financial insights.\n"
         "Refer directly to the numbers (e.g., specific P/E, RSI values, promoter pledge ratios, WACC) to back up your points.\n"
-        "Keep your tone highly professional, balanced, and direct. Do not exceed 250 words per response."
+        "Keep your tone highly professional, balanced, and direct. Do not exceed 250 words per response.\n\n"
+        "If the user asks to navigate, go to, or show a tab (like Screener, Analyzer, Watchlists, Alerts, Portfolio, etc.) or load/view a stock (like RELIANCE, TCS, INFY), you can trigger viewport actions by appending exactly `[ACTIONS_PAYLOAD]: [{\"type\": \"change_tab\", \"tab_id\": \"<tab_id>\"}]` or `[ACTIONS_PAYLOAD]: [{\"type\": \"load_stock\", \"symbol\": \"<symbol>.NS\"}]` at the very end of your text response. Valid tab_ids are: tab-screener, tab-universe, tab-analyzer, tab-compare, tab-alerts, tab-rule-scanner, tab-watchlist, tab-portfolio, tab-swing-scan, tab-swing.\n\n"
+        "If the user asks to configure, set, or create an alert (either simple or compound/composite, e.g. 'alert me when price is below 2000' or 'alert me when price is below 2000 and rsi is under 40'), you can trigger the alert creation action by appending exactly `[ACTIONS_PAYLOAD]: [{\"type\": \"change_tab\", \"tab_id\": \"tab-alerts\"}, {\"type\": \"create_alert\", \"prompt\": \"<alert prompt text>\"}]` at the very end of your text response. Ensure the prompt describes the conditions clearly.\n\n"
+        f"Watchlist management guidelines:{watchlists_context}\n"
+        "If the user explicitly asks to add the stock under analysis to their watchlist:\n"
+        "1. If only ONE watchlist exists, trigger the write action directly by appending exactly `[ACTIONS_PAYLOAD]: [{\"type\": \"add_to_watchlist\", \"symbol\": \"<symbol>.NS\", \"watchlist_id\": <watchlist_id>}]`.\n"
+        "2. If MULTIPLE watchlists exist, you must ask the user in your text response which watchlist they want to add the stock to, and list the available watchlist names. DO NOT generate the `add_to_watchlist` action payload yet. Once the user selects one of the watchlists from your list, match it to the available watchlist IDs and then append the action payload `[ACTIONS_PAYLOAD]: [{\"type\": \"add_to_watchlist\", \"symbol\": \"<symbol>.NS\", \"watchlist_id\": <chosen_watchlist_id>}]`."
     )
     
     if not profile or "company_name" not in profile:

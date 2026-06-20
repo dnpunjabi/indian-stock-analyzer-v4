@@ -8237,10 +8237,14 @@ async function generateNLAlertRule() {
     loader.style.display = 'flex';
 
     try {
+        const activeTicker = activeStockProfile ? activeStockProfile.ticker : "";
         const response = await fetch('/api/alerts/parse-nl', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: promptText })
+            body: JSON.stringify({
+                prompt: promptText,
+                active_ticker: activeTicker
+            })
         });
 
         if (!response.ok) {
@@ -8262,9 +8266,7 @@ async function generateNLAlertRule() {
 
 // Start Real-Time Alert Engine background scanner
 function startRealTimeAlertScanner() {
-    // If WebSocket is connected, poll less frequently (5 min) for technical alerts only
-    // If not connected, keep 30-second polling as before
-    const getInterval = () => liveTicksConnected ? 300000 : 30000; // 5 min or 30s
+    const getInterval = () => 10000; // Poll every 10 seconds for quick automatic updates
 
     const runScan = async () => {
         try {
@@ -8509,10 +8511,31 @@ function renderAlertsPage(page) {
             statusBadge = `<span class="alert-status-badge scanning">🟢 Scanning</span>`;
         }
 
+        let operatorCellContent = '';
+        let condBadgeStyle = '';
+        if (item.condition_type === 'COMPOUND') {
+            condBadgeStyle = 'background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); font-size:10px; cursor: default; position: relative;';
+            try {
+                const condList = JSON.parse(item.value);
+                const parts = condList.map(c => {
+                    if (c.operator && !c.indicator) {
+                        return ` <span class="logical-op" style="color: #c084fc; font-weight: bold;">${c.operator}</span> `;
+                    }
+                    return `${c.indicator} ${c.operator} ${c.value}`;
+                });
+                operatorCellContent = parts.join('');
+            } catch (err) {
+                operatorCellContent = item.value;
+            }
+        } else {
+            condBadgeStyle = 'font-size:10px; cursor: default; position: relative;';
+            operatorCellContent = `${item.operator} ${item.value}`;
+        }
+
         tr.innerHTML = `
             <td><a href="#" class="alert-stock-link" data-ticker="${item.ticker}" title="Open in Equity Research Terminal" style="color: var(--color-primary-light); text-decoration: none; font-weight: 700; cursor: pointer; border-bottom: 1px dashed rgba(59,130,246,0.3); transition: all 0.2s ease;">${item.ticker}</a></td>
-            <td><span class="badge-ticker alert-condition-badge" style="font-size:10px; cursor: default; position: relative;" title="${item.condition_type} ${item.operator} ${item.value}">${item.condition_type}</span></td>
-            <td style="font-family: monospace; font-size:12px; font-weight:600;">${item.operator} ${item.value}</td>
+            <td><span class="badge-ticker alert-condition-badge" style="${condBadgeStyle}" title="${item.condition_type}">${item.condition_type}</span></td>
+            <td style="font-family: monospace; font-size:12px; font-weight:600;">${operatorCellContent}</td>
             <td>${statusBadge}</td>
             <td class="rs-hide-mobile"><span class="text-muted" style="font-size:11px;">${item.trigger_date || 'Active scan...'}</span></td>
             <td>
@@ -10217,6 +10240,72 @@ async function sendUserChatMessage() {
         document.getElementById(typingId).remove();
         appendChatMessage('assistant', chatReplyText);
         chatHistory.push({ role: 'assistant', content: chatReplyText });
+
+        // Execute workspace actions parsed from the LLM
+        if (data.actions && Array.isArray(data.actions)) {
+            data.actions.forEach(async (act) => {
+                if (act.type === 'change_tab') {
+                    let tabKey = act.tab_id || '';
+                    if (tabKey.startsWith('tab-')) {
+                        tabKey = tabKey.replace('tab-', '');
+                    }
+                    if (tabs[tabKey] || document.getElementById('tab-' + tabKey)) {
+                        switchTab(tabKey);
+                    }
+                } else if (act.type === 'load_stock') {
+                    const symbol = act.symbol || '';
+                    if (symbol) {
+                        loadStockAnalyzer(symbol);
+                    }
+                } else if (act.type === 'add_to_watchlist') {
+                    const symbol = act.symbol || '';
+                    const watchlistId = act.watchlist_id;
+                    if (symbol && watchlistId) {
+                        try {
+                            const response = await fetch(`/api/watchlists/${watchlistId}/items`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ symbol: symbol })
+                            });
+                            if (response.ok) {
+                                showToast(`Successfully added ${symbol} to the watchlist.`, "success");
+                                await fetchWatchlists();
+                            } else {
+                                const err = await response.json();
+                                showToast(`Watchlist update failed: ${err.detail || 'Error'}`, "error");
+                            }
+                        } catch (e) {
+                            console.error("Watchlist addition failed:", e);
+                        }
+                    }
+                } else if (act.type === 'create_alert') {
+                    const alertPrompt = act.prompt || '';
+                    if (alertPrompt) {
+                        try {
+                            const activeTicker = activeStockProfile ? activeStockProfile.ticker : "";
+                            const response = await fetch('/api/alerts/parse-nl', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    prompt: alertPrompt,
+                                    active_ticker: activeTicker
+                                })
+                            });
+                            if (response.ok) {
+                                const resData = await response.json();
+                                showToast(`Successfully created alert rule for ${resData.ticker}.`, "success");
+                                fetchAlertsList();
+                            } else {
+                                const err = await response.json();
+                                showToast(`Alert creation failed: ${err.detail || 'Error'}`, "error");
+                            }
+                        } catch (e) {
+                            console.error("Alert creation failed:", e);
+                        }
+                    }
+                }
+            });
+        }
     } catch (e) {
         document.getElementById(typingId).remove();
         appendChatMessage('assistant', "I encountered a connection error. Please verify your API key configurations.");
@@ -12121,6 +12210,18 @@ async function loadPriceVolumeDynamics(symbol, generateAi = false) {
         if (statusIcon && patternTitle && patternDesc && diagnosisPanel) {
             patternTitle.innerText = data.vsa_diagnose.pattern;
             patternDesc.innerText = data.vsa_diagnose.description;
+
+            const vsaGlossary = {
+                "Selling Climax / Bag Holding": "Layman: A massive panic sell-off by retail investors where institutions step in to buy everything up, marking a potential price bottom.",
+                "No Supply Bar": "Layman: The price dips on very low trading volume, proving that sellers have run out of stock and the downward trend is exhausted.",
+                "No Demand Bar": "Layman: The price rises on very low trading volume, proving that buyers are not interested in chasing the stock higher and the uptrend is losing steam.",
+                "Effort vs Result (Accumulation)": "Layman: Heavy trading volume (effort) fails to push the price down, indicating that institutions are blocking the fall by absorbing all sell orders.",
+                "Effort vs Result (Distribution)": "Layman: Heavy trading volume (effort) fails to push the price higher, indicating that institutions are selling off their shares to block the rise.",
+                "Normal Price Action": "Layman: Standard day-to-day trading activity with balanced buyers and sellers."
+            };
+            patternTitle.title = vsaGlossary[data.vsa_diagnose.pattern] || vsaGlossary["Normal Price Action"];
+            patternTitle.style.cursor = "help";
+            patternTitle.style.borderBottom = "1.5px dashed var(--color-primary-light)";
 
             const vsaType = data.vsa_diagnose.type;
             if (vsaType === 'bullish') {
@@ -18323,14 +18424,136 @@ async function loadTaxHarvestingReport() {
 
 // ==================== PORTFOLIO BACKTESTER ====================
 
+async function runPortfolioStressTest() {
+    const input = document.getElementById('portfolio-stress-scenario-input');
+    const btn = document.getElementById('run-portfolio-stress-test-btn');
+    const resultsContainer = document.getElementById('portfolio-stress-test-results');
+    
+    if (!input || !btn || !resultsContainer) return;
+    
+    const scenario = input.value.trim();
+    if (!scenario) {
+        showToast("Please describe a macroeconomic scenario.", "warning");
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerText = "Running AI Stress Simulation...";
+    
+    try {
+        const response = await fetch('/api/portfolio/stress-test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scenario: scenario })
+        });
+        
+        if (!response.ok) throw new Error("Macro simulation failed.");
+        const data = await response.json();
+        
+        const analysis = data.analysis;
+        
+        // Render Summary
+        document.getElementById('portfolio-stress-summary-text').innerText = analysis.impact_summary || "No summary provided.";
+        
+        // Render Impact Badge
+        const badge = document.getElementById('portfolio-stress-impact-badge');
+        badge.innerText = analysis.margin_impact || "Unknown";
+        
+        const impactLower = (analysis.margin_impact || "").toLowerCase();
+        if (impactLower.includes("high risk")) {
+            badge.style.background = "rgba(239, 68, 68, 0.15)";
+            badge.style.color = "#f87171";
+            badge.style.borderColor = "rgba(239, 68, 68, 0.3)";
+        } else if (impactLower.includes("positive") || impactLower.includes("hedge")) {
+            badge.style.background = "rgba(16, 185, 129, 0.15)";
+            badge.style.color = "#34d399";
+            badge.style.borderColor = "rgba(16, 185, 129, 0.3)";
+        } else {
+            badge.style.background = "rgba(245, 158, 11, 0.15)";
+            badge.style.color = "#fbbf24";
+            badge.style.borderColor = "rgba(245, 158, 11, 0.3)";
+        }
+
+        const impactGlossary = {
+            "high risk": "High Risk: A severe impact where multiple portfolio companies face compressed margins, high debt costs, or lack pricing power to pass on costs.",
+            "moderate risk": "Moderate Risk: A mild impact where some sectors struggle while others remain stable or act as partial hedges.",
+            "low risk": "Low Risk: A highly resilient portfolio setup that is insulated from these macroeconomic shocks.",
+            "positive": "Positive Impact: The portfolio contains assets that stand to benefit from this scenario.",
+            "hedge": "Hedging Impact: The portfolio contains assets that act as direct hedges against this scenario."
+        };
+        let impactTooltip = "Layman: The calculated vulnerability level of your active holdings based on sector sensitivity, solvency, and pricing power.";
+        for (const [key, desc] of Object.entries(impactGlossary)) {
+            if (impactLower.includes(key)) {
+                impactTooltip = desc;
+                break;
+            }
+        }
+        badge.title = impactTooltip;
+        badge.style.cursor = "help";
+        badge.style.borderBottom = "1px dashed rgba(255,255,255,0.3)";
+        
+        // Render Lists
+        const vList = document.getElementById('portfolio-stress-vulnerable-list');
+        const rList = document.getElementById('portfolio-stress-resilient-list');
+        const recList = document.getElementById('portfolio-stress-recommendations-list');
+        
+        vList.innerHTML = "";
+        rList.innerHTML = "";
+        recList.innerHTML = "";
+        
+        if (analysis.vulnerable_stocks && analysis.vulnerable_stocks.length > 0) {
+            analysis.vulnerable_stocks.forEach(stock => {
+                const li = document.createElement('li');
+                li.innerText = stock;
+                vList.appendChild(li);
+            });
+        } else {
+            vList.innerHTML = "<li>No highly vulnerable holdings identified.</li>";
+        }
+        
+        if (analysis.resilient_stocks && analysis.resilient_stocks.length > 0) {
+            analysis.resilient_stocks.forEach(stock => {
+                const li = document.createElement('li');
+                li.innerText = stock;
+                rList.appendChild(li);
+            });
+        } else {
+            rList.innerHTML = "<li>No specific resilient holdings identified.</li>";
+        }
+        
+        if (analysis.recommendations && analysis.recommendations.length > 0) {
+            analysis.recommendations.forEach(rec => {
+                const li = document.createElement('li');
+                li.innerText = rec;
+                recList.appendChild(li);
+            });
+        } else {
+            recList.innerHTML = "<li>Maintain current holdings and monitor volatility.</li>";
+        }
+        
+        resultsContainer.style.display = "block";
+        resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        showToast("Stress test completed successfully.", "success");
+        
+    } catch (err) {
+        console.error("Stress test error:", err);
+        showToast("Failed to run macro stress test: " + err.message, "error");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Run AI Stress Test";
+    }
+}
+
 function setupPortfolioBacktester() {
     const portTabDiagnosticsBtn = document.getElementById('port-tab-diagnostics-btn');
     const portTabTaxBtn = document.getElementById('port-tab-tax-btn');
     const portTabBacktesterBtn = document.getElementById('port-tab-backtester-btn');
+    const portTabStressBtn = document.getElementById('port-tab-stress-btn');
 
     const portPanelDiagnostics = document.getElementById('port-panel-diagnostics');
     const portPanelTax = document.getElementById('port-panel-tax');
     const portPanelBacktester = document.getElementById('port-panel-backtester');
+    const portPanelStress = document.getElementById('port-panel-stress');
 
     // Collapsible Ledger Block Click Listener
     const ledgerHeader = document.getElementById('backtest-rebalance-ledger-header');
@@ -18351,7 +18574,7 @@ function setupPortfolioBacktester() {
     if (!portTabDiagnosticsBtn || !portTabBacktesterBtn) return;
 
     const switchSubTab = (activeBtn, activePanel) => {
-        [portTabDiagnosticsBtn, portTabTaxBtn, portTabBacktesterBtn].forEach(btn => {
+        [portTabDiagnosticsBtn, portTabTaxBtn, portTabBacktesterBtn, portTabStressBtn].forEach(btn => {
             if (btn) {
                 if (btn === activeBtn) {
                     btn.classList.add('active');
@@ -18367,7 +18590,7 @@ function setupPortfolioBacktester() {
             }
         });
 
-        [portPanelDiagnostics, portPanelTax, portPanelBacktester].forEach(panel => {
+        [portPanelDiagnostics, portPanelTax, portPanelBacktester, portPanelStress].forEach(panel => {
             if (panel) {
                 panel.style.display = panel === activePanel ? 'block' : 'none';
             }
@@ -18395,6 +18618,17 @@ function setupPortfolioBacktester() {
                 await syncLedgerToBacktestSandbox();
             }
         });
+    }
+
+    if (portTabStressBtn) {
+        portTabStressBtn.addEventListener('click', () => {
+            switchSubTab(portTabStressBtn, portPanelStress);
+        });
+    }
+
+    const runStressBtn = document.getElementById('run-portfolio-stress-test-btn');
+    if (runStressBtn) {
+        runStressBtn.addEventListener('click', runPortfolioStressTest);
     }
     const today = new Date();
     const endStr = today.toISOString().split('T')[0];
@@ -24348,6 +24582,26 @@ function formatMarkdownToHTML(text) {
         if (trimmed.startsWith('<li') || trimmed.startsWith('<h')) return trimmed;
         return `<p style="margin-bottom: 8px;">${trimmed.replace(/\n/g, '<br>')}</p>`;
     }).join('');
+
+    // Layman tooltips for identified chart patterns
+    const patternGlossary = {
+        "Double Bottom": "Layman: A 'W' shape on the chart where the price hit a floor twice and bounced back. Signals that sellers have given up and a rise is starting.",
+        "Double Top": "Layman: An 'M' shape on the chart where the price hit a ceiling twice and fell back. Signals that buyers have given up and a fall is starting.",
+        "Head and Shoulders": "Layman: A peak (head) surrounded by two lower peaks (shoulders). Signals that the uptrend has run out of gas and a downtrend is coming.",
+        "Inverse Head and Shoulders": "Layman: A trough (head) surrounded by two higher troughs (shoulders). Signals that the downtrend has hit bottom and an uptrend is starting.",
+        "Ascending Triangle": "Layman: A flat ceiling resistance line and a rising support line. Shows buyers are buying at higher lows, preparing for an upward breakout.",
+        "Descending Triangle": "Layman: A flat floor support line and a falling resistance line. Shows sellers are pushing lower highs, preparing for a downward breakdown.",
+        "Symmetrical Triangle": "Layman: Price squeezing between a falling ceiling and a rising floor. Represents a tight coil before an explosive breakout in either direction.",
+        "Bull Flag": "Layman: A brief downward pause/channel after a sharp rally. Signals the stock is catching its breath before continuing the upward run.",
+        "Bear Flag": "Layman: A brief upward pause/channel after a sharp drop. Signals the stock is pausing before continuing the downward slide.",
+        "Pennant": "Layman: A tiny triangle consolidation that forms after a major move, signaling trend continuation.",
+        "Wedge Breakout": "Layman: A price squeeze within sloping trendlines, leading to an explosive breakout in the opposite direction of the wedge."
+    };
+
+    for (const [pattern, definition] of Object.entries(patternGlossary)) {
+        const regex = new RegExp(`\\b(${pattern})\\b`, "gi");
+        formatted = formatted.replace(regex, `<span class="pattern-tooltip-highlight" style="color: var(--color-primary-light); border-bottom: 1.5px dashed var(--color-primary-light); cursor: help; font-weight: 600;" title="${definition}">$1</span>`);
+    }
 
     return formatted;
 }

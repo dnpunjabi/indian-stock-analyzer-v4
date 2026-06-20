@@ -1172,6 +1172,7 @@ class AlertSettingsRequest(BaseModel):
 
 class ParseNLAlertRequest(BaseModel):
     prompt: str
+    active_ticker: Optional[str] = None
 
 class ParseNLScanRequest(BaseModel):
     prompt: str
@@ -1236,6 +1237,9 @@ class PortfolioItemUpdate(BaseModel):
 
 class WatchlistRename(BaseModel):
     name: str
+
+class StressTestRequest(BaseModel):
+    scenario: str
 
 @app.get("/api/search")
 async def search_ticker(q: str):
@@ -1926,6 +1930,7 @@ async def get_indicator_synthesis(
         system_prompt = (
             "You are a professional Technical Analyst and Senior Market Strategist specializing in the Indian Stock Markets.\n"
             "Your objective is to provide a highly detailed, concise, and structured tactical analysis of the stock based *only* on the provided custom indicator calculations.\n"
+            "In addition, analyze the historical structural levels, supports, resistances, and order blocks to identify any classic chart patterns (such as Double Tops/Bottoms, Head & Shoulders, Ascending/Descending Triangles, or Pennant/Wedge Breakouts). Specifically confirm if any classic pattern is active, forming, or breached, explaining the tactical implications.\n"
             "Format your response in structured Markdown. Start directly with the analysis. Avoid conversational preambles (like 'Here is the analysis...').\n"
             "Use clear bullet points and bold styling. Do not hallucinate prices; rely only on the structured indicators values provided in the prompt."
         )
@@ -1953,8 +1958,9 @@ async def get_indicator_synthesis(
                 f"- Active Resistance Trendline Price: {res_str}\n"
                 f"- Recent Bullish Breakout (last 15 bars): {'YES' if recent_bull_break else 'NO'}\n"
                 f"- Recent Bearish Breakout (last 15 bars): {'YES' if recent_bear_break else 'NO'}\n\n"
-                f"Based on these Trendlines with Breaks metrics, draft a brief, professional summary explaining the support and resistance structure, "
-                f"the implications of any recent breakout, and set logical tactical stop loss and target bounds using the current ATR."
+                f"Based on these Trendlines with Breaks metrics, draft a brief, professional summary explaining the support and resistance structure. "
+                f"Identify if the converging or parallel trendlines indicate a flag, pennant, or triangle consolidation pattern. "
+                f"Explain the implications of any recent breakout, and set logical tactical stop loss and target bounds using the current ATR."
             )
             
         elif indicator == "lux-smc":
@@ -2004,8 +2010,9 @@ async def get_indicator_synthesis(
                 f"- Premium / Discount Zones: {pd_str}\n"
                 f"- Current Price Position: Sits in the {pd_zone}\n"
                 f"- Prev Day High/Low (Daily levels): {daily_str}\n\n"
-                f"Draft a tactical Smart Money report. Explain if the market bias is bullish or bearish based on the BOS/CHoCH structure, "
-                f"identify the key order blocks to monitor for pullbacks or reversals, and note whether the current price is in the premium or discount zone."
+                f"Draft a tactical Smart Money report. Explain if the market bias is bullish or bearish based on the BOS/CHoCH structure. "
+                f"Identify if the structure transitions and order block clusters signal a trend reversal pattern (like a Double Top/Bottom or Head & Shoulders) or a continuation flag. "
+                f"Identify the key order blocks to monitor for pullbacks or reversals, and note whether the current price is in the premium or discount zone."
             )
             
         elif indicator == "mxwll":
@@ -2043,7 +2050,8 @@ async def get_indicator_synthesis(
                 f"- Active Supply Zones (OBs): {supply_str}\n"
                 f"- Unmitigated Fair Value Gaps (FVGs): {fvg_str}\n"
                 f"- Auto-Fibonacci Retracement Levels: {fibs_str}\n\n"
-                f"Synthesize this price action report. Detail how the market structural transitions compare, analyze any unmitigated Fair Value Gaps (FVG) or Order Blocks, "
+                f"Synthesize this price action report. Detail how the market structural transitions compare, analyze any unmitigated Fair Value Gaps (FVG) or Order Blocks. "
+                f"Scan the price relative to Fibonacci levels to identify if any classic retracement patterns (such as a 61.8% Golden Pocket bounce or 50% equilibrium retest) are forming, "
                 f"and explain where key Fibonacci support levels lie for planning exit/entry points."
             )
             
@@ -2054,7 +2062,7 @@ async def get_indicator_synthesis(
                 f"Active Indicator: Price and Volatility Only\n\n"
                 f"Calculated Metrics:\n"
                 f"- Volatility (ATR-14): {atr_val}\n"
-                f"Write a standard short-term volatility and trend structure overview based on the price action."
+                f"Write a standard short-term volatility and trend structure overview based on the price action, looking for basic double top/bottom patterns if price is consolidating near key extreme levels."
             )
             
         synthesis = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
@@ -2746,14 +2754,34 @@ async def get_synthesis(
 async def advisory_chat(request: ChatRequest):
     """Stateful context-retained advisory chat console."""
     try:
+        # Fetch current watchlists for chat context
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name FROM watchlists")
+            watchlists = [dict(row) for row in cursor.fetchall()]
+
         history_list = [{"role": msg.role, "content": msg.content} for msg in request.history]
         response_text = await asyncio.to_thread(
             run_conversational_chat,
             history_list, 
             request.message, 
-            request.profile
+            request.profile,
+            None,
+            watchlists
         )
-        return {"response": response_text}
+        
+        actions = []
+        clean_response = response_text
+        if "[ACTIONS_PAYLOAD]:" in response_text:
+            try:
+                parts = response_text.split("[ACTIONS_PAYLOAD]:")
+                clean_response = parts[0].strip()
+                import json
+                actions = json.loads(parts[1].strip())
+            except Exception as e:
+                print(f"Error parsing ACTIONS_PAYLOAD: {e}")
+                
+        return {"response": clean_response, "actions": actions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat session failed: {str(e)}")
 
@@ -2807,8 +2835,13 @@ async def parse_nl_alert(data: ParseNLAlertRequest):
         from backend.agent import call_groq_llm
         from backend.financial_utils import resolve_company_ticker
 
+        fallback_context = ""
+        if data.active_ticker:
+            fallback_context = f"\nActive Ticker Context: {data.active_ticker}. If the user alert setup prompt does not explicitly specify a stock/company name or ticker, you MUST default to using this ticker for the rule. Do not default to TCS or any other stock if this active ticker context is provided.\n"
+
         sys_prompt = (
             "You are an expert financial system developer parsing plain English alert setup requests into structured JSON rules.\n"
+            f"{fallback_context}"
             "Analyze the user prompt and output a single JSON object. DO NOT output any markdown tags (like ```json), and DO NOT output any conversational text or preambles. Only output the raw JSON string.\n"
             "Allowed condition types:\n"
             "- RSI (Relative Strength Index limit)\n"
@@ -2826,17 +2859,30 @@ async def parse_nl_alert(data: ParseNLAlertRequest):
             "- FIB_LEVEL (proximity to any Fib level in %, e.g. 1.5)\n"
             "- FIB_382 (proximity to Fib 38.2% in %, e.g. 1.5)\n"
             "- FIB_500 (proximity to Fib 50.0% in %, e.g. 1.5)\n"
-            "- FIB_618 (proximity to Fib 61.8% in %, e.g. 1.5)\n\n"
+            "- FIB_618 (proximity to Fib 61.8% in %, e.g. 1.5)\n"
+            "- COMPOUND (logical combination of multiple simple rules using AND or OR operators)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
             "- '<' (Less Than / Crosses Below)\n"
             "- '==' (Equals / Near Proximity - mandatory for FIB and RATING conditions)\n\n"
-            "Output format example:\n"
+            "CRITICAL RULES FOR COMPOUND ALERTS:\n"
+            "If the request contains multiple alert parameters combined via logical operators 'and', 'or', '&&', '||' (e.g. 'price below 2000 and rsi under 40'), you MUST:\n"
+            "1. Set 'condition_type': 'COMPOUND'\n"
+            "2. Set 'operator': ''\n"
+            "3. Set 'value': to a JSON string representation of a list of conditions and logical operators. For example, if user asks: 'price is below 2000 and rsi is under 40', you must set 'value' to the string: '[{\"indicator\": \"PRICE\", \"operator\": \"<\", \"value\": \"2000\"}, {\"operator\": \"AND\"}, {\"indicator\": \"RSI\", \"operator\": \"<\", \"value\": \"40\"}]'. Note that logical operator items only have the 'operator' field, whereas rule items have 'indicator', 'operator', and 'value' fields.\n\n"
+            "Output format example for simple alert:\n"
             "{\n"
             "  \"ticker_query\": \"TCS\",\n"
             "  \"condition_type\": \"EMA_CROSS\",\n"
             "  \"operator\": \">\",\n"
             "  \"value\": \"0.0\"\n"
+            "}\n\n"
+            "Output format example for compound alert:\n"
+            "{\n"
+            "  \"ticker_query\": \"TCS\",\n"
+            "  \"condition_type\": \"COMPOUND\",\n"
+            "  \"operator\": \"\",\n"
+            "  \"value\": \"[{\\\"indicator\\\": \\\"PRICE\\\", \\\"operator\\\": \\\"<\\\", \\\"value\\\": \\\"2000\\\"}, {\\\"operator\\\": \\\"AND\\\"}, {\\\"indicator\\\": \\\"RSI\\\", \\\"operator\\\": \\\"<\\\", \\\"value\\\": \\\"40\\\"}]\"\n"
             "}"
         )
 
@@ -3002,9 +3048,219 @@ async def delete_alert(alert_id: str):
     # Unregister from real-time AlertEvaluator
     from backend.websocket_server import alert_evaluator as _ae
     if _ae is not None:
-        _ae.unregister_alert(alert_id)
+        try:
+            _ae.unregister_alert(alert_id)
+        except Exception as e:
+            print(f"Error unregistering alert: {e}")
 
-    return {"status": "success"}
+async def evaluate_single_condition_bool(cond_type: str, op: str, val_str: str, t: dict, df) -> tuple:
+    triggered = False
+    cur_val = ""
+    
+    cond_type = cond_type.upper()
+    try:
+        if cond_type == "RSI":
+            rsi_val = t["technicals"]["rsi"]
+            cur_val = f"RSI: {rsi_val:.1f}"
+            if op == "<" and rsi_val < float(val_str):
+                triggered = True
+            elif op == ">" and rsi_val > float(val_str):
+                triggered = True
+                
+        elif cond_type == "PE":
+            pe_val = t["fundamentals"]["pe_ratio"]
+            cur_val = f"PE: {pe_val}"
+            if val_str.upper() == "MEDIAN":
+                compare_num = t["pe_bands"]["median_pe"]
+            else:
+                compare_num = float(val_str)
+            if op == "<" and pe_val < compare_num:
+                triggered = True
+            elif op == ">" and pe_val > compare_num:
+                triggered = True
+                
+        elif cond_type == "RATING":
+            rating_val = t["analysis"]["recommendation"].upper() if "analysis" in t else "HOLD"
+            cur_val = f"Rating: {rating_val}"
+            if op == "==" and rating_val == val_str.upper():
+                triggered = True
+                
+        elif cond_type == "PRICE":
+            price_val = t["fundamentals"]["current_price"]
+            cur_val = f"Price: Rs. {price_val:.2f}"
+            if op == "<" and price_val < float(val_str):
+                triggered = True
+            elif op == ">" and price_val > float(val_str):
+                triggered = True
+                
+        elif cond_type == "SMA":
+            price_val = t["fundamentals"]["current_price"]
+            sma_200 = t["technicals"]["sma_200"]
+            pct_diff = ((price_val - sma_200) / sma_200) * 100 if sma_200 > 0 else 0.0
+            cur_val = f"Price: Rs. {price_val:.2f} vs SMA200 (Diff: {pct_diff:+.1f}%)"
+            threshold = float(val_str)
+            if op == ">" and pct_diff > threshold:
+                triggered = True
+            elif op == "<" and pct_diff < threshold:
+                triggered = True
+                
+        elif cond_type == "DMA_CROSS" and df is not None and not df.empty:
+            df_copy = df.copy()
+            df_copy["MA_50"] = df_copy["Close"].rolling(window=50).mean()
+            df_copy["MA_200"] = df_copy["Close"].rolling(window=200).mean()
+            df_clean = df_copy.dropna(subset=["MA_200"])
+            if len(df_clean) >= 2:
+                ma50_prev, ma50_curr = float(df_clean["MA_50"].iloc[-2]), float(df_clean["MA_50"].iloc[-1])
+                ma200_prev, ma200_curr = float(df_clean["MA_200"].iloc[-2]), float(df_clean["MA_200"].iloc[-1])
+                cur_val = f"50d SMA: Rs. {ma50_curr:.2f} vs 200d SMA: Rs. {ma200_curr:.2f}"
+                buffer_pct = float(val_str)
+                diff_prev = ((ma50_prev - ma200_prev) / ma200_prev) * 100
+                diff_curr = ((ma50_curr - ma200_curr) / ma200_curr) * 100
+                if op == ">" and diff_prev < buffer_pct and diff_curr >= buffer_pct:
+                    triggered = True
+                elif op == "<" and diff_prev > -abs(buffer_pct) and diff_curr <= -abs(buffer_pct):
+                    triggered = True
+                    
+        elif cond_type == "EMA_CROSS" and df is not None and not df.empty:
+            df_copy = df.copy()
+            df_copy["MA_50"] = df_copy["Close"].ewm(span=50, adjust=False).mean()
+            df_copy["MA_200"] = df_copy["Close"].ewm(span=200, adjust=False).mean()
+            df_clean = df_copy.dropna(subset=["MA_200"])
+            if len(df_clean) >= 2:
+                ma50_prev, ma50_curr = float(df_clean["MA_50"].iloc[-2]), float(df_clean["MA_50"].iloc[-1])
+                ma200_prev, ma200_curr = float(df_clean["MA_200"].iloc[-2]), float(df_clean["MA_200"].iloc[-1])
+                cur_val = f"50d EMA: Rs. {ma50_curr:.2f} vs 200d EMA: Rs. {ma200_curr:.2f}"
+                buffer_pct = float(val_str)
+                diff_prev = ((ma50_prev - ma200_prev) / ma200_prev) * 100
+                diff_curr = ((ma50_curr - ma200_curr) / ma200_curr) * 100
+                if op == ">" and diff_prev < buffer_pct and diff_curr >= buffer_pct:
+                    triggered = True
+                elif op == "<" and diff_prev > -abs(buffer_pct) and diff_curr <= -abs(buffer_pct):
+                    triggered = True
+                    
+        elif cond_type == "VOL_BREAKOUT" and df is not None and not df.empty:
+            df_copy = df.copy()
+            df_copy["Vol_20MA"] = df_copy["Volume"].rolling(window=20).mean()
+            df_clean = df_copy.dropna(subset=["Vol_20MA"])
+            if len(df_clean) >= 1:
+                vol_curr = float(df_clean["Volume"].iloc[-1])
+                vol_ma = float(df_clean["Vol_20MA"].iloc[-1])
+                vol_ratio = vol_curr / vol_ma if vol_ma > 0 else 1.0
+                cur_val = f"Vol Ratio: {vol_ratio:.2f}x"
+                threshold = float(val_str)
+                if op == ">" and vol_ratio > threshold:
+                    triggered = True
+                elif op == "<" and vol_ratio < threshold:
+                    triggered = True
+                    
+        elif cond_type == "BB_CROSS" and df is not None and not df.empty:
+            df_copy = df.copy()
+            df_copy["BB_Mid"] = df_copy["Close"].rolling(window=20).mean()
+            df_copy["BB_Std"] = df_copy["Close"].rolling(window=20).std()
+            df_copy["BB_Upper"] = df_copy["BB_Mid"] + 2 * df_copy["BB_Std"]
+            df_copy["BB_Lower"] = df_copy["BB_Mid"] - 2 * df_copy["BB_Std"]
+            df_clean = df_copy.dropna(subset=["BB_Upper"])
+            if len(df_clean) >= 2:
+                close_prev, close_curr = float(df_clean["Close"].iloc[-2]), float(df_clean["Close"].iloc[-1])
+                upper_prev, upper_curr = float(df_clean["BB_Upper"].iloc[-2]), float(df_clean["BB_Upper"].iloc[-1])
+                lower_prev, lower_curr = float(df_clean["BB_Lower"].iloc[-2]), float(df_clean["BB_Lower"].iloc[-1])
+                if op == ">":
+                    cur_val = f"Price: Rs. {close_curr:.2f} vs BB Upper: Rs. {upper_curr:.2f}"
+                    if close_prev < upper_prev and close_curr >= upper_curr:
+                        triggered = True
+                elif op == "<":
+                    cur_val = f"Price: Rs. {close_curr:.2f} vs BB Lower: Rs. {lower_curr:.2f}"
+                    if close_prev > lower_prev and close_curr <= lower_curr:
+                        triggered = True
+                        
+        elif cond_type == "MACD_CROSS" and df is not None and not df.empty:
+            df_copy = df.copy()
+            ema12 = df_copy["Close"].ewm(span=12, adjust=False).mean()
+            ema26 = df_copy["Close"].ewm(span=26, adjust=False).mean()
+            df_copy["MACD"] = ema12 - ema26
+            df_copy["Signal"] = df_copy["MACD"].ewm(span=9, adjust=False).mean()
+            df_clean = df_copy.dropna(subset=["Signal"])
+            if len(df_clean) >= 2:
+                macd_prev, macd_curr = float(df_clean["MACD"].iloc[-2]), float(df_clean["MACD"].iloc[-1])
+                sig_prev, sig_curr = float(df_clean["Signal"].iloc[-2]), float(df_clean["Signal"].iloc[-1])
+                cur_val = f"MACD: {macd_curr:.3f} vs Signal: {sig_curr:.3f}"
+                buffer_val = float(val_str)
+                diff_prev = macd_prev - sig_prev
+                diff_curr = macd_curr - sig_curr
+                if op == ">" and diff_prev < buffer_val and diff_curr >= buffer_val:
+                    triggered = True
+                elif op == "<" and diff_prev > -abs(buffer_val) and diff_curr <= -abs(buffer_val):
+                    triggered = True
+                    
+        elif cond_type == "52W_PROXIMITY" and df is not None and not df.empty:
+            high_52w = float(df["Close"].max())
+            low_52w = float(df["Close"].min())
+            if len(df) >= 1:
+                price_val = float(df["Close"].iloc[-1])
+                proximity_pct = float(val_str)
+                if op == ">":
+                    diff_pct = ((high_52w - price_val) / high_52w) * 100
+                    cur_val = f"Price: Rs. {price_val:.2f} near 52w High (Diff: {diff_pct:.1f}%)"
+                    if diff_pct <= proximity_pct:
+                        triggered = True
+                elif op == "<":
+                    diff_pct = ((price_val - low_52w) / low_52w) * 100
+                    cur_val = f"Price: Rs. {price_val:.2f} near 52w Low (Diff: {diff_pct:.1f}%)"
+                    if diff_pct <= proximity_pct:
+                        triggered = True
+                        
+        elif cond_type == "SMA50" and df is not None and not df.empty:
+            df_copy = df.copy()
+            df_copy["SMA_50"] = df_copy["Close"].rolling(window=50).mean()
+            df_clean = df_copy.dropna(subset=["SMA_50"])
+            if len(df_clean) >= 1:
+                price_val = float(df_clean["Close"].iloc[-1])
+                sma_50 = float(df_clean["SMA_50"].iloc[-1])
+                pct_diff = ((price_val - sma_50) / sma_50) * 100
+                cur_val = f"Price: Rs. {price_val:.2f} vs SMA50 (Diff: {pct_diff:+.1f}%)"
+                threshold = float(val_str)
+                if op == ">" and pct_diff > threshold:
+                    triggered = True
+                elif op == "<" and pct_diff < threshold:
+                    triggered = True
+                    
+        elif cond_type in ["FIB_LEVEL", "FIB_382", "FIB_500", "FIB_618"] and df is not None and not df.empty:
+            sub_df = df.iloc[-120:] if len(df) >= 120 else df
+            swing_high = float(sub_df["Close"].max())
+            swing_low = float(sub_df["Close"].min())
+            swing_diff = swing_high - swing_low
+            fib_382 = swing_high - 0.382 * swing_diff
+            fib_500 = swing_high - 0.500 * swing_diff
+            fib_618 = swing_high - 0.618 * swing_diff
+            if len(df) >= 1:
+                price_val = float(df["Close"].iloc[-1])
+                try:
+                    proximity_pct = float(val_str)
+                except Exception:
+                    proximity_pct = 1.5
+                levels_to_check = []
+                if cond_type == "FIB_LEVEL":
+                    levels_to_check = [("38.2%", fib_382), ("50.0%", fib_500), ("61.8%", fib_618)]
+                elif cond_type == "FIB_382":
+                    levels_to_check = [("38.2%", fib_382)]
+                elif cond_type == "FIB_500":
+                    levels_to_check = [("50.0%", fib_500)]
+                elif cond_type == "FIB_618":
+                    levels_to_check = [("61.8%", fib_618)]
+                matched_level = None
+                matched_val = 0.0
+                for level_name, level_val in levels_to_check:
+                    diff_pct = abs(price_val - level_val) / level_val * 100
+                    if diff_pct <= proximity_pct:
+                        matched_level = level_name
+                        matched_val = level_val
+                        triggered = True
+                        break
+                cur_val = f"Price: Rs. {price_val:.2f} near Fib {matched_level or 'Support'} Level: Rs. {matched_val:.2f}"
+    except Exception as eval_err:
+        print(f"Error evaluating condition {cond_type} {op} {val_str}: {eval_err}")
+        
+    return triggered, cur_val
 
 @app.get("/api/alerts/check")
 async def check_alerts():
@@ -3036,248 +3292,68 @@ async def check_alerts():
         try:
             ticker = alert["ticker"]
             t = await asyncio.to_thread(get_complete_financial_profile, ticker)
-            triggered = False
-            cur_val = ""
             
             # Fetch history if required
             df = None
-            if alert["condition_type"] in ["DMA_CROSS", "EMA_CROSS", "VOL_BREAKOUT", "BB_CROSS", "MACD_CROSS", "52W_PROXIMITY", "SMA50", "FIB_LEVEL", "FIB_382", "FIB_500", "FIB_618"]:
+            history_indicators = ["DMA_CROSS", "EMA_CROSS", "VOL_BREAKOUT", "BB_CROSS", "MACD_CROSS", "52W_PROXIMITY", "SMA50", "FIB_LEVEL", "FIB_382", "FIB_500", "FIB_618"]
+            needs_df = False
+            
+            if alert["condition_type"] == "COMPOUND":
+                try:
+                    cond_list = json.loads(alert["value"])
+                    for item in cond_list:
+                        if "indicator" in item and item["indicator"] in history_indicators:
+                            needs_df = True
+                            break
+                except Exception:
+                    pass
+            else:
+                needs_df = alert["condition_type"] in history_indicators
+                
+            if needs_df:
                 df = await fetch_history_df(ticker, "1y", "1d")
                 if df.empty:
                     print(f"Skipping alert check #{alert['id']} for {ticker} as price history is empty.")
                     continue
+
+            triggered = False
+            cur_val = ""
             
-            if alert["condition_type"] == "RSI":
-                rsi_val = t["technicals"]["rsi"]
-                cur_val = f"RSI: {rsi_val:.1f}"
-                if alert["operator"] == "<" and rsi_val < float(alert["value"]):
-                    triggered = True
-                elif alert["operator"] == ">" and rsi_val > float(alert["value"]):
-                    triggered = True
-                    
-            elif alert["condition_type"] == "PE":
-                pe_val = t["fundamentals"]["pe_ratio"]
-                cur_val = f"PE: {pe_val}"
-                val_to_compare = alert["value"]
-                if val_to_compare.upper() == "MEDIAN":
-                    compare_num = t["pe_bands"]["median_pe"]
-                else:
-                    compare_num = float(val_to_compare)
-                    
-                if alert["operator"] == "<" and pe_val < compare_num:
-                    triggered = True
-                elif alert["operator"] == ">" and pe_val > compare_num:
-                    triggered = True
-                    
-            elif alert["condition_type"] == "RATING":
-                rating_val = t["analysis"]["recommendation"].upper() if "analysis" in t else "HOLD"
-                cur_val = f"Rating: {rating_val}"
-                if alert["operator"] == "==" and rating_val == alert["value"].upper():
-                    triggered = True
-                    
-            elif alert["condition_type"] == "PRICE":
-                price_val = t["fundamentals"]["current_price"]
-                cur_val = f"Price: Rs. {price_val:.2f}"
-                if alert["operator"] == "<" and price_val < float(alert["value"]):
-                    triggered = True
-                elif alert["operator"] == ">" and price_val > float(alert["value"]):
-                    triggered = True
-                    
-            elif alert["condition_type"] == "SMA":
-                price_val = t["fundamentals"]["current_price"]
-                sma_200 = t["technicals"]["sma_200"]
-                pct_diff = ((price_val - sma_200) / sma_200) * 100 if sma_200 > 0 else 0.0
-                cur_val = f"Price: Rs. {price_val:.2f} vs SMA200: Rs. {sma_200:.2f} (Diff: {pct_diff:+.1f}%)"
+            if alert["condition_type"] == "COMPOUND":
                 try:
-                    threshold = float(alert["value"])
-                except Exception:
-                    threshold = 0.0
-                if alert["operator"] == ">" and pct_diff > threshold:
-                    triggered = True
-                elif alert["operator"] == "<" and pct_diff < threshold:
-                    triggered = True
+                    cond_list = json.loads(alert["value"])
+                    results = []
+                    descriptions = []
+                    for item in cond_list:
+                        if "operator" in item and "indicator" not in item:
+                            results.append(item["operator"].upper())
+                        else:
+                            res_bool, desc_str = await evaluate_single_condition_bool(
+                                item["indicator"], item["operator"], item["value"], t, df
+                            )
+                            results.append(res_bool)
+                            if desc_str:
+                                descriptions.append(desc_str)
                     
-            elif alert["condition_type"] == "DMA_CROSS":
-                # 50 SMA vs 200 SMA
-                df["MA_50"] = df["Close"].rolling(window=50).mean()
-                df["MA_200"] = df["Close"].rolling(window=200).mean()
-                df_clean = df.dropna(subset=["MA_200"])
-                if len(df_clean) >= 2:
-                    ma50_prev, ma50_curr = float(df_clean["MA_50"].iloc[-2]), float(df_clean["MA_50"].iloc[-1])
-                    ma200_prev, ma200_curr = float(df_clean["MA_200"].iloc[-2]), float(df_clean["MA_200"].iloc[-1])
-                    cur_val = f"50d SMA: Rs. {ma50_curr:.2f} vs 200d SMA: Rs. {ma200_curr:.2f}"
-                    try:
-                        buffer_pct = float(alert["value"])
-                    except Exception:
-                        buffer_pct = 0.0
-                    
-                    diff_prev = ((ma50_prev - ma200_prev) / ma200_prev) * 100
-                    diff_curr = ((ma50_curr - ma200_curr) / ma200_curr) * 100
-                    
-                    if alert["operator"] == ">": # Golden Cross with positive buffer
-                        if diff_prev < buffer_pct and diff_curr >= buffer_pct:
-                            triggered = True
-                    elif alert["operator"] == "<": # Death Cross with negative buffer
-                        target_val = -abs(buffer_pct)
-                        if diff_prev > target_val and diff_curr <= target_val:
-                            triggered = True
-
-            elif alert["condition_type"] == "EMA_CROSS":
-                # 50 EMA vs 200 EMA
-                df["MA_50"] = df["Close"].ewm(span=50, adjust=False).mean()
-                df["MA_200"] = df["Close"].ewm(span=200, adjust=False).mean()
-                df_clean = df.dropna(subset=["MA_200"])
-                if len(df_clean) >= 2:
-                    ma50_prev, ma50_curr = float(df_clean["MA_50"].iloc[-2]), float(df_clean["MA_50"].iloc[-1])
-                    ma200_prev, ma200_curr = float(df_clean["MA_200"].iloc[-2]), float(df_clean["MA_200"].iloc[-1])
-                    cur_val = f"50d EMA: Rs. {ma50_curr:.2f} vs 200d EMA: Rs. {ma200_curr:.2f}"
-                    try:
-                        buffer_pct = float(alert["value"])
-                    except Exception:
-                        buffer_pct = 0.0
-                    
-                    diff_prev = ((ma50_prev - ma200_prev) / ma200_prev) * 100
-                    diff_curr = ((ma50_curr - ma200_curr) / ma200_curr) * 100
-                    
-                    if alert["operator"] == ">": # Golden Cross with positive buffer
-                        if diff_prev < buffer_pct and diff_curr >= buffer_pct:
-                            triggered = True
-                    elif alert["operator"] == "<": # Death Cross with negative buffer
-                        target_val = -abs(buffer_pct)
-                        if diff_prev > target_val and diff_curr <= target_val:
-                            triggered = True
-
-            elif alert["condition_type"] == "VOL_BREAKOUT":
-                # Volume vs 20d Average Volume ratio
-                df["Vol_20MA"] = df["Volume"].rolling(window=20).mean()
-                df_clean = df.dropna(subset=["Vol_20MA"])
-                if len(df_clean) >= 1:
-                    vol_curr = float(df_clean["Volume"].iloc[-1])
-                    vol_ma = float(df_clean["Vol_20MA"].iloc[-1])
-                    vol_ratio = vol_curr / vol_ma if vol_ma > 0 else 1.0
-                    cur_val = f"Volume Ratio: {vol_ratio:.2f}x (Avg: {int(vol_ma)})"
-                    threshold = float(alert["value"])
-                    if alert["operator"] == ">" and vol_ratio > threshold:
-                        triggered = True
-                    elif alert["operator"] == "<" and vol_ratio < threshold:
-                        triggered = True
-
-            elif alert["condition_type"] == "BB_CROSS":
-                # Bollinger Band Crossover
-                df["BB_Mid"] = df["Close"].rolling(window=20).mean()
-                df["BB_Std"] = df["Close"].rolling(window=20).std()
-                df["BB_Upper"] = df["BB_Mid"] + 2 * df["BB_Std"]
-                df["BB_Lower"] = df["BB_Mid"] - 2 * df["BB_Std"]
-                df_clean = df.dropna(subset=["BB_Upper"])
-                if len(df_clean) >= 2:
-                    close_prev, close_curr = float(df_clean["Close"].iloc[-2]), float(df_clean["Close"].iloc[-1])
-                    upper_prev, upper_curr = float(df_clean["BB_Upper"].iloc[-2]), float(df_clean["BB_Upper"].iloc[-1])
-                    lower_prev, lower_curr = float(df_clean["BB_Lower"].iloc[-2]), float(df_clean["BB_Lower"].iloc[-1])
-                    if alert["operator"] == ">": # Crosses above Upper Band
-                        cur_val = f"Price: Rs. {close_curr:.2f} vs BB Upper: Rs. {upper_curr:.2f}"
-                        if close_prev < upper_prev and close_curr >= upper_curr:
-                            triggered = True
-                    elif alert["operator"] == "<": # Crosses below Lower Band
-                        cur_val = f"Price: Rs. {close_curr:.2f} vs BB Lower: Rs. {lower_curr:.2f}"
-                        if close_prev > lower_prev and close_curr <= lower_curr:
-                            triggered = True
-
-            elif alert["condition_type"] == "MACD_CROSS":
-                # MACD vs Signal Line Crossover
-                ema12 = df["Close"].ewm(span=12, adjust=False).mean()
-                ema26 = df["Close"].ewm(span=26, adjust=False).mean()
-                df["MACD"] = ema12 - ema26
-                df["Signal"] = df["MACD"].ewm(span=9, adjust=False).mean()
-                df_clean = df.dropna(subset=["Signal"])
-                if len(df_clean) >= 2:
-                    macd_prev, macd_curr = float(df_clean["MACD"].iloc[-2]), float(df_clean["MACD"].iloc[-1])
-                    sig_prev, sig_curr = float(df_clean["Signal"].iloc[-2]), float(df_clean["Signal"].iloc[-1])
-                    cur_val = f"MACD: {macd_curr:.3f} vs Signal: {sig_curr:.3f}"
-                    try:
-                        buffer_val = float(alert["value"])
-                    except Exception:
-                        buffer_val = 0.0
-                    
-                    diff_prev = macd_prev - sig_prev
-                    diff_curr = macd_curr - sig_curr
-                    
-                    if alert["operator"] == ">":
-                        if diff_prev < buffer_val and diff_curr >= buffer_val:
-                            triggered = True
-                    elif alert["operator"] == "<":
-                        target_val = -abs(buffer_val)
-                        if diff_prev > target_val and diff_curr <= target_val:
-                            triggered = True
-
-            elif alert["condition_type"] == "52W_PROXIMITY":
-                # Price vs 52-Week Range
-                high_52w = float(df["Close"].max())
-                low_52w = float(df["Close"].min())
-                if len(df) >= 1:
-                    price_val = float(df["Close"].iloc[-1])
-                    proximity_pct = float(alert["value"])
-                    if alert["operator"] == ">": # near 52w High
-                        diff_pct = ((high_52w - price_val) / high_52w) * 100
-                        cur_val = f"Price: Rs. {price_val:.2f} (52w High: Rs. {high_52w:.2f}, Diff: {diff_pct:.1f}%)"
-                        if diff_pct <= proximity_pct:
-                            triggered = True
-                    elif alert["operator"] == "<": # near 52w Low
-                        diff_pct = ((price_val - low_52w) / low_52w) * 100
-                        cur_val = f"Price: Rs. {price_val:.2f} (52w Low: Rs. {low_52w:.2f}, Diff: {diff_pct:.1f}%)"
-                        if diff_pct <= proximity_pct:
-                            triggered = True
-
-            elif alert["condition_type"] == "SMA50":
-                # Price vs SMA-50 % diff
-                df["SMA_50"] = df["Close"].rolling(window=50).mean()
-                df_clean = df.dropna(subset=["SMA_50"])
-                if len(df_clean) >= 1:
-                    price_val = float(df_clean["Close"].iloc[-1])
-                    sma_50 = float(df_clean["SMA_50"].iloc[-1])
-                    pct_diff = ((price_val - sma_50) / sma_50) * 100
-                    cur_val = f"Price: Rs. {price_val:.2f} vs SMA50: Rs. {sma_50:.2f} (Diff: {pct_diff:+.1f}%)"
-                    threshold = float(alert["value"])
-                    if alert["operator"] == ">" and pct_diff > threshold:
-                        triggered = True
-                    elif alert["operator"] == "<" and pct_diff < threshold:
-                        triggered = True
-
-            elif alert["condition_type"] in ["FIB_LEVEL", "FIB_382", "FIB_500", "FIB_618"]:
-                # Fibonacci Retracement Proximity
-                sub_df = df.iloc[-120:] if len(df) >= 120 else df
-                swing_high = float(sub_df["Close"].max())
-                swing_low = float(sub_df["Close"].min())
-                swing_diff = swing_high - swing_low
-                fib_382 = swing_high - 0.382 * swing_diff
-                fib_500 = swing_high - 0.500 * swing_diff
-                fib_618 = swing_high - 0.618 * swing_diff
-                if len(df) >= 1:
-                    price_val = float(df["Close"].iloc[-1])
-                    try:
-                        proximity_pct = float(alert["value"])
-                    except Exception:
-                        proximity_pct = 1.5
-
-                    levels_to_check = []
-                    if alert["condition_type"] == "FIB_LEVEL":
-                        levels_to_check = [("38.2%", fib_382), ("50.0%", fib_500), ("61.8%", fib_618)]
-                    elif alert["condition_type"] == "FIB_382":
-                        levels_to_check = [("38.2%", fib_382)]
-                    elif alert["condition_type"] == "FIB_500":
-                        levels_to_check = [("50.0%", fib_500)]
-                    elif alert["condition_type"] == "FIB_618":
-                        levels_to_check = [("61.8%", fib_618)]
-
-                    matched_level = None
-                    matched_val = 0.0
-                    for level_name, level_val in levels_to_check:
-                        diff_pct = abs(price_val - level_val) / level_val * 100
-                        if diff_pct <= proximity_pct:
-                            matched_level = level_name
-                            matched_val = level_val
-                            triggered = True
-                            break
-                    cur_val = f"Price: Rs. {price_val:.2f} near Fib {matched_level or 'Support'} Level: Rs. {matched_val:.2f} (Range: {swing_low:.0f}-{swing_high:.0f})"
+                    if results:
+                        triggered = results[0]
+                        i = 1
+                        while i < len(results) - 1:
+                            op_str = results[i]
+                            next_val = results[i+1]
+                            if op_str == "AND":
+                                triggered = triggered and next_val
+                            elif op_str == "OR":
+                                triggered = triggered or next_val
+                            i += 2
+                            
+                    cur_val = " & ".join(descriptions) if descriptions else "Compound parameters met"
+                except Exception as comp_err:
+                    print(f"Error parsing compound alert: {comp_err}")
+            else:
+                triggered, cur_val = await evaluate_single_condition_bool(
+                    alert["condition_type"], alert["operator"], alert["value"], t, df
+                )
                     
             if triggered:
                 trigger_date = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -4462,6 +4538,127 @@ async def get_portfolio_tax_report(generate_prescription: bool = False):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Tax Analysis Error: {str(e)}")
 
+@app.post("/api/portfolio/stress-test")
+async def run_portfolio_stress_test(data: StressTestRequest):
+    """
+    Simulates a macroeconomic scenario (shock) against the active portfolio holdings,
+    assessing exposure and potential margin impacts.
+    """
+    if not data.scenario:
+        raise HTTPException(status_code=400, detail="Scenario description is required.")
+        
+    try:
+        # 1. Query all transactions
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, symbol, name, sector, quantity, purchase_price, purchase_date, transaction_type FROM portfolio_items")
+            all_txs = [dict(row) for row in cursor.fetchall()]
+            
+        # Compute active holdings
+        holdings = compute_active_holdings(all_txs)
+        if not holdings:
+            return {
+                "scenario": data.scenario,
+                "analysis": {
+                    "impact_summary": "No active portfolio holdings detected to simulate stress testing against. Please populate your portfolio first.",
+                    "vulnerable_stocks": [],
+                    "resilient_stocks": [],
+                    "margin_impact": "Unknown",
+                    "recommendations": ["Add transactions to your portfolio."]
+                }
+            }
+            
+        # Get current prices and details from cache
+        portfolio_summary = []
+        for h in holdings:
+            sym = h["symbol"]
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (sym,))
+                cache_row = cursor.fetchone()
+                
+            curr_price = h["purchase_price"] # fallback
+            pricing_power = "Moderate"
+            altman_zone = "Grey Zone"
+            debt_eq = 0.5
+            
+            if cache_row:
+                try:
+                    p = json.loads(cache_row["profile_json"])
+                    curr_price = p["fundamentals"].get("current_price", curr_price)
+                    pricing_power = p["fundamentals"].get("pricing_power_proxy", "Moderate")
+                    altman_zone = p.get("earnings_quality", {}).get("altman_zone", "Grey Zone")
+                    debt_eq = p["fundamentals"].get("debt_to_equity", 0.5)
+                except Exception:
+                    pass
+                    
+            value = round(h["quantity"] * curr_price, 2)
+            portfolio_summary.append({
+                "symbol": sym,
+                "name": h["name"],
+                "sector": h["sector"],
+                "quantity": h["quantity"],
+                "price": curr_price,
+                "value": value,
+                "pricing_power": pricing_power,
+                "altman_zone": altman_zone,
+                "debt_to_equity": debt_eq
+            })
+            
+        # 2. Run LLM scenario simulation using Groq
+        from backend.agent import call_groq_llm
+        
+        system_prompt = (
+            "You are an expert macroeconomic strategist and risk auditor for a major Indian hedge fund.\n"
+            "Your objective is to stress-test the user's active stock portfolio against the specified macroeconomic scenario (shock).\n"
+            "Evaluate each holding's vulnerability based on its sector, leverage (Debt-to-Equity), pricing power proxy, and solvency zone (Altman Z-Score).\n"
+            "Determine which stocks are highly vulnerable, which are resilient (hedged), and estimate margin impact.\n"
+            "You MUST return a valid JSON object matching the following structure strictly:\n"
+            "{\n"
+            '  "impact_summary": "A high-level executive summary of the portfolio impact.",\n'
+            '  "vulnerable_stocks": ["TCS.NS (High IT sensitivity to US budget cuts)", ...],\n'
+            '  "resilient_stocks": ["RELIANCE.NS (Energy integration buffer)", ...],\n'
+            '  "margin_impact": "High Risk / Moderate Risk / Positive Hedge",\n'
+            '  "recommendations": ["Rebalance cash reserves", ...]\n'
+            "}\n"
+            "Do not include markdown tags inside the JSON string itself. Output raw JSON only."
+        )
+        
+        user_prompt = f"""
+        Macroeconomic Shock Scenario:
+        "{data.scenario}"
+        
+        Active Portfolio Holdings:
+        {json.dumps(portfolio_summary, indent=2)}
+        """
+        
+        response_text = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt, max_tokens=1500)
+        
+        # Parse JSON from response
+        try:
+            clean_json = response_text.strip()
+            if clean_json.startswith("```json"):
+                clean_json = clean_json[7:]
+            if clean_json.endswith("```"):
+                clean_json = clean_json[:-3]
+            clean_json = clean_json.strip()
+            analysis = json.loads(clean_json)
+        except Exception as e:
+            print(f"Error parsing stress-test JSON: {e}\nRaw: {response_text}")
+            analysis = {
+                "impact_summary": f"Failed to compile structured LLM report. Raw response: {response_text[:300]}...",
+                "vulnerable_stocks": ["Check high-leverage sectors manually."],
+                "resilient_stocks": ["Check low-debt consumer staples manually."],
+                "margin_impact": "Unknown",
+                "recommendations": ["Review cash levels."]
+            }
+            
+        return {
+            "scenario": data.scenario,
+            "analysis": analysis
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Macro Stress Simulation failed: {str(e)}")
 
 @app.get("/api/analyze/risk-factors")
 async def get_risk_factors(symbol: str, benchmark: str = "^NSEI", period: str = "1y"):

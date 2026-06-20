@@ -4096,6 +4096,7 @@
                     <button class="portfolio-subtab-btn active" id="port-tab-diagnostics-btn" style="cursor: pointer; padding: 8px 16px; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary); outline: none;">🩺 Diagnostics Audit</button>
                     <button class="portfolio-subtab-btn" id="port-tab-tax-btn" style="cursor: pointer; padding: 8px 16px; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; border: 1px solid transparent; background: transparent; color: var(--text-muted); outline: none;">💸 Tax & Harvesting</button>
                     <button class="portfolio-subtab-btn" id="port-tab-backtester-btn" style="cursor: pointer; padding: 8px 16px; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; border: 1px solid transparent; background: transparent; color: var(--text-muted); outline: none;">📊 Historical Backtester</button>
+                    <button class="portfolio-subtab-btn" id="port-tab-stress-btn" style="cursor: pointer; padding: 8px 16px; border-radius: 6px; font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s; border: 1px solid transparent; background: transparent; color: var(--text-muted); outline: none;">💥 Macro Stress Test</button>
                 </div>
 
                 <!-- PANEL 1: DIAGNOSTICS AUDIT -->
@@ -4692,6 +4693,57 @@
                                 <div id="backtest-rebalance-ledger-text" style="font-size: 11.5px; line-height: 1.6; font-family: 'Inter', sans-serif; color: var(--text-secondary); max-height: 300px; overflow-y: auto;">
                                     <!-- Rebalancing trades loaded dynamically -->
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANEL 4: MACRO STRESS TEST -->
+                <div id="port-panel-stress" class="portfolio-panel" style="display: none; margin-top: 15px;">
+                    <div class="card">
+                        <div class="card-header" style="border: none; padding: 0; margin-bottom: 15px;">
+                            <h3 style="display: flex; align-items: center; gap: 8px; margin: 0;">
+                                <span>💥 Macroeconomic Stress Tester</span>
+                                <span class="badge-rec" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">AI Simulation Active</span>
+                            </h3>
+                        </div>
+                        <p style="font-size: 11.5px; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.4;">
+                            Stress-test your active portfolio holdings against custom macroeconomic shock scenarios (e.g. interest rate spikes, commodity price surges, inflation hikes, or currency shocks). The AI Agent evaluates sector resilience, solvency parameters, and pricing power proxies to map out portfolio vulnerabilities.
+                        </p>
+
+                        <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 20px;" class="no-print">
+                            <input type="text" id="portfolio-stress-scenario-input" placeholder="Describe the macroeconomic scenario (e.g., Crude oil spikes to $110/barrel due to geopolitics, or US Fed cuts rates by 50bps)..." style="flex: 1; background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 6px; padding: 8px 12px; font-size: 11.5px; outline: none; height: 34px; box-sizing: border-box;">
+                            <button class="btn-primary" id="run-portfolio-stress-test-btn" style="height: 34px; padding: 0 16px; font-size: 11.5px; font-weight: 600; border-radius: 6px; background: var(--color-primary); color: #000; cursor: pointer; border: none; outline: none; transition: all 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">Run AI Stress Test</button>
+                        </div>
+
+                        <!-- Results display container -->
+                        <div id="portfolio-stress-test-results" style="display: none; border: 1px solid var(--border-glass); border-radius: 8px; padding: 15px; background: rgba(255,255,255,0.01);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; margin-bottom: 15px;">
+                                <h4 style="margin: 0; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                                    <span>📊 AI Risk Assessment Matrix</span>
+                                </h4>
+                                <span id="portfolio-stress-impact-badge" class="badge-rec" style="font-size: 10px; font-weight: 700; text-transform: uppercase;"></span>
+                            </div>
+                            
+                            <div style="margin-bottom: 15px;">
+                                <h5 style="margin: 0 0 6px 0; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Executive Scenario Summary</h5>
+                                <p id="portfolio-stress-summary-text" style="margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.5;"></p>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div style="border: 1px solid rgba(239, 68, 68, 0.15); border-radius: 6px; padding: 10px; background: rgba(239, 68, 68, 0.02);">
+                                    <h5 style="margin: 0 0 8px 0; font-size: 11px; color: #f87171; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">⚠️ Vulnerable Assets</h5>
+                                    <ul id="portfolio-stress-vulnerable-list" style="margin: 0; padding-left: 15px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.6;"></ul>
+                                </div>
+                                <div style="border: 1px solid rgba(16, 185, 129, 0.15); border-radius: 6px; padding: 10px; background: rgba(16, 185, 129, 0.02);">
+                                    <h5 style="margin: 0 0 8px 0; font-size: 11px; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px;">🛡️ Resilient Assets / Hedges</h5>
+                                    <ul id="portfolio-stress-resilient-list" style="margin: 0; padding-left: 15px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.6;"></ul>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h5 style="margin: 0 0 6px 0; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Actionable Portfolio Recommendations</h5>
+                                <ul id="portfolio-stress-recommendations-list" style="margin: 0; padding-left: 15px; font-size: 11.5px; color: var(--text-secondary); line-height: 1.6;"></ul>
                             </div>
                         </div>
                     </div>

@@ -471,6 +471,88 @@ class TestSwingAPIRoutes(unittest.TestCase):
         response_mxwll = self.client.get("/api/chart/indicator-synthesis?ticker=RELIANCE.NS&indicator=mxwll&length=10&mult=1.5")
         self.assertEqual(response_mxwll.status_code, 200)
 
+    @patch("backend.main.get_db")
+    @patch("backend.agent.call_groq_llm")
+    def test_post_portfolio_stress_test(self, mock_groq, mock_db):
+        """Verifies portfolio stress-test endpoint scoring and breakdown metrics."""
+        # Mock database portfolio items & cached profiles
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_db.return_value.__enter__.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cursor
+        
+        mock_cursor.fetchall.side_effect = [
+            [
+                {"id": 1, "symbol": "INFY.NS", "name": "Infosys", "sector": "IT", "quantity": 10, "purchase_price": 1500.0, "purchase_date": "2026-01-01", "transaction_type": "BUY"},
+                {"id": 2, "symbol": "RELIANCE.NS", "name": "Reliance", "sector": "Energy", "quantity": 5, "purchase_price": 2400.0, "purchase_date": "2026-01-01", "transaction_type": "BUY"}
+            ]
+        ]
+        mock_cursor.fetchone.side_effect = [
+            {"profile_json": json.dumps({"fundamentals": {"current_price": 1500.0, "pricing_power_proxy": "High", "debt_to_equity": 0.1}})},
+            {"profile_json": json.dumps({"fundamentals": {"current_price": 2400.0, "pricing_power_proxy": "Medium", "debt_to_equity": 0.4}})}
+        ]
+
+        mock_groq.return_value = json.dumps({
+            "explanation": "Vulnerable sectors, score 45/100",
+            "score": 45,
+            "table": [
+                {"holding": "INFY", "sector": "IT", "margin_impact": "Medium", "rating_risk": "Low", "verdict": "Hold"},
+                {"holding": "RELIANCE", "sector": "Energy", "margin_impact": "High", "rating_risk": "High", "verdict": "Reduce"}
+            ]
+        })
+        
+        payload = {
+            "scenario": "Crude spikes 30% and currency depreciates"
+        }
+        
+        response = self.client.post("/api/portfolio/stress-test", json=payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        analysis = data.get("analysis", {})
+        self.assertIn("score", analysis)
+        self.assertEqual(analysis["score"], 45)
+        self.assertIn("explanation", analysis)
+        self.assertIn("table", analysis)
+        self.assertEqual(len(analysis["table"]), 2)
+
+    def test_evaluate_single_condition_bool(self):
+        """Verifies evaluate_single_condition_bool correctly computes simple rules."""
+        import asyncio
+        from backend.main import evaluate_single_condition_bool
+        
+        mock_profile = {
+            "fundamentals": {
+                "pe_ratio": 25.0,
+                "current_price": 1000.0
+            },
+            "technicals": {
+                "rsi": 28.0,
+                "sma_200": 950.0
+            },
+            "pe_bands": {
+                "median_pe": 20.0
+            }
+        }
+        
+        # Test RSI < 30
+        triggered, cur_val = asyncio.run(evaluate_single_condition_bool(
+            "RSI", "<", "30", mock_profile, None
+        ))
+        self.assertTrue(triggered)
+        self.assertIn("RSI", cur_val)
+        
+        # Test RSI > 50 (should be false)
+        triggered, cur_val = asyncio.run(evaluate_single_condition_bool(
+            "RSI", ">", "50", mock_profile, None
+        ))
+        self.assertFalse(triggered)
+
+        # Test Price < 1200
+        triggered, cur_val = asyncio.run(evaluate_single_condition_bool(
+            "PRICE", "<", "1200", mock_profile, None
+        ))
+        self.assertTrue(triggered)
+
 
 class TestQuantScoring(unittest.TestCase):
     
