@@ -69,7 +69,11 @@ class AngelOneConnector:
             logger.error("Cannot authenticate: smartapi-python is not installed.")
             return False
 
-        for attempt in range(2):  # Auto-retry once
+        import random
+        # Randomized jitter to prevent multi-worker synchronized rate limits
+        time.sleep(random.uniform(0.2, 2.0))
+
+        for attempt in range(3):  # 3 attempts
             try:
                 totp_code = pyotp.TOTP(self.totp_key).now()
                 self.smart_connect = SmartConnect(api_key=self.api_key)
@@ -94,12 +98,12 @@ class AngelOneConnector:
                     logger.warning(
                         f"Angel One auth attempt {attempt + 1} failed: {msg}"
                     )
-                    if attempt == 0:
-                        time.sleep(2)  # Brief pause before retry (TOTP window)
+                    # Pause before retry with randomized backoff
+                    time.sleep(random.uniform(3.0, 7.0))
             except Exception as e:
                 logger.error(f"Angel One auth attempt {attempt + 1} exception: {e}")
-                if attempt == 0:
-                    time.sleep(2)
+                # Pause before retry with randomized backoff
+                time.sleep(random.uniform(3.0, 7.0))
 
         self._authenticated = False
         return False
