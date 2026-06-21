@@ -2680,6 +2680,22 @@
                                             <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #34d399; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-indicator-lrtc" style="cursor: pointer; accent-color: #10b981;"> LRTC
                                             </label>
+                                    </div>
+                                    <div style="font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); user-select: none; flex-wrap: wrap;">
+                                        <span>EMAs:</span>
+                                        <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="tv-ema-selector">
+                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; cursor: pointer; user-select: none; font-weight: 500;">
+                                                <input type="checkbox" id="tv-ema-20" checked style="cursor: pointer; accent-color: #3b82f6;"> EMA 20
+                                            </label>
+                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; cursor: pointer; user-select: none; font-weight: 500;">
+                                                <input type="checkbox" id="tv-ema-50" checked style="cursor: pointer; accent-color: #f59e0b;"> EMA 50
+                                            </label>
+                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #34d399; cursor: pointer; user-select: none; font-weight: 500;">
+                                                <input type="checkbox" id="tv-ema-100" style="cursor: pointer; accent-color: #10b981;"> EMA 100
+                                            </label>
+                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #f87171; cursor: pointer; user-select: none; font-weight: 500;">
+                                                <input type="checkbox" id="tv-ema-200" style="cursor: pointer; accent-color: #ef4444;"> EMA 200
+                                            </label>
                                         </div>
                                     </div>
                                     <input type="hidden" id="tv-active-indicator" value="lux-algo">
@@ -2770,13 +2786,21 @@
                                 <!-- Legend & Indicators Panel -->
                                 <div id="tv-chart-legend-panel" style="display: flex; gap: 15px; flex-wrap: wrap; justify-content: space-between; align-items: center; background: var(--bg-card-sub); padding: 10px 15px; border-radius: 6px; border: 1px solid var(--border-glass); font-size: 11px;">
                                     <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                        <div id="tv-legend-ema-20" style="display: flex; align-items: center; gap: 6px;">
                                             <span style="display: inline-block; width: 12px; height: 3px; background: #3b82f6; border-radius: 1px;"></span>
                                             <span style="color: var(--text-secondary);">EMA 20</span>
                                         </div>
-                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                        <div id="tv-legend-ema-50" style="display: flex; align-items: center; gap: 6px;">
                                             <span style="display: inline-block; width: 12px; height: 3px; background: #f59e0b; border-radius: 1px;"></span>
                                             <span style="color: var(--text-secondary);">EMA 50</span>
+                                        </div>
+                                        <div id="tv-legend-ema-100" style="display: none; align-items: center; gap: 6px;">
+                                            <span style="display: inline-block; width: 12px; height: 3px; background: #10b981; border-radius: 1px;"></span>
+                                            <span style="color: var(--text-secondary);">EMA 100</span>
+                                        </div>
+                                        <div id="tv-legend-ema-200" style="display: none; align-items: center; gap: 6px;">
+                                            <span style="display: inline-block; width: 12px; height: 3px; background: #ef4444; border-radius: 1px;"></span>
+                                            <span style="color: var(--text-secondary);">EMA 200</span>
                                         </div>
                                         <div class="tv-indicator-legend" style="display: flex; align-items: center; gap: 6px;">
                                             <span style="display: inline-block; width: 12px; height: 2px; border-top: 1px dashed #ef4444;"></span>

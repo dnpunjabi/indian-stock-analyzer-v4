@@ -20437,6 +20437,8 @@ let activeTVWorkstationChart = null;
 let activeTVCandleSeries = null;
 let activeTVEma20Series = null;
 let activeTVEma50Series = null;
+let activeTVEma100Series = null;
+let activeTVEma200Series = null;
 let activeTVResistanceSeries = null;
 let activeTVSupportSeries = null;
 let activeTVVolumeSeries = null;
@@ -24278,6 +24280,17 @@ async function renderTVWorkstationChart(symbol) {
     const showLrtcHistorical = document.getElementById('tv-lrtc-show-historical')?.checked ?? true;
     const showLrtcAlerts = document.getElementById('tv-lrtc-show-alerts')?.checked ?? true;
 
+    // EMA Selectors
+    const showEma20 = document.getElementById('tv-ema-20')?.checked ?? true;
+    const showEma50 = document.getElementById('tv-ema-50')?.checked ?? true;
+    const showEma100 = document.getElementById('tv-ema-100')?.checked ?? false;
+    const showEma200 = document.getElementById('tv-ema-200')?.checked ?? false;
+
+    if (document.getElementById('tv-legend-ema-20')) document.getElementById('tv-legend-ema-20').style.display = showEma20 ? 'flex' : 'none';
+    if (document.getElementById('tv-legend-ema-50')) document.getElementById('tv-legend-ema-50').style.display = showEma50 ? 'flex' : 'none';
+    if (document.getElementById('tv-legend-ema-100')) document.getElementById('tv-legend-ema-100').style.display = showEma100 ? 'flex' : 'none';
+    if (document.getElementById('tv-legend-ema-200')) document.getElementById('tv-legend-ema-200').style.display = showEma200 ? 'flex' : 'none';
+
     // Show/hide parameter controls based on active indicators
     const legendLegends = document.querySelectorAll('.tv-indicator-legend');
     const luxAlgoCtrls = document.querySelectorAll('.lux-algo-control-element');
@@ -24398,32 +24411,76 @@ async function renderTVWorkstationChart(symbol) {
         }
 
         // EMA 20
-        const ema20Series = chart.addLineSeries({
-            color: '#3b82f6',
-            lineWidth: 1.5,
-            title: 'EMA 20',
-            axisLabelVisible: false,
-            priceLineVisible: false
-        });
-        const ema20Data = data.candlesticks
-            .map(c => ({ time: c.time, value: c.ema_20 }))
-            .filter(d => d.value !== null && d.value !== undefined);
-        ema20Series.setData(ema20Data);
-        activeTVEma20Series = ema20Series;
+        if (showEma20) {
+            const ema20Series = chart.addLineSeries({
+                color: '#3b82f6',
+                lineWidth: 1.5,
+                title: 'EMA 20',
+                axisLabelVisible: false,
+                priceLineVisible: false
+            });
+            const ema20Data = data.candlesticks
+                .map(c => ({ time: c.time, value: c.ema_20 }))
+                .filter(d => d.value !== null && d.value !== undefined);
+            ema20Series.setData(ema20Data);
+            activeTVEma20Series = ema20Series;
+        } else {
+            activeTVEma20Series = null;
+        }
 
         // EMA 50
-        const ema50Series = chart.addLineSeries({
-            color: '#f59e0b',
-            lineWidth: 1.5,
-            title: 'EMA 50',
-            axisLabelVisible: false,
-            priceLineVisible: false
-        });
-        const ema50Data = data.candlesticks
-            .map(c => ({ time: c.time, value: c.ema_50 }))
-            .filter(d => d.value !== null && d.value !== undefined);
-        ema50Series.setData(ema50Data);
-        activeTVEma50Series = ema50Series;
+        if (showEma50) {
+            const ema50Series = chart.addLineSeries({
+                color: '#f59e0b',
+                lineWidth: 1.5,
+                title: 'EMA 50',
+                axisLabelVisible: false,
+                priceLineVisible: false
+            });
+            const ema50Data = data.candlesticks
+                .map(c => ({ time: c.time, value: c.ema_50 }))
+                .filter(d => d.value !== null && d.value !== undefined);
+            ema50Series.setData(ema50Data);
+            activeTVEma50Series = ema50Series;
+        } else {
+            activeTVEma50Series = null;
+        }
+
+        // EMA 100
+        if (showEma100) {
+            const ema100Series = chart.addLineSeries({
+                color: '#10b981',
+                lineWidth: 1.5,
+                title: 'EMA 100',
+                axisLabelVisible: false,
+                priceLineVisible: false
+            });
+            const ema100Data = data.candlesticks
+                .map(c => ({ time: c.time, value: c.ema_100 }))
+                .filter(d => d.value !== null && d.value !== undefined);
+            ema100Series.setData(ema100Data);
+            activeTVEma100Series = ema100Series;
+        } else {
+            activeTVEma100Series = null;
+        }
+
+        // EMA 200
+        if (showEma200) {
+            const ema200Series = chart.addLineSeries({
+                color: '#ef4444',
+                lineWidth: 1.5,
+                title: 'EMA 200',
+                axisLabelVisible: false,
+                priceLineVisible: false
+            });
+            const ema200Data = data.candlesticks
+                .map(c => ({ time: c.time, value: c.ema_200 }))
+                .filter(d => d.value !== null && d.value !== undefined);
+            ema200Series.setData(ema200Data);
+            activeTVEma200Series = ema200Series;
+        } else {
+            activeTVEma200Series = null;
+        }
 
         const mergedMarkers = [];
 
@@ -24998,6 +25055,31 @@ function updateIndicatorPillStyles() {
     });
 }
 
+function updateEmaPillStyles() {
+    const pills = [
+        { cb: document.getElementById('tv-ema-20'), color: '#3b82f6', bgChecked: 'rgba(59, 130, 246, 0.25)', borderChecked: '#3b82f6', colorChecked: '#93c5fd' },
+        { cb: document.getElementById('tv-ema-50'), color: '#f59e0b', bgChecked: 'rgba(245, 158, 11, 0.25)', borderChecked: '#f59e0b', colorChecked: '#fde047' },
+        { cb: document.getElementById('tv-ema-100'), color: '#10b981', bgChecked: 'rgba(16, 185, 129, 0.25)', borderChecked: '#10b981', colorChecked: '#6ee7b7' },
+        { cb: document.getElementById('tv-ema-200'), color: '#ef4444', bgChecked: 'rgba(239, 68, 68, 0.25)', borderChecked: '#ef4444', colorChecked: '#f87171' }
+    ];
+    pills.forEach(p => {
+        if (p.cb) {
+            const label = p.cb.closest('.indicator-pill');
+            if (label) {
+                if (p.cb.checked) {
+                    label.style.background = p.bgChecked;
+                    label.style.borderColor = p.borderChecked;
+                    label.style.color = p.colorChecked;
+                } else {
+                    label.style.background = 'rgba(255, 255, 255, 0.03)';
+                    label.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                    label.style.color = 'var(--text-muted)';
+                }
+            }
+        }
+    });
+}
+
 function setupTVWorkstationChartControls() {
     const activeInd = document.getElementById('tv-active-indicator');
     const lengthSelect = document.getElementById('tv-length');
@@ -25031,8 +25113,15 @@ function setupTVWorkstationChartControls() {
     const indicatorLuxSMC = document.getElementById('tv-indicator-lux-smc');
     const indicatorLRTC = document.getElementById('tv-indicator-lrtc');
 
+    // EMA checkboxes
+    const tvEma20 = document.getElementById('tv-ema-20');
+    const tvEma50 = document.getElementById('tv-ema-50');
+    const tvEma100 = document.getElementById('tv-ema-100');
+    const tvEma200 = document.getElementById('tv-ema-200');
+
     // Initialize pill styles
     updateIndicatorPillStyles();
+    updateEmaPillStyles();
 
     // Bind checkboxes and handle defaults
     const indCheckboxes = [
@@ -25062,6 +25151,18 @@ function setupTVWorkstationChartControls() {
                     if (indicatorLRTC?.checked) activeList.push('lrtc');
                     activeInd.value = activeList.length > 0 ? activeList.join(',') : 'none';
                 }
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    renderTVWorkstationChart(activeStockProfile.ticker);
+                }
+            });
+        }
+    });
+
+    const emaCheckboxes = [tvEma20, tvEma50, tvEma100, tvEma200];
+    emaCheckboxes.forEach(cb => {
+        if (cb) {
+            cb.addEventListener('change', () => {
+                updateEmaPillStyles();
                 if (activeStockProfile && activeStockProfile.ticker) {
                     renderTVWorkstationChart(activeStockProfile.ticker);
                 }
