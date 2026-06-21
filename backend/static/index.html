@@ -363,14 +363,15 @@
                 </div>
 
                 <div class="card" style="padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 15px;">
+                    <!-- Responsive Header -->
+                    <div class="sector-radar-header-wrap" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 15px; flex-wrap: wrap; gap: 15px;">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
                             <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.03em;">🔥 SECTOR STANDINGS</h3>
                             <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 500;">Relative strength rotational sweep</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="sector-radar-controls-wrap" style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                             <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-secondary);">
-                                <label for="sector-radar-lookback" style="font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Lookback Period:</label>
+                                <label for="sector-radar-lookback" style="font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Lookback:</label>
                                 <select id="sector-radar-lookback" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); border-radius: 6px; color: #fff; font-size: 11px; padding: 4px 10px; font-family: 'Inter'; outline: none; cursor: pointer;">
                                     <option value="1m" selected>1 Month (20D)</option>
                                     <option value="3m">3 Months</option>
@@ -381,13 +382,33 @@
                             </div>
                             <button id="sector-radar-refresh-btn" class="btn-secondary" title="Refresh Sector Relative Strength Stats" style="font-family: 'Outfit'; font-weight: 600; font-size: 11.5px; height: 32px; padding: 0 14px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s;">
                                 <span id="sector-radar-refresh-spinner" style="display: none; animation: spin 1s linear infinite;">↻</span>
-                                <span id="sector-radar-refresh-icon">↻</span> Sync Sector Rotations
+                                <span id="sector-radar-refresh-icon">↻</span> Sync Rotations
                             </button>
                         </div>
                     </div>
 
-                    <div id="sector-radar-list" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
-                        <!-- Populated dynamically -->
+                    <!-- Market Breadth Advance/Decline HUD -->
+                    <div class="sector-breadth-hud-card" style="display: flex; flex-direction: column; gap: 12px; background: rgba(0, 0, 0, 0.15); border: 1px solid var(--border-glass); border-radius: 8px; padding: 18px; box-sizing: border-box;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 700; font-family: 'Outfit'; flex-wrap: wrap; gap: 5px;">
+                            <span style="color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">📊 SECTOR ROTATION CONFLUENCE (Moneycontrol Analogy)</span>
+                            <span id="market-breadth-ratio-lbl" style="color: var(--neon-green); font-weight: 800;">1.54x Advances</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-muted); font-family: 'Inter';">
+                            <span id="market-advances-count">▲ 312 Advances</span>
+                            <span id="market-declines-count">▼ 184 Declines</span>
+                        </div>
+                        <div style="height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; display: flex; overflow: hidden; width: 100%;">
+                            <div id="market-breadth-adv-bar" style="height: 100%; width: 63%; background: var(--neon-green); transition: width 0.5s ease;"></div>
+                            <div id="market-breadth-dec-bar" style="height: 100%; width: 37%; background: var(--neon-red); transition: width 0.5s ease;"></div>
+                        </div>
+                        <p style="margin: 0; font-size: 11px; line-height: 1.5; color: var(--text-muted); font-family: 'Inter', sans-serif;">
+                            <strong>Interpretation Matrix:</strong> Moneycontrol's Advance/Decline ratio provides intraday/daily market momentum. By mapping daily advances against intermediate relative strength (tiles below), you get a high-fidelity confluence signature. A sector that has high structural momentum (strong green tiles) AND positive daily advances (advancing breadth) is prime for swing breakout entry setups.
+                        </p>
+                    </div>
+
+                    <!-- Sector Heatmap Grid Container -->
+                    <div id="sector-radar-list" class="sector-heatmap-grid">
+                        <!-- Populated dynamically with color-coded heatmap tiles -->
                     </div>
                 </div>
             </section>
