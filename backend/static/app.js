@@ -1550,8 +1550,45 @@ function renderActiveScreenerChips() {
     container.appendChild(createChip('Style', styleLabel, 'style'));
     container.appendChild(createChip('Universe', universeLabel, 'universe'));
 
+    // Append redirected filters if active
+    if (window.screenerSectorFilter) {
+        const sectorChip = document.createElement('div');
+        sectorChip.className = 'screener-filter-chip';
+        sectorChip.innerHTML = `<span>Sector: ${window.screenerSectorFilter}</span>`;
+        const clearBtn = document.createElement('span');
+        clearBtn.className = 'clear-chip-btn';
+        clearBtn.innerText = ' ✕';
+        clearBtn.style.cursor = 'pointer';
+        clearBtn.style.marginLeft = '5px';
+        clearBtn.addEventListener('click', () => {
+            window.screenerSectorFilter = null;
+            renderActiveScreenerChips();
+            runAIScreener();
+        });
+        sectorChip.appendChild(clearBtn);
+        container.appendChild(sectorChip);
+    }
+    if (window.screenerSymbolFilter) {
+        const symbolChip = document.createElement('div');
+        symbolChip.className = 'screener-filter-chip';
+        symbolChip.innerHTML = `<span>Stock: ${window.screenerSymbolFilter}</span>`;
+        const clearBtn = document.createElement('span');
+        clearBtn.className = 'clear-chip-btn';
+        clearBtn.innerText = ' ✕';
+        clearBtn.style.cursor = 'pointer';
+        clearBtn.style.marginLeft = '5px';
+        clearBtn.addEventListener('click', () => {
+            window.screenerSymbolFilter = null;
+            renderActiveScreenerChips();
+            runAIScreener();
+        });
+        symbolChip.appendChild(clearBtn);
+        container.appendChild(symbolChip);
+    }
+
     container.style.display = 'flex';
 }
+window.renderActiveScreenerChips = renderActiveScreenerChips;
 
 function resetScreenerFilter(type) {
     if (type === 'strategy') {
@@ -1785,9 +1822,11 @@ async function runAIScreener() {
     try {
         const encodedHorizon = encodeURIComponent(horizon);
         const encodedRisk = encodeURIComponent(risk);
-        const response = await fetch(`/api/discover?strategy=${activeScreenerStrategy}&universe=${universe}&horizon=${encodedHorizon}&risk=${encodedRisk}&style=${activeScreenerStyle}`);
+        const sectorParam = window.screenerSectorFilter ? encodeURIComponent(window.screenerSectorFilter) : '';
+        const symbolParam = window.screenerSymbolFilter ? encodeURIComponent(window.screenerSymbolFilter) : '';
+        const response = await fetch(`/api/discover?strategy=${activeScreenerStrategy}&universe=${universe}&horizon=${encodedHorizon}&risk=${encodedRisk}&style=${activeScreenerStyle}&sector=${sectorParam}&symbol=${symbolParam}`);
         if (!response.ok) throw new Error("Screener scan failed.");
-        const results = await response.json();
+        let results = await response.json();
 
         // Assign ranks initially
         results.forEach((item, index) => {
@@ -1817,6 +1856,7 @@ async function runAIScreener() {
         showToast("Failed to execute screener scan: " + e.message, 'error');
     }
 }
+window.runAIScreener = runAIScreener;
 
 function renderScreenerResults(results, isSorted = false) {
     const tbody = document.getElementById('screener-results-body');
@@ -24832,41 +24872,96 @@ window.renderTVWorkstationChart = renderTVWorkstationChart;
         }
     }
 
+    window.screenerSectorFilter = null;
+    window.screenerSymbolFilter = null;
+    window.activeSectorSentiments = {};
     window.renderSectorRegimeList = function() {
         const listEl = document.getElementById('sector-radar-list');
         const lookbackSelect = document.getElementById('sector-radar-lookback');
+        const capSelect = document.getElementById('sector-radar-cap');
         if (!listEl || !window.activeSectorRegimeData) return;
 
         const period = lookbackSelect ? lookbackSelect.value : '1m';
         const colName = `return_${period}`; // return_1m, return_3m, return_6m, return_1y, return_ytd
+        const selectedCap = capSelect ? capSelect.value.toLowerCase() : 'all';
 
-        // Make a copy and sort by the selected period return descending
-        const sectors = [...window.activeSectorRegimeData].sort((a, b) => {
-            const valA = a[colName] || 0.0;
-            const valB = b[colName] || 0.0;
-            return valB - valA;
-        });
-
-        // 1. Calculate dynamic Advance/Decline breadth metrics based on activeSectorRegimeData returns to represent market state
+        // 1. Process sectors and calculate stats dynamically on the client-side
+        const processedSectors = [];
         let totalAdvances = 0;
         let totalDeclines = 0;
-        sectors.forEach(s => {
-            const ret = s[colName] || 0.0;
-            if (ret >= 0) {
-                // Positive momentum sector implies strong market breadth
-                totalAdvances += Math.round(35 + (ret * 3.5));
-                totalDeclines += Math.round(15 + (10 / (ret + 1)));
+
+        window.activeSectorRegimeData.forEach(s => {
+            // Filter stocks by cap type
+            const filteredStocks = [];
+            (s.stocks || []).forEach(stk => {
+                if (selectedCap === 'all' || (stk.cap_type && stk.cap_type.toLowerCase() === selectedCap)) {
+                    filteredStocks.push(stk);
+                    const retVal = stk[colName] || 0.0;
+                    if (retVal >= 0) {
+                        totalAdvances++;
+                    } else {
+                        totalDeclines++;
+                    }
+                }
+            });
+
+            if (filteredStocks.length === 0) return;
+
+            // Re-average returns based on filtered stocks
+            const sumRet = filteredStocks.reduce((acc, curr) => acc + (curr[colName] || 0.0), 0.0);
+            const avgRet = sumRet / filteredStocks.length;
+
+            // Find leader and laggard inside the filtered list
+            let leader = filteredStocks[0];
+            let laggard = filteredStocks[0];
+            filteredStocks.forEach(stk => {
+                if ((stk[colName] || 0.0) > (leader[colName] || 0.0)) leader = stk;
+                if ((stk[colName] || 0.0) < (laggard[colName] || 0.0)) laggard = stk;
+            });
+
+            let leader_sym = "N/A";
+            let leader_ret = 0.0;
+            let laggard_sym = "N/A";
+            let laggard_ret = 0.0;
+
+            if (filteredStocks.length === 1) {
+                const singleStock = filteredStocks[0];
+                const singleRet = singleStock[colName] || 0.0;
+                if (singleRet >= 0) {
+                    leader_sym = singleStock.symbol.replace(".NS", "");
+                    leader_ret = singleRet;
+                    laggard_sym = "N/A";
+                    laggard_ret = 0.0;
+                } else {
+                    leader_sym = "N/A";
+                    leader_ret = 0.0;
+                    laggard_sym = singleStock.symbol.replace(".NS", "");
+                    laggard_ret = singleRet;
+                }
             } else {
-                // Negative momentum sector implies weak market breadth
-                totalAdvances += Math.round(15 + (10 / (Math.abs(ret) + 1)));
-                totalDeclines += Math.round(35 + (Math.abs(ret) * 3.5));
+                leader_sym = leader.symbol.replace(".NS", "");
+                leader_ret = leader[colName] || 0.0;
+                laggard_sym = laggard.symbol.replace(".NS", "");
+                laggard_ret = laggard[colName] || 0.0;
             }
+
+            processedSectors.push({
+                sector: s.sector,
+                updated_at: s.updated_at,
+                avg_return: avgRet,
+                stocks_count: filteredStocks.length,
+                leader_symbol: leader_sym,
+                leader_return: leader_ret,
+                laggard_symbol: laggard_sym,
+                laggard_return: laggard_ret,
+                stocks: filteredStocks
+            });
         });
-        
-        // Safety bounds
-        if (totalAdvances < 10) totalAdvances = 180;
-        if (totalDeclines < 10) totalDeclines = 120;
-        
+
+        // Sort sectors descending by average return
+        processedSectors.sort((a, b) => b.avg_return - a.avg_return);
+
+        // 2. Render color-coded Advance/Decline HUD
         const ratio = totalDeclines > 0 ? (totalAdvances / totalDeclines) : 1.0;
         const totalCount = totalAdvances + totalDeclines;
         const advPct = totalCount > 0 ? (totalAdvances / totalCount * 100) : 50;
@@ -24887,18 +24982,18 @@ window.renderTVWorkstationChart = renderTVWorkstationChart;
         if (advBar) advBar.style.width = `${advPct}%`;
         if (decBar) decBar.style.width = `${decPct}%`;
 
-        // 2. Render color-coded Heatmap Matrix tiles
+        // 3. Render color-coded Heatmap Matrix tiles
         listEl.innerHTML = '';
-        if (sectors.length === 0) {
-            listEl.innerHTML = '<div style="font-size:10px; color:var(--text-muted); text-align:center; padding:15px; grid-column: 1/-1;">No sector relative strength data available.</div>';
+        if (processedSectors.length === 0) {
+            listEl.innerHTML = '<div style="font-size:10px; color:var(--text-muted); text-align:center; padding:15px; grid-column: 1/-1;">No sectors match the selected capitalization filter.</div>';
             return;
         }
 
         // Find max return value for scaling
-        const maxVal = Math.max(...sectors.map(s => Math.abs(s[colName] || 0.1)));
+        const maxVal = Math.max(...processedSectors.map(s => Math.abs(s.avg_return || 0.1)));
 
-        sectors.forEach(s => {
-            const ret = s[colName] || 0.0;
+        processedSectors.forEach(s => {
+            const ret = s.avg_return || 0.0;
             const absPct = maxVal > 0 ? (Math.abs(ret) / maxVal) * 100 : 0;
             const sign = ret >= 0 ? '+' : '';
             
@@ -24909,77 +25004,306 @@ window.renderTVWorkstationChart = renderTVWorkstationChart;
             let barColor = 'rgba(255, 255, 255, 0.1)';
 
             if (ret >= 5.0) {
-                // Outperforming sector (Deep Green)
                 tileBg = 'rgba(16, 185, 129, 0.15)';
                 tileBorder = '1px solid rgba(16, 185, 129, 0.4)';
                 valueColor = 'var(--neon-green)';
                 barColor = 'var(--neon-green)';
             } else if (ret > 0.0) {
-                // Moderate Outperforming (Soft Green)
                 tileBg = 'rgba(16, 185, 129, 0.05)';
                 tileBorder = '1px solid rgba(16, 185, 129, 0.18)';
                 valueColor = '#a7f3d0';
                 barColor = 'rgba(16, 185, 129, 0.6)';
             } else if (ret <= -5.0) {
-                // Underperforming sector (Deep Red)
                 tileBg = 'rgba(239, 68, 68, 0.15)';
                 tileBorder = '1px solid rgba(239, 68, 68, 0.4)';
                 valueColor = 'var(--neon-red)';
                 barColor = 'var(--neon-red)';
             } else if (ret < 0.0) {
-                // Moderate Underperforming (Soft Red)
                 tileBg = 'rgba(239, 68, 68, 0.05)';
                 tileBorder = '1px solid rgba(239, 68, 68, 0.18)';
                 valueColor = '#fca5a5';
                 barColor = 'rgba(239, 68, 68, 0.6)';
             }
 
+            // Sentiment Overlay
+            const sentimentScore = window.activeSectorSentiments[s.sector];
+            let sentimentHtml = '';
+            if (sentimentScore !== undefined) {
+                const icon = sentimentScore >= 60 ? '🐂' : (sentimentScore <= 40 ? '🐻' : '⚖️');
+                const col = sentimentScore >= 60 ? 'var(--neon-green)' : (sentimentScore <= 40 ? 'var(--neon-red)' : '#f59e0b');
+                sentimentHtml = `<span style="font-size: 9.5px; background: var(--bg-glass-input); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-glass); font-weight: 700; color: ${col}; display: inline-flex; align-items: center; gap: 3px;">
+                                    🌡️ ${icon} ${sentimentScore}% Sent.
+                                 </span>`;
+            } else {
+                sentimentHtml = `<span style="font-size: 9.5px; background: var(--bg-glass-input); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-glass); font-weight: 500; color: var(--text-muted); display: inline-flex; align-items: center; gap: 3px;" title="Click 'Analyze Rotation' button below to calculate live news-driven sentiment ratings">
+                                    🌡️ AI Sent: --%
+                                 </span>`;
+            }
+
             const tile = document.createElement('div');
             tile.className = 'sector-heatmap-tile';
             tile.style.background = tileBg;
             tile.style.border = tileBorder;
-            tile.title = `Last calculated: ${s.updated_at}\nClick to sweep this sector in the Screener!`;
+            tile.title = `Last calculated: ${s.updated_at}\nClick to view constituent stocks!`;
 
             tile.innerHTML = `
                 <div class="sector-heatmap-tile-header">
-                    <span class="sector-heatmap-tile-title">${s.sector}</span>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span class="sector-heatmap-tile-title">${s.sector}</span>
+                        <div style="margin-top: 2px;">${sentimentHtml}</div>
+                    </div>
                     <span class="sector-heatmap-tile-pct" style="color: ${valueColor};">${sign}${ret.toFixed(2)}%</span>
+                </div>
+                <div class="sector-heatmap-tile-drivers" style="margin-top: 10px; font-size: 10.5px; line-height: 1.35; display: flex; flex-direction: column; gap: 2px; width: 100%; box-sizing: border-box;">
+                    <span style="color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block; width: 100%;">
+                        🟢 <strong style="color: var(--neon-green);">Leader:</strong> ${s.leader_symbol !== 'N/A' ? `${s.leader_symbol} (${s.leader_return >= 0 ? '+' : ''}${s.leader_return.toFixed(1)}%)` : 'N/A'}
+                    </span>
+                    <span style="color: var(--text-secondary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; display: block; width: 100%;">
+                        🔴 <strong style="color: var(--neon-red);">Laggard:</strong> ${s.laggard_symbol !== 'N/A' ? `${s.laggard_symbol} (${s.laggard_return >= 0 ? '+' : ''}${s.laggard_return.toFixed(1)}%)` : 'N/A'}
+                    </span>
                 </div>
                 <div class="sector-heatmap-tile-bar-bg">
                     <div class="sector-heatmap-tile-bar-fill" style="width: ${absPct}%; background: ${barColor};"></div>
                 </div>
+                <div class="sector-heatmap-tile-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; font-size: 11px; width: 100%; border-top: 1px solid rgba(255, 255, 255, 0.04); padding-top: 8px;">
+                    <span class="view-stocks-btn" style="color: var(--color-primary); font-weight: 700; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                        🔍 View ${s.stocks_count} Stocks
+                    </span>
+                    <span class="screen-sector-btn" style="color: var(--text-muted); text-decoration: underline; cursor: pointer;">
+                        Screener ↗
+                    </span>
+                </div>
             `;
             
-            // Add click action to search sectors inside the Screener tab
-            tile.addEventListener('click', () => {
-                const styleSelect = document.getElementById('screener-style-select');
-                const universeSelect = document.getElementById('screener-universe-select');
-                if (styleSelect) styleSelect.value = 'all';
-                if (universeSelect) universeSelect.value = 'all';
-                
-                // Fire custom screener logic using target sector name if available
-                const runScreenerBtn = document.getElementById('run-screener-btn');
-                if (runScreenerBtn && window.switchTab) {
-                    window.switchTab('screener');
-                    // Find active strategy button and trigger scan
-                    const activeStrategyBtn = document.querySelector('.strategy-btn.active');
-                    const strategy = activeStrategyBtn ? activeStrategyBtn.getAttribute('data-strategy') : 'hybrid';
-                    
-                    // Trigger screener run with sector filter override
-                    if (window.runScreenerScan) {
-                        window.runScreenerScan(strategy, 'all', 'all', s.sector);
-                    }
+            // Clicking the main tile area opens the stock modal
+            tile.addEventListener('click', (e) => {
+                if (e.target.closest('.screen-sector-btn') || e.target.closest('.view-stocks-btn')) {
+                    return;
                 }
+                window.openSectorStocksModal(s.sector, s.stocks, period);
             });
+            
+            // View stocks button triggers modal
+            const viewBtn = tile.querySelector('.view-stocks-btn');
+            if (viewBtn) {
+                viewBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    window.openSectorStocksModal(s.sector, s.stocks, period);
+                });
+            }
+            
+            // Screener link triggers scan redirection
+            const screenBtn = tile.querySelector('.screen-sector-btn');
+            if (screenBtn) {
+                screenBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    window.screenerSectorFilter = s.sector;
+                    window.screenerSymbolFilter = null;
+
+                    const styleSelect = document.getElementById('screener-style-select');
+                    const universeSelect = document.getElementById('screener-universe-select');
+                    if (styleSelect) styleSelect.value = 'all';
+                    if (universeSelect) universeSelect.value = 'all';
+
+                    if (window.switchTab) {
+                        window.switchTab('screener');
+                        
+                        // Set the global variables in our script scope
+                        activeScreenerStrategy = 'hybrid';
+                        activeScreenerStyle = 'all';
+
+                        const strategyBtns = document.querySelectorAll('#tab-screener .strategy-btn');
+                        strategyBtns.forEach(btn => {
+                            btn.classList.remove('active');
+                            if (btn.getAttribute('data-strategy') === 'hybrid') btn.classList.add('active');
+                        });
+
+                        if (window.renderActiveScreenerChips) {
+                            window.renderActiveScreenerChips();
+                        }
+                        if (window.runAIScreener) {
+                            window.runAIScreener();
+                        }
+                    }
+                });
+            }
 
             listEl.appendChild(tile);
         });
+    };
+
+    window.openSectorStocksModal = function(sectorName, stocksList, period) {
+        const modal = document.getElementById('sector-stocks-modal');
+        const titleEl = document.getElementById('sector-stocks-modal-title');
+        const badgeEl = document.getElementById('sector-stocks-horizon-badge');
+        const searchInput = document.getElementById('sector-stocks-search');
+        const tableBody = document.getElementById('sector-stocks-table-body');
+        const closeBtn = document.getElementById('sector-stocks-modal-close-btn');
+
+        if (!modal || !tableBody) return;
+
+        // Reset search input
+        if (searchInput) searchInput.value = '';
+
+        // Map period labels
+        const horizonLabels = {
+            '1m': '1 Month (20D)',
+            '3m': '3 Months',
+            '6m': '6 Months',
+            '1y': '1 Year',
+            'ytd': 'Year-To-Date (YTD)'
+        };
+        if (badgeEl) badgeEl.innerText = horizonLabels[period] || period;
+        if (titleEl) titleEl.innerText = `🔥 ${sectorName} Sector Constituents`;
+
+        const activeCol = `return_${period}`;
+
+        // Keep local copy sorted descending by return in the active period
+        let stocks = [...stocksList].sort((a, b) => {
+            const valA = a[activeCol] || 0.0;
+            const valB = b[activeCol] || 0.0;
+            return valB - valA;
+        });
+
+        function renderRows(filteredStocks) {
+            tableBody.innerHTML = '';
+            if (filteredStocks.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; padding: 15px; color: var(--text-muted);">No stocks matching filter.</td></tr>`;
+                return;
+            }
+
+            filteredStocks.forEach(stk => {
+                const ret1m = stk.return_1m || 0.0;
+                const ret3m = stk.return_3m || 0.0;
+                const ret6m = stk.return_6m || 0.0;
+                const ret1y = stk.return_1y || 0.0;
+
+                // Color-coded pill builder
+                function getPillHtml(val) {
+                    const sign = val >= 0 ? '+' : '';
+                    const col = val >= 5.0 ? 'var(--neon-green)' : (val >= 0.0 ? '#a7f3d0' : (val <= -5.0 ? 'var(--neon-red)' : '#fca5a5'));
+                    const bg = val >= 5.0 ? 'rgba(16, 185, 129, 0.15)' : (val >= 0.0 ? 'rgba(16, 185, 129, 0.05)' : (val <= -5.0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.05)'));
+                    return `<span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: ${col}; background: ${bg}; border: 1px solid rgba(255,255,255,0.03); font-family: 'Outfit'; min-width: 50px; text-align: right;">${sign}${val.toFixed(1)}%</span>`;
+                }
+
+                // Cap badge
+                let capBadgeHtml = '';
+                const cap = (stk.cap_type || 'small').toLowerCase();
+                if (cap === 'large') {
+                    capBadgeHtml = `<span style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; padding: 1px 4px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">L</span>`;
+                } else if (cap === 'mid') {
+                    capBadgeHtml = `<span style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 1px 4px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">M</span>`;
+                } else {
+                    capBadgeHtml = `<span style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; padding: 1px 4px; border-radius: 4px; font-size: 9.5px; font-weight: 700;">S</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--border-glass)';
+
+                tr.innerHTML = `
+                    <td style="padding: 10px 12px; font-weight: 700; color: var(--color-primary);">${stk.symbol.replace(".NS", "")}</td>
+                    <td style="padding: 10px 12px; color: var(--text-secondary); max-width: 250px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${stk.company_name}</td>
+                    <td style="padding: 10px 12px; text-align: center;">${capBadgeHtml}</td>
+                    <td style="padding: 10px 12px; text-align: center;">${getPillHtml(ret1m)}</td>
+                    <td style="padding: 10px 12px; text-align: center;">${getPillHtml(ret3m)}</td>
+                    <td style="padding: 10px 12px; text-align: center;">${getPillHtml(ret6m)}</td>
+                    <td style="padding: 10px 12px; text-align: center;">${getPillHtml(ret1y)}</td>
+                    <td style="padding: 10px 12px; text-align: center; display: flex; gap: 6px; justify-content: center; align-items: center;">
+                        <button class="btn-primary modal-analyze-btn" style="height: 24px; padding: 0 8px; border-radius: 4px; font-size: 9.5px; font-weight: 700; background: var(--color-primary); color: #000; border: none; cursor: pointer; font-family: 'Outfit';">Analyze 📈</button>
+                        <button class="btn-secondary modal-screen-btn" style="height: 24px; padding: 0 8px; border-radius: 4px; font-size: 9.5px; font-weight: 700; cursor: pointer; font-family: 'Outfit';">Screen 🔍</button>
+                    </td>
+                `;
+
+                // Bind Analyze button click
+                tr.querySelector('.modal-analyze-btn').addEventListener('click', () => {
+                    modal.style.display = 'none';
+                    if (window.switchTab) window.switchTab('analyzer');
+                    if (window.loadStockAnalyzer) {
+                        window.loadStockAnalyzer(stk.symbol);
+                    }
+                });
+
+                // Bind Screen button click
+                tr.querySelector('.modal-screen-btn').addEventListener('click', () => {
+                    modal.style.display = 'none';
+                    window.screenerSectorFilter = null;
+                    window.screenerSymbolFilter = stk.symbol.replace(".NS", "");
+
+                    const styleSelect = document.getElementById('screener-style-select');
+                    const universeSelect = document.getElementById('screener-universe-select');
+                    if (styleSelect) styleSelect.value = 'all';
+                    if (universeSelect) universeSelect.value = 'all';
+
+                    if (window.switchTab) {
+                        window.switchTab('screener');
+                        
+                        activeScreenerStrategy = 'hybrid';
+                        activeScreenerStyle = 'all';
+
+                        const strategyBtns = document.querySelectorAll('#tab-screener .strategy-btn');
+                        strategyBtns.forEach(btn => {
+                            btn.classList.remove('active');
+                            if (btn.getAttribute('data-strategy') === 'hybrid') btn.classList.add('active');
+                        });
+
+                        if (window.renderActiveScreenerChips) {
+                            window.renderActiveScreenerChips();
+                        }
+                        if (window.runAIScreener) {
+                            window.runAIScreener();
+                        }
+                    }
+                });
+                
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // Render all stocks initially
+        renderRows(stocks);
+
+        // Search filtering keyup handler
+        if (searchInput) {
+            const onSearch = () => {
+                const query = searchInput.value.toLowerCase().trim();
+                const filtered = stocks.filter(stk => 
+                    stk.symbol.toLowerCase().includes(query) || 
+                    stk.company_name.toLowerCase().includes(query)
+                );
+                renderRows(filtered);
+            };
+            searchInput.removeEventListener('input', searchInput._onInput);
+            searchInput._onInput = onSearch;
+            searchInput.addEventListener('input', onSearch);
+        }
+
+        // Show modal wrapper
+        modal.style.display = 'flex';
+
+        // Close bindings
+        const onClose = () => {
+            modal.style.display = 'none';
+        };
+        if (closeBtn) {
+            closeBtn.onclick = onClose;
+        }
+        modal.onclick = (e) => {
+            if (e.target === modal) onClose();
+        };
     };
 
     window.setupSectorRadarControls = function() {
         const lookbackSelect = document.getElementById('sector-radar-lookback');
         if (lookbackSelect) {
             lookbackSelect.addEventListener('change', () => {
+                if (window.renderSectorRegimeList && window.activeSectorRegimeData) {
+                    window.renderSectorRegimeList();
+                }
+            });
+        }
+        const capSelect = document.getElementById('sector-radar-cap');
+        if (capSelect) {
+            capSelect.addEventListener('change', () => {
                 if (window.renderSectorRegimeList && window.activeSectorRegimeData) {
                     window.renderSectorRegimeList();
                 }
@@ -24992,6 +25316,217 @@ window.renderTVWorkstationChart = renderTVWorkstationChart;
                     window.loadScreenerSectorRegime(true);
                 }
             });
+        }
+
+        // 4. Wire up On-Demand AI Rotation Insights
+        const aiBtn = document.getElementById('sector-ai-btn');
+        const aiSpinner = document.getElementById('sector-ai-spinner');
+        const aiContent = document.getElementById('sector-ai-content');
+        const chatArea = document.getElementById('sector-ai-chat-area');
+        const chatStream = document.getElementById('sector-ai-chat-stream');
+        const chatInput = document.getElementById('sector-ai-chat-input');
+        const chatSend = document.getElementById('sector-ai-chat-send');
+
+        let chatHistory = [];
+
+        if (aiBtn) {
+            aiBtn.onclick = async () => {
+                try {
+                    if (aiSpinner) aiSpinner.style.display = 'inline-block';
+                    aiBtn.setAttribute('disabled', 'true');
+                    aiContent.innerHTML = 'Consulting AI rotation strategist and pulling live yfinance driver catalysts... Please wait.';
+
+                    const period = lookbackSelect ? lookbackSelect.value : '1m';
+                    const capType = capSelect ? capSelect.value : 'all';
+
+                    const response = await fetch('/api/screener/sector-regime/ai-analysis', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cap_type: capType, period: period })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Server returned status code ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Store sector sentiments and redraw matrix with thermometers!
+                    if (data.sector_sentiments) {
+                        window.activeSectorSentiments = data.sector_sentiments;
+                        window.renderSectorRegimeList();
+                    }
+
+                    // Render insights HTML
+                    let alphaHtml = '';
+                    if (data.alpha_ideas && data.alpha_ideas.length > 0) {
+                        alphaHtml = `<div style="margin-top: 10px;">
+                                        <strong style="color: var(--color-primary);">🧬 AI Alpha Breakout Ideas:</strong>
+                                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;">
+                                            ${data.alpha_ideas.map(item => `
+                                                <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 4px;">
+                                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                                        <span class="chat-ticker-btn" data-ticker="${item.symbol}" style="font-weight: 700; color: var(--color-primary); cursor: pointer; text-decoration: underline;">
+                                                            ${item.symbol.replace(".NS", "")} (${item.sector})
+                                                        </span>
+                                                        <span style="font-size: 10px; color: var(--text-muted);">${item.company_name}</span>
+                                                    </div>
+                                                    <div style="color: var(--text-secondary); font-size: 11px;">${item.reasoning}</div>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                     </div>`;
+                    }
+
+                    let riskHtml = '';
+                    if (data.risk_flags && data.risk_flags.length > 0) {
+                        riskHtml = `<div style="margin-top: 10px;">
+                                        <strong style="color: var(--neon-red);">⚠️ Rotational Risk Warnings:</strong>
+                                        <ul style="margin: 6px 0 0 0; padding-left: 20px; color: var(--text-secondary);">
+                                            ${data.risk_flags.map(item => `<li><strong style="color: var(--text-primary);">${item.sector}:</strong> ${item.flag_reason}</li>`).join('')}
+                                        </ul>
+                                     </div>`;
+                    }
+
+                    aiContent.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <div>
+                                <strong style="color: #a5b4fc;">💡 Rotation Commentary:</strong> ${data.commentary}
+                            </div>
+                            <div style="border-top: 1px solid rgba(255,255,255,0.04); padding-top: 8px;">
+                                <strong style="color: #a5b4fc;">📊 Top-Down Macro Allocator Analysis:</strong> ${data.macro_allocator}
+                            </div>
+                            ${alphaHtml}
+                            ${riskHtml}
+                        </div>
+                    `;
+
+                    // Bind chat ticker clicks
+                    aiContent.querySelectorAll('.chat-ticker-btn').forEach(btn => {
+                        btn.onclick = () => {
+                            const ticker = btn.getAttribute('data-ticker');
+                            if (window.switchTab) window.switchTab('analyzer');
+                            if (window.loadStockAnalyzer) window.loadStockAnalyzer(ticker);
+                        };
+                    });
+
+                    // Reveal Chat Co-Pilot Interface
+                    if (chatArea) {
+                        chatArea.style.display = 'flex';
+                        if (chatStream) {
+                            chatStream.innerHTML = `
+                                <div style="margin-bottom: 4px;">
+                                    <span style="color: var(--color-primary); font-weight: 700;">[Co-Pilot]</span>
+                                    Hello! I am your Rotation Co-Pilot, operating context-aware of the current standings (${capType} cap segment over ${period} horizon). Ask me any follow-up question!
+                                </div>
+                            `;
+                            chatHistory = [
+                                { role: "assistant", content: `Hello! I am your Rotation Co-Pilot, operating context-aware of the current standings (${capType} cap segment over ${period} horizon). Ask me any follow-up question!` }
+                            ];
+                        }
+                    }
+
+                } catch (e) {
+                    console.error("AI Rotation analysis query failed:", e);
+                    aiContent.innerHTML = `<span style="color: var(--neon-red);">Failed to query AI Rotational intelligence. Please verify your Groq API key: ${e.message}</span>`;
+                } finally {
+                    if (aiSpinner) aiSpinner.style.display = 'none';
+                    aiBtn.removeAttribute('disabled');
+                }
+            };
+        }
+
+        // Setup Chat sending logic
+        if (chatSend && chatInput && chatStream) {
+            const handleChatSend = async () => {
+                const query = chatInput.value.trim();
+                if (!query) return;
+
+                chatInput.value = '';
+                
+                // Append user bubble
+                chatStream.innerHTML += `
+                    <div style="margin-top: 6px;">
+                        <span style="color: #a5b4fc; font-weight: 700;">[User]</span> ${query}
+                    </div>
+                `;
+                chatHistory.push({ role: "user", content: query });
+                chatStream.scrollTop = chatStream.scrollHeight;
+
+                // Append loading bubble
+                const loadId = `copilot-load-${Date.now()}`;
+                chatStream.innerHTML += `
+                    <div id="${loadId}" style="margin-top: 6px; color: var(--text-muted);">
+                        <span style="color: var(--color-primary); font-weight: 700;">[Co-Pilot]</span> thinking...
+                    </div>
+                `;
+                chatStream.scrollTop = chatStream.scrollHeight;
+
+                try {
+                    const period = lookbackSelect ? lookbackSelect.value : '1m';
+                    const capType = capSelect ? capSelect.value : 'all';
+
+                    // Gather active standings summary to feed chatbot context
+                    const response = await fetch('/api/screener/sector-regime/ai-chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            question: query,
+                            history: chatHistory,
+                            sector_data: window.activeSectorRegimeData
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Server returned ${response.status}`);
+                    }
+
+                    const reply = await response.json();
+                    
+                    // Remove loading bubble
+                    const loadEl = document.getElementById(loadId);
+                    if (loadEl) loadEl.remove();
+
+                    // Parse any markdown ticker formats like [TCS.NS] into clickable tags
+                    let formattedReply = reply.replace(/\[([A-Z0-9_\-\.]+)(?:\.NS)?\]/g, (match, ticker) => {
+                        const cleanTicker = ticker.includes(".NS") ? ticker : `${ticker}.NS`;
+                        return `<span class="chat-inline-ticker" data-ticker="${cleanTicker}" style="font-weight: 700; color: var(--color-primary); cursor: pointer; text-decoration: underline;">${ticker}</span>`;
+                    });
+
+                    chatStream.innerHTML += `
+                        <div style="margin-top: 6px;">
+                            <span style="color: var(--color-primary); font-weight: 700;">[Co-Pilot]</span> ${formattedReply}
+                        </div>
+                    `;
+                    chatHistory.push({ role: "assistant", content: reply });
+                    chatStream.scrollTop = chatStream.scrollHeight;
+
+                    // Bind inline ticker clicks
+                    chatStream.querySelectorAll('.chat-inline-ticker').forEach(btn => {
+                        btn.onclick = () => {
+                            const ticker = btn.getAttribute('data-ticker');
+                            if (window.switchTab) window.switchTab('analyzer');
+                            if (window.loadStockAnalyzer) window.loadStockAnalyzer(ticker);
+                        };
+                    });
+
+                } catch (err) {
+                    console.error("Co-Pilot Chat response failed:", err);
+                    const loadEl = document.getElementById(loadId);
+                    if (loadEl) loadEl.remove();
+                    chatStream.innerHTML += `
+                        <div style="margin-top: 6px; color: var(--neon-red);">
+                            <span style="color: var(--color-primary); font-weight: 700;">[Co-Pilot]</span> Connection error. Failed to query AI assistant.
+                        </div>
+                    `;
+                    chatStream.scrollTop = chatStream.scrollHeight;
+                }
+            };
+
+            chatSend.onclick = handleChatSend;
+            chatInput.onkeydown = (e) => {
+                if (e.key === 'Enter') handleChatSend();
+            };
         }
     };
 

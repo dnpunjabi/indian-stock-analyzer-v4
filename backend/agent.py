@@ -611,7 +611,7 @@ async def run_cio_parent_agent(query: str, horizon: str, risk_profile: str, cust
     return profile
 
 # 5. Dynamic AI Stock Screener Engine (Discovery with Mid & Small Cap Support!)
-def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "Long-term (3+ years)", risk_profile: str = "Moderate", style: str = "all") -> list:
+def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "Long-term (3+ years)", risk_profile: str = "Moderate", style: str = "all", target_sector: str = None, target_symbol: str = None) -> list:
     """
     Screens the pre-populated Large, Mid, and Small Cap universe and returns ranked recommendations.
     Strictly implements Top-Down, Bottom-Up, and Hybrid pipelines with dynamic quality gates,
@@ -635,7 +635,12 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
     try:
         with get_db() as conn:
             cursor = conn.cursor()
-            if universe == "all":
+            if target_symbol and target_symbol.strip():
+                sym = target_symbol.strip()
+                cursor.execute("SELECT symbol, company_name, sector, cap_type FROM screener_universe WHERE (symbol LIKE ? OR company_name LIKE ?) AND symbol NOT LIKE '%DUMMY%'", (f"%{sym}%", f"%{sym}%"))
+            elif target_sector and target_sector.strip():
+                cursor.execute("SELECT symbol, company_name, sector, cap_type FROM screener_universe WHERE sector = ? AND symbol NOT LIKE '%DUMMY%'", (target_sector.strip(),))
+            elif universe == "all":
                 cursor.execute("SELECT symbol, company_name, sector, cap_type FROM screener_universe WHERE symbol NOT LIKE '%DUMMY%'")
             else:
                 cursor.execute("SELECT symbol, company_name, sector, cap_type FROM screener_universe WHERE cap_type = ? AND symbol NOT LIKE '%DUMMY%'", (universe,))
@@ -845,8 +850,9 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
                         gates_passed = False
                     
             if not gates_passed:
-                if strategy == "bottom_up" or strategy == "hybrid" or strategy == "top_down" or style != "all":
-                    continue
+                if not (target_symbol or target_sector):
+                    if strategy == "bottom_up" or strategy == "hybrid" or strategy == "top_down" or style != "all":
+                        continue
                     
             # ============================================================
             # LAYER 3: Scoring & Recommendation Badge

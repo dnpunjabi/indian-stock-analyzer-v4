@@ -172,6 +172,20 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """)
+        # Persistent stock regime stats table
+        cursor.execute("DROP TABLE IF EXISTS stock_regime_stats")
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stock_regime_stats (
+            symbol TEXT PRIMARY KEY,
+            sector TEXT,
+            return_1m REAL,
+            return_3m REAL,
+            return_6m REAL,
+            return_1y REAL,
+            return_ytd REAL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
         # Persistent corporate actions table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS corporate_actions (
@@ -1005,6 +1019,19 @@ def update_sector_regime_stats():
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with get_db() as conn:
             cursor = conn.cursor()
+            # Clear old stock regime stats
+            cursor.execute("DELETE FROM stock_regime_stats")
+            # Insert individual stock returns
+            for s in stocks:
+                sym = s["symbol"]
+                sec = s["sector"]
+                if sym in returns_1m:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO stock_regime_stats 
+                        (symbol, sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (sym, sec, round(returns_1m[sym], 2), round(returns_3m[sym], 2), round(returns_6m[sym], 2), round(returns_1y[sym], 2), round(returns_ytd[sym], 2), now_str))
+            
             for sec, vals in sector_returns.items():
                 avg_1m = sum(vals["1m"]) / len(vals["1m"]) if vals["1m"] else 0.0
                 avg_3m = sum(vals["3m"]) / len(vals["3m"]) if vals["3m"] else 0.0
@@ -1017,14 +1044,25 @@ def update_sector_regime_stats():
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (sec, round(avg_1m, 2), round(avg_3m, 2), round(avg_6m, 2), round(avg_1y, 2), round(avg_ytd, 2), now_str))
             conn.commit()
-        print("Sector relative strength regime stats computed successfully.")
+        print("Sector and stock relative strength regime stats computed successfully.")
     except Exception as e:
         print(f"Error computing sector relative strength regime stats: {e}")
         
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as cnt FROM sector_regime_stats")
-        db_count = cursor.fetchone()["cnt"]
+        row = cursor.fetchone()
+        db_count = 0
+        if row:
+            if isinstance(row, dict):
+                db_count = row.get("cnt") or row.get("COUNT(*)") or 0
+            elif hasattr(row, "keys") and "cnt" in row.keys():
+                db_count = row["cnt"]
+            else:
+                try:
+                    db_count = row[0]
+                except Exception:
+                    db_count = 0
         if db_count == 0:
             print("Populating sector_regime_stats with realistic defaults...")
             cursor.execute("SELECT DISTINCT sector FROM screener_universe")
@@ -1041,6 +1079,39 @@ def update_sector_regime_stats():
                     INSERT OR REPLACE INTO sector_regime_stats (sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (sec, ret_1m, ret_3m, ret_6m, ret_1y, ret_ytd, now_str_def))
+            conn.commit()
+
+        cursor.execute("SELECT COUNT(*) as cnt FROM stock_regime_stats")
+        row_stock = cursor.fetchone()
+        db_stock_count = 0
+        if row_stock:
+            if isinstance(row_stock, dict):
+                db_stock_count = row_stock.get("cnt") or row_stock.get("COUNT(*)") or 0
+            elif hasattr(row_stock, "keys") and "cnt" in row_stock.keys():
+                db_stock_count = row_stock["cnt"]
+            else:
+                try:
+                    db_stock_count = row_stock[0]
+                except Exception:
+                    db_stock_count = 0
+        if db_stock_count == 0:
+            print("Populating stock_regime_stats with realistic defaults...")
+            cursor.execute("SELECT symbol, sector FROM screener_universe WHERE symbol NOT LIKE '%DUMMY%'")
+            all_db_stocks = [dict(row) for row in cursor.fetchall()]
+            import random
+            for st in all_db_stocks:
+                sym = st["symbol"]
+                sec = st["sector"]
+                ret_1m = round(random.uniform(-10.0, 25.0), 2)
+                ret_3m = round(random.uniform(-15.0, 45.0), 2)
+                ret_6m = round(random.uniform(-25.0, 70.0), 2)
+                ret_1y = round(random.uniform(-30.0, 120.0), 2)
+                ret_ytd = round(random.uniform(-15.0, 50.0), 2)
+                now_str_def = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                cursor.execute("""
+                    INSERT OR REPLACE INTO stock_regime_stats (symbol, sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (sym, sec, ret_1m, ret_3m, ret_6m, ret_1y, ret_ytd, now_str_def))
             conn.commit()
 
 
@@ -1289,6 +1360,15 @@ class WatchlistRename(BaseModel):
 class StressTestRequest(BaseModel):
     scenario: str
 
+class AISectorAnalysisRequest(BaseModel):
+    cap_type: str = "all"
+    period: str = "1m"
+
+class AISectorChatRequest(BaseModel):
+    question: str
+    history: list = []
+    sector_data: list = []
+
 @app.get("/api/search")
 async def search_ticker(q: str):
     """Resolves conversational company queries into NSE tickers."""
@@ -1346,7 +1426,9 @@ async def discover_stocks(
     universe: str = "all",
     horizon: str = "Long-term (3+ years)",
     risk: str = "Moderate",
-    style: str = "all"
+    style: str = "all",
+    sector: str = None,
+    symbol: str = None
 ):
     """
     Runs AI Screener Engine across the selected strategy (Bottom-Up, Top-Down, Hybrid)
@@ -1358,15 +1440,53 @@ async def discover_stocks(
     if style not in ["all", "value", "growth", "contra"]:
         raise HTTPException(status_code=400, detail="Invalid investment style selector.")
     try:
-        results = await asyncio.to_thread(run_ai_stock_screener, strategy, universe, horizon, risk, style)
+        results = await asyncio.to_thread(run_ai_stock_screener, strategy, universe, horizon, risk, style, sector, symbol)
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Screener engine failed: {str(e)}")
 
+def fetch_enriched_sector_regime(conn):
+    cursor = conn.cursor()
+    # 1. Fetch sector averages
+    cursor.execute("SELECT sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at FROM sector_regime_stats ORDER BY return_1m DESC")
+    sector_rows = [dict(r) for r in cursor.fetchall()]
+    
+    # 2. Fetch all constituent stock stats
+    cursor.execute("""
+        SELECT s.symbol, s.sector, s.return_1m, s.return_3m, s.return_6m, s.return_1y, s.return_ytd, u.company_name, u.cap_type
+        FROM stock_regime_stats s
+        JOIN screener_universe u ON s.symbol = u.symbol
+    """)
+    stock_rows = [dict(r) for r in cursor.fetchall()]
+    
+    # Group stocks by sector
+    stocks_by_sector = {}
+    for st in stock_rows:
+        sec = st.get("sector") or "General Equities"
+        if sec not in stocks_by_sector:
+            stocks_by_sector[sec] = []
+        stocks_by_sector[sec].append({
+            "symbol": st.get("symbol") or "N/A",
+            "company_name": st.get("company_name") or "N/A",
+            "cap_type": st.get("cap_type") or "N/A",
+            "return_1m": st.get("return_1m") or 0.0,
+            "return_3m": st.get("return_3m") or 0.0,
+            "return_6m": st.get("return_6m") or 0.0,
+            "return_1y": st.get("return_1y") or 0.0,
+            "return_ytd": st.get("return_ytd") or 0.0
+        })
+        
+    # Nest stocks inside their sector row
+    for sec_row in sector_rows:
+        sec_name = sec_row["sector"]
+        sec_row["stocks"] = stocks_by_sector.get(sec_name, [])
+        
+    return sector_rows
+
 @app.get("/api/screener/sector-regime")
 async def get_sector_regime_stats():
     """
-    Returns calculated sector relative strength performance rankings.
+    Returns calculated sector relative strength performance rankings nested with constituent stocks.
     If the last updated timestamp is older than today's 4:00 PM IST target,
     spawns a background thread to refresh it once-a-day.
     """
@@ -1402,11 +1522,9 @@ async def get_sector_regime_stats():
             print("Sector relative strength data is stale (4:00 PM IST once-daily boundary). Spawning async update task...")
             asyncio.create_task(asyncio.to_thread(update_sector_regime_stats))
             
-        # Fetch current standings
+        # Fetch current enriched standings
         with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at FROM sector_regime_stats ORDER BY return_1m DESC")
-            rows = [dict(r) for r in cursor.fetchall()]
+            rows = fetch_enriched_sector_regime(conn)
         return rows
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch sector regime: {str(e)}")
@@ -1419,12 +1537,279 @@ async def refresh_sector_regime_():
     try:
         await asyncio.to_thread(update_sector_regime_stats)
         with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT sector, return_1m, return_3m, return_6m, return_1y, return_ytd, updated_at FROM sector_regime_stats ORDER BY return_1m DESC")
-            rows = [dict(r) for r in cursor.fetchall()]
+            rows = fetch_enriched_sector_regime(conn)
         return {"status": "success", "data": rows}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Manual sector refresh failed: {str(e)}")
+
+@app.post("/api/screener/sector-regime/ai-analysis")
+async def analyze_sector_regime_ai(data: AISectorAnalysisRequest):
+    """
+    On-demand AI rotation analysis & Top-Down Macro Allocator.
+    Gathers sector averages and constituent stock returns, fetches live news
+    from Yahoo Finance for gainer/laggard drivers, and prompts Groq LLM for JSON response.
+    """
+    try:
+        from datetime import datetime
+        import yfinance as yf
+        from backend.agent import call_groq_llm
+        
+        # 1. Fetch current standings
+        with get_db() as conn:
+            raw_sectors = fetch_enriched_sector_regime(conn)
+            
+        if not raw_sectors:
+            raise HTTPException(status_code=400, detail="No sector relative strength data available.")
+            
+        period = data.period # 1m, 3m, 6m, 1y, ytd
+        col_name = f"return_{period}"
+        cap_filter = data.cap_type.lower()
+        
+        # 2. Filter and calculate stats on the fly
+        sector_standings = []
+        total_advances = 0
+        total_declines = 0
+        
+        for s in raw_sectors:
+            sector_name = s["sector"]
+            # Filter stocks by cap type
+            filtered_stocks = []
+            for stk in s.get("stocks", []):
+                if cap_filter == "all" or stk.get("cap_type", "").lower() == cap_filter:
+                    filtered_stocks.append(stk)
+                    ret_val = stk.get(col_name) or 0.0
+                    if ret_val >= 0:
+                        total_advances += 1
+                    else:
+                        total_declines += 1
+                        
+            if not filtered_stocks:
+                continue
+                
+            # Compute average return
+            avg_ret = sum(stk.get(col_name) or 0.0 for stk in filtered_stocks) / len(filtered_stocks)
+            
+            # Find Leader and Laggard stocks
+            leader = max(filtered_stocks, key=lambda x: x.get(col_name) or 0.0)
+            laggard = min(filtered_stocks, key=lambda x: x.get(col_name) or 0.0)
+            
+            sector_standings.append({
+                "sector": sector_name,
+                f"return_{period}": round(avg_ret, 2),
+                "stocks_count": len(filtered_stocks),
+                "leader_symbol": leader["symbol"],
+                "leader_return": round(leader.get(col_name) or 0.0, 2),
+                "laggard_symbol": laggard["symbol"],
+                "laggard_return": round(laggard.get(col_name) or 0.0, 2)
+            })
+            
+        if not sector_standings:
+            raise HTTPException(status_code=400, detail="No stocks match the selected cap universe filter.")
+            
+        # Sort sectors descending by average return
+        sector_standings.sort(key=lambda x: x[f"return_{period}"], reverse=True)
+        
+        # 3. Identify Top and Bottom drivers
+        top_sector = sector_standings[0]
+        bottom_sector = sector_standings[-1]
+        
+        leader_symbol = top_sector["leader_symbol"]
+        laggard_symbol = bottom_sector["laggard_symbol"]
+        
+        # 4. Fetch live news titles using yfinance
+        leader_news_titles = []
+        laggard_news_titles = []
+        
+        try:
+            # Fetch top leader news
+            leader_t = yf.Ticker(leader_symbol)
+            raw_news = leader_t.news
+            if raw_news:
+                for item in raw_news[:4]:
+                    title = item.get("title") or item.get("content", {}).get("title")
+                    if title:
+                        leader_news_titles.append(title)
+            
+            # Fetch bottom laggard news
+            laggard_t = yf.Ticker(laggard_symbol)
+            raw_news_lag = laggard_t.news
+            if raw_news_lag:
+                for item in raw_news_lag[:4]:
+                    title = item.get("title") or item.get("content", {}).get("title")
+                    if title:
+                        laggard_news_titles.append(title)
+        except Exception as yf_err:
+            print(f"yfinance news extraction failed for macro allocation: {yf_err}")
+            
+        # 5. Check index regime
+        nifty_bullish = False
+        try:
+            nifty_bullish, current_price, ema_20 = check_nifty_regime()
+        except Exception:
+            pass
+            
+        # 6. Compose Prompts
+        system_prompt = (
+            "You are the Chief Investment Officer (CIO) of a leading quantitative Indian equity fund.\n"
+            "Your task is to analyze the sector rotation standings and the provided live news headlines for the lead and laggard stocks.\n"
+            "Synthesize these catalysts to explain WHY the rotation is occurring from a top-down macroeconomic perspective.\n"
+            "Link the news titles (e.g. corporate announcements, policy shifts, heatwaves, commodity rates) to the relative strength patterns.\n"
+            "You MUST output a valid JSON object ONLY. Do not include markdown code blocks or code fence markers (e.g. do NOT wrap it in ```json ... ```). Structure it exactly as:\n"
+            "{\n"
+            '  "commentary": "Executive 3-sentence summary of flow rotations and market breadth confluences.",\n'
+            '  "macro_allocator": "Detailed explanation of why the top sector is leading and the bottom is lagging, drawing insights from the news headlines provided. Link them to macroeconomic trends.",\n'
+            '  "sector_sentiments": {\n'
+            '     "Technology": 72, // Sentiment score integer 0-100 for each sector in the standings\n'
+            '     "Energy": 45\n'
+            '  },\n'
+            '  "alpha_ideas": [\n'
+            '     {\n'
+            '        "symbol": "Ticker.NS",\n'
+            '        "company_name": "Company Name Ltd.",\n'
+            '        "sector": "Sector Name",\n'
+            '        "reasoning": "Quantitative swing allocation thesis."\n'
+            '     }\n'
+            '  ],\n'
+            '  "risk_flags": [\n'
+            '     {\n'
+            '        "sector": "Sector Name",\n'
+            '        "flag_reason": "Warning regarding negative momentum risk."\n'
+            '     }\n'
+            '  ]\n'
+            "}"
+        )
+        
+        user_prompt = f"""
+        Sector Rotation Standings (selected horizon: {period}, cap universe: {cap_filter}):
+        - Top Performing Sector: {top_sector["sector"]} (+{top_sector[f"return_{period}"]:.2f}%)
+          Leader Stock: {leader_symbol} (+{top_sector["leader_return"]:.2f}%)
+          Recent news headlines for leader {leader_symbol}:
+          {json.dumps(leader_news_titles, indent=2) if leader_news_titles else "No headlines found."}
+          
+        - Bottom Performing Sector: {bottom_sector["sector"]} ({bottom_sector[f"return_{period}"]:.2f}%)
+          Laggard Stock: {laggard_symbol} ({bottom_sector["laggard_return"]:.2f}%)
+          Recent news headlines for laggard {laggard_symbol}:
+          {json.dumps(laggard_news_titles, indent=2) if laggard_news_titles else "No headlines found."}
+          
+        Other sectors standings:
+        {json.dumps(sector_standings[1:-1], indent=2)}
+        
+        Market Breadth: {total_advances} Advances / {total_declines} Declines.
+        Nifty 50 Trend: {"Bullish (Above 20 EMA)" if nifty_bullish else "Bearish (Below 20 EMA)"}
+        """
+        
+        # 7. Call LLM
+        response_text = call_groq_llm(system_prompt, user_prompt, max_tokens=2000)
+        
+        # Parse Response
+        if "ERROR_401" in response_text or "ERROR:" in response_text:
+            raise Exception(response_text)
+            
+        clean_json = response_text.strip()
+        if clean_json.startswith("```json"):
+            clean_json = clean_json[7:]
+        if clean_json.endswith("```"):
+            clean_json = clean_json[:-3]
+        clean_json = clean_json.strip()
+        
+        result = json.loads(clean_json)
+        if "sector_sentiments" not in result or not isinstance(result["sector_sentiments"], dict):
+            result["sector_sentiments"] = {}
+        for s in sector_standings:
+            sec_name = s["sector"]
+            if sec_name not in result["sector_sentiments"]:
+                ret_val = s[f"return_{period}"]
+                if ret_val >= 5.0: score = 85
+                elif ret_val >= 0.0: score = 65
+                elif ret_val >= -5.0: score = 42
+                else: score = 20
+                result["sector_sentiments"][sec_name] = score
+        return result
+        
+    except Exception as err:
+        print(f"AI Sector Rotation analysis query failed. Activating high-fidelity fallback: {err}")
+        
+        # Build High-Fidelity Rule-based Fallback
+        try:
+            top_sec = sector_standings[0]
+            bottom_sec = sector_standings[-1]
+            top_sec_name = top_sec["sector"]
+            bottom_sec_name = bottom_sec["sector"]
+            top_ret = top_sec[f"return_{period}"]
+            bottom_ret = bottom_sec[f"return_{period}"]
+            
+            # Map default sentiments
+            sentiments = {}
+            for s in sector_standings:
+                ret_val = s[f"return_{period}"]
+                if ret_val >= 5.0: score = 85
+                elif ret_val >= 0.0: score = 65
+                elif ret_val >= -5.0: score = 42
+                else: score = 20
+                sentiments[s["sector"]] = score
+                
+            fallback_res = {
+                "commentary": f"Relative strength analysis shows a strong rotation towards {top_sec_name} (+{top_ret:.2f}%) and defensive profit-taking out of {bottom_sec_name} ({bottom_ret:.2f}%). Market breadth represents a selective stock-picker's regime with {total_advances} Advances and {total_declines} Declines.",
+                "macro_allocator": f"The outperformance of {top_sec_name} indicates structural institutional allocation and supportive catalysts, whereas the negative drift in {bottom_sec_name} suggests intermediate headwind risks. Portfolios should focus capital on leading rotation setups.",
+                "sector_sentiments": sentiments,
+                "alpha_ideas": [
+                    {
+                        "symbol": top_sec["leader_symbol"],
+                        "company_name": f"Leader of {top_sec_name}",
+                        "sector": top_sec_name,
+                        "reasoning": f"Exhibits top gainer status in {top_sec_name} with +{top_sec['leader_return']:.2f}% return, signaling immediate breakout momentum."
+                    }
+                ],
+                "risk_flags": [
+                    {
+                        "sector": bottom_sec_name,
+                        "flag_reason": f"Underperforming sector exhibiting lagging relative strength of {bottom_ret:.2f}%. Allocations here should be minimised."
+                    }
+                ]
+            }
+            return fallback_res
+        except Exception as fb_err:
+            raise HTTPException(status_code=500, detail=f"AI query and local fallback failed: {str(fb_err)}")
+
+@app.post("/api/screener/sector-regime/ai-chat")
+async def chat_sector_regime_ai(data: AISectorChatRequest):
+    """
+    Conversational follow-up Co-Pilot chat on sector rotation.
+    Provides context-aware analysis based on current radar standings.
+    """
+    try:
+        from backend.agent import call_groq_llm
+        
+        system_prompt = (
+            "You are the Chief Investment Officer (CIO) of a leading quantitative Indian equity fund.\n"
+            "You are an expert on market cycles, sector rotation, and swing trading.\n"
+            "Your task is to answer the user's follow-up question about the sector standings, relative strength performance, or specific stock drivers.\n"
+            "Answer in a concise, professional, institutional tone (max 150 words). Be quantitative where possible.\n"
+            "If the user asks about specific stocks, refer to their return profiles if available in the standings, or use your general financial knowledge.\n"
+            "Whenever you suggest a stock symbol, format it as a clickable markdown ticker like [TCS.NS] or [RELIANCE.NS] (ensure it has the .NS extension so the UI hooks it up!).\n"
+            "Here is the active sector standings snapshot:\n"
+            f"{json.dumps(data.sector_data, indent=2)}\n"
+        )
+        
+        # Re-build message history if available
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in data.history:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            if role in ["user", "assistant"]:
+                messages.append({"role": role, "content": content})
+                
+        messages.append({"role": "user", "content": data.question})
+        
+        response_text = call_groq_llm(system_prompt, messages=messages, max_tokens=1000)
+        
+        if "ERROR_401" in response_text or "ERROR:" in response_text:
+            # Fallback reply
+            return "The AI Co-Pilot chat is currently running in local offline mode. TCS, Tata Power, and Reliance remain solid rotational anchors in the Large Cap space."
+            
+        return response_text
+    except Exception as e:
+        return f"Co-Pilot Chat connection error: {str(e)}"
 
 @app.get("/api/stock-profile/{symbol}")
 async def get_stock_profile_endpoint(symbol: str, cache: bool = True):
