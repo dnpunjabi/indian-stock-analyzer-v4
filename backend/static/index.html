@@ -2665,15 +2665,24 @@
                                     <span>📈</span> INTERACTIVE WORKSTATION CHART
                                 </h3>
                                 <div class="chart-controls no-print" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
-                                        Indicator: 
-                                        <select id="tv-active-indicator" style="padding: 4px 8px; border-radius: 4px; font-size:11px; background: var(--bg-select-input); color: var(--text-primary); border: 1px solid var(--border-glass); cursor:pointer;">
-                                            <option value="lux-algo" selected>LuxAlgo: Trendlines with Breaks</option>
-                                            <option value="mxwll">Mxwll Price Action Suite</option>
-                                            <option value="lux-smc">LuxAlgo: Smart Money Concepts</option>
-                                            <option value="none">None (Price Only)</option>
-                                        </select>
-                                    </label>
+                                    <div style="font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); user-select: none; flex-wrap: wrap;">
+                                        <span>Indicators:</span>
+                                        <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="tv-indicator-selector">
+                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; cursor: pointer; user-select: none; font-weight: 500;">
+                                                <input type="checkbox" id="tv-indicator-lux-algo" checked style="cursor: pointer; accent-color: #a855f7;"> Breaks
+                                            </label>
+                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); color: #60a5fa; cursor: pointer; user-select: none; font-weight: 500;">
+                                                <input type="checkbox" id="tv-indicator-mxwll" style="cursor: pointer; accent-color: #3b82f6;"> Mxwll
+                                            </label>
+                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); color: #fbbf24; cursor: pointer; user-select: none; font-weight: 500;">
+                                                <input type="checkbox" id="tv-indicator-lux-smc" style="cursor: pointer; accent-color: #f59e0b;"> SMC
+                                            </label>
+                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #34d399; cursor: pointer; user-select: none; font-weight: 500;">
+                                                <input type="checkbox" id="tv-indicator-lrtc" style="cursor: pointer; accent-color: #10b981;"> LRTC
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="tv-active-indicator" value="lux-algo">
                                     <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary);">
                                         Length: 
                                         <select id="tv-length" style="padding: 2px 6px; border-radius: 4px; font-size:11px; background: var(--bg-select-input); color: var(--text-primary); border: 1px solid var(--border-glass); cursor:pointer;">
@@ -2682,6 +2691,7 @@
                                             <option value="14" selected>14</option>
                                             <option value="20">20</option>
                                             <option value="30">30</option>
+                                            <option value="40">40</option>
                                             <option value="50">50</option>
                                         </select>
                                     </label>
@@ -2693,6 +2703,8 @@
                                             <option value="1.0" selected>1.0</option>
                                             <option value="1.5">1.5</option>
                                             <option value="2.0">2.0</option>
+                                            <option value="2.5">2.5</option>
+                                            <option value="3.0">3.0</option>
                                         </select>
                                     </label>
                                     <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
@@ -2703,6 +2715,15 @@
                                     </label>
                                     <label class="lux-algo-control-element" style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-show-breaks" checked style="cursor: pointer;"> Show breaks
+                                    </label>
+                                    <label class="lrtc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-lrtc-show-channel" checked style="cursor: pointer;"> Show Channel
+                                    </label>
+                                    <label class="lrtc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-lrtc-show-historical" checked style="cursor: pointer;"> Show Entry Lines
+                                    </label>
+                                    <label class="lrtc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-lrtc-show-alerts" checked style="cursor: pointer;"> Show Alerts
                                     </label>
                                     <label class="mxwll-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-show-fibs" checked style="cursor: pointer;"> Show Fibs
@@ -2764,6 +2785,18 @@
                                         <div class="tv-indicator-legend" style="display: flex; align-items: center; gap: 6px;">
                                             <span style="display: inline-block; width: 12px; height: 2px; border-top: 1px dashed #10b981;"></span>
                                             <span style="color: var(--text-secondary);">Support Line</span>
+                                        </div>
+                                        <div class="lrtc-legend" style="display: none; align-items: center; gap: 6px;">
+                                            <span style="display: inline-block; width: 12px; height: 3px; background: #ef4444; border-radius: 1px;"></span>
+                                            <span style="color: var(--text-secondary);">LRTC Upper (Sell)</span>
+                                        </div>
+                                        <div class="lrtc-legend" style="display: none; align-items: center; gap: 6px;">
+                                            <span style="display: inline-block; width: 12px; height: 3px; background: #f59e0b; border-radius: 1px;"></span>
+                                            <span style="color: var(--text-secondary);">LRTC Median</span>
+                                        </div>
+                                        <div class="lrtc-legend" style="display: none; align-items: center; gap: 6px;">
+                                            <span style="display: inline-block; width: 12px; height: 3px; background: #10b981; border-radius: 1px;"></span>
+                                            <span style="color: var(--text-secondary);">LRTC Lower (Buy)</span>
                                         </div>
                                         <div class="tv-indicator-legend" style="display: flex; gap: 10px; align-items: center;">
                                             <span style="font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 2px 6px; border-radius: 4px;">🟢 B = Bullish Breakout</span>

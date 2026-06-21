@@ -1194,3 +1194,120 @@ def calculate_lux_smc(df, int_sens=5, ext_sens=50, equal_len=3, equal_thresh=0.1
         "monthly_levels": monthly_levels[-show_last:]
     }
 
+
+def calculate_linear_regression_trend_channel(df, period=40, deviations_mult=2.0, lookback=3):
+    """
+    Calculates the Linear Regression Trend Channel with Entries & Alerts.
+    Inputs:
+    - period: sliding window size
+    - deviations_mult: standard error multiplier
+    - lookback: lookback offset for entry boundary value comparison
+    """
+    n = len(df)
+    upper_entry = [None] * n
+    lower_entry = [None] * n
+    middle = [None] * n
+    
+    ready_to_buy = [False] * n
+    ready_to_sell = [False] * n
+    
+    if n < period:
+        return {
+            "upper_entry": upper_entry,
+            "lower_entry": lower_entry,
+            "middle": middle,
+            "ready_to_buy": ready_to_buy,
+            "ready_to_sell": ready_to_sell,
+            "latest_channel": None
+        }
+        
+    closes = df['Close'].values
+    
+    # Precompute constant sums
+    P = period
+    Ex = P * (P - 1) / 2.0
+    Ex2 = P * (P - 1) * (2 * P - 1) / 6.0
+    ExEx = Ex * Ex
+    denom = (P * Ex2 - ExEx)
+    
+    # Calculate for each bar t
+    for t in range(P - 1, n):
+        # Extract window in reverse order: t, t-1, ..., t-P+1
+        window_closes = closes[t - P + 1 : t + 1][::-1]
+        
+        Ey = float(np.sum(window_closes))
+        Exy = float(np.sum(window_closes * np.arange(P)))
+        
+        if denom == 0:
+            slope = 0.0
+        else:
+            slope = (P * Exy - Ex * Ey) / denom
+            
+        linearRegression = (Ey - slope * Ex) / P
+        
+        # Calculate deviation
+        y_hat = linearRegression + slope * np.arange(P)
+        sum_sq_errors = float(np.sum((window_closes - y_hat) ** 2))
+        
+        deviation_val = deviations_mult * math.sqrt(sum_sq_errors / (P - 1)) if P > 1 else 0.0
+        
+        upper_entry[t] = round(linearRegression + deviation_val, 2)
+        lower_entry[t] = round(linearRegression - deviation_val, 2)
+        middle[t] = round(linearRegression, 2)
+        
+    # Check Alerts and crossover
+    for t in range(period - 1 + lookback, n):
+        close_curr = closes[t]
+        close_prev = closes[t-1]
+        
+        upper_prev = upper_entry[t - lookback]
+        lower_prev = lower_entry[t - lookback]
+        
+        if upper_prev is not None:
+            # crossover: close_prev <= upper_prev and close_curr > upper_prev
+            if close_prev <= upper_prev and close_curr > upper_prev:
+                ready_to_sell[t] = True
+        if lower_prev is not None:
+            # crossunder: close_prev >= lower_prev and close_curr < lower_prev
+            if close_prev >= lower_prev and close_curr < lower_prev:
+                ready_to_buy[t] = True
+                
+    # Packages details for drawing the latest channel segment
+    times = [str(d.date()) if hasattr(d, 'date') else str(d) for d in df.index]
+    latest_channel = None
+    if upper_entry[-1] is not None:
+        t_last = n - 1
+        window_closes = closes[t_last - P + 1 : t_last + 1][::-1]
+        Ey = float(np.sum(window_closes))
+        Exy = float(np.sum(window_closes * np.arange(P)))
+        slope_latest = (P * Exy - Ex * Ey) / denom if denom != 0 else 0.0
+        linearRegression_latest = (Ey - slope_latest * Ex) / P
+        y_hat_latest = linearRegression_latest + slope_latest * np.arange(P)
+        sum_sq_errors_latest = float(np.sum((window_closes - y_hat_latest) ** 2))
+        deviation_latest = deviations_mult * math.sqrt(sum_sq_errors_latest / (P - 1)) if P > 1 else 0.0
+        
+        startingPointY = linearRegression_latest + slope_latest * (P - 1)
+        
+        latest_channel = {
+            "start_time": times[t_last - P + 1],
+            "end_time": times[t_last],
+            "median_start": round(startingPointY, 2),
+            "median_end": round(linearRegression_latest, 2),
+            "upper_start": round(startingPointY + deviation_latest, 2),
+            "upper_end": round(linearRegression_latest + deviation_latest, 2),
+            "lower_start": round(startingPointY - deviation_latest, 2),
+            "lower_end": round(linearRegression_latest - deviation_latest, 2),
+            "slope": slope_latest,
+            "deviation": deviation_latest
+        }
+        
+    return {
+        "upper_entry": upper_entry,
+        "lower_entry": lower_entry,
+        "middle": middle,
+        "ready_to_buy": ready_to_buy,
+        "ready_to_sell": ready_to_sell,
+        "latest_channel": latest_channel
+    }
+
+

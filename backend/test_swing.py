@@ -18,7 +18,8 @@ from backend.swing_utils import (
     analyze_swing_signals,
     calculate_pivot_points,
     calculate_trendlines_with_breaks,
-    calculate_mxwll_suite
+    calculate_mxwll_suite,
+    calculate_linear_regression_trend_channel
 )
 
 class TestSwingUtils(unittest.TestCase):
@@ -87,6 +88,33 @@ class TestSwingUtils(unittest.TestCase):
         self.assertIn("order_blocks", res)
         self.assertIn("fvg", res)
         self.assertIn("structures", res)
+
+    def test_calculate_linear_regression_trend_channel(self):
+        """Verifies calculation of Linear Regression Trend Channel (LRTC)."""
+        dates = pd.date_range(end="2026-06-07", periods=60)
+        prices = [100.0 + i * 0.5 for i in range(60)]
+        df = pd.DataFrame({
+            "Open": prices,
+            "High": [p + 1.0 for p in prices],
+            "Low": [p - 1.0 for p in prices],
+            "Close": prices,
+            "Volume": [1000] * 60
+        }, index=dates)
+
+        res = calculate_linear_regression_trend_channel(df, period=40, deviations_mult=2.0)
+        self.assertIn("upper_entry", res)
+        self.assertIn("lower_entry", res)
+        self.assertIn("middle", res)
+        self.assertIn("ready_to_buy", res)
+        self.assertIn("ready_to_sell", res)
+        
+        self.assertIn("latest_channel", res)
+        latest = res["latest_channel"]
+        self.assertIn("slope", latest)
+        self.assertIn("upper_end", latest)
+        self.assertIn("median_end", latest)
+        self.assertIn("lower_end", latest)
+        self.assertNotEqual(latest["slope"], 0.0)
     
     def test_clean_float(self):
         """Verifies clean_float converts values and handles NaN/Inf properly."""
@@ -424,6 +452,14 @@ class TestSwingAPIRoutes(unittest.TestCase):
         self.assertIn("order_blocks", data["mxwll"])
         self.assertIn("fvg", data["mxwll"])
         self.assertIn("structures", data["mxwll"])
+        
+        # Verify LRTC fields are returned in TV chart data
+        self.assertIn("lrtc_upper", first_candle)
+        self.assertIn("lrtc_lower", first_candle)
+        self.assertIn("lrtc_middle", first_candle)
+        self.assertIn("lrtc_ready_to_buy", first_candle)
+        self.assertIn("lrtc_ready_to_sell", first_candle)
+        self.assertIn("lrtc_latest", data)
 
     @patch("requests.get")
     @patch("backend.agent.call_groq_llm")
@@ -470,6 +506,18 @@ class TestSwingAPIRoutes(unittest.TestCase):
         # Test mxwll
         response_mxwll = self.client.get("/api/chart/indicator-synthesis?ticker=RELIANCE.NS&indicator=mxwll&length=10&mult=1.5")
         self.assertEqual(response_mxwll.status_code, 200)
+
+        # Test lrtc
+        response_lrtc = self.client.get("/api/chart/indicator-synthesis?ticker=RELIANCE.NS&indicator=lrtc&length=10&mult=1.5")
+        self.assertEqual(response_lrtc.status_code, 200)
+        data_lrtc = response_lrtc.json()
+        self.assertIn("synthesis", data_lrtc)
+
+        # Test multi-indicator synthesis
+        response_multi = self.client.get("/api/chart/indicator-synthesis?ticker=RELIANCE.NS&indicator=lux-algo,lrtc&length=10&mult=1.5")
+        self.assertEqual(response_multi.status_code, 200)
+        data_multi = response_multi.json()
+        self.assertIn("synthesis", data_multi)
 
     @patch("backend.main.get_db")
     @patch("backend.agent.call_groq_llm")

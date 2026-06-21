@@ -20440,6 +20440,12 @@ let activeTVEma50Series = null;
 let activeTVResistanceSeries = null;
 let activeTVSupportSeries = null;
 let activeTVVolumeSeries = null;
+let activeTVLrtcUpperSeries = null;
+let activeTVLrtcLowerSeries = null;
+let activeTVLrtcMiddleSeries = null;
+let activeTVLrtcLatestUpperSeries = null;
+let activeTVLrtcLatestMiddleSeries = null;
+let activeTVLrtcLatestLowerSeries = null;
 
 function setupSwingWorkspace() {
     // Horizon Switch Syncing & Binding
@@ -24230,7 +24236,22 @@ async function renderTVWorkstationChart(symbol) {
         return;
     }
 
-    const indicator = document.getElementById('tv-active-indicator')?.value || 'lux-algo';
+    const showLuxAlgo = document.getElementById('tv-indicator-lux-algo')?.checked ?? false;
+    const showMxwll = document.getElementById('tv-indicator-mxwll')?.checked ?? false;
+    const showLuxSMC = document.getElementById('tv-indicator-lux-smc')?.checked ?? false;
+    const showLRTC = document.getElementById('tv-indicator-lrtc')?.checked ?? false;
+
+    // Sync tv-active-indicator value for backwards compatibility
+    const activeIndInput = document.getElementById('tv-active-indicator');
+    if (activeIndInput) {
+        const activeList = [];
+        if (showLuxAlgo) activeList.push('lux-algo');
+        if (showMxwll) activeList.push('mxwll');
+        if (showLuxSMC) activeList.push('lux-smc');
+        if (showLRTC) activeList.push('lrtc');
+        activeIndInput.value = activeList.length > 0 ? activeList.join(',') : 'none';
+    }
+
     const length = parseInt(document.getElementById('tv-length')?.value || '14', 10);
     const mult = parseFloat(document.getElementById('tv-mult')?.value || '1.0');
 
@@ -24252,41 +24273,40 @@ async function renderTVWorkstationChart(symbol) {
     const showSMCMtf = document.getElementById('tv-smc-mtf')?.checked ?? false;
     const showSMCZones = document.getElementById('tv-smc-zones')?.checked ?? false;
 
-    // Show/hide parameter controls based on active indicator
+    // LRTC Controls
+    const showLrtcChannel = document.getElementById('tv-lrtc-show-channel')?.checked ?? true;
+    const showLrtcHistorical = document.getElementById('tv-lrtc-show-historical')?.checked ?? true;
+    const showLrtcAlerts = document.getElementById('tv-lrtc-show-alerts')?.checked ?? true;
+
+    // Show/hide parameter controls based on active indicators
     const legendLegends = document.querySelectorAll('.tv-indicator-legend');
     const luxAlgoCtrls = document.querySelectorAll('.lux-algo-control-element');
     const mxwllCtrls = document.querySelectorAll('.mxwll-control-element');
     const luxSMCCtrls = document.querySelectorAll('.lux-smc-control-element');
+    const lrtcCtrls = document.querySelectorAll('.lrtc-control-element');
+    const lrtcLegends = document.querySelectorAll('.lrtc-legend');
 
-    if (indicator === 'none') {
+    // Manage Length select disabled state
+    if (showLuxAlgo || showMxwll || showLuxSMC || showLRTC) {
+        if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = false;
+    } else {
         if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = true;
-        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = true;
-        legendLegends.forEach(el => el.style.display = 'none');
-        luxAlgoCtrls.forEach(el => el.style.display = 'none');
-        mxwllCtrls.forEach(el => el.style.display = 'none');
-        luxSMCCtrls.forEach(el => el.style.display = 'none');
-    } else if (indicator === 'lux-algo') {
-        if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = false;
-        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = false;
-        legendLegends.forEach(el => el.style.display = 'flex');
-        luxAlgoCtrls.forEach(el => el.style.display = 'flex');
-        mxwllCtrls.forEach(el => el.style.display = 'none');
-        luxSMCCtrls.forEach(el => el.style.display = 'none');
-    } else if (indicator === 'mxwll') {
-        if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = false;
-        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = true;
-        legendLegends.forEach(el => el.style.display = 'none');
-        luxAlgoCtrls.forEach(el => el.style.display = 'none');
-        mxwllCtrls.forEach(el => el.style.display = 'flex');
-        luxSMCCtrls.forEach(el => el.style.display = 'none');
-    } else if (indicator === 'lux-smc') {
-        if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = false;
-        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = true;
-        legendLegends.forEach(el => el.style.display = 'none');
-        luxAlgoCtrls.forEach(el => el.style.display = 'none');
-        mxwllCtrls.forEach(el => el.style.display = 'none');
-        luxSMCCtrls.forEach(el => el.style.display = 'flex');
     }
+
+    // Manage Mult select disabled state
+    if (showLuxAlgo || showLRTC) {
+        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = false;
+    } else {
+        if (document.getElementById('tv-mult')) document.getElementById('tv-mult').disabled = true;
+    }
+
+    // Toggle display of control divs
+    legendLegends.forEach(el => el.style.display = showLuxAlgo ? 'flex' : 'none');
+    luxAlgoCtrls.forEach(el => el.style.display = showLuxAlgo ? 'flex' : 'none');
+    mxwllCtrls.forEach(el => el.style.display = showMxwll ? 'flex' : 'none');
+    luxSMCCtrls.forEach(el => el.style.display = showLuxSMC ? 'flex' : 'none');
+    lrtcCtrls.forEach(el => el.style.display = showLRTC ? 'flex' : 'none');
+    lrtcLegends.forEach(el => el.style.display = showLRTC ? 'flex' : 'none');
 
     try {
         // Fetch data (ext_sens corresponds to the Length parameter selected)
@@ -24405,71 +24425,72 @@ async function renderTVWorkstationChart(symbol) {
         ema50Series.setData(ema50Data);
         activeTVEma50Series = ema50Series;
 
-        // LuxAlgo Trendlines
-        if (indicator === 'lux-algo' && showLines) {
-            // Resistance Line
-            const resSeries = chart.addLineSeries({
-                color: '#ef4444',
-                lineWidth: 1.5,
-                lineStyle: LightweightCharts.LineStyle.Dashed,
-                title: 'Resistance',
-                axisLabelVisible: false,
-                priceLineVisible: false
-            });
-            const resData = data.candlesticks
-                .map(c => ({ time: c.time, value: c.resistance }))
-                .filter(d => d.value !== null && d.value !== undefined);
-            resSeries.setData(resData);
-            activeTVResistanceSeries = resSeries;
+        const mergedMarkers = [];
 
-            // Support Line
-            const supSeries = chart.addLineSeries({
-                color: '#10b981',
-                lineWidth: 1.5,
-                lineStyle: LightweightCharts.LineStyle.Dashed,
-                title: 'Support',
-                axisLabelVisible: false,
-                priceLineVisible: false
-            });
-            const supData = data.candlesticks
-                .map(c => ({ time: c.time, value: c.support }))
-                .filter(d => d.value !== null && d.value !== undefined);
-            supSeries.setData(supData);
-            activeTVSupportSeries = supSeries;
+        // 1. LuxAlgo Trendlines & Breakouts
+        if (showLuxAlgo) {
+            if (showLines) {
+                // Resistance Line
+                const resSeries = chart.addLineSeries({
+                    color: '#ef4444',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Resistance',
+                    axisLabelVisible: false,
+                    priceLineVisible: false
+                });
+                const resData = data.candlesticks
+                    .map(c => ({ time: c.time, value: c.resistance }))
+                    .filter(d => d.value !== null && d.value !== undefined);
+                resSeries.setData(resData);
+                activeTVResistanceSeries = resSeries;
+
+                // Support Line
+                const supSeries = chart.addLineSeries({
+                    color: '#10b981',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Support',
+                    axisLabelVisible: false,
+                    priceLineVisible: false
+                });
+                const supData = data.candlesticks
+                    .map(c => ({ time: c.time, value: c.support }))
+                    .filter(d => d.value !== null && d.value !== undefined);
+                supSeries.setData(supData);
+                activeTVSupportSeries = supSeries;
+            }
+
+            if (showBreaks) {
+                data.candlesticks.forEach(c => {
+                    if (c.bullish_break) {
+                        mergedMarkers.push({
+                            time: c.time,
+                            position: 'belowBar',
+                            color: '#10b981',
+                            shape: 'arrowUp',
+                            text: 'B',
+                            size: 1.5
+                        });
+                    } else if (c.bearish_break) {
+                        mergedMarkers.push({
+                            time: c.time,
+                            position: 'aboveBar',
+                            color: '#ef4444',
+                            shape: 'arrowDown',
+                            text: 'S',
+                            size: 1.5
+                        });
+                    }
+                });
+            }
         }
 
-        // Breakout Markers
-        if (indicator === 'lux-algo' && showBreaks) {
-            const markers = [];
-            data.candlesticks.forEach(c => {
-                if (c.bullish_break) {
-                    markers.push({
-                        time: c.time,
-                        position: 'belowBar',
-                        color: '#10b981',
-                        shape: 'arrowUp',
-                        text: 'B',
-                        size: 1.5
-                    });
-                } else if (c.bearish_break) {
-                    markers.push({
-                        time: c.time,
-                        position: 'aboveBar',
-                        color: '#ef4444',
-                        shape: 'arrowDown',
-                        text: 'S',
-                        size: 1.5
-                    });
-                }
-            });
-            candleSeries.setMarkers(markers);
-        }
-
-        // Mxwll Price Action Suite Rendering
-        if (indicator === 'mxwll' && data.mxwll) {
+        // 2. Mxwll Price Action Suite Rendering
+        if (showMxwll && data.mxwll) {
             const mxwll = data.mxwll;
 
-            // 1. Fibonacci Levels
+            // Fibonacci Levels
             if (showFibs && mxwll.fib_levels) {
                 const fibs = mxwll.fib_levels;
                 const fibColors = {
@@ -24495,7 +24516,7 @@ async function renderTVWorkstationChart(symbol) {
                 }
             }
 
-            // 2. Order Blocks (Supply/Demand Zones)
+            // Order Blocks (Supply/Demand Zones)
             if (showOBs && mxwll.order_blocks) {
                 mxwll.order_blocks.forEach(ob => {
                     const color = ob.type === 'supply' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)';
@@ -24534,7 +24555,7 @@ async function renderTVWorkstationChart(symbol) {
                 });
             }
 
-            // 3. Fair Value Gaps (FVG)
+            // Fair Value Gaps (FVG)
             if (showFVGs && mxwll.fvg) {
                 mxwll.fvg.forEach(g => {
                     const color = 'rgba(242, 184, 7, 0.35)';
@@ -24573,16 +24594,15 @@ async function renderTVWorkstationChart(symbol) {
                 });
             }
 
-            // 4. BOS/CHoCH Structures Markers
+            // BOS/CHoCH Structures Markers
             if (showStructs && mxwll.structures) {
-                const markers = [];
                 mxwll.structures.forEach(s => {
                     const candleExists = data.candlesticks.some(c => c.time === s.time);
                     if (candleExists) {
                         const color = s.direction === 'bullish' ? '#10b981' : '#ef4444';
                         const position = s.direction === 'bullish' ? 'aboveBar' : 'belowBar';
                         const shape = s.direction === 'bullish' ? 'arrowUp' : 'arrowDown';
-                        markers.push({
+                        mergedMarkers.push({
                             time: s.time,
                             position: position,
                             color: color,
@@ -24592,17 +24612,14 @@ async function renderTVWorkstationChart(symbol) {
                         });
                     }
                 });
-                markers.sort((a, b) => new Date(a.time) - new Date(b.time));
-                candleSeries.setMarkers(markers);
             }
         }
 
-        // LuxAlgo SMC Concepts Rendering
-        if (indicator === 'lux-smc' && data.lux_smc) {
+        // 3. LuxAlgo SMC Concepts Rendering
+        if (showLuxSMC && data.lux_smc) {
             const smc = data.lux_smc;
 
-            // 1. Swing & Internal Structures
-            const smcMarkers = [];
+            // Swing & Internal Structures Markers
             if (smc.structures) {
                 smc.structures.forEach(s => {
                     const isInt = s.type.startsWith('I-');
@@ -24613,7 +24630,7 @@ async function renderTVWorkstationChart(symbol) {
                     const position = s.direction === 'bullish' ? 'aboveBar' : 'belowBar';
                     const shape = s.direction === 'bullish' ? 'arrowUp' : 'arrowDown';
 
-                    smcMarkers.push({
+                    mergedMarkers.push({
                         time: s.time,
                         position: position,
                         color: color,
@@ -24622,11 +24639,9 @@ async function renderTVWorkstationChart(symbol) {
                         size: isInt ? 1.0 : 1.3
                     });
                 });
-                smcMarkers.sort((a, b) => new Date(a.time) - new Date(b.time));
-                candleSeries.setMarkers(smcMarkers);
             }
 
-            // 2. Order Blocks
+            // Order Blocks
             if (showSMCOBs && smc.order_blocks) {
                 smc.order_blocks.forEach(ob => {
                     const isSwing = ob.class === 'swing';
@@ -24669,7 +24684,7 @@ async function renderTVWorkstationChart(symbol) {
                 });
             }
 
-            // 3. Fair Value Gaps (FVG)
+            // Fair Value Gaps (FVG)
             if (showSMCFVGs && smc.fvg) {
                 smc.fvg.forEach(g => {
                     const color = g.type === 'bullish' ? 'rgba(0, 255, 104, 0.25)' : 'rgba(255, 0, 8, 0.25)';
@@ -24708,7 +24723,7 @@ async function renderTVWorkstationChart(symbol) {
                 });
             }
 
-            // 4. Equal Highs / Equal Lows (EQH/EQL)
+            // Equal Highs / Equal Lows (EQH/EQL)
             if (showSMCEqhl && smc.equal_high_low) {
                 const eq = smc.equal_high_low;
                 const drawEqualLines = (list, tag, color) => {
@@ -24741,7 +24756,7 @@ async function renderTVWorkstationChart(symbol) {
                 drawEqualLines(eq.equal_lows, 'EQL', '#10b981');
             }
 
-            // 5. Daily, Weekly, Monthly MTF Levels
+            // Daily, Weekly, Monthly MTF Levels
             if (showSMCMtf) {
                 if (smc.daily_levels && smc.daily_levels.length > 0) {
                     const d = smc.daily_levels[smc.daily_levels.length - 1];
@@ -24796,7 +24811,7 @@ async function renderTVWorkstationChart(symbol) {
                 }
             }
 
-            // 6. Premium/Discount Zones
+            // Premium/Discount Zones
             if (showSMCZones && smc.premium_discount) {
                 const zd = smc.premium_discount;
                 candleSeries.createPriceLine({
@@ -24823,10 +24838,164 @@ async function renderTVWorkstationChart(symbol) {
             }
         }
 
+        // 4. Linear Regression Trend Channel (LRTC) Rendering
+        if (showLRTC) {
+            if (showLrtcHistorical) {
+                // Upper Entry Line
+                const lrtcUpperSeries = chart.addLineSeries({
+                    color: 'rgba(239, 68, 68, 0.5)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'LRTC Upper (Sell)',
+                    axisLabelVisible: false,
+                    priceLineVisible: false
+                });
+                const lrtcUpperData = data.candlesticks
+                    .map(c => ({ time: c.time, value: c.lrtc_upper }))
+                    .filter(d => d.value !== null && d.value !== undefined);
+                lrtcUpperSeries.setData(lrtcUpperData);
+                activeTVLrtcUpperSeries = lrtcUpperSeries;
+
+                // Lower Entry Line
+                const lrtcLowerSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.5)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'LRTC Lower (Buy)',
+                    axisLabelVisible: false,
+                    priceLineVisible: false
+                });
+                const lrtcLowerData = data.candlesticks
+                    .map(c => ({ time: c.time, value: c.lrtc_lower }))
+                    .filter(d => d.value !== null && d.value !== undefined);
+                lrtcLowerSeries.setData(lrtcLowerData);
+                activeTVLrtcLowerSeries = lrtcLowerSeries;
+
+                // Median Line
+                const lrtcMiddleSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.4)',
+                    lineWidth: 1.2,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'LRTC Median',
+                    axisLabelVisible: false,
+                    priceLineVisible: false
+                });
+                const lrtcMiddleData = data.candlesticks
+                    .map(c => ({ time: c.time, value: c.lrtc_middle }))
+                    .filter(d => d.value !== null && d.value !== undefined);
+                lrtcMiddleSeries.setData(lrtcMiddleData);
+                activeTVLrtcMiddleSeries = lrtcMiddleSeries;
+            }
+
+            if (showLrtcChannel && data.lrtc_latest) {
+                const latest = data.lrtc_latest;
+
+                // Upper Channel segment
+                const lrtcLatestUpperSeries = chart.addLineSeries({
+                    color: '#ef4444',
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    priceLineVisible: false,
+                    title: 'LRTC Upper Bound'
+                });
+                lrtcLatestUpperSeries.setData([
+                    { time: latest.start_time, value: latest.upper_start },
+                    { time: latest.end_time, value: latest.upper_end }
+                ]);
+                activeTVLrtcLatestUpperSeries = lrtcLatestUpperSeries;
+
+                // Median Channel segment
+                const lrtcLatestMiddleSeries = chart.addLineSeries({
+                    color: '#f59e0b',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: false,
+                    priceLineVisible: false,
+                    title: 'LRTC Median Bound'
+                });
+                lrtcLatestMiddleSeries.setData([
+                    { time: latest.start_time, value: latest.median_start },
+                    { time: latest.end_time, value: latest.median_end }
+                ]);
+                activeTVLrtcLatestMiddleSeries = lrtcLatestMiddleSeries;
+
+                // Lower Channel segment
+                const lrtcLatestLowerSeries = chart.addLineSeries({
+                    color: '#10b981',
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    priceLineVisible: false,
+                    title: 'LRTC Lower Bound'
+                });
+                lrtcLatestLowerSeries.setData([
+                    { time: latest.start_time, value: latest.lower_start },
+                    { time: latest.end_time, value: latest.lower_end }
+                ]);
+                activeTVLrtcLatestLowerSeries = lrtcLatestLowerSeries;
+            }
+
+            if (showLrtcAlerts) {
+                data.candlesticks.forEach(c => {
+                    if (c.lrtc_ready_to_sell) {
+                        mergedMarkers.push({
+                            time: c.time,
+                            position: 'aboveBar',
+                            color: '#ef4444',
+                            shape: 'arrowDown',
+                            text: 'Sell Alert',
+                            size: 1.5
+                        });
+                    } else if (c.lrtc_ready_to_buy) {
+                        mergedMarkers.push({
+                            time: c.time,
+                            position: 'belowBar',
+                            color: '#10b981',
+                            shape: 'arrowUp',
+                            text: 'Buy Alert',
+                            size: 1.5
+                        });
+                    }
+                });
+            }
+        }
+
+        // Apply Merged & Chronologically Sorted Markers
+        if (mergedMarkers.length > 0) {
+            mergedMarkers.sort((a, b) => new Date(a.time) - new Date(b.time));
+            candleSeries.setMarkers(mergedMarkers);
+        }
+
     } catch (err) {
         console.error("Error drawing Interactive Chart Terminal: ", err);
         container.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">Failed to load and calculate indicators for ${symbol}. Please try again.</div>`;
     }
+}
+
+function updateIndicatorPillStyles() {
+    const pills = [
+        { cb: document.getElementById('tv-indicator-lux-algo'), color: '#a855f7', bgChecked: 'rgba(168, 85, 247, 0.25)', borderChecked: '#a855f7', colorChecked: '#d8b4fe' },
+        { cb: document.getElementById('tv-indicator-mxwll'), color: '#3b82f6', bgChecked: 'rgba(59, 130, 246, 0.25)', borderChecked: '#3b82f6', colorChecked: '#93c5fd' },
+        { cb: document.getElementById('tv-indicator-lux-smc'), color: '#f59e0b', bgChecked: 'rgba(245, 158, 11, 0.25)', borderChecked: '#f59e0b', colorChecked: '#fde047' },
+        { cb: document.getElementById('tv-indicator-lrtc'), color: '#10b981', bgChecked: 'rgba(16, 185, 129, 0.25)', borderChecked: '#10b981', colorChecked: '#6ee7b7' }
+    ];
+    pills.forEach(p => {
+        if (p.cb) {
+            const label = p.cb.closest('.indicator-pill');
+            if (label) {
+                if (p.cb.checked) {
+                    label.style.background = p.bgChecked;
+                    label.style.borderColor = p.borderChecked;
+                    label.style.color = p.colorChecked;
+                } else {
+                    label.style.background = 'rgba(255, 255, 255, 0.03)';
+                    label.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                    label.style.color = 'var(--text-muted)';
+                }
+            }
+        }
+    });
 }
 
 function setupTVWorkstationChartControls() {
@@ -24851,21 +25020,60 @@ function setupTVWorkstationChartControls() {
     const smcMtf = document.getElementById('tv-smc-mtf');
     const smcZones = document.getElementById('tv-smc-zones');
 
-    // Set default Length when choosing indicator
-    if (activeInd) {
-        activeInd.addEventListener('change', () => {
-            if (activeInd.value === 'lux-smc') {
-                if (lengthSelect) lengthSelect.value = '50';
-            } else if (activeInd.value === 'mxwll') {
-                if (lengthSelect) lengthSelect.value = '14';
-            }
-        });
-    }
+    // LRTC Controls
+    const showLrtcChannel = document.getElementById('tv-lrtc-show-channel');
+    const showLrtcHistorical = document.getElementById('tv-lrtc-show-historical');
+    const showLrtcAlerts = document.getElementById('tv-lrtc-show-alerts');
+
+    // Indicators checkboxes
+    const indicatorLuxAlgo = document.getElementById('tv-indicator-lux-algo');
+    const indicatorMxwll = document.getElementById('tv-indicator-mxwll');
+    const indicatorLuxSMC = document.getElementById('tv-indicator-lux-smc');
+    const indicatorLRTC = document.getElementById('tv-indicator-lrtc');
+
+    // Initialize pill styles
+    updateIndicatorPillStyles();
+
+    // Bind checkboxes and handle defaults
+    const indCheckboxes = [
+        { cb: indicatorLuxAlgo, length: '14' },
+        { cb: indicatorMxwll, length: '14' },
+        { cb: indicatorLuxSMC, length: '50' },
+        { cb: indicatorLRTC, length: '40', mult: '2.0' }
+    ];
+    indCheckboxes.forEach(item => {
+        if (item.cb) {
+            item.cb.addEventListener('change', () => {
+                updateIndicatorPillStyles();
+                if (item.cb.checked) {
+                    if (item.length && lengthSelect) {
+                        lengthSelect.value = item.length;
+                    }
+                    if (item.mult && multSelect) {
+                        multSelect.value = item.mult;
+                    }
+                }
+                // Sync the tv-active-indicator hidden input
+                if (activeInd) {
+                    const activeList = [];
+                    if (indicatorLuxAlgo?.checked) activeList.push('lux-algo');
+                    if (indicatorMxwll?.checked) activeList.push('mxwll');
+                    if (indicatorLuxSMC?.checked) activeList.push('lux-smc');
+                    if (indicatorLRTC?.checked) activeList.push('lrtc');
+                    activeInd.value = activeList.length > 0 ? activeList.join(',') : 'none';
+                }
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    renderTVWorkstationChart(activeStockProfile.ticker);
+                }
+            });
+        }
+    });
 
     const elements = [
         activeInd, lengthSelect, multSelect, showVolume, showLines, showBreaks,
         showFibs, showOBs, showFVGs, showStructs,
-        smcSwing, smcInternal, smcOBs, smcFVGs, smcEqhl, smcMtf, smcZones
+        smcSwing, smcInternal, smcOBs, smcFVGs, smcEqhl, smcMtf, smcZones,
+        showLrtcChannel, showLrtcHistorical, showLrtcAlerts
     ];
     elements.forEach(el => {
         if (el) {
