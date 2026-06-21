@@ -883,8 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupSectorRadarControls(); // Sector Radar Controls
     setupBrandReset(); // Initialize brand logo reset button events
 
-    // Always default to 'analyzer' (home page) on page load/refresh
-    switchTab('analyzer');
+    // Routing is initialized dynamically by setupTabNavigation() using location.hash
 
     // Connect to Backend WebSocket
     connectLiveTicksWS();
@@ -1430,9 +1429,28 @@ function setupTabNavigation() {
             console.warn(`Tab button not found for key: ${tabKey}`);
         }
     });
+
+    // Listen to hash changes for browser back/forward history navigation
+    window.addEventListener('hashchange', () => {
+        const tabKey = location.hash.substring(1);
+        if (tabKey && tabBtns[tabKey]) {
+            switchTab(tabKey);
+        }
+    });
+
+    // Parse and load initial tab based on location hash
+    const initialTab = location.hash.substring(1);
+    if (initialTab && tabBtns[initialTab]) {
+        switchTab(initialTab);
+    } else {
+        switchTab('analyzer');
+    }
 }
 
 function switchTab(tabKey) {
+    if (location.hash !== '#' + tabKey) {
+        location.hash = tabKey;
+    }
     activeTab = tabKey;
     localStorage.setItem('active-tab', tabKey);
     Object.keys(tabs).forEach(k => {
@@ -1449,6 +1467,9 @@ function switchTab(tabKey) {
             }
         }
     });
+
+    // Expose switchTab globally
+    window.switchTab = switchTab;
 
     if (tabKey === 'sector-radar') {
         if (window.loadScreenerSectorRegime) window.loadScreenerSectorRegime();
