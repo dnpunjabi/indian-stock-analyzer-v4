@@ -1330,19 +1330,64 @@ function parseMarkdownToPitchbookHTML(md) {
 
 function setupMetaBannerToggles() {
     const cards = document.querySelectorAll('.meta-stat-card');
+    const bottomSheet = document.getElementById('mobile-meta-bottom-sheet');
+    const sheetTitle = document.getElementById('mobile-bottom-sheet-title');
+    const sheetBody = document.getElementById('mobile-bottom-sheet-body');
+    const sheetCloseBtn = document.getElementById('mobile-bottom-sheet-close');
+    const sheetOverlay = bottomSheet ? bottomSheet.querySelector('.bottom-sheet-overlay') : null;
+
+    // Helper to close mobile bottom sheet
+    function closeBottomSheet() {
+        if (bottomSheet) {
+            bottomSheet.classList.remove('active');
+        }
+    }
+
+    if (sheetCloseBtn) {
+        sheetCloseBtn.addEventListener('click', closeBottomSheet);
+    }
+    if (sheetOverlay) {
+        sheetOverlay.addEventListener('click', closeBottomSheet);
+    }
+
     cards.forEach(card => {
         const dropdown = card.querySelector('.meta-dropdown-panel');
         if (!dropdown) return;
 
         card.addEventListener('click', (e) => {
-            // Prevent close-on-click-outside from firing immediately
             e.stopPropagation();
 
+            // Mobile Bottom Sheet behavior
+            if (window.innerWidth <= 768) {
+                // Extract card title
+                const cardHeader = card.querySelector('div:first-child');
+                const titleText = cardHeader ? cardHeader.textContent.trim() : 'Details';
+                
+                // Clone the dropdown table
+                const tableClone = dropdown.querySelector('table') ? dropdown.querySelector('table').cloneNode(true) : null;
+                
+                if (sheetTitle) sheetTitle.textContent = titleText;
+                if (sheetBody) {
+                    sheetBody.innerHTML = '';
+                    if (tableClone) {
+                        sheetBody.appendChild(tableClone);
+                    } else {
+                        sheetBody.innerHTML = `<div style="text-align: center; padding: 20px; color: var(--text-muted);">No details available</div>`;
+                    }
+                }
+                
+                if (bottomSheet) {
+                    bottomSheet.classList.add('active');
+                }
+                
+                // Close any open desktop hover states
+                cards.forEach(c => c.classList.remove('active'));
+                return;
+            }
+
+            // Desktop click toggle behavior
             const isActive = card.classList.contains('active');
-
-            // Close all other dropdowns
             cards.forEach(c => c.classList.remove('active'));
-
             if (!isActive) {
                 card.classList.add('active');
             }
