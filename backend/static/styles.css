@@ -2758,7 +2758,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 /* Micro Indicators Grid */
 .synthesis-micro-indicators {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 8px;
 }
 
@@ -3886,8 +3886,24 @@ input[type="range"]::-webkit-slider-thumb:hover {
     
     .drawer-tab-content {
         height: calc(100% - 92px) !important;
-        overflow-y: hidden !important;
-        -webkit-overflow-scrolling: auto !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    
+    .synthesis-report-container {
+        height: auto !important;
+        max-height: none !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        flex-grow: 0 !important;
+        flex-shrink: 0 !important;
+    }
+    
+    .synthesis-report-text {
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        overflow-y: visible !important;
     }
     
     .chat-drawer-messages {
@@ -11076,4 +11092,52 @@ tr.active-peer-row td:first-child {
 
 [data-theme="light"] .bottom-sheet-header {
     border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+/* --- COLLAPSIBLE SYNTHESIS PANEL HEADER --- */
+.synthesis-header-collapsible {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 550px;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, margin-bottom 0.3s ease, padding 0.3s ease;
+    opacity: 1;
+    flex-shrink: 0;
+}
+
+.synthesis-header-collapsible.collapsed {
+    max-height: 0 !important;
+    opacity: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none;
+}
+
+#synthesis-header-toggle-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 9.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#synthesis-header-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+[data-theme="light"] #synthesis-header-toggle-btn {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
+    color: var(--text-secondary);
+}
+
+[data-theme="light"] #synthesis-header-toggle-btn:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--text-primary);
 }
