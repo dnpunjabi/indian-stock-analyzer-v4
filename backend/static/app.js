@@ -2422,7 +2422,7 @@ function renderScreenerResults(results, isSorted = false) {
         summaryBox.style.borderLeft = `4px solid ${accentColor}`;
 
         let html = '';
-        html += '<div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; align-items: start;">';
+        html += '<div class="responsive-summary-grid">';
 
         html += '  <div>';
         html += `    <div style="font-size: 11px; font-weight: 700; color: ${accentColor}; margin-bottom: 5px; letter-spacing: 0.04em;">${cohortTitle}</div>`;
@@ -15065,7 +15065,7 @@ function filterAndRenderUniverse() {
         summaryBox.style.borderLeft = `4px solid ${accentColor}`;
 
         let html = '';
-        html += '<div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 18px; align-items: start;">';
+        html += '<div class="responsive-summary-grid">';
 
         // Left Column: Metaphor
         html += '  <div>';
