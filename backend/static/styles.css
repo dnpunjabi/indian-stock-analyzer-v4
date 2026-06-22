@@ -11459,6 +11459,8 @@ tr.active-peer-row td:first-child {
     }
     .movers-pane {
         flex: 1 1 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
     }
 }
 
@@ -11468,6 +11470,20 @@ tr.active-peer-row td:first-child {
     }
     .temp-cards-grid {
         grid-template-columns: 1fr !important;
+    }
+    /* Compact table cells for Movers Tables on small screens to prevent layout overflow */
+    .movers-pane table.screener-table th,
+    .movers-pane table.screener-table td {
+        padding: 8px 6px !important;
+        font-size: 10.5px !important;
+    }
+    .movers-pane table.screener-table td:nth-child(2) {
+        max-width: 105px !important;
+    }
+    /* Squeeze Movers Segmented Control on mobile */
+    .movers-filter-segmented button.segmented-btn {
+        padding: 6px 8px !important;
+        font-size: 10px !important;
     }
 }
 
