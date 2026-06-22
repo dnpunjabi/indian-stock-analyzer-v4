@@ -24576,6 +24576,34 @@ function setupMetricHoverTooltips() {
         return { chartData, chartLabels, title, subtitle, label };
     }
 
+    function resolveChartColors(metricType, chartData, isLight) {
+        let lineColor = '#00d2ff'; // default blue
+        if (isLight) {
+            lineColor = '#2563eb'; // light theme blue
+        }
+
+        if (metricType === 'debteq') {
+            const isDebtReduced = chartData[chartData.length - 1] <= chartData[0];
+            lineColor = isDebtReduced ? '#10b981' : '#ef4444';
+        } else if (metricType === 'fii' || metricType === 'dii') {
+            const isUp = chartData[chartData.length - 1] >= chartData[0];
+            lineColor = isUp ? '#10b981' : '#ef4444';
+        } else if (metricType === 'pe') {
+            lineColor = isLight ? '#2563eb' : '#00d2ff';
+        }
+
+        const baseHex = lineColor.startsWith('#') ? lineColor : '#00d2ff';
+        const r = parseInt(baseHex.slice(1, 3), 16);
+        const g = parseInt(baseHex.slice(3, 5), 16);
+        const b = parseInt(baseHex.slice(5, 7), 16);
+        const areaColor = `rgba(${r}, ${g}, ${b}, 0.06)`;
+
+        const gridColor = isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.04)';
+        const textColor = isLight ? '#475569' : '#9ca3af';
+
+        return { lineColor, areaColor, gridColor, textColor };
+    }
+
     // DESKTOP: mouseover to show absolute floating tooltip
     document.addEventListener('mouseover', (e) => {
         const trigger = e.target.closest('.hover-chart-trigger');
@@ -24604,20 +24632,7 @@ function setupMetricHoverTooltips() {
         }
 
         const isLight = document.documentElement.getAttribute('data-mode') === 'light';
-        let lineColor = 'var(--neon-blue)';
-        if (metricType === 'debteq') {
-            const isDebtReduced = chartData[chartData.length - 1] <= chartData[0];
-            lineColor = isDebtReduced ? 'var(--color-emerald)' : 'var(--color-crimson)';
-        } else if (metricType === 'fii' || metricType === 'dii') {
-            const isUp = chartData[chartData.length - 1] >= chartData[0];
-            lineColor = isUp ? 'var(--color-emerald)' : 'var(--color-crimson)';
-        } else {
-            lineColor = isLight ? '#2563eb' : '#00d2ff';
-        }
-
-        const areaColor = isLight ? 'rgba(37, 99, 235, 0.05)' : 'rgba(0, 210, 255, 0.05)';
-        const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)';
-        const textColor = isLight ? '#475569' : '#9ca3af';
+        const { lineColor, areaColor, gridColor, textColor } = resolveChartColors(metricType, chartData, isLight);
 
         // Initialize Chart.js
         hoverChartInstance = new Chart(canvas, {
@@ -24756,20 +24771,7 @@ function setupMetricHoverTooltips() {
         if (!mobileCanvas) return;
 
         const isLight = document.documentElement.getAttribute('data-mode') === 'light';
-        let lineColor = 'var(--neon-blue)';
-        if (metricType === 'debteq') {
-            const isDebtReduced = chartData[chartData.length - 1] <= chartData[0];
-            lineColor = isDebtReduced ? 'var(--color-emerald)' : 'var(--color-crimson)';
-        } else if (metricType === 'fii' || metricType === 'dii') {
-            const isUp = chartData[chartData.length - 1] >= chartData[0];
-            lineColor = isUp ? 'var(--color-emerald)' : 'var(--color-crimson)';
-        } else {
-            lineColor = isLight ? '#2563eb' : '#00d2ff';
-        }
-
-        const areaColor = isLight ? 'rgba(37, 99, 235, 0.04)' : 'rgba(0, 210, 255, 0.03)';
-        const gridColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)';
-        const textColor = isLight ? '#475569' : '#9ca3af';
+        const { lineColor, areaColor, gridColor, textColor } = resolveChartColors(metricType, chartData, isLight);
 
         if (hoverChartInstance) {
             hoverChartInstance.destroy();
