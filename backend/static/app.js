@@ -6,18 +6,108 @@
 
 // ==================== GLOBAL INTERCEPTOR & CAPACITOR ROUTER ====================
 (function() {
-    const isCapacitor = window.hasOwnProperty('Capacitor') || (window.Capacitor !== undefined);
+    const isCapacitor = window.hasOwnProperty('Capacitor') || 
+                        (window.Capacitor !== undefined) || 
+                        ((location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'capacitor:') && 
+                         (location.port !== '8000' && location.port !== '5000'));
     const apiBaseUrl = isCapacitor ? 'https://my-stock-advisor.duckdns.org' : '';
     
-    if (isCapacitor) {
-        const originalFetch = window.fetch;
-        window.fetch = function(input, init) {
-            if (typeof input === 'string' && input.startsWith('/api/')) {
-                input = apiBaseUrl + input;
+    let isLoginModalOpen = false;
+    function showServerLoginModal() {
+        if (isLoginModalOpen) return;
+        const modal = document.getElementById('mobile-server-login-modal');
+        if (!modal) return;
+        
+        isLoginModalOpen = true;
+        modal.style.display = 'flex';
+        
+        const userIn = document.getElementById('mobile-login-user');
+        const passIn = document.getElementById('mobile-login-pass');
+        const errDiv = document.getElementById('mobile-login-err');
+        const btn = document.getElementById('mobile-login-btn');
+        
+        if (!btn) return;
+        
+        // Clone button to strip old event listeners
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        newBtn.addEventListener('click', async () => {
+            const username = userIn ? userIn.value.trim() : '';
+            const password = passIn ? passIn.value.trim() : '';
+            
+            if (!username || !password) {
+                if (errDiv) {
+                    errDiv.textContent = 'Please fill out all fields.';
+                    errDiv.style.display = 'block';
+                }
+                return;
             }
-            return originalFetch(input, init);
-        };
+            
+            newBtn.disabled = true;
+            newBtn.textContent = 'Authenticating...';
+            if (errDiv) errDiv.style.display = 'none';
+            
+            const testToken = btoa(username + ':' + password);
+            
+            try {
+                const testRes = await originalFetch('https://my-stock-advisor.duckdns.org/api/universe', {
+                    headers: { 'Authorization': 'Basic ' + testToken }
+                });
+                if (testRes.status === 401) {
+                    throw new Error('Invalid credentials');
+                }
+                
+                // Save valid credentials
+                localStorage.setItem('server_auth_token', testToken);
+                modal.style.display = 'none';
+                isLoginModalOpen = false;
+                
+                // Reload page dynamically to initialize all fetches with the token
+                location.reload();
+            } catch (err) {
+                newBtn.disabled = false;
+                newBtn.textContent = 'Connect Workstation';
+                if (errDiv) {
+                    errDiv.textContent = 'Connection failed. Check credentials.';
+                    errDiv.style.display = 'block';
+                }
+            }
+        });
     }
+    
+    window.showServerLoginModal = showServerLoginModal;
+    
+    const originalFetch = window.fetch;
+    window.fetch = async function(input, init) {
+        let isApi = typeof input === 'string' && input.startsWith('/api/');
+        let targetUrl = isApi ? (apiBaseUrl + input) : input;
+        
+        const authToken = localStorage.getItem('server_auth_token');
+        if (authToken && (isApi || (typeof input === 'string' && input.includes('my-stock-advisor.duckdns.org')))) {
+            init = init || {};
+            init.headers = init.headers || {};
+            
+            if (init.headers instanceof Headers) {
+                init.headers.set('Authorization', 'Basic ' + authToken);
+            } else {
+                init.headers['Authorization'] = 'Basic ' + authToken;
+            }
+        }
+        
+        try {
+            const response = await originalFetch(targetUrl, init);
+            if (response.status === 401 && isCapacitor) {
+                showServerLoginModal();
+            }
+            return response;
+        } catch (error) {
+            if (isCapacitor && !authToken) {
+                showServerLoginModal();
+            }
+            throw error;
+        }
+    };
 })();
 
 
@@ -54,9 +144,23 @@ function connectLiveTicksWS() {
         return; // Already connected or connecting
     }
 
-    const isCapacitor = window.hasOwnProperty('Capacitor') || (window.Capacitor !== undefined);
+    const isCapacitor = window.hasOwnProperty('Capacitor') || 
+                        (window.Capacitor !== undefined) || 
+                        ((location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'capacitor:') && 
+                         (location.port !== '8000' && location.port !== '5000'));
     const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = isCapacitor ? 'my-stock-advisor.duckdns.org' : location.host;
+    const authToken = localStorage.getItem('server_auth_token');
+    
+    let host = isCapacitor ? 'my-stock-advisor.duckdns.org' : location.host;
+    if (isCapacitor && authToken) {
+        try {
+            const rawCreds = atob(authToken); // "username:password"
+            host = `${rawCreds}@my-stock-advisor.duckdns.org`;
+        } catch (e) {
+            console.error('Error decoding auth token for WS:', e);
+        }
+    }
+    
     const wsProto = isCapacitor ? 'wss:' : protocol;
     const wsUrl = `${wsProto}//${host}/ws/live-ticks`;
 

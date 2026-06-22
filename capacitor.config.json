@@ -2,5 +2,13 @@
   "appId": "com.stockanalyzer.app",
   "appName": "Stock Analyzer",
   "webDir": "backend/static",
-  "bundledWebRuntime": false
+  "bundledWebRuntime": false,
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "CapacitorCookies": {
+      "enabled": true
+    }
+  }
 }

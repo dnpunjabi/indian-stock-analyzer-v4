@@ -5429,6 +5429,32 @@
         </div>
     </div>
 
+    <!-- Mobile Server Basic Auth Login Modal -->
+    <div id="mobile-server-login-modal" class="modal no-print" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:200000; justify-content:center; align-items:center; box-sizing:border-box; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);">
+        <div class="modal-content" style="background:rgba(15, 23, 42, 0.95); border:1px solid rgba(255, 255, 255, 0.15); border-radius:16px; width:90%; max-width:380px; padding:25px; box-shadow:0 12px 40px rgba(0,0,0,0.6); box-sizing:border-box; text-align:center;">
+            <div style="font-size: 32px; margin-bottom: 12px;">🔒</div>
+            <h3 style="margin:0 0 8px 0; font-family:'Outfit',sans-serif; color:#ffffff; font-size:16px; text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Server Verification</h3>
+            <p style="margin:0 0 20px 0; font-size:11px; color:var(--text-muted); line-height:1.5;">This Stock Analyzer workstation is private. Please enter your Nginx server credentials to connect.</p>
+            
+            <div style="display:flex; flex-direction:column; gap:12px; text-align:left; margin-bottom:20px;">
+                <div>
+                    <label style="font-size:9.5px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:5px;">Username</label>
+                    <input type="text" id="mobile-login-user" placeholder="Enter server username" style="width:100%; padding:10px 12px; background:rgba(255, 255, 255, 0.05); border:1px solid rgba(255, 255, 255, 0.1); border-radius:8px; color:#ffffff; font-size:12px; outline:none; box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="font-size:9.5px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.04em; display:block; margin-bottom:5px;">Password</label>
+                    <input type="password" id="mobile-login-pass" placeholder="Enter server password" style="width:100%; padding:10px 12px; background:rgba(255, 255, 255, 0.05); border:1px solid rgba(255, 255, 255, 0.1); border-radius:8px; color:#ffffff; font-size:12px; outline:none; box-sizing:border-box;">
+                </div>
+            </div>
+            
+            <div id="mobile-login-err" style="display:none; color:var(--neon-red, #ef4444); font-size:11px; margin-bottom:15px; font-weight:600;">Invalid credentials. Please try again.</div>
+            
+            <button id="mobile-login-btn" style="width:100%; background:var(--color-primary, #6366f1); color:#ffffff; border:none; padding:12px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; display:flex; justify-content:center; align-items:center; transition:all 0.2s;">
+                Connect Workstation
+            </button>
+        </div>
+    </div>
+
     <script src="app.js?v=1.0.9"></script>
 </body>
 </html>
