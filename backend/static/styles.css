@@ -7297,7 +7297,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 
 .pe-stat-list {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: 8px;
     width: 100%;
 }
