@@ -1640,7 +1640,12 @@ function switchTab(tabKey) {
             const overlay = document.getElementById('portfolio-lock-overlay');
             if (overlay) overlay.classList.remove('hidden');
             if (window.triggerBiometricVerification) {
-                window.triggerBiometricVerification();
+                // Introduce a small delay to avoid native lifecycle/context conflicts during Android layout transitions
+                setTimeout(() => {
+                    if (activeTab === 'portfolio' && !window.portfolioUnlocked) {
+                        window.triggerBiometricVerification();
+                    }
+                }, 350);
             }
         }
     } else {
