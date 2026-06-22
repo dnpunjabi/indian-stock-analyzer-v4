@@ -1634,6 +1634,10 @@ function setupTabNavigation() {
 }
 
 function switchTab(tabKey) {
+    if (activeTab === tabKey) return;
+    activeTab = tabKey;
+    localStorage.setItem('active-tab', tabKey);
+
     // Portfolio security interception and lock resets
     if (tabKey === 'portfolio') {
         if (!window.portfolioUnlocked) {
@@ -1661,8 +1665,6 @@ function switchTab(tabKey) {
     if (location.hash !== '#' + tabKey) {
         location.hash = tabKey;
     }
-    activeTab = tabKey;
-    localStorage.setItem('active-tab', tabKey);
     Object.keys(tabs).forEach(k => {
         const el = tabs[k] || document.getElementById('tab-' + k);
         const btn = tabBtns[k] || document.getElementById('tab-' + k + '-btn');
@@ -26954,14 +26956,22 @@ window.renderTVWorkstationChart = renderTVWorkstationChart;
             }
         }
         
+        let isBiometricPromptActive = false;
         async function triggerBiometricVerification() {
+            if (isBiometricPromptActive) {
+                console.log("[Portfolio Lock] Biometric prompt is already active. Ignoring call.");
+                return;
+            }
+            isBiometricPromptActive = true;
             if (!isNative) {
                 console.log("Not running in native Capacitor environment. Skipping native biometrics.");
+                isBiometricPromptActive = false;
                 return;
             }
             const NativeBiometric = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.NativeBiometric;
             if (!NativeBiometric) {
                 console.warn("Capacitor NativeBiometric plugin not available.");
+                isBiometricPromptActive = false;
                 return;
             }
             try {
@@ -26980,6 +26990,8 @@ window.renderTVWorkstationChart = renderTVWorkstationChart;
             } catch (err) {
                 console.error("Biometric authentication error/failed:", err);
                 showToast("Biometric verification canceled or failed.", "info");
+            } finally {
+                isBiometricPromptActive = false;
             }
         }
         
