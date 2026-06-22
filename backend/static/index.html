@@ -2897,83 +2897,88 @@
                         
                         <!-- Tab Content 1: Executive Synthesis -->
                         <div class="drawer-tab-content active" id="drawer-synthesis-content">
-                            <div class="synthesis-score-gauge-wrap">
-                                <div class="synthesis-gauge-container">
-                                    <svg viewBox="0 0 36 36" class="synthesis-gauge-svg">
-                                        <path class="synthesis-gauge-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                        <path id="synthesis-gauge-fill" class="synthesis-gauge-fill" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                                    </svg>
-                                    <div class="synthesis-gauge-text">
-                                        <span id="synthesis-gauge-score-num">--</span>
-                                        <span class="synthesis-gauge-label">Score</span>
+                            <div id="synthesis-header-collapsible" class="synthesis-header-collapsible">
+                                <div class="synthesis-score-gauge-wrap">
+                                    <div class="synthesis-gauge-container">
+                                        <svg viewBox="0 0 36 36" class="synthesis-gauge-svg">
+                                            <path class="synthesis-gauge-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                            <path id="synthesis-gauge-fill" class="synthesis-gauge-fill" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                        </svg>
+                                        <div class="synthesis-gauge-text">
+                                            <span id="synthesis-gauge-score-num">--</span>
+                                            <span class="synthesis-gauge-label">Score</span>
+                                        </div>
+                                    </div>
+                                    <div class="synthesis-rec-badge-wrap">
+                                        <span class="synthesis-badge-hdr">AI Rating</span>
+                                        <span class="badge-rec" id="synthesis-badge-rec">HOLD 🟡</span>
+                                    </div>
+                                    <div class="synthesis-print-wrap">
+                                        <span class="synthesis-print-hdr">Prospectus</span>
+                                        <button class="btn-secondary" id="print-prospectus-btn"><span>🖨️</span> Print</button>
                                     </div>
                                 </div>
-                                <div class="synthesis-rec-badge-wrap">
-                                    <span class="synthesis-badge-hdr">AI Rating</span>
-                                    <span class="badge-rec" id="synthesis-badge-rec">HOLD 🟡</span>
-                                </div>
-                                <div class="synthesis-print-wrap">
-                                    <span class="synthesis-print-hdr">Prospectus</span>
-                                    <button class="btn-secondary" id="print-prospectus-btn"><span>🖨️</span> Print</button>
-                                </div>
-                            </div>
 
-                            <!-- Synthesis Audio Console -->
-                            <div class="synthesis-audio-console" id="synthesis-audio-console">
-                                <div class="audio-console-left">
-                                    <span style="font-size: 14px;">🔊</span>
-                                    <div style="display: flex; flex-direction: column;">
-                                        <span class="audio-console-title">Debate Dialectic Audio</span>
-                                        <span class="audio-console-status" id="audio-playback-status">Ready to play synthesis</span>
+                                <!-- Synthesis Audio Console -->
+                                <div class="synthesis-audio-console" id="synthesis-audio-console">
+                                    <div class="audio-console-left">
+                                        <span style="font-size: 14px;">🔊</span>
+                                        <div style="display: flex; flex-direction: column;">
+                                            <span class="audio-console-title">Debate Dialectic Audio</span>
+                                            <span class="audio-console-status" id="audio-playback-status">Ready to play synthesis</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="audio-console-controls">
-                                    <select id="audio-voice-select" style="background: var(--bg-card); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 3.5px 6px; font-size: 10px; font-family: inherit; font-weight: 500; cursor: pointer; outline: none; width: 100%; box-sizing: border-box; height: 24px;">
-                                        <option value="default">Default System voice</option>
-                                    </select>
-                                    <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
-                                        <select id="audio-rate-select" style="background: var(--bg-card); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 3.5px 6px; font-size: 10px; font-family: inherit; font-weight: 500; cursor: pointer; outline: none; flex: 0 0 auto; width: 80px; box-sizing: border-box; height: 24px;">
-                                            <option value="0.75">0.75x</option>
-                                            <option value="1.0" selected>1.0x</option>
-                                            <option value="1.25">1.25x</option>
-                                            <option value="1.5">1.5x</option>
-                                            <option value="2.0">2.0x</option>
+                                    <div class="audio-console-controls">
+                                        <select id="audio-voice-select" style="background: var(--bg-card); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 3.5px 6px; font-size: 10px; font-family: inherit; font-weight: 500; cursor: pointer; outline: none; width: 100%; box-sizing: border-box; height: 24px;">
+                                            <option value="default">Default System voice</option>
                                         </select>
-                                        <button class="audio-btn" id="audio-play-pause-btn" style="height: 24px; box-sizing: border-box; flex: 1;"><span>▶️</span> Play</button>
-                                        <button class="audio-btn" id="audio-stop-btn" style="height: 24px; box-sizing: border-box; flex: 1;"><span>⏹️</span> Stop</button>
+                                        <div style="display: flex; gap: 6px; width: 100%; align-items: center;">
+                                            <select id="audio-rate-select" style="background: var(--bg-card); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 3.5px 6px; font-size: 10px; font-family: inherit; font-weight: 500; cursor: pointer; outline: none; flex: 0 0 auto; width: 80px; box-sizing: border-box; height: 24px;">
+                                                <option value="0.75">0.75x</option>
+                                                <option value="1.0" selected>1.0x</option>
+                                                <option value="1.25">1.25x</option>
+                                                <option value="1.5">1.5x</option>
+                                                <option value="2.0">2.0x</option>
+                                            </select>
+                                            <button class="audio-btn" id="audio-play-pause-btn" style="height: 24px; box-sizing: border-box; flex: 1;"><span>▶️</span> Play</button>
+                                            <button class="audio-btn" id="audio-stop-btn" style="height: 24px; box-sizing: border-box; flex: 1;"><span>⏹️</span> Stop</button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            <div class="synthesis-micro-indicators">
-                                <div class="synthesis-micro-item">
-                                    <span class="synthesis-micro-lbl">Valuation MoS</span>
-                                    <strong id="synthesis-micro-mos">--%</strong>
-                                </div>
-                                <div class="synthesis-micro-item">
-                                    <span class="synthesis-micro-lbl">Solvency (Z)</span>
-                                    <strong id="synthesis-micro-altman">--</strong>
-                                </div>
-                                <div class="synthesis-micro-item">
-                                    <span class="synthesis-micro-lbl">Piotroski Quality</span>
-                                    <strong id="synthesis-micro-piotroski">--/9</strong>
-                                </div>
-                                <div class="synthesis-micro-item">
-                                    <span class="synthesis-micro-lbl">Delivery Z-Score</span>
-                                    <strong id="synthesis-micro-zscore">--</strong>
-                                </div>
-                                <div class="synthesis-micro-item">
-                                    <span class="synthesis-micro-lbl">VSA Setup</span>
-                                    <strong id="synthesis-micro-vsa">--</strong>
-                                </div>
-                                <div class="synthesis-micro-item">
-                                    <span class="synthesis-micro-lbl">POC Floor</span>
-                                    <strong id="synthesis-micro-poc">--</strong>
+                                <div class="synthesis-micro-indicators">
+                                    <div class="synthesis-micro-item">
+                                        <span class="synthesis-micro-lbl">Valuation MoS</span>
+                                        <strong id="synthesis-micro-mos">--%</strong>
+                                    </div>
+                                    <div class="synthesis-micro-item">
+                                        <span class="synthesis-micro-lbl">Solvency (Z)</span>
+                                        <strong id="synthesis-micro-altman">--</strong>
+                                    </div>
+                                    <div class="synthesis-micro-item">
+                                        <span class="synthesis-micro-lbl">Piotroski Quality</span>
+                                        <strong id="synthesis-micro-piotroski">--/9</strong>
+                                    </div>
+                                    <div class="synthesis-micro-item">
+                                        <span class="synthesis-micro-lbl">Delivery Z-Score</span>
+                                        <strong id="synthesis-micro-zscore">--</strong>
+                                    </div>
+                                    <div class="synthesis-micro-item">
+                                        <span class="synthesis-micro-lbl">VSA Setup</span>
+                                        <strong id="synthesis-micro-vsa">--</strong>
+                                    </div>
+                                    <div class="synthesis-micro-item">
+                                        <span class="synthesis-micro-lbl">POC Floor</span>
+                                        <strong id="synthesis-micro-poc">--</strong>
+                                    </div>
                                 </div>
                             </div>
 
                             <div class="synthesis-report-container">
-                                <h5>📊 INSTITUTIONAL PROSPECTUS</h5>
+                                <div class="synthesis-report-header-row" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed var(--border-glass); padding-bottom: 8px; margin-bottom: 12px; width: 100%;">
+                                    <h5 style="margin: 0; border: none; padding: 0;">📊 INSTITUTIONAL PROSPECTUS</h5>
+                                    <button id="synthesis-header-toggle-btn">Hide Metrics</button>
+                                </div>
                                 <div id="synthesis-report-text" class="synthesis-report-text">
                                     <div class="copilot-intro-card">
                                         <div class="copilot-card-title">

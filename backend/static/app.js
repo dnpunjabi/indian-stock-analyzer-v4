@@ -9910,6 +9910,23 @@ function setupChatDrawer() {
         });
     }
 
+    // Setup collapsible synthesis metrics toggle
+    const toggleBtn = document.getElementById('synthesis-header-toggle-btn');
+    const collapsibleHeader = document.getElementById('synthesis-header-collapsible');
+    if (toggleBtn && collapsibleHeader) {
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isCollapsed = collapsibleHeader.classList.contains('collapsed');
+            if (isCollapsed) {
+                collapsibleHeader.classList.remove('collapsed');
+                toggleBtn.textContent = 'Hide Metrics';
+            } else {
+                collapsibleHeader.classList.add('collapsed');
+                toggleBtn.textContent = 'Show Metrics';
+            }
+        });
+    }
+
     // Anchor the banner trigger click event: toggling drawer and focusing synthesis
     const convictionTrigger = document.getElementById('meta-ai-conviction-trigger');
     if (convictionTrigger) {
