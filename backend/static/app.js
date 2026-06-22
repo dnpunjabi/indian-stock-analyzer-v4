@@ -13721,6 +13721,15 @@ function refreshChartThemeColors() {
     if (typeof updateLightweightChartsThemeColors === 'function') {
         updateLightweightChartsThemeColors();
     }
+    // Re-render the advanced TradingView widget if active to match theme toggle
+    const activeSubtabBtn = document.querySelector('.subtab-btn.active');
+    if (activeSubtabBtn && activeSubtabBtn.getAttribute('data-subtab') === 'tv-advanced') {
+        if (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) {
+            if (typeof window.renderTVAdvancedChart === 'function') {
+                window.renderTVAdvancedChart(activeStockProfile.ticker);
+            }
+        }
+    }
 }
 
 function updateLightweightChartsThemeColors() {
@@ -16533,6 +16542,14 @@ function setupAnalyzerSubtabs() {
             if (activeSubtab === 'tv-chart') {
                 if (activeStockProfile && activeStockProfile.ticker) {
                     renderTVWorkstationChart(activeStockProfile.ticker);
+                } else {
+                    showToast("Please load a stock analyzer profile first.", "warning");
+                }
+            }
+
+            if (activeSubtab === 'tv-advanced') {
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    renderTVAdvancedChart(activeStockProfile.ticker);
                 } else {
                     showToast("Please load a stock analyzer profile first.", "warning");
                 }
@@ -25591,6 +25608,40 @@ function formatMarkdownToHTML(text) {
 }
 
 window.renderTVWorkstationChart = renderTVWorkstationChart;
+
+async function renderTVAdvancedChart(symbol) {
+    if (!symbol) return;
+    const container = document.getElementById('tv-advanced-container');
+    if (!container) return;
+
+    let cleanTicker = symbol.split('.')[0].toUpperCase();
+    let tvSymbol = "NSE:" + cleanTicker;
+    
+    // Detect theme (dark or light)
+    const isDark = document.documentElement.getAttribute('data-mode') === 'light' ? 'light' : 'dark';
+    
+    container.innerHTML = `<div id="tradingview_advanced_widget" style="width: 100%; height: 100%; min-height: 520px;"></div>`;
+    
+    if (typeof TradingView === 'undefined') {
+        container.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">TradingView API is offline. Please check your network connection.</div>`;
+        return;
+    }
+
+    new TradingView.widget({
+        "autosize": true,
+        "symbol": tvSymbol,
+        "interval": "D",
+        "timezone": "Asia/Kolkata",
+        "theme": isDark,
+        "style": "1",
+        "locale": "en",
+        "enable_publishing": false,
+        "hide_side_toolbar": false,
+        "allow_symbol_change": true,
+        "container_id": "tradingview_advanced_widget"
+    });
+}
+window.renderTVAdvancedChart = renderTVAdvancedChart;
 
 // ==================== FULLSCREEN WORKSTATION CHART OVERLAYS ====================
 (function() {
