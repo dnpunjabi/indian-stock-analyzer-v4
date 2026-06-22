@@ -25764,12 +25764,34 @@ function formatMarkdownToHTML(text) {
 window.renderTVWorkstationChart = renderTVWorkstationChart;
 
 async function renderTVAdvancedChart(symbol) {
-    if (!symbol) return;
+    if (!symbol || symbol === 'STOCK') {
+        symbol = "RELIANCE.NS";
+    }
     const container = document.getElementById('tv-advanced-container');
     if (!container) return;
 
-    let cleanTicker = symbol.split('.')[0].toUpperCase();
-    let tvSymbol = "NSE:" + cleanTicker;
+    let cleanTicker = symbol.replace('^', '').split('.')[0].toUpperCase();
+    let tvSymbol = "";
+    
+    if (symbol.includes('.NS')) {
+        tvSymbol = "NSE:" + cleanTicker;
+    } else if (symbol.includes('.BO')) {
+        tvSymbol = "BSE:" + cleanTicker;
+    } else if (symbol === '^NSEI' || cleanTicker === 'NSEI') {
+        tvSymbol = "NSE:NIFTY";
+    } else if (symbol === '^BSESN' || cleanTicker === 'BSESN') {
+        tvSymbol = "BSE:SENSEX";
+    } else if (symbol === '^NSEBANK' || cleanTicker === 'NSEBANK') {
+        tvSymbol = "NSE:BANKNIFTY";
+    } else if (symbol === '^CNXIT' || cleanTicker === 'CNXIT') {
+        tvSymbol = "NSE:NIFTYIT";
+    } else if (symbol === '^CNXINFRA' || cleanTicker === 'CNXINFRA') {
+        tvSymbol = "NSE:NIFTYINFRA";
+    } else if (symbol === '^CNXAUTO' || cleanTicker === 'CNXAUTO') {
+        tvSymbol = "NSE:NIFTYAUTO";
+    } else {
+        tvSymbol = cleanTicker;
+    }
     
     // Detect theme (dark or light)
     const isDark = document.documentElement.getAttribute('data-mode') === 'light' ? 'light' : 'dark';
