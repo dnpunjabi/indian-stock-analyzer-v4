@@ -25773,9 +25773,7 @@ async function renderTVAdvancedChart(symbol) {
     let cleanTicker = symbol.replace('^', '').split('.')[0].toUpperCase();
     let tvSymbol = "";
     
-    if (symbol.includes('.NS')) {
-        tvSymbol = "NSE:" + cleanTicker;
-    } else if (symbol.includes('.BO')) {
+    if (symbol.includes('.NS') || symbol.includes('.BO')) {
         tvSymbol = "BSE:" + cleanTicker;
     } else if (symbol === '^NSEI' || cleanTicker === 'NSEI') {
         tvSymbol = "NSE:NIFTY";
