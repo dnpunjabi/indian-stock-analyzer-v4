@@ -6639,7 +6639,7 @@ def run_groq_news_sentiment_analysis(symbol: str, news_list: list, anomalies_lis
 
 
 @app.get("/api/portfolio/news-impact")
-async def get_news_impact(symbol: str, refresh: bool = False):
+async def get_news_impact(symbol: str, refresh: bool = False, run_llm: bool = False):
     import json
     import sqlite3
     from datetime import datetime, timedelta
@@ -6658,12 +6658,14 @@ async def get_news_impact(symbol: str, refresh: bool = False):
                     cached_time = datetime.strptime(row["updated_at"], "%Y-%m-%d %H:%M:%S")
                     if datetime.now() - cached_time < timedelta(hours=24):
                         parsed_json = json.loads(row["sentiment_json"])
+                        # If a full audit is stored, return it directly
                         return {
                             "symbol": sym,
                             "sentiment_index": parsed_json.get("sentiment_index", 50.0),
                             "news_items": parsed_json.get("news_items", []),
                             "updated_at": row["updated_at"],
-                            "cached": True
+                            "cached": True,
+                            "has_audit": parsed_json.get("has_audit", True)
                         }
         except Exception as cache_err:
             print(f"Error reading news impact cache for {sym}: {cache_err}")
@@ -6712,9 +6714,48 @@ async def get_news_impact(symbol: str, refresh: bool = False):
                 "news_items": [],
                 "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "cached": False,
+                "has_audit": False,
                 "error": "No news items found."
             }
             
+        # Fast Path: If LLM analysis is not requested, immediately return raw headlines
+        if not run_llm:
+            raw_items = []
+            anomaly_map = {item["date"]: item for item in anomalies_list}
+            for item in raw_news:
+                news_date = item["date"]
+                ab_ret = 0.0
+                price_change = 0.0
+                is_anomaly = False
+                
+                if news_date in anomaly_map:
+                    ab_ret = anomaly_map[news_date]["abnormal_return"]
+                    price_change = anomaly_map[news_date]["return"]
+                    is_anomaly = anomaly_map[news_date]["is_anomaly"]
+                    
+                raw_items.append({
+                    "title": item["title"],
+                    "publisher": item.get("source") or item.get("publisher") or "Yahoo Finance",
+                    "date": news_date,
+                    "link": item["link"] or "#",
+                    "sentiment_score": 0.0,
+                    "category": "Market Sentiment",
+                    "abnormal_return": ab_ret,
+                    "price_change": price_change,
+                    "is_anomaly": is_anomaly,
+                    "correlation_summary": "Click 'Run Groq Audit' at the top to analyze sentiment and categories."
+                })
+                
+            return {
+                "symbol": sym,
+                "sentiment_index": 50.0,
+                "news_items": raw_items,
+                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "cached": False,
+                "has_audit": False
+            }
+            
+        # Slow Path: Run Jina Reader & Groq Llama 3 analysis
         scraped_tasks = [asyncio.to_thread(fetch_jina_markdown, item["link"]) for item in raw_news]
         scraped_texts = await asyncio.gather(*scraped_tasks)
         
@@ -6779,6 +6820,7 @@ async def get_news_impact(symbol: str, refresh: bool = False):
             updated_news_items.append(item)
             
         synthesis_payload["news_items"] = updated_news_items
+        synthesis_payload["has_audit"] = True
         
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
@@ -6796,7 +6838,8 @@ async def get_news_impact(symbol: str, refresh: bool = False):
             "sentiment_index": synthesis_payload.get("sentiment_index", 50.0),
             "news_items": synthesis_payload.get("news_items", []),
             "updated_at": now_str,
-            "cached": False
+            "cached": False,
+            "has_audit": True
         }
         
     except Exception as run_err:

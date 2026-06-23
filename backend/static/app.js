@@ -5408,11 +5408,13 @@ function renderStockDashboard(p) {
             e.preventDefault();
             e.stopPropagation();
             if (window.activeStockSymbol) {
-                loadPortfolioNewsImpact(window.activeStockSymbol, true);
+                const container = document.getElementById('news-feed-container');
+                const wasAudited = container && container.dataset.hasAudit === 'true';
+                loadPortfolioNewsImpact(window.activeStockSymbol, true, wasAudited);
             }
         });
     }
-    loadPortfolioNewsImpact(p.ticker, false);
+    loadPortfolioNewsImpact(p.ticker, false, false);
     // Initial fetch of the default chart duration (1 year daily)
     fetchAndRenderChart();
 
@@ -28021,7 +28023,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
 })();
 
 // Global scope helpers for AI news scraping and synthesis timeline
-async function loadPortfolioNewsImpact(symbol, forceRefresh = false) {
+async function loadPortfolioNewsImpact(symbol, forceRefresh = false, runLLM = false) {
     const newsFeed = document.getElementById('news-feed-container');
     const newsSentimentWrapper = document.getElementById('news-sentiment-wrapper');
     const newsSentimentFill = document.getElementById('news-sentiment-thermometer-fill');
@@ -28038,15 +28040,16 @@ async function loadPortfolioNewsImpact(symbol, forceRefresh = false) {
     if (!newsFeed) return;
 
     // Show dynamic loaders
+    const loaderMsg = runLLM ? "Scraping news via Jina Reader & correlating with Groq Llama 3..." : "Fetching live RSS catalog...";
     newsFeed.innerHTML = `
         <div style="padding:40px; text-align: center; width: 100%; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 12px;">
             <div class="loader-spinner" style="border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid var(--color-primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; box-sizing: border-box;"></div>
-            <span style="font-size: 11px;">Scraping news via Jina Reader & correlating with Groq Llama 3...</span>
+            <span style="font-size: 11px;">${loaderMsg}</span>
         </div>
     `;
 
     try {
-        const url = `/api/portfolio/news-impact?symbol=${encodeURIComponent(symbol)}&refresh=${forceRefresh ? 'true' : 'false'}`;
+        const url = `/api/portfolio/news-impact?symbol=${encodeURIComponent(symbol)}&refresh=${forceRefresh ? 'true' : 'false'}&run_llm=${runLLM ? 'true' : 'false'}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to fetch news impact API");
         const data = await res.json();
@@ -28063,41 +28066,109 @@ async function loadPortfolioNewsImpact(symbol, forceRefresh = false) {
         }
 
         if (newsCacheStatus) {
-            newsCacheStatus.innerText = data.cached ? "Cache: Active" : "Cache: Fresh Scrape";
-            newsCacheStatus.style.color = data.cached ? "var(--text-muted)" : "var(--neon-green)";
+            if (data.has_audit) {
+                newsCacheStatus.innerText = data.cached ? "Cache: Active" : "Cache: Fresh Scrape";
+                newsCacheStatus.style.color = data.cached ? "var(--text-muted)" : "var(--neon-green)";
+            } else {
+                newsCacheStatus.innerText = "Fast RSS Catalog";
+                newsCacheStatus.style.color = "var(--text-muted)";
+            }
         }
         if (newsDiagnostics) {
-            const timeStr = data.updated_at ? data.updated_at.split(' ')[1] : "";
-            newsDiagnostics.innerText = `Engine: Groq Llama 3 | Refreshed: ${timeStr || "Just Now"}`;
+            if (data.has_audit) {
+                const timeStr = data.updated_at ? data.updated_at.split(' ')[1] : "";
+                newsDiagnostics.innerText = `Engine: Groq Llama 3 | Refreshed: ${timeStr || "Just Now"}`;
+            } else {
+                newsDiagnostics.innerText = "Engine: RSS | Groq Audit Pending";
+            }
         }
 
         const sentimentVal = data.sentiment_index;
         if (newsSentimentFill) {
-            newsSentimentFill.style.width = `${sentimentVal}%`;
+            if (data.has_audit) {
+                newsSentimentFill.style.width = `${sentimentVal}%`;
+                newsSentimentFill.style.background = ''; // reset to default CSS linear-gradient
+            } else {
+                newsSentimentFill.style.width = '50%';
+                newsSentimentFill.style.background = '#64748b'; // neutral grey
+            }
         }
         if (newsSentimentVal) {
-            if (sentimentVal >= 60) {
-                newsSentimentVal.innerText = `${sentimentVal.toFixed(1)}% Bullish`;
-                newsSentimentVal.style.color = 'var(--neon-green)';
-            } else if (sentimentVal <= 40) {
-                newsSentimentVal.innerText = `${sentimentVal.toFixed(1)}% Bearish`;
-                newsSentimentVal.style.color = '#ef4444';
+            if (data.has_audit) {
+                if (sentimentVal >= 60) {
+                    newsSentimentVal.innerText = `${sentimentVal.toFixed(1)}% Bullish`;
+                    newsSentimentVal.style.color = 'var(--neon-green)';
+                } else if (sentimentVal <= 40) {
+                    newsSentimentVal.innerText = `${sentimentVal.toFixed(1)}% Bearish`;
+                    newsSentimentVal.style.color = '#ef4444';
+                } else {
+                    newsSentimentVal.innerText = `${sentimentVal.toFixed(1)}% Neutral`;
+                    newsSentimentVal.style.color = 'var(--color-amber)';
+                }
             } else {
-                newsSentimentVal.innerText = `${sentimentVal.toFixed(1)}% Neutral`;
-                newsSentimentVal.style.color = 'var(--color-amber)';
+                newsSentimentVal.innerText = 'Consensus Pending';
+                newsSentimentVal.style.color = 'var(--text-muted)';
             }
         }
         if (newsSentimentDesc) {
-            let descText = "Balanced or mixed sentiment. Stock movements are primarily driven by macro index flows.";
-            if (sentimentVal >= 60) {
-                descText = "Highly positive news sentiment. Press releases and filings signal strong expansion and operational performance.";
-            } else if (sentimentVal <= 40) {
-                descText = "Precautionary market consensus. Watch for margin pressures, regulatory tariffs, or short-term sector headwinds.";
+            if (data.has_audit) {
+                let descText = "Balanced or mixed sentiment. Stock movements are primarily driven by macro index flows.";
+                if (sentimentVal >= 60) {
+                    descText = "Highly positive news sentiment. Press releases and filings signal strong expansion and operational performance.";
+                } else if (sentimentVal <= 40) {
+                    descText = "Precautionary market consensus. Watch for margin pressures, regulatory tariffs, or short-term sector headwinds.";
+                }
+                newsSentimentDesc.innerHTML = `Consensus: <strong>${descText}</strong>`;
+            } else {
+                newsSentimentDesc.innerHTML = `Consensus: <strong>AI Sentiment Audit is available for this ticker. Click 'Run Groq Audit' below to analyze.</strong>`;
             }
-            newsSentimentDesc.innerHTML = `Consensus: <strong>${descText}</strong>`;
         }
 
         newsFeed.innerHTML = '';
+        newsFeed.dataset.hasAudit = data.has_audit ? 'true' : 'false';
+
+        if (!data.has_audit) {
+            const banner = document.createElement('div');
+            banner.id = 'news-audit-cta-banner';
+            banner.style.cssText = `
+                background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(79, 70, 229, 0.1) 100%);
+                border: 1px solid rgba(124, 58, 237, 0.25);
+                border-radius: 8px;
+                padding: 12px 16px;
+                margin-bottom: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                backdrop-filter: blur(8px);
+                box-shadow: 0 4px 12px rgba(124, 58, 237, 0.05);
+            `;
+            banner.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px; text-align: left;">
+                    <span style="font-size: 20px;">🤖</span>
+                    <div>
+                        <strong style="display: block; font-size: 12.5px; color: var(--text-primary); font-family: 'Outfit', sans-serif;">AI Sentiment Audit Available</strong>
+                        <span style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px; line-height: 1.4;">Extract driver catalysts, sentiment scoring, and price anomaly correlation via Groq LLM & Jina Reader.</span>
+                    </div>
+                </div>
+                <button id="run-groq-audit-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #ffffff; border: none; padding: 7px 14px; font-size: 11px; font-weight: 700; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3); white-space: nowrap; font-family: 'Outfit', sans-serif;"
+                        onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(124, 58, 237, 0.5)';"
+                        onmouseout="this.style.transform='none'; this.style.boxShadow='0 2px 8px rgba(124, 58, 237, 0.3)';">
+                    <span>✨</span> Run Groq Audit
+                </button>
+            `;
+            newsFeed.appendChild(banner);
+            
+            const auditBtn = banner.querySelector('#run-groq-audit-btn');
+            if (auditBtn) {
+                auditBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    loadPortfolioNewsImpact(symbol, true, true);
+                });
+            }
+        }
+
         let posCount = 0;
         let negCount = 0;
         let neutCount = 0;
@@ -28106,16 +28177,21 @@ async function loadPortfolioNewsImpact(symbol, forceRefresh = false) {
             const score = item.sentiment_score;
             let sentimentClass = 'neutral';
             let sentimentText = 'Neutral';
-            if (score > 0.15) {
-                sentimentClass = 'positive';
-                sentimentText = `Bullish (+${score.toFixed(2)})`;
-                posCount++;
-            } else if (score < -0.15) {
-                sentimentClass = 'negative';
-                sentimentText = `Bearish (${score.toFixed(2)})`;
-                negCount++;
+            if (data.has_audit) {
+                if (score > 0.15) {
+                    sentimentClass = 'positive';
+                    sentimentText = `Bullish (+${score.toFixed(2)})`;
+                    posCount++;
+                } else if (score < -0.15) {
+                    sentimentClass = 'negative';
+                    sentimentText = `Bearish (${score.toFixed(2)})`;
+                    negCount++;
+                } else {
+                    neutCount++;
+                }
             } else {
-                neutCount++;
+                sentimentClass = 'unaudited';
+                sentimentText = 'Unaudited';
             }
 
             const card = document.createElement('div');
@@ -28154,9 +28230,9 @@ async function loadPortfolioNewsImpact(symbol, forceRefresh = false) {
         });
 
         if (countAll) countAll.innerText = data.news_items.length;
-        if (countPositive) countPositive.innerText = posCount;
-        if (countNegative) countNegative.innerText = negCount;
-        if (countNeutral) countNeutral.innerText = neutCount;
+        if (countPositive) countPositive.innerText = data.has_audit ? posCount : '-';
+        if (countNegative) countNegative.innerText = data.has_audit ? negCount : '-';
+        if (countNeutral) countNeutral.innerText = data.has_audit ? neutCount : '-';
 
         const chips = document.querySelectorAll('.news-filter-chip');
         chips.forEach(chip => {
