@@ -27624,11 +27624,39 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
             return;
         }
 
+        // Group transactions by symbol to avoid tranche duplicates
+        const grouped = {};
+        items.forEach(item => {
+            const sym = item.symbol;
+            if (!grouped[sym]) {
+                grouped[sym] = {
+                    symbol: sym,
+                    quantity: 0,
+                    totalCost: 0,
+                    current_price: parseFloat(item.current_price || 0)
+                };
+            }
+            const qty = parseFloat(item.quantity || 0);
+            const price = parseFloat(item.purchase_price || 0);
+            grouped[sym].quantity += qty;
+            grouped[sym].totalCost += qty * price;
+        });
+
+        window.uniqueOptimizerAssets = Object.values(grouped).map(item => {
+            return {
+                symbol: item.symbol,
+                quantity: item.quantity,
+                avg_buy_price: item.quantity > 0 ? (item.totalCost / item.quantity) : 0,
+                current_price: item.current_price,
+                current_value: item.quantity * item.current_price
+            };
+        });
+
         emptyState.style.display = 'none';
         workspace.style.display = 'grid'; // Split columns
 
-        // Populate assets checkable list
-        assetsListContainer.innerHTML = items.map(item => `
+        // Populate assets checkable list with aggregated holdings
+        assetsListContainer.innerHTML = window.uniqueOptimizerAssets.map(item => `
             <div class="optimizer-asset-item" style="margin-bottom: 8px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <input type="checkbox" class="optimizer-asset-checkbox" checked data-symbol="${item.symbol}" style="cursor: pointer; transform: scale(1.15);">
@@ -27699,7 +27727,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
         if (!cachedOptimizationResult || !tableBody || !tableWrap || !kpiGrid || !ticketsList || !ticketsWrap) return;
 
         const targetData = activeOptimizationTarget === 'sharpe' ? cachedOptimizationResult.max_sharpe : cachedOptimizationResult.min_vol;
-        const items = (typeof activePortfolioLedgerItems !== 'undefined' && activePortfolioLedgerItems) ? activePortfolioLedgerItems : [];
+        const items = window.uniqueOptimizerAssets || [];
         
         // Calculate total invested capital in active items
         const selectedHoldings = items.filter(item => {
@@ -27720,8 +27748,12 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
         tableWrap.style.display = 'block';
         tableBody.innerHTML = '';
 
-        // Merge target weight list keys
-        const allKeys = Object.keys(targetData.weights);
+        // Union of optimal target weight keys and current selected holdings
+        const allKeysSet = new Set([
+            ...Object.keys(targetData.weights),
+            ...Object.keys(currentWeights)
+        ]);
+        const allKeys = Array.from(allKeysSet);
         allKeys.forEach(key => {
             const curW = currentWeights[key] || 0.0;
             const tarW = targetData.weights[key] || 0.0;
