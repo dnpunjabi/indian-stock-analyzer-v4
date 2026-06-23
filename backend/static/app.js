@@ -27331,6 +27331,12 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
         console.log("[Portfolio Lock] setupPortfolioSecurity initializing...");
         window.portfolioUnlocked = false;
         
+        const shieldEnabled = localStorage.getItem('portfolio-security-shield-enabled') !== 'false';
+        if (!shieldEnabled) {
+            const overlay = document.getElementById('portfolio-lock-overlay');
+            if (overlay) overlay.classList.add('hidden');
+        }
+        
         const biometricBtn = document.getElementById('portfolio-biometric-btn');
         const keyButtons = document.querySelectorAll('.lock-keypad-grid .key-btn[data-key]');
         const dots = document.querySelectorAll('#lock-pin-dots .dot');
@@ -27498,6 +27504,9 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
         
         // Auto-lock when tab or app backgrounded
         document.addEventListener('visibilitychange', () => {
+            const shieldEnabled = localStorage.getItem('portfolio-security-shield-enabled') !== 'false';
+            if (!shieldEnabled) return;
+
             if (document.hidden) {
                 window.portfolioUnlocked = false;
                 const overlay = document.getElementById('portfolio-lock-overlay');
@@ -27512,6 +27521,9 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
         const CapacitorApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
         if (CapacitorApp) {
             CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+                const shieldEnabled = localStorage.getItem('portfolio-security-shield-enabled') !== 'false';
+                if (!shieldEnabled) return;
+
                 if (!isActive) {
                     window.portfolioUnlocked = false;
                     const overlay = document.getElementById('portfolio-lock-overlay');
