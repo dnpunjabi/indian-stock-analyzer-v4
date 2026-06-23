@@ -964,7 +964,8 @@ const tabs = {
     'swing-scan': document.getElementById('tab-swing-scan'),
     swing: document.getElementById('tab-swing'),
     'sector-radar': document.getElementById('tab-sector-radar'),
-    movers: document.getElementById('tab-movers')
+    movers: document.getElementById('tab-movers'),
+    'market-news': document.getElementById('tab-market-news')
 };
 
 const tabBtns = {
@@ -979,7 +980,8 @@ const tabBtns = {
     'swing-scan': document.getElementById('tab-swing-scan-btn'),
     swing: document.getElementById('tab-swing-btn'),
     'sector-radar': document.getElementById('tab-sector-radar-btn'),
-    movers: document.getElementById('tab-movers-btn')
+    movers: document.getElementById('tab-movers-btn'),
+    'market-news': document.getElementById('tab-market-news-btn')
 };
 
 // Initialize Application
@@ -1017,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.setupMarketMovers) window.setupMarketMovers(); // Today's Market Movers Dashboard
     setupSwingWorkspace(); // Swing Trading Workspace
     setupSectorRadarControls(); // Sector Radar Controls
+    setupGlobalMarketNewsControls(); // Global Market News Feed Controls
     setupBrandReset(); // Initialize brand logo reset button events
     try {
         if (window.setupPortfolioSecurity) window.setupPortfolioSecurity();
@@ -1695,6 +1698,10 @@ function switchTab(tabKey) {
 
     if (tabKey === 'sector-radar') {
         if (window.loadScreenerSectorRegime) window.loadScreenerSectorRegime();
+    }
+
+    if (tabKey === 'market-news') {
+        if (window.loadGlobalMarketNews) window.loadGlobalMarketNews();
     }
 
     if (tabKey === 'movers') {
@@ -28274,4 +28281,211 @@ function setupNewsFilters() {
         });
     });
 }
+
+// --- GLOBAL MARKET NEWS TERMINAL ---
+let globalMarketNewsData = null;
+let currentMarketNewsSource = 'all';
+let currentMarketNewsCategory = 'all';
+
+function setupGlobalMarketNewsControls() {
+    // 1. Search filter event
+    const searchInput = document.getElementById('market-news-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            applyMarketNewsFilters();
+        });
+    }
+
+    // 2. Source filter chips
+    const sourceFiltersWrap = document.getElementById('market-news-source-filters');
+    if (sourceFiltersWrap) {
+        sourceFiltersWrap.addEventListener('click', (e) => {
+            const chip = e.target.closest('.news-filter-chip');
+            if (!chip) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            sourceFiltersWrap.querySelectorAll('.news-filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+
+            currentMarketNewsSource = chip.dataset.source;
+            applyMarketNewsFilters();
+        });
+    }
+
+    // 3. Category filter chips
+    const categoryFiltersWrap = document.getElementById('market-news-category-filters');
+    if (categoryFiltersWrap) {
+        categoryFiltersWrap.addEventListener('click', (e) => {
+            const chip = e.target.closest('.screener-filter-chip');
+            if (!chip) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            categoryFiltersWrap.querySelectorAll('.screener-filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+
+            currentMarketNewsCategory = chip.dataset.category;
+            applyMarketNewsFilters();
+        });
+    }
+
+    // 4. AI Synthesis button
+    const aiBtn = document.getElementById('market-news-ai-btn');
+    if (aiBtn) {
+        aiBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            loadGlobalMarketNews(true, true);
+        });
+    }
+}
+
+async function loadGlobalMarketNews(forceRefresh = false, runLLM = false) {
+    const newsFeed = document.getElementById('market-news-feed-container');
+    const marquee = document.getElementById('market-news-marquee');
+    const aiBriefingWrap = document.getElementById('market-news-ai-briefing-wrap');
+    const aiTimeBadge = document.getElementById('market-news-ai-time-badge');
+    const aiSynthesis = document.getElementById('market-news-ai-synthesis');
+    const aiDrivers = document.getElementById('market-news-ai-drivers');
+    const aiPlaceholder = document.getElementById('market-news-ai-placeholder');
+
+    if (!newsFeed) return;
+
+    // Show dynamic loader
+    const loaderMsg = runLLM ? "Generating AI Market consensus briefing via Groq Llama 3..." : "Aggregating news from ET, LiveMint, Business Standard & Yahoo Finance...";
+    newsFeed.innerHTML = `
+        <div style="padding:40px; text-align: center; width: 100%; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 12px;">
+            <div class="loader-spinner" style="border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid var(--color-primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; box-sizing: border-box;"></div>
+            <span style="font-size: 11px;">${loaderMsg}</span>
+        </div>
+    `;
+
+    try {
+        const url = `/api/market-news?refresh=${forceRefresh ? 'true' : 'false'}&run_llm=${runLLM ? 'true' : 'false'}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Failed to fetch market news from API");
+        const data = await res.json();
+
+        globalMarketNewsData = data;
+
+        // 1. Populate Marquee Ticker
+        if (marquee) {
+            if (data.news_items && data.news_items.length > 0) {
+                marquee.innerHTML = data.news_items.slice(0, 10).map(item => `
+                    <span style="margin-right: 40px; display: inline-flex; align-items: center; gap: 6px;">
+                        <span style="color: var(--color-primary);">[${item.source}]</span> ${item.title}
+                    </span>
+                `).join('');
+            } else {
+                marquee.innerText = "No bulletins available.";
+            }
+        }
+
+        // 2. Populate AI Market Briefing
+        if (data.has_ai_report && data.ai_report) {
+            if (aiBriefingWrap) aiBriefingWrap.style.display = 'block';
+            if (aiPlaceholder) aiPlaceholder.style.display = 'none';
+            if (aiSynthesis) aiSynthesis.innerText = data.ai_report.synthesis_report;
+            if (aiDrivers) {
+                aiDrivers.innerHTML = (data.ai_report.top_drivers || []).map(driver => `
+                    <li style="list-style-type: square; margin-left: 15px;">${driver}</li>
+                `).join('');
+            }
+            if (aiTimeBadge) {
+                const timePart = data.updated_at ? data.updated_at.split(' ')[1] : 'Just Now';
+                aiTimeBadge.innerText = `Audited: ${timePart}`;
+            }
+        } else {
+            if (aiBriefingWrap) aiBriefingWrap.style.display = 'none';
+            if (aiPlaceholder) aiPlaceholder.style.display = 'flex';
+        }
+
+        // 3. Render news cards
+        newsFeed.innerHTML = '';
+        if (data.news_items && data.news_items.length > 0) {
+            data.news_items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = `timeline-card sentiment-${item.sentiment.toLowerCase()}`;
+                card.dataset.sentiment = item.sentiment.toLowerCase();
+                card.dataset.source = item.source;
+                card.dataset.category = item.category;
+
+                card.innerHTML = `
+                    <div class="news-card-header">
+                        <div class="news-card-metadata">
+                            <span>📰 ${item.source}</span>
+                            <span>•</span>
+                            <span>🕒 ${item.date}</span>
+                        </div>
+                        <div class="news-card-badges">
+                            <span class="badge-sentiment sentiment-${item.sentiment.toLowerCase()}">${item.sentiment}</span>
+                            <span class="badge-driver">${item.category}</span>
+                        </div>
+                    </div>
+                    <div class="news-card-body" style="margin-bottom: 0;">
+                        <a href="${item.link || '#'}" target="_blank" style="text-decoration:none; color:inherit; font-size:12.5px; font-weight:700; line-height:1.45; color:var(--text-primary); display:block; cursor:pointer;">
+                            ${item.title}
+                        </a>
+                    </div>
+                `;
+                newsFeed.appendChild(card);
+            });
+            applyMarketNewsFilters();
+        } else {
+            newsFeed.innerHTML = '<div style="padding:40px; text-align: center; width: 100%; color: var(--text-muted); font-size:12px;">No news catalysts identified in the last 30 days.</div>';
+        }
+
+    } catch (err) {
+        console.error("Error loading global market news:", err);
+        newsFeed.innerHTML = `<div style="padding:20px; text-align: center; width: 100%; color: var(--color-crimson); font-size:11.5px;">Failed to scrape and correlate live catalysts: ${err.message}.</div>`;
+    }
+}
+
+function applyMarketNewsFilters() {
+    const container = document.getElementById('market-news-feed-container');
+    if (!container) return;
+
+    const cards = container.querySelectorAll('.timeline-card');
+    const query = (document.getElementById('market-news-search')?.value || '').toLowerCase().trim();
+
+    let visibleCount = 0;
+    cards.forEach(card => {
+        const source = card.dataset.source;
+        const category = card.dataset.category;
+        const title = (card.querySelector('.news-card-body a')?.innerText || '').toLowerCase();
+
+        const sourceMatch = (currentMarketNewsSource === 'all' || source === currentMarketNewsSource);
+        const categoryMatch = (currentMarketNewsCategory === 'all' || category === currentMarketNewsCategory);
+        const searchMatch = (!query || title.includes(query));
+
+        if (sourceMatch && categoryMatch && searchMatch) {
+            card.style.display = 'block';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    let noResultsMsg = document.getElementById('market-news-no-results');
+    if (visibleCount === 0) {
+        if (!noResultsMsg) {
+            noResultsMsg = document.createElement('div');
+            noResultsMsg.id = 'market-news-no-results';
+            noResultsMsg.style.cssText = 'padding: 30px; text-align: center; color: var(--text-muted); font-size: 12px;';
+            noResultsMsg.innerText = 'No news catalysts match the selected filters.';
+            container.appendChild(noResultsMsg);
+        } else {
+            noResultsMsg.style.display = 'block';
+        }
+    } else {
+        if (noResultsMsg) {
+            noResultsMsg.style.display = 'none';
+        }
+    }
+}
+
+// Expose functions to global window context
+window.loadGlobalMarketNews = loadGlobalMarketNews;
+window.setupGlobalMarketNewsControls = setupGlobalMarketNewsControls;
 

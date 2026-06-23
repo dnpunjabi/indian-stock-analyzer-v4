@@ -80,6 +80,9 @@
                 <button class="nav-btn" id="tab-movers-btn" data-title="Today's Market Movers">
                     <span class="btn-icon">🚀</span> <span class="btn-text">Today's Market Movers</span>
                 </button>
+                <button class="nav-btn" id="tab-market-news-btn" data-title="Global Market News Feed">
+                    <span class="btn-icon">📡</span> <span class="btn-text">Global News Feed</span>
+                </button>
 
                 <div class="nav-category-header">⚡ Tactical Trading</div>
                 <button class="nav-btn" id="tab-swing-scan-btn" data-title="Swing Setup Scanner">
@@ -895,6 +898,109 @@
                     </div>
                 </div>
             </section>
+
+
+            <!-- SECTION: GLOBAL MARKET NEWS TERMINAL -->
+            <section class="workspace-tab" id="tab-market-news" style="display: none; font-family: 'Inter', sans-serif;">
+                <div class="section-header">
+                    <h2>Global Market News Terminal</h2>
+                    <p>Real-time financial intelligence feed aggregating catalysts, bulletins, and indices across major active publishers.</p>
+                </div>
+
+                <!-- Flash News Marquee Ticker -->
+                <div class="market-marquee-card card" style="margin-bottom: 20px; padding: 10px 16px; overflow: hidden; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-glass);">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <span style="font-size: 10px; font-weight: 800; background: #ef4444; color: #fff; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.08em; display: inline-flex; align-items: center; gap: 4px; animation: pulse 2s infinite;">
+                            <span class="live-dot" style="width: 6px; height: 6px; background: #fff; border-radius: 50%;"></span> FLASH
+                        </span>
+                        <div class="marquee-wrapper" style="overflow: hidden; flex-grow: 1; position: relative; height: 20px;">
+                            <div class="marquee-content" id="market-news-marquee" style="display: flex; gap: 40px; white-space: nowrap; position: absolute; left: 100%; animation: marquee-scroll 75s linear infinite; font-size: 12px; font-weight: 600; color: var(--text-secondary);">
+                                Loading latest bulletins...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Market Briefing Panel (Collapsible/Hidden by default until audited) -->
+                <div id="market-news-ai-briefing-wrap" class="card" style="display: none; margin-bottom: 20px; border-left: 4px solid #7c3aed; background: rgba(124, 58, 237, 0.04); border-color: #7c3aed; padding: 20px; box-shadow: 0 4px 15px rgba(124, 58, 237, 0.08);">
+                    <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 13.5px; color: #a855f7; display: flex; align-items: center; gap: 8px; font-family: 'Outfit', sans-serif; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 1px dashed var(--border-glass); padding-bottom: 10px;">
+                        <span>✨ AI MARKET INTELLIGENCE SYNTHESIS</span>
+                        <span id="market-news-ai-time-badge" style="font-size: 9px; color: var(--text-muted); text-transform: uppercase; margin-left: auto; font-family: monospace;">Audited Just Now</span>
+                    </h4>
+                    <p id="market-news-ai-synthesis" style="font-size: 12px; line-height: 1.65; color: var(--text-primary); margin-bottom: 15px;">
+                        Loading AI Synthesis...
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <span style="font-size: 10.5px; font-weight: 750; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Core Sentiment Drivers:</span>
+                        <ul id="market-news-ai-drivers" style="margin: 0; padding-left: 20px; font-size: 12px; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 6px;">
+                            <!-- Drivers list items -->
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Placeholder AI trigger card -->
+                <div id="market-news-ai-placeholder" class="card" style="margin-bottom: 20px; padding: 20px; display: flex; align-items: center; justify-content: space-between; gap: 15px; border: 1px dashed rgba(124, 58, 237, 0.3); background: rgba(124, 58, 237, 0.02);">
+                    <div style="display: flex; align-items: center; gap: 12px; text-align: left;">
+                        <span style="font-size: 24px;">🤖</span>
+                        <div>
+                            <strong style="display: block; font-size: 13px; color: var(--text-primary); font-family: 'Outfit', sans-serif;">Generate Real-Time AI Market Briefing</strong>
+                            <span style="display: block; font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.4;">Summarize the active feed, extract the top 3 core drivers, and synthesize market sentiment using Groq Llama 3 on-demand.</span>
+                        </div>
+                    </div>
+                    <button id="market-news-ai-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #ffffff; border: none; padding: 9px 18px; font-size: 11.5px; font-weight: 700; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; box-shadow: 0 2px 10px rgba(124, 58, 237, 0.3); white-space: nowrap; font-family: 'Outfit', sans-serif;"
+                            onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 15px rgba(124, 58, 237, 0.5)';"
+                            onmouseout="this.style.transform='none'; this.style.boxShadow='0 2px 10px rgba(124, 58, 237, 0.3)';">
+                        <span>✨</span> Run AI Synthesis
+                    </button>
+                </div>
+
+                <!-- Feed Controls and Filtering Card -->
+                <div class="card" style="margin-bottom: 20px; padding: 18px 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
+                        <!-- News search box -->
+                        <div style="position: relative; width: 100%; max-width: 320px; display: flex; align-items: center;">
+                            <span style="position: absolute; left: 12px; color: var(--text-muted); font-size: 12px;">🔍</span>
+                            <input type="text" id="market-news-search" placeholder="Filter headlines by keyword..." style="width: 100%; padding: 7px 12px 7px 34px; border-radius: 6px; border: 1px solid var(--border-glass); background: var(--bg-select-input); color: var(--text-primary); font-size: 12px; outline: none; transition: all 0.2s;">
+                        </div>
+
+                        <!-- Source Filters -->
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="market-news-source-filters">
+                            <button class="news-filter-chip active" data-source="all" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.05); color: var(--text-secondary); transition: all 0.2s;">
+                                All Sources
+                            </button>
+                            <button class="news-filter-chip" data-source="Economic Times" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.02); color: var(--text-muted); transition: all 0.2s;">
+                                Economic Times
+                            </button>
+                            <button class="news-filter-chip" data-source="LiveMint" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.02); color: var(--text-muted); transition: all 0.2s;">
+                                LiveMint
+                            </button>
+                            <button class="news-filter-chip" data-source="Yahoo Finance" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.02); color: var(--text-muted); transition: all 0.2s;">
+                                Yahoo Finance
+                            </button>
+                            <button class="news-filter-chip" data-source="Business Standard" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.02); color: var(--text-muted); transition: all 0.2s;">
+                                Business Standard
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Category Tab Filters -->
+                    <div style="display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid var(--border-glass); padding-top: 15px; flex-wrap: wrap; width: 100%;" id="market-news-category-filters">
+                        <button class="screener-filter-chip active" data-category="all" style="cursor: pointer;">All Sectors</button>
+                        <button class="screener-filter-chip" data-category="Macro & Indices" style="cursor: pointer;">📈 Macro</button>
+                        <button class="screener-filter-chip" data-category="Corporate & Earnings" style="cursor: pointer;">💼 Corporate</button>
+                        <button class="screener-filter-chip" data-category="IPOs & Primary Markets" style="cursor: pointer;">🚀 IPOs</button>
+                        <button class="screener-filter-chip" data-category="Regulatory & Policy" style="cursor: pointer;">🏦 Policy</button>
+                        <button class="screener-filter-chip" data-category="Institutional Flows" style="cursor: pointer;">📊 FII/DII</button>
+                        <button class="screener-filter-chip" data-category="Global Markets" style="cursor: pointer;">🌍 Global</button>
+                    </div>
+                </div>
+
+                <!-- Feed Chronological timeline cards container -->
+                <div class="news-timeline-wrapper" id="market-news-feed-container">
+                    <!-- Loaded dynamically -->
+                </div>
+            </section>
+
 
             <!-- SECTION 2: SINGLE STOCK WORKSPACE (ANALYZER) -->
             <section class="workspace-tab" id="tab-analyzer">

@@ -271,6 +271,16 @@ def init_db():
         )
         """)
 
+        # Cache table for Global Market News Feed
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cached_global_market_news (
+            feed_key TEXT PRIMARY KEY,
+            payload_json TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+
         
         # Mock loader for history, block deals, and corporate actions if empty
         cursor.execute("SELECT COUNT(*) as cnt FROM daily_delivery_history")
@@ -6883,6 +6893,247 @@ async def get_news_impact(symbol: str, refresh: bool = False, run_llm: bool = Fa
     except Exception as run_err:
         print(f"Error running news impact synthesis: {run_err}")
         raise HTTPException(status_code=500, detail=f"News Synthesis Error: {str(run_err)}")
+
+
+def classify_news_category(title: str) -> str:
+    t = title.lower()
+    if any(k in t for k in ["nifty", "sensex", "gdp", "inflation", "cpi", "macro", "index", "indices", "bond", "yield", "economy", "growth rate"]):
+        return "Macro & Indices"
+    if any(k in t for k in ["ipo", "listings", "listing", "debut", "public issue", "public offer", "initial public", "primary market"]):
+        return "IPOs & Primary Markets"
+    if any(k in t for k in ["sebi", "rbi", "regulation", "regulatory", "policy", "customs", "tax", "tariff", "government", "govt", "fmc", "finance ministry"]):
+        return "Regulatory & Policy"
+    if any(k in t for k in ["fii", "dii", "institutional", "mutual fund", "block deal", "bulk deal", "promoter stake", "buying stake", "foreign portfolio", "fpi"]):
+        return "Institutional Flows"
+    if any(k in t for k in ["nasdaq", "dow jones", "wall street", "nikkei", "hang seng", "us stock", "global market", "fed", "federal reserve", "spacex", "tesla", "nvidia", "apple", "google", "meta"]):
+        return "Global Markets"
+    if any(k in t for k in ["dividend", "earnings", "quarterly", "profit", "net profit", "loss", "q1", "q2", "q3", "q4", "revenue", "ebitda", "merger", "acquisition", "stake sale", "expansion", "order win", "contract", "corporate"]):
+        return "Corporate & Earnings"
+    return "General Markets"
+
+
+def classify_news_sentiment(title: str) -> str:
+    t = title.lower()
+    bullish_k = ["jump", "surge", "gain", "rise", "climb", "high", "record", "rally", "upbeat", "expand", "profit jumps", "positive", "growth", "win", "acquisition", "dividend", "bullish", "soar", "advance", "upgrade", "outperform"]
+    bearish_k = ["slip", "fall", "slump", "drop", "plunge", "losses", "slips", "decline", "downbeat", "loss", "negative", "warn", "tariff", "penalty", "sebi bar", "regulatory action", "fraud", "crash", "bearish", "downgrade", "underperform", "trim"]
+    
+    bull_count = sum(1 for k in bullish_k if k in t)
+    bear_count = sum(1 for k in bearish_k if k in t)
+    
+    if bull_count > bear_count:
+        return "Bullish"
+    elif bear_count > bull_count:
+        return "Bearish"
+    else:
+        return "Neutral"
+
+
+@app.get("/api/market-news")
+async def get_market_news(refresh: bool = False, run_llm: bool = False):
+    import json
+    import sqlite3
+    from datetime import datetime, timedelta
+    import urllib.request
+    import xml.etree.ElementTree as ET
+    
+    if not refresh:
+        try:
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT payload_json, updated_at FROM cached_global_market_news WHERE feed_key = 'global_news'")
+                row = cursor.fetchone()
+                if row:
+                    cached_time = datetime.strptime(row["updated_at"], "%Y-%m-%d %H:%M:%S")
+                    if datetime.now() - cached_time < timedelta(minutes=10):
+                        parsed_json = json.loads(row["payload_json"])
+                        if not run_llm or parsed_json.get("has_ai_report", False):
+                            return {
+                                "news_items": parsed_json.get("news_items", []),
+                                "ai_report": parsed_json.get("ai_report"),
+                                "has_ai_report": parsed_json.get("has_ai_report", False),
+                                "updated_at": row["updated_at"],
+                                "cached": True
+                            }
+        except Exception as cache_err:
+            print(f"Error reading market news cache: {cache_err}")
+            
+    feeds = {
+        "Economic Times": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+        "LiveMint": "https://www.livemint.com/rss/markets",
+        "Yahoo Finance": "https://finance.yahoo.com/news/rss",
+        "Business Standard": "https://www.business-standard.com/rss/markets-106.rss"
+    }
+    
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive'
+    }
+    
+    async def fetch_feed(name, url):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            loop = asyncio.get_event_loop()
+            response_bytes = await loop.run_in_executor(None, lambda: urllib.request.urlopen(req, timeout=10).read())
+            
+            root = ET.fromstring(response_bytes)
+            feed_items = []
+            for item in root.findall('.//item'):
+                title = item.find('title').text if item.find('title') is not None else ""
+                link = item.find('link').text if item.find('link') is not None else "#"
+                pub_date = item.find('pubDate').text if item.find('pubDate') is not None else ""
+                
+                if not title:
+                    continue
+                    
+                feed_items.append({
+                    "title": title.strip(),
+                    "link": link.strip(),
+                    "date_str": pub_date.strip(),
+                    "source": name
+                })
+            return feed_items
+        except Exception as e:
+            print(f"Error fetching feed {name}: {e}")
+            return []
+            
+    tasks = [fetch_feed(name, url) for name, url in feeds.items()]
+    feeds_results = await asyncio.gather(*tasks)
+    
+    all_news = []
+    for r in feeds_results:
+        all_news.extend(r)
+        
+    parsed_items = []
+    one_month_ago = datetime.now() - timedelta(days=30)
+    
+    for item in all_news:
+        date_str = item.get("date_str")
+        parsed_dt = None
+        if date_str:
+            for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%a, %d %b %Y %H:%M:%S %Z", "%d %b %Y", "%Y-%m-%dT%H:%M:%SZ"):
+                try:
+                    parsed_dt = datetime.strptime(date_str.strip(), fmt)
+                    break
+                except ValueError:
+                    continue
+            if not parsed_dt:
+                try:
+                    parsed_dt = datetime.strptime(date_str.strip()[:-6].strip(), "%a, %d %b %Y %H:%M:%S")
+                except Exception:
+                    pass
+            if not parsed_dt:
+                try:
+                    parsed_dt = datetime.strptime(date_str.strip()[:10], "%Y-%m-%d")
+                except Exception:
+                    pass
+                    
+        if not parsed_dt:
+            parsed_dt = datetime.now()
+            
+        if parsed_dt >= one_month_ago:
+            item["parsed_dt"] = parsed_dt
+            item["date"] = parsed_dt.strftime("%Y-%m-%d")
+            item["category"] = classify_news_category(item["title"])
+            item["sentiment"] = classify_news_sentiment(item["title"])
+            parsed_items.append(item)
+            
+    parsed_items.sort(key=lambda x: x["parsed_dt"], reverse=True)
+    
+    seen_titles = set()
+    cleaned_items = []
+    for item in parsed_items:
+        title_slug = "".join(c for c in item["title"].lower() if c.isalnum())[:35]
+        if title_slug not in seen_titles:
+            seen_titles.add(title_slug)
+            
+            item_copy = item.copy()
+            if "parsed_dt" in item_copy:
+                del item_copy["parsed_dt"]
+            if "date_str" in item_copy:
+                del item_copy["date_str"]
+            cleaned_items.append(item_copy)
+            
+    cleaned_items = cleaned_items[:50]
+    
+    ai_report = None
+    has_ai_report = False
+    
+    if run_llm and cleaned_items:
+        brief_headlines = [f"[{item['source']} - {item['category']}] {item['title']}" for item in cleaned_items[:25]]
+        bullet_list = "\n".join(brief_headlines)
+        
+        prompt = f"""
+        You are a chief investment officer analyzing live Indian & global market catalysts.
+        Evaluate the following recent financial headlines:
+        {bullet_list}
+        
+        Provide a structured, executive-grade analysis in JSON format containing:
+        1. "synthesis_report": A precise, insightful paragraph summarizing the overall consensus, key market sentiment, and tactical implications for portfolio holdings (2-3 sentences max).
+        2. "top_drivers": An array of exactly 3 bullet points, each detail-rich (e.g. "SpaceX stake adjustments", "Jio IPO expectation", "Federal Reserve interest hawkishness"), identifying the major market drivers.
+        
+        Respond ONLY with a valid JSON object matching this schema:
+        {{
+            "synthesis_report": "Your institutional summary paragraph...",
+            "top_drivers": [
+                "Driver 1 detailed bulletin...",
+                "Driver 2 detailed bulletin...",
+                "Driver 3 detailed bulletin..."
+            ]
+        }}
+        """
+        
+        try:
+            import os
+            api_key = os.environ.get("GROQ_API_KEY")
+            if api_key:
+                from groq import Groq
+                client = Groq(api_key=api_key)
+                completion = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": "You are a professional financial editor returning structured JSON reports."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.15,
+                    max_tokens=800
+                )
+                raw_res = completion.choices[0].message.content
+                ai_data = json.loads(raw_res)
+                ai_report = {
+                    "synthesis_report": ai_data.get("synthesis_report", "Consensus shows moderate consolidation across index ranges."),
+                    "top_drivers": ai_data.get("top_drivers", ["Global Tech Volatility", "Institutional Flows", "IPO Pipeline"])
+                }
+                has_ai_report = True
+        except Exception as groq_err:
+            print(f"Error generating AI Market Briefing: {groq_err}")
+            
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    payload = {
+        "news_items": cleaned_items,
+        "ai_report": ai_report,
+        "has_ai_report": has_ai_report
+    }
+    
+    try:
+        with get_db() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO cached_global_market_news (feed_key, payload_json, updated_at) VALUES ('global_news', ?, ?)",
+                (json.dumps(payload), now_str)
+            )
+            conn.commit()
+    except Exception as db_err:
+        print(f"Error caching global news: {db_err}")
+        
+    return {
+        "news_items": cleaned_items,
+        "ai_report": ai_report,
+        "has_ai_report": has_ai_report,
+        "updated_at": now_str,
+        "cached": False
+    }
 
 
 class SwingSynthesisRequest(BaseModel):

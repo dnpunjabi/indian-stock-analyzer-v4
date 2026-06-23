@@ -12211,5 +12211,89 @@ tr.active-peer-row td:first-child {
 }
 
 
+/* --- GLOBAL MARKET NEWS TERMINAL --- */
+
+.market-marquee-card {
+    border-radius: 8px;
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+}
+
+@keyframes marquee-scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.65; }
+}
+
+/* Timeline Card sentiment glowing borders for Global News Feed */
+.timeline-card.sentiment-bullish {
+    border-left: 4px solid var(--neon-green) !important;
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.06);
+}
+.timeline-card.sentiment-bearish {
+    border-left: 4px solid #ef4444 !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.06);
+}
+.timeline-card.sentiment-neutral {
+    border-left: 4px solid var(--text-muted) !important;
+}
+
+.timeline-card.sentiment-bullish::after { background: var(--neon-green); box-shadow: 0 0 8px var(--neon-green); }
+.timeline-card.sentiment-bearish::after { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+.timeline-card.sentiment-neutral::after { background: var(--text-muted); }
+
+/* Badges sentiment styles for global feed */
+.badge-sentiment.sentiment-bullish { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.badge-sentiment.sentiment-bearish { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.badge-sentiment.sentiment-neutral { background: rgba(255, 255, 255, 0.08); color: var(--text-muted); }
+
+/* Responsive tweaks for the news feed marquee and control cards */
+@media (max-width: 768px) {
+    #market-news-source-filters {
+        width: 100%;
+        margin-top: 10px;
+        justify-content: flex-start;
+    }
+    #market-news-ai-placeholder {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        text-align: center;
+    }
+    #market-news-ai-placeholder button {
+        width: 100%;
+    }
+}
+
+/* Light Theme overrides for Global News Feed Elements */
+[data-mode="light"] .market-marquee-card,
+[data-theme="light"] .market-marquee-card {
+    background: rgba(0, 0, 0, 0.03) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-mode="light"] #market-news-ai-briefing-wrap,
+[data-theme="light"] #market-news-ai-briefing-wrap {
+    background: rgba(124, 58, 237, 0.05) !important;
+    border-color: #7c3aed !important;
+}
+
+[data-mode="light"] #market-news-ai-placeholder,
+[data-theme="light"] #market-news-ai-placeholder {
+    background: rgba(124, 58, 237, 0.03) !important;
+    border-color: rgba(124, 58, 237, 0.2) !important;
+}
+
+[data-mode="light"] .badge-sentiment.sentiment-neutral,
+[data-theme="light"] .badge-sentiment.sentiment-neutral {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: var(--text-muted) !important;
+}
+
+
+
 
 
