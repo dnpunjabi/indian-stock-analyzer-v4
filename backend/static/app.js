@@ -28143,32 +28143,14 @@ async function loadPortfolioNewsImpact(symbol, forceRefresh = false) {
                         ${arHTML}
                     </div>
                 </div>
-                <div class="news-card-body">
-                    <a href="${item.link || '#'}" target="_blank" style="text-decoration:none; color:inherit; font-size:12.5px; font-weight:700; line-height:1.45; color:var(--text-primary); display:block; margin-bottom:6px; cursor:pointer;">
+                <div class="news-card-body" style="margin-bottom: 0;">
+                    <a href="${item.link || '#'}" target="_blank" style="text-decoration:none; color:inherit; font-size:12.5px; font-weight:700; line-height:1.45; color:var(--text-primary); display:block; cursor:pointer;">
                         ${item.title}
                     </a>
-                </div>
-                <button class="news-expand-toggle-btn" id="news-toggle-${index}">
-                    <span>👁️</span> Show Price-Impact Synthesis
-                </button>
-                <div class="news-card-synthesis" id="news-synth-${index}">
-                    <strong>Groq Attribution Analysis:</strong><br>
-                    <p style="margin: 6px 0 0 0; color: var(--text-secondary);">${item.correlation_summary || 'No news-price correlation detected on this date.'}</p>
                 </div>
             `;
 
             newsFeed.appendChild(card);
-
-            const toggleBtn = card.querySelector(`#news-toggle-${index}`);
-            const synthBlock = card.querySelector(`#news-synth-${index}`);
-            if (toggleBtn && synthBlock) {
-                toggleBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const isVisible = synthBlock.classList.toggle('visible');
-                    toggleBtn.innerHTML = isVisible ? `<span>🙈</span> Hide Synthesis` : `<span>👁️</span> Show Price-Impact Synthesis`;
-                });
-            }
         });
 
         if (countAll) countAll.innerText = data.news_items.length;
