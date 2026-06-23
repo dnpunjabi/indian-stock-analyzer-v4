@@ -1638,9 +1638,11 @@ function switchTab(tabKey) {
     activeTab = tabKey;
     localStorage.setItem('active-tab', tabKey);
 
+    const shieldEnabled = localStorage.getItem('portfolio-security-shield-enabled') !== 'false';
+
     // Portfolio security interception and lock resets
     if (tabKey === 'portfolio') {
-        if (!window.portfolioUnlocked) {
+        if (shieldEnabled && !window.portfolioUnlocked) {
             const overlay = document.getElementById('portfolio-lock-overlay');
             if (overlay) overlay.classList.remove('hidden');
             if (window.triggerBiometricVerification) {
@@ -1651,14 +1653,22 @@ function switchTab(tabKey) {
                     }
                 }, 350);
             }
+        } else {
+            const overlay = document.getElementById('portfolio-lock-overlay');
+            if (overlay) overlay.classList.add('hidden');
         }
     } else {
-        window.portfolioUnlocked = false;
-        const overlay = document.getElementById('portfolio-lock-overlay');
-        if (overlay) {
-            overlay.classList.remove('hidden');
-            const dots = overlay.querySelectorAll('.dot');
-            dots.forEach(dot => dot.classList.remove('filled'));
+        if (shieldEnabled) {
+            window.portfolioUnlocked = false;
+            const overlay = document.getElementById('portfolio-lock-overlay');
+            if (overlay) {
+                overlay.classList.remove('hidden');
+                const dots = overlay.querySelectorAll('.dot');
+                dots.forEach(dot => dot.classList.remove('filled'));
+            }
+        } else {
+            const overlay = document.getElementById('portfolio-lock-overlay');
+            if (overlay) overlay.classList.add('hidden');
         }
     }
 
@@ -13572,6 +13582,32 @@ function setupThemeToggle() {
         alertsToggle.checked = savedAlerts;
         alertsToggle.addEventListener('change', (e) => {
             localStorage.setItem('setting-alerts-enabled', e.target.checked);
+        });
+    }
+
+    // Wire Portfolio Security Shield toggle
+    const shieldToggle = document.getElementById('setting-security-shield-toggle');
+    if (shieldToggle) {
+        const savedShield = localStorage.getItem('portfolio-security-shield-enabled') !== 'false';
+        shieldToggle.checked = savedShield;
+        shieldToggle.addEventListener('change', (e) => {
+            const enabled = e.target.checked;
+            localStorage.setItem('portfolio-security-shield-enabled', enabled);
+            
+            // Apply setting dynamically without a hard refresh
+            const overlay = document.getElementById('portfolio-lock-overlay');
+            if (!enabled) {
+                // If disabled, immediately unlock and hide the shield
+                if (overlay) overlay.classList.add('hidden');
+            } else {
+                // If enabled and on portfolio tab and not unlocked, lock it immediately
+                if (activeTab === 'portfolio' && !window.portfolioUnlocked) {
+                    if (overlay) overlay.classList.remove('hidden');
+                    if (window.triggerBiometricVerification) {
+                        window.triggerBiometricVerification();
+                    }
+                }
+            }
         });
     }
 }
