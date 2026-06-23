@@ -6526,6 +6526,14 @@ def fetch_google_news_rss(query: str):
 
 
 def fetch_jina_markdown(url: str) -> str:
+    if not url or url.strip() in ("", "#"):
+        return ""
+        
+    # Skip Jina scraping for general tags index search URLs (e.g. from fallback templates)
+    url_lower = url.lower()
+    if "/search" in url_lower or "/tags" in url_lower or "google.com/rss" in url_lower:
+        return ""
+        
     import urllib.request
     
     jina_url = f"https://r.jina.ai/{url}"
@@ -6617,8 +6625,9 @@ def run_groq_news_sentiment_analysis(symbol: str, news_list: list, anomalies_lis
         for item in news_list:
             default_items.append({
                 "title": item["title"],
-                "publisher": item["source"],
+                "publisher": item.get("source") or item.get("publisher") or "Yahoo Finance",
                 "date": item["date"],
+                "link": item.get("link") or "#",
                 "sentiment_score": 0.0,
                 "category": "Market Sentiment",
                 "correlation_summary": "Auto-parsed news. LLM synthesis failed to return valid JSON format."
@@ -6671,7 +6680,8 @@ async def get_news_impact(symbol: str, refresh: bool = False):
         yf_news = []
         try:
             from backend.financial_utils import get_complete_financial_profile
-            profile = get_complete_financial_profile(sym)
+            # Force cache bypass if refresh toggle was explicitly requested
+            profile = get_complete_financial_profile(sym, bypass_db_cache=refresh)
             raw_yf = profile.get("news", [])
             for item in raw_yf[:4]:
                 yf_news.append({
@@ -6721,7 +6731,38 @@ async def get_news_impact(symbol: str, refresh: bool = False):
         anomaly_map = {item["date"]: item for item in anomalies_list}
         
         updated_news_items = []
-        for item in synthesis_payload.get("news_items", []):
+        for idx, item in enumerate(synthesis_payload.get("news_items", [])):
+            # Match Groq output items back to the input raw_news list to restore the source link URLs and publishers
+            title_llm = item.get("title", "")
+            slug_llm = "".join(c for c in title_llm.lower() if c.isalnum())
+            
+            matched = None
+            # 1. Exact match based on alphanumeric title slug
+            for orig in raw_news:
+                slug_orig = "".join(c for c in orig["title"].lower() if c.isalnum())
+                if slug_llm == slug_orig:
+                    matched = orig
+                    break
+            
+            # 2. Fuzzy substring match
+            if not matched:
+                for orig in raw_news:
+                    slug_orig = "".join(c for c in orig["title"].lower() if c.isalnum())
+                    if slug_llm in slug_orig or slug_orig in slug_llm:
+                        matched = orig
+                        break
+            
+            # 3. Positional fallback
+            if not matched and idx < len(raw_news):
+                matched = raw_news[idx]
+                
+            if matched:
+                item["link"] = matched.get("link") or "#"
+                item["publisher"] = matched.get("source") or matched.get("publisher") or item.get("publisher") or "Financial Feed"
+            else:
+                item["link"] = "#"
+                item["publisher"] = item.get("publisher") or "Financial Feed"
+                
             news_date = item.get("date", "")
             ab_ret = 0.0
             price_change = 0.0
