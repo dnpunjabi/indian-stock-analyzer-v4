@@ -27480,3 +27480,54 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
     }
 })();
 
+(function() {
+    // TradingView Advanced Fullscreen Controller
+    const advancedCard = document.getElementById('tv-advanced-card');
+    const fullscreenBtn = document.getElementById('tv-advanced-fullscreen-btn');
+    const container = document.getElementById('tv-advanced-container');
+
+    function toggleAdvancedFullscreen() {
+        if (!advancedCard) return;
+        const isFull = advancedCard.classList.toggle('chart-full-window');
+        if (fullscreenBtn) {
+            fullscreenBtn.innerHTML = isFull ? '🗗 Exit Fullscreen' : '🗖 Fullscreen';
+        }
+        if (container) {
+            if (isFull) {
+                container.style.height = 'calc(100vh - 80px)';
+            } else {
+                container.style.height = ''; // Let standard CSS flex/min-height control it
+            }
+        }
+    }
+
+    if (advancedCard) {
+        advancedCard.addEventListener('dblclick', (e) => {
+            // Prevent toggling if clicked on input/button/a tags
+            if (e.target.closest('button') || e.target.closest('a') || e.target.closest('select')) return;
+            toggleAdvancedFullscreen();
+        });
+    }
+
+    if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleAdvancedFullscreen();
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (advancedCard && advancedCard.classList.contains('chart-full-window')) {
+                advancedCard.classList.remove('chart-full-window');
+                if (fullscreenBtn) {
+                    fullscreenBtn.innerHTML = '🗖 Fullscreen';
+                }
+                if (container) {
+                    container.style.height = '';
+                }
+            }
+        }
+    });
+})();
+
