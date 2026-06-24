@@ -939,6 +939,8 @@ let activeAlertsPage = 1;
 let alertsPageSize = 10;
 let alertsSortCol = 'id';
 let alertsSortAsc = true;
+let alertsLogSearchQuery = '';
+let alertsLogFilteredCount = 0;
 
 // Rule Scanner state
 let lastRuleScanResults = [];
@@ -9008,20 +9010,52 @@ function renderAlertsPage(page) {
 
     tbody.innerHTML = '';
 
+    let filteredList = lastAlertsList;
+    if (alertsLogSearchQuery) {
+        const query = alertsLogSearchQuery.toLowerCase().trim();
+        filteredList = lastAlertsList.filter(item => {
+            return (item.ticker || '').toLowerCase().includes(query) ||
+                   (item.condition_type || '').toLowerCase().includes(query) ||
+                   (item.operator || '').toLowerCase().includes(query) ||
+                   (item.value || '').toLowerCase().includes(query) ||
+                   (item.status || '').toLowerCase().includes(query);
+        });
+    }
+
+    alertsLogFilteredCount = filteredList.length;
+
+    // Telemetry matches count update
+    const telBadge = document.getElementById('alerts-search-telemetry');
+    const telCount = document.getElementById('alerts-search-match-count');
+    if (telBadge && telCount) {
+        if (alertsLogSearchQuery) {
+            telCount.textContent = `${filteredList.length} of ${lastAlertsList.length}`;
+            telBadge.style.display = 'inline-flex';
+        } else {
+            telBadge.style.display = 'none';
+        }
+    }
+
     if (lastAlertsList.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="center-text text-muted">No alert rules configured. Create one on the left.</td></tr>';
         if (pagContainer) pagContainer.style.display = 'none';
         return;
     }
 
-    const totalPages = Math.ceil(lastAlertsList.length / alertsPageSize) || 1;
+    if (filteredList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="center-text text-muted">No matching alert rules found. Try adjusting your query.</td></tr>';
+        if (pagContainer) pagContainer.style.display = 'none';
+        return;
+    }
+
+    const totalPages = Math.ceil(filteredList.length / alertsPageSize) || 1;
     if (page < 1) page = 1;
     if (page > totalPages) page = totalPages;
     activeAlertsPage = page;
 
     const startIndex = (page - 1) * alertsPageSize;
-    const endIndex = Math.min(startIndex + alertsPageSize, lastAlertsList.length);
-    const pageSlice = lastAlertsList.slice(startIndex, endIndex);
+    const endIndex = Math.min(startIndex + alertsPageSize, filteredList.length);
+    const pageSlice = filteredList.slice(startIndex, endIndex);
 
     pageSlice.forEach(item => {
         const tr = document.createElement('tr');
@@ -9217,7 +9251,7 @@ function setupAlertsTableSorting() {
             }
         });
         nextBtn.addEventListener('click', () => {
-            const totalPages = Math.ceil(lastAlertsList.length / alertsPageSize) || 1;
+            const totalPages = Math.ceil(alertsLogFilteredCount / alertsPageSize) || 1;
             if (activeAlertsPage < totalPages) {
                 renderAlertsPage(activeAlertsPage + 1);
             }
@@ -9230,6 +9264,31 @@ function setupAlertsTableSorting() {
             alertsPageSize = parseInt(e.target.value) || 10;
             activeAlertsPage = 1;
             renderAlertsPage(1);
+        });
+    }
+
+    // Set up search and clear actions
+    const searchInput = document.getElementById('alerts-log-search');
+    const searchClear = document.getElementById('alerts-search-clear');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            alertsLogSearchQuery = e.target.value;
+            if (searchClear) {
+                searchClear.style.display = alertsLogSearchQuery ? 'block' : 'none';
+            }
+            activeAlertsPage = 1;
+            renderAlertsPage(1);
+        });
+    }
+
+    if (searchClear && searchInput) {
+        searchClear.addEventListener('click', () => {
+            searchInput.value = '';
+            alertsLogSearchQuery = '';
+            searchClear.style.display = 'none';
+            activeAlertsPage = 1;
+            renderAlertsPage(1);
+            searchInput.focus();
         });
     }
 }

@@ -12293,7 +12293,42 @@ tr.active-peer-row td:first-child {
     color: var(--text-muted) !important;
 }
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ALERTS LOG SEARCH STYLING (ENTERPRISE GLASSMORPHISM)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+#alerts-log-search {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
 
+#alerts-log-search:focus {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3) !important;
+    background: rgba(0, 0, 0, 0.4) !important;
+}
 
+#alerts-search-clear:hover {
+    color: var(--color-crimson, #ef4444) !important;
+    transform: scale(1.15);
+}
 
+#alerts-search-telemetry {
+    animation: fadeIn 0.2s ease-out;
+}
 
+@media (max-width: 768px) {
+    .alerts-header-actions {
+        width: 100% !important;
+        justify-content: flex-start !important;
+        gap: 8px !important;
+        margin-top: 10px;
+    }
+    
+    .alerts-search-wrapper {
+        flex-grow: 1 !important;
+        width: 100% !important;
+    }
+    
+    #alerts-log-search {
+        width: 100% !important;
+    }
+}
