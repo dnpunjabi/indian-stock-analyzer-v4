@@ -1201,19 +1201,31 @@ function setupEnterpriseHeader() {
 
     // Handle clearing notifications
     const clearBtn = document.getElementById('clear-all-alerts-btn');
-    const notifBody = document.getElementById('notification-list-body');
-    const badge = document.getElementById('bell-badge-count');
-
-    if (clearBtn && notifBody && badge) {
+    if (clearBtn) {
         clearBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            notifBody.innerHTML = '<div style="font-size:10px; color:var(--text-muted); padding:20px; text-align:center;">No new system notifications.</div>';
-            badge.style.display = 'none';
-            badge.innerText = '0';
-            const sidebarBadge = document.getElementById('sidebar-alerts-badge');
-            if (sidebarBadge) {
-                sidebarBadge.style.display = 'none';
-                sidebarBadge.innerText = '0';
+            
+            // Save active triggered alert IDs to dismissed list in localStorage
+            let dismissedIds = [];
+            try {
+                dismissedIds = JSON.parse(localStorage.getItem('dismissed-alert-ids') || '[]');
+            } catch (err) {
+                dismissedIds = [];
+            }
+            
+            if (Array.isArray(lastAlertsList)) {
+                lastAlertsList.forEach(item => {
+                    if (item.triggered && !dismissedIds.includes(item.id)) {
+                        dismissedIds.push(item.id);
+                    }
+                });
+            }
+            
+            localStorage.setItem('dismissed-alert-ids', JSON.stringify(dismissedIds));
+            
+            // Re-render notification bell to reflect cleared state
+            if (typeof updateNotificationBell === 'function') {
+                updateNotificationBell(lastAlertsList);
             }
             showToast("System notifications cleared.", "success");
         });
@@ -1709,6 +1721,10 @@ function switchTab(tabKey) {
         if (window.startMoversPolling) window.startMoversPolling();
     } else {
         if (window.stopMoversPolling) window.stopMoversPolling();
+    }
+
+    if (tabKey === 'alerts') {
+        if (typeof fetchAlertsList === 'function') fetchAlertsList();
     }
 
     // Auto-resize TradingView Lightweight Charts on tab activation to prevent collapsed canvas sizing
@@ -8748,6 +8764,11 @@ function startRealTimeAlertScanner() {
             if (!response.ok) return;
             const data = await response.json();
 
+            // Always update notification bell to keep it in sync with database status!
+            if (typeof updateNotificationBell === 'function') {
+                updateNotificationBell(data.alerts);
+            }
+
             // Check if there are any new triggers in this sweep
             if (data.triggers && data.triggers.length > 0) {
                 // 1. Play premium institutional alert sound
@@ -8769,52 +8790,6 @@ function startRealTimeAlertScanner() {
                     setTimeout(() => {
                         bellIcon.classList.remove('bell-shake-active');
                     }, 800);
-                }
-
-                // 4. Append triggers dynamically to the header notifications list
-                const notifBody = document.getElementById('notification-list-body');
-                const badge = document.getElementById('bell-badge-count');
-
-                if (notifBody) {
-                    if (notifBody.innerText.includes("No new system notifications")) {
-                        notifBody.innerHTML = '';
-                    }
-
-                    data.triggers.forEach(msg => {
-                        const now = new Date();
-                        const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-                        const item = document.createElement('div');
-                        item.className = 'notification-item';
-                        item.style.borderLeft = '3px solid var(--color-primary, #3b82f6)';
-                        item.innerHTML = `
-                            <div class="notif-header">
-                                <span class="notif-badge badge-red">TRIGGERED</span>
-                                <span class="notif-time">Just Now (${timeStr})</span>
-                            </div>
-                            <div class="notif-text" style="color: var(--text-primary); font-weight: 500;">
-                                ${msg}
-                            </div>
-                        `;
-                        notifBody.insertBefore(item, notifBody.firstChild);
-                    });
-                }
-
-                // 5. Update the badge count
-                if (badge) {
-                    let currentCount = 0;
-                    if (badge.style.display !== 'none' && badge.innerText !== '') {
-                        currentCount = parseInt(badge.innerText) || 0;
-                    }
-                    currentCount += data.triggers.length;
-                    badge.innerText = currentCount;
-                    badge.style.display = 'flex';
-
-                    const sidebarBadge = document.getElementById('sidebar-alerts-badge');
-                    if (sidebarBadge) {
-                        sidebarBadge.innerText = currentCount;
-                        sidebarBadge.style.display = 'flex';
-                    }
                 }
 
                 // 6. If user is currently looking at the alert center tab, update the list automatically!
@@ -8907,6 +8882,66 @@ function playAlertSound(style = null) {
     }
 }
 
+function updateNotificationBell(list) {
+    const notifBody = document.getElementById('notification-list-body');
+    const badge = document.getElementById('bell-badge-count');
+    const sidebarBadge = document.getElementById('sidebar-alerts-badge');
+    if (!notifBody) return;
+
+    let dismissedIds = [];
+    try {
+        dismissedIds = JSON.parse(localStorage.getItem('dismissed-alert-ids') || '[]');
+    } catch (e) {
+        dismissedIds = [];
+    }
+
+    const activeTriggers = list.filter(item => item.triggered && !dismissedIds.includes(item.id));
+    
+    // Sort by trigger date descending
+    activeTriggers.sort((a, b) => new Date(b.trigger_date || 0) - new Date(a.trigger_date || 0));
+
+    if (activeTriggers.length === 0) {
+        notifBody.innerHTML = '<div style="font-size:10px; color:var(--text-muted); padding:20px; text-align:center;">No new system notifications.</div>';
+        if (badge) {
+            badge.style.display = 'none';
+            badge.innerText = '0';
+        }
+        if (sidebarBadge) {
+            sidebarBadge.style.display = 'none';
+            sidebarBadge.innerText = '0';
+        }
+        return;
+    }
+
+    notifBody.innerHTML = '';
+    activeTriggers.forEach(item => {
+        const msg = `ALERT TRIGGERED: ${item.ticker} met condition (${item.condition_type} ${item.operator} ${item.value})`;
+        const notifEl = document.createElement('div');
+        notifEl.className = 'notification-item';
+        notifEl.style.borderLeft = '3px solid var(--color-crimson, #ef4444)';
+        notifEl.innerHTML = `
+            <div class="notif-header">
+                <span class="notif-badge badge-red" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); font-size: 8px; padding: 2px 4px; border-radius: 3px; font-weight: 700;">TRIGGERED</span>
+                <span class="notif-time" style="font-size: 9.5px; color: var(--text-secondary);">${item.trigger_date || 'Just Now'}</span>
+            </div>
+            <div class="notif-text" style="color: var(--text-primary); font-weight: 500; font-size: 11px; margin-top: 4px;">
+                ${msg}
+            </div>
+            ${item.ai_context ? `<div class="notif-subtext" style="font-size: 10px; color: var(--text-secondary); margin-top: 4px; font-style: italic; line-height: 1.3;">🤖 ${item.ai_context}</div>` : ''}
+        `;
+        notifBody.appendChild(notifEl);
+    });
+
+    if (badge) {
+        badge.innerText = activeTriggers.length;
+        badge.style.display = 'flex';
+    }
+    if (sidebarBadge) {
+        sidebarBadge.innerText = activeTriggers.length;
+        sidebarBadge.style.display = 'flex';
+    }
+}
+
 async function fetchAlertsList() {
     try {
         const response = await fetch('/api/alerts/list');
@@ -8950,6 +8985,11 @@ async function setAlertRule() {
 
 function renderAlertsList(list) {
     lastAlertsList = list;
+
+    // Update notification bell dropdown dynamically
+    if (typeof updateNotificationBell === 'function') {
+        updateNotificationBell(list);
+    }
 
     // Also update cockpit radar scanner target plots!
     renderRadarTargets(list);
