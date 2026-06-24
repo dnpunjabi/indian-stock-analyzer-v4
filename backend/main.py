@@ -843,7 +843,7 @@ async def run_background_market_movers_updater():
             
             df_stocks = await loop.run_in_executor(
                 None, 
-                lambda: yf.download(stocks_tickers, period="2d", interval="1d", progress=False, threads=True)
+                lambda: yf.download(stocks_tickers, period="2d", interval="1d", progress=False, threads=12)
             )
             
             parsed_stocks = []
@@ -4898,7 +4898,7 @@ async def batch_quotes(data: BatchQuotesRequest):
                 period="2d",
                 interval="1d",
                 progress=False,
-                threads=True
+                threads=12
             )
 
             if not df.empty:
