@@ -2,101 +2,89 @@
 Provider-Agnostic LLM Configuration Module
 ==========================================
 Unified abstraction layer for routing LLM calls to different models/providers.
-
-Supports:
-- Groq (native SDK)
-- Any OpenAI-compatible API (Together AI, OpenRouter, Ollama, vLLM, etc.)
-
-Configuration is driven entirely by environment variables (.env file).
+Configuration is dynamically loaded from environment variables on every call to support hot-swapping.
 """
 
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
-
-# ---------------------------------------------------------------------------
 # Task-type constants for hybrid routing
-# ---------------------------------------------------------------------------
 TASK_HEAVY = "heavy"   # CFA Fundamentals, CIO Synthesis, Portfolio Doctor
 TASK_FAST  = "fast"    # Co-Pilot Chat, Sentiment, Technical, News synthesis
 
-# ---------------------------------------------------------------------------
-# Environment-driven configuration
-# ---------------------------------------------------------------------------
-LLM_PROVIDER   = os.environ.get("LLM_PROVIDER", "groq").lower()
-LLM_BASE_URL   = os.environ.get("LLM_BASE_URL", "")
-LLM_API_KEY    = os.environ.get("LLM_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
+def _get_config():
+    """Dynamically load and return configuration from environment variables."""
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+    
+    provider = os.environ.get("LLM_PROVIDER", "groq").lower()
+    base_url = os.environ.get("LLM_BASE_URL", "")
+    api_key = os.environ.get("LLM_API_KEY", "") or os.environ.get("GROQ_API_KEY", "")
+    
+    heavy_model = os.environ.get("LLM_HEAVY_MODEL", "llama-3.3-70b-versatile")
+    fast_model = os.environ.get("LLM_FAST_MODEL", "llama-3.3-70b-versatile")
+    
+    heavy_label = os.environ.get("LLM_HEAVY_LABEL", "Groq Llama 3.3 70B")
+    fast_label = os.environ.get("LLM_FAST_LABEL", "Groq Llama 3.3 70B")
+    
+    temperature = float(os.environ.get("LLM_TEMPERATURE", "0.2"))
+    
+    return {
+        "provider": provider,
+        "base_url": base_url,
+        "api_key": api_key,
+        "heavy_model": heavy_model,
+        "fast_model": fast_model,
+        "heavy_label": heavy_label,
+        "fast_label": fast_label,
+        "temperature": temperature
+    }
 
-# Model identifiers (provider-specific model strings)
-LLM_HEAVY_MODEL = os.environ.get("LLM_HEAVY_MODEL", "llama-3.3-70b-versatile")
-LLM_FAST_MODEL  = os.environ.get("LLM_FAST_MODEL", "llama-3.3-70b-versatile")
+# Client cache references
+_cached_client = None
+_cached_key = None
+_cached_provider = None
+_cached_base_url = None
 
-# Human-readable display labels for the frontend
-LLM_HEAVY_LABEL = os.environ.get("LLM_HEAVY_LABEL", "Groq Llama 3.3 70B")
-LLM_FAST_LABEL  = os.environ.get("LLM_FAST_LABEL", "Groq Llama 3.3 70B")
+def _get_client(config=None):
+    """Return appropriate client, recreating it dynamically if config changes."""
+    global _cached_client, _cached_key, _cached_provider, _cached_base_url
+    if config is None:
+        config = _get_config()
+        
+    api_key = config["api_key"]
+    provider = config["provider"]
+    base_url = config["base_url"]
+    
+    # Recreate client if configuration has changed
+    if (_cached_client is None or 
+        _cached_key != api_key or 
+        _cached_provider != provider or 
+        _cached_base_url != base_url):
+        
+        _cached_client = None
+        _cached_key = api_key
+        _cached_provider = provider
+        _cached_base_url = base_url
+        
+        try:
+            if provider == "groq":
+                from groq import Groq
+                _cached_client = Groq(api_key=api_key) if api_key else Groq()
+                print("[LLM Config] Reinitialized Groq client dynamically.")
+            else:
+                from openai import OpenAI
+                if base_url:
+                    _cached_client = OpenAI(api_key=api_key, base_url=base_url)
+                else:
+                    _cached_client = OpenAI(api_key=api_key)
+                print(f"[LLM Config] Reinitialized OpenAI client dynamically (base_url={base_url}).")
+        except Exception as e:
+            print(f"[LLM Config] Error dynamically initializing client: {e}")
+            _cached_client = None
+            
+    return _cached_client
 
-# Generation defaults
-LLM_TEMPERATURE = float(os.environ.get("LLM_TEMPERATURE", "0.2"))
-
-# ---------------------------------------------------------------------------
-# Client initialization
-# ---------------------------------------------------------------------------
-_groq_client = None
-_openai_client = None
-
-def _init_groq_client():
-    """Initialize the Groq native SDK client."""
-    global _groq_client
-    if _groq_client is not None:
-        return _groq_client
-    try:
-        from groq import Groq
-        _groq_client = Groq(api_key=LLM_API_KEY) if LLM_API_KEY else Groq()
-        print(f"[LLM Config] Groq client initialized successfully.")
-        return _groq_client
-    except Exception as e:
-        print(f"[LLM Config] Failed to initialize Groq client: {e}")
-        return None
-
-def _init_openai_client():
-    """Initialize an OpenAI-compatible client (works with Together AI, OpenRouter, Ollama, etc.)."""
-    global _openai_client
-    if _openai_client is not None:
-        return _openai_client
-    try:
-        from openai import OpenAI
-        if not LLM_BASE_URL:
-            print("[LLM Config] WARNING: LLM_BASE_URL is not set for openai_compat provider.")
-            return None
-        _openai_client = OpenAI(
-            api_key=LLM_API_KEY,
-            base_url=LLM_BASE_URL,
-        )
-        print(f"[LLM Config] OpenAI-compatible client initialized (base_url={LLM_BASE_URL}).")
-        return _openai_client
-    except Exception as e:
-        print(f"[LLM Config] Failed to initialize OpenAI-compatible client: {e}")
-        return None
-
-
-def _get_client():
-    """Return the appropriate client based on configured provider."""
-    if LLM_PROVIDER == "groq":
-        return _init_groq_client()
-    elif LLM_PROVIDER in ("openai_compat", "openai", "together", "openrouter", "ollama", "vllm"):
-        return _init_openai_client()
-    else:
-        # Default: try Groq first, then OpenAI-compat
-        client = _init_groq_client()
-        if client is None:
-            client = _init_openai_client()
-        return client
-
-
-# ---------------------------------------------------------------------------
-# Unified LLM call interface
-# ---------------------------------------------------------------------------
 def call_llm(task_type: str,
              system_prompt: str,
              user_prompt: str = None,
@@ -104,24 +92,15 @@ def call_llm(task_type: str,
              messages: list = None) -> str:
     """
     Provider-agnostic LLM call. Routes to the correct model based on task_type.
-    
-    Args:
-        task_type: TASK_HEAVY or TASK_FAST — determines which model to use.
-        system_prompt: The system instruction.
-        user_prompt: The user message (optional if messages is provided).
-        max_tokens: Maximum tokens for the response.
-        messages: Pre-built message list (overrides system_prompt/user_prompt if provided).
-    
-    Returns:
-        The LLM response text, or an error string prefixed with "ERROR".
     """
-    client = _get_client()
+    config = _get_config()
+    client = _get_client(config)
     if client is None:
         return "ERROR_401: LLM client is not initialized. Please verify your API key and LLM_PROVIDER settings."
 
-    # Select model based on task type
-    model = LLM_HEAVY_MODEL if task_type == TASK_HEAVY else LLM_FAST_MODEL
-    label = LLM_HEAVY_LABEL if task_type == TASK_HEAVY else LLM_FAST_LABEL
+    model = config["heavy_model"] if task_type == TASK_HEAVY else config["fast_model"]
+    label = config["heavy_label"] if task_type == TASK_HEAVY else config["fast_label"]
+    temperature = config["temperature"]
 
     # Ensure system prompt suppresses thinking process/chain-of-thought metadata
     suppress_instructions = (
@@ -154,7 +133,7 @@ def call_llm(task_type: str,
             messages=messages,
             model=model,
             max_tokens=safe_max_tokens,
-            temperature=LLM_TEMPERATURE
+            temperature=temperature
         )
         response_content = chat_completion.choices[0].message.content
         print(f"[LLM] Successfully received response from {label} ({len(response_content)} chars)")
@@ -166,7 +145,7 @@ def call_llm(task_type: str,
             return "ERROR_401: Invalid API Key. Activating local high-fidelity fallback reasoning."
 
         # Fallback: try the other model if the primary fails
-        fallback_model = LLM_FAST_MODEL if task_type == TASK_HEAVY else LLM_HEAVY_MODEL
+        fallback_model = config["fast_model"] if task_type == TASK_HEAVY else config["heavy_model"]
         if fallback_model != model:
             try:
                 print(f"[LLM] Retrying with fallback model: {fallback_model}...")
@@ -174,7 +153,7 @@ def call_llm(task_type: str,
                     messages=messages,
                     model=fallback_model,
                     max_tokens=safe_max_tokens,
-                    temperature=LLM_TEMPERATURE
+                    temperature=temperature
                 )
                 return _clean_reasoning_metadata(chat_completion.choices[0].message.content)
             except Exception as e2:
@@ -241,7 +220,6 @@ def _clean_reasoning_metadata(text: str) -> str:
         
     return text.strip()
 
-
 # ---------------------------------------------------------------------------
 # Status & Configuration API (consumed by frontend via /api/llm-config)
 # ---------------------------------------------------------------------------
@@ -249,16 +227,16 @@ def is_llm_available() -> bool:
     """Check whether a valid LLM client can be initialized."""
     return _get_client() is not None
 
-
 def get_llm_config() -> dict:
     """Return active LLM configuration for the frontend API endpoint."""
+    config = _get_config()
     available = is_llm_available()
     return {
-        "provider": LLM_PROVIDER,
-        "heavy_model": LLM_HEAVY_MODEL,
-        "fast_model": LLM_FAST_MODEL,
-        "heavy_label": LLM_HEAVY_LABEL,
-        "fast_label": LLM_FAST_LABEL,
+        "provider": config["provider"],
+        "heavy_model": config["heavy_model"],
+        "fast_model": config["fast_model"],
+        "heavy_label": config["heavy_label"],
+        "fast_label": config["fast_label"],
         "status": "connected" if available else "disconnected",
-        "base_url": LLM_BASE_URL or "(default provider endpoint)",
+        "base_url": config["base_url"] or "(default provider endpoint)",
     }
