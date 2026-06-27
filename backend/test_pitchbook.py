@@ -15,7 +15,7 @@ class TestPitchbookAPIRoutes(unittest.TestCase):
     def setUpClass(cls):
         cls.client = TestClient(app)
 
-    @patch("backend.main.call_groq_llm")
+    @patch("backend.main.call_llm")
     @patch("backend.main.get_complete_financial_profile")
     @patch("requests.get")
     def test_get_pitchbook_endpoint(self, mock_requests_get, mock_get_profile, mock_call_groq):

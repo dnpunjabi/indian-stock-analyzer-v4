@@ -2,7 +2,7 @@ import os
 import json
 import asyncio
 import yfinance as yf
-from groq import Groq
+from backend.llm_config import call_llm, TASK_HEAVY, TASK_FAST, is_llm_available, get_llm_config
 from google.antigravity import Agent, LocalAgentConfig
 from backend.financial_utils import get_complete_financial_profile, calculate_dcf_valuation
 
@@ -16,11 +16,11 @@ def clean_float(val, default=0.0):
     except Exception:
         return default
 
-# Initialize Groq client
-try:
-    groq_client = Groq()
-except Exception:
-    groq_client = None
+# LLM client is now initialized in backend.llm_config
+# Backward-compatible alias for call_groq_llm (used by tests and imports)
+def call_groq_llm(system_prompt: str, user_prompt: str = None, max_tokens: int = 2500, messages: list = None) -> str:
+    """Backward-compatible wrapper. Routes to the unified call_llm interface."""
+    return call_llm(TASK_HEAVY, system_prompt, user_prompt, max_tokens=max_tokens, messages=messages)
 
 # Enhanced Screener Universe containing 380+ constituents of Nifty 200 and Nifty MidSmallcap 400 (Nifty 100, Midcap 150, Smallcap 250)
 import sqlite3
@@ -44,46 +44,9 @@ def get_db():
     finally:
         conn.close()
 
-def call_groq_llm(system_prompt: str, user_prompt: str = None, max_tokens: int = 2500, messages: list = None) -> str:
-    if not groq_client:
-        return "ERROR_401: Groq client is not initialized. Please verify your GROQ_API_KEY."
-    
-    if messages is None:
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-        
-    try:
-        print(f"Calling Groq API (model: llama-3.3-70b-versatile, tokens: {max_tokens})...")
-        chat_completion = groq_client.chat.completions.create(
-            messages=messages,
-            model="llama-3.3-70b-versatile",
-            max_tokens=max_tokens,
-            temperature=0.2
-        )
-        response_content = chat_completion.choices[0].message.content
-        print(f"Successfully received response from Groq API ({len(response_content)} chars)")
-        return response_content
-    except Exception as e:
-        print(f"Error calling Groq API: {e}")
-        # Detect Invalid API Key (Finding 7 resolution)
-        err_msg = str(e)
-        if "invalid_api_key" in err_msg or "401" in err_msg or "Invalid API Key" in err_msg:
-            return "ERROR_401: Invalid API Key. Activating local high-fidelity fallback reasoning."
-            
-        try:
-            chat_completion = groq_client.chat.completions.create(
-                messages=messages,
-                model="llama3-70b-8192",
-                max_tokens=max_tokens,
-                temperature=0.2
-            )
-            return chat_completion.choices[0].message.content
-        except Exception as e2:
-            if "invalid_api_key" in str(e2) or "401" in str(e2):
-                return "ERROR_401: Invalid API Key. Activating local high-fidelity fallback reasoning."
-            return f"ERROR: Failed to query Groq model. Details: {str(e2)}"
+# NOTE: The original call_groq_llm function has been replaced by the unified
+# call_llm interface in backend.llm_config. The backward-compatible alias is
+# defined above (line 21) for existing imports and tests.
 
 def run_local_fallback_analysis(p: dict, horizon: str, risk: str) -> dict:
     import math
@@ -328,7 +291,7 @@ def run_fundamental_subagent(profile: dict) -> str:
     {json.dumps(profile['peers'][:4], indent=2)}
     """
     
-    return call_groq_llm(system_prompt, user_prompt)
+    return call_llm(TASK_HEAVY, system_prompt, user_prompt)
 
 # 2. Technical Strategist Subagent
 def run_technical_subagent(profile: dict) -> str:
@@ -355,7 +318,7 @@ def run_technical_subagent(profile: dict) -> str:
     - Rise from 52-week Low: {profile['technicals']['dist_low_52w_pct']:.1f}%
     """
     
-    return call_groq_llm(system_prompt, user_prompt)
+    return call_llm(TASK_FAST, system_prompt, user_prompt)
 
 # 3. Sentiment & Governance Auditor Subagent
 def run_sentiment_subagent(profile: dict) -> str:
@@ -378,7 +341,7 @@ def run_sentiment_subagent(profile: dict) -> str:
     {json.dumps(profile['news'], indent=2)}
     """
     
-    return call_groq_llm(system_prompt, user_prompt)
+    return call_llm(TASK_FAST, system_prompt, user_prompt)
 
 # 4. Chief Investment Officer (CIO) Parent Orchestrator Agent
 async def run_cio_parent_agent(query: str, horizon: str, risk_profile: str, custom_dcf: dict = None, force_llm: bool = False) -> dict:
@@ -422,7 +385,7 @@ async def run_cio_parent_agent(query: str, horizon: str, risk_profile: str, cust
     
     # 3. Check for API key presence and run subagents or fall back to high-fidelity local simulator
     # This prevents NameError, 401 exceptions, and delivers an incredible out-of-the-box user experience
-    use_local_simulator = not groq_client or not force_llm
+    use_local_simulator = not is_llm_available() or not force_llm
     fundamental_report = ""
     technical_report = ""
     sentiment_report = ""
@@ -513,7 +476,7 @@ async def run_cio_parent_agent(query: str, horizon: str, risk_profile: str, cust
     - Median Target Price: Rs. {profile['consensus']['target_median']}
     """
     
-    response_text = call_groq_llm(system_prompt, user_prompt, max_tokens=1500)
+    response_text = call_llm(TASK_HEAVY, system_prompt, user_prompt, max_tokens=1500)
     
     if "ERROR_401" in response_text:
         # Secondary API fail catcher
@@ -971,10 +934,10 @@ def run_comparison_synthesizer(tickers: list, generate_thesis: bool = False) -> 
         )
         
         user_prompt = f"Rivals Comparison Matrix:\n{json.dumps(matrix, indent=2)}"
-        battleground_thesis = call_groq_llm(system_prompt, user_prompt, max_tokens=1000)
+        battleground_thesis = call_llm(TASK_FAST, system_prompt, user_prompt, max_tokens=1000)
         
         # Elegant fallback Battleground Thesis if Groq key 401 triggers (Finding 7 resolution!)
-        if "ERROR_401" in battleground_thesis or not groq_client:
+        if "ERROR_401" in battleground_thesis or not is_llm_available():
             sorted_matrix = sorted(matrix, key=lambda x: x["margin_of_safety"] + x["roe"], reverse=True)
             winner = sorted_matrix[0]
             loser = sorted_matrix[-1]
@@ -1066,10 +1029,10 @@ def run_conversational_chat(chat_history: list, user_message: str, profile: dict
         
     formatted_messages.append({"role": "user", "content": user_message})
     
-    res = call_groq_llm(system_prompt, user_message, max_tokens=600, messages=formatted_messages)
+    res = call_llm(TASK_FAST, system_prompt, user_message, max_tokens=600, messages=formatted_messages)
     
     # If invalid API key or error triggers fallback
-    if not res or "ERROR_401" in res or "ERROR" in res or not groq_client:
+    if not res or "ERROR_401" in res or "ERROR" in res or not is_llm_available():
         print("Activating local chatbot simulator...")
         
         # Check if we are in batch watchlist mode
@@ -1427,9 +1390,9 @@ def calculate_portfolio_taxes(portfolio_items: list, run_prescription: bool = Fa
             f"Please provide your expert capital gains optimization diagnostic prescription."
         )
         
-        diagnosis = call_groq_llm(sys_prompt, user_prompt, max_tokens=2500)
+        diagnosis = call_llm(TASK_HEAVY, sys_prompt, user_prompt, max_tokens=2500)
         
-        if "ERROR_401" in diagnosis or "ERROR" in diagnosis or not groq_client:
+        if "ERROR_401" in diagnosis or "ERROR" in diagnosis or not is_llm_available():
             diagnosis = generate_local_tax_prescription(
                 {
                     "total_cost": total_cost,
@@ -1603,10 +1566,10 @@ def run_portfolio_doctor(portfolio_items: list) -> dict:
         f"Please provide your expert diagnostic review, analyzing each holding's contribution and proposing actionable trades."
     )
     
-    diagnosis = call_groq_llm(sys_prompt, user_prompt, max_tokens=2500)
+    diagnosis = call_llm(TASK_HEAVY, sys_prompt, user_prompt, max_tokens=2500)
     
     # Check for invalid api key or error to run high-fidelity local advisor fallback
-    if "ERROR_401" in diagnosis or "ERROR" in diagnosis or not groq_client:
+    if "ERROR_401" in diagnosis or "ERROR" in diagnosis or not is_llm_available():
         diagnosis = generate_local_portfolio_diagnosis(
             analyzed_items, sector_allocation, total_investment, total_current_value,
             total_pl, total_pl_pct, health_score, concentration_label, hhi
@@ -2074,10 +2037,10 @@ def generate_backtest_synthesis(metrics: dict, tickers_weights: list) -> str:
     )
     
     try:
-        response = call_groq_llm(system_prompt, user_prompt)
+        response = call_llm(TASK_HEAVY, system_prompt, user_prompt)
         return response
     except Exception as e:
-        print(f"Error calling Groq for backtest synthesis: {e}")
+        print(f"Error calling LLM for backtest synthesis: {e}")
         # Local fallback analysis if Groq fails
         md = []
         md.append("### 🔬 Local Backtest Performance Synthesis")

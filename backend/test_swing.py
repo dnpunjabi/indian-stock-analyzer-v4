@@ -325,7 +325,7 @@ class TestSwingAPIRoutes(unittest.TestCase):
         self.assertIn("equity_curve", data)
         self.assertGreater(len(data["equity_curve"]), 0)
 
-    @patch("backend.main.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_post_swing_synthesis(self, mock_groq):
         """Verifies tactical docket generation using mock Groq output."""
         mock_groq.return_value = (
@@ -356,7 +356,7 @@ class TestSwingAPIRoutes(unittest.TestCase):
         self.assertIn("synthesis", data)
         self.assertIn("### I. Tactical Setup & Technical Signals", data["synthesis"])
 
-    @patch("backend.main.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_post_swing_synthesis_fallback(self, mock_groq):
         """Verifies fallback text docket generation when Groq returns an error/empty string."""
         mock_groq.return_value = "ERROR: rate limit exceeded"
@@ -465,7 +465,7 @@ class TestSwingAPIRoutes(unittest.TestCase):
         self.assertIn("lrtc_latest", data)
 
     @patch("requests.get")
-    @patch("backend.agent.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_get_indicator_synthesis(self, mock_groq, mock_get):
         """Verifies custom indicator AI synthesis endpoints and LLM prompts compilation."""
         mock_response = MagicMock()
@@ -523,7 +523,7 @@ class TestSwingAPIRoutes(unittest.TestCase):
         self.assertIn("synthesis", data_multi)
 
     @patch("backend.main.get_db")
-    @patch("backend.agent.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_post_portfolio_stress_test(self, mock_groq, mock_db):
         """Verifies portfolio stress-test endpoint scoring and breakdown metrics."""
         # Mock database portfolio items & cached profiles

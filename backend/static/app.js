@@ -806,7 +806,43 @@ function updatePortfolioLedgerRealtime(ticksData) {
 }
 
 // Initialize WebSocket on page load
+
+async function fetchLLMConfig() {
+    try {
+        const res = await fetch('/api/llm-config');
+        const config = await res.json();
+        window.llmConfig = config;
+        
+        // Update sidebar label
+        const statusLabel = document.getElementById('llm-status-label');
+        if (statusLabel) {
+            statusLabel.textContent = config.heavy_label || 'Active LLM';
+        }
+        
+        // Update all general labels
+        document.querySelectorAll('.llm-engine-label').forEach(el => {
+            el.textContent = config.fast_label || 'AI Engine';
+        });
+        
+        // Update all badges
+        document.querySelectorAll('.llm-engine-badge').forEach(el => {
+            el.textContent = config.fast_label || 'AI Copilot';
+        });
+        
+        // Also update any inline buttons or text containing Run AI Audit
+        const groqAuditBtn = document.getElementById('run-groq-audit-btn');
+        if (groqAuditBtn) {
+            groqAuditBtn.innerHTML = `<span>🤖</span> Run ${config.fast_label} Audit`;
+        }
+        
+        console.log('[LLM Config] Dynamic labels updated:', config);
+    } catch (e) {
+        console.warn('Failed to fetch LLM config:', e);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    fetchLLMConfig();
     // Check if Angel One is configured before connecting WS
     fetch('/api/angel/status').then(r => r.json()).then(status => {
         if (status.connected || status.authenticated) {
@@ -10425,7 +10461,7 @@ function setupChatDrawer() {
         </div>
         <div class="meta-item">
             <span class="meta-label">Platform Engine</span>
-            <span class="meta-value">Groq Llama 3 Synthesis</span>
+            <span class="meta-value">AI Executive Synthesis</span>
         </div>
     </div>
 
@@ -10561,7 +10597,7 @@ async function fetchAndRenderStockSynthesis(symbol) {
         console.error("Synthesis load error:", e);
         if (triggerText) triggerText.innerText = "Error";
         if (reportTextEl) {
-            reportTextEl.innerHTML = `<span class="red-text" style="font-size: 12px;">Failed to compile AI equities synthesis: ${e.message}. Please verify Groq API configurations.</span>`;
+            reportTextEl.innerHTML = `<span class="red-text" style="font-size: 12px;">Failed to compile AI equities synthesis: ${e.message}. Please verify API configurations.</span>`;
         }
     }
 }
@@ -22401,10 +22437,10 @@ async function executeNLRuleScan() {
 
     showLoader(
         "AI Scan Command Radar",
-        "Groq Copilot is parsing prompt requirements and compiling logic conditions...",
+        ((window.llmConfig ? window.llmConfig.fast_label : "AI Copilot") + " is parsing prompt requirements and compiling logic conditions..."),
         true,
         [
-            { threshold: 15, msg: `[INFO] Sending query prompt to Groq LLM: "${prompt}"...`, color: '#38bdf8' },
+            { threshold: 15, msg: `[INFO] Sending query prompt to AI: "${prompt}"...`, color: '#38bdf8' },
             { threshold: 30, msg: "[INFO] Parsing NLP tokens and mapping fields...", color: '#f59e0b' },
             { threshold: 45, msg: "[INFO] Resolving cap type and logic parameters...", color: '#a855f7' }
         ]
@@ -26922,7 +26958,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
 
                 } catch (e) {
                     console.error("AI Rotation analysis query failed:", e);
-                    aiContent.innerHTML = `<span style="color: var(--neon-red);">Failed to query AI Rotational intelligence. Please verify your Groq API key: ${e.message}</span>`;
+                    aiContent.innerHTML = `<span style="color: var(--neon-red);">Failed to query AI Rotational intelligence. Please verify your API key: ${e.message}</span>`;
                 } finally {
                     if (aiSpinner) aiSpinner.style.display = 'none';
                     aiBtn.removeAttribute('disabled');
@@ -28068,7 +28104,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
             runAiBtn.disabled = true;
             runAiBtn.innerHTML = `<span>⏳ Synthesizing Report...</span>`;
             if (aiResult) {
-                aiResult.innerHTML = `<p style="margin: 0; color: var(--text-secondary); font-style: italic;">🤖 Quantitative agent connecting to Groq LLM. Parsing covariance matrix and trade tickets...</p>`;
+                aiResult.innerHTML = `<p style="margin: 0; color: var(--text-secondary); font-style: italic;">🤖 Quantitative agent connecting to AI. Parsing covariance matrix and trade tickets...</p>`;
             }
 
             try {
@@ -28145,7 +28181,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                 console.error("AI Rebalancing Synthesis failed: ", err);
                 showToast("Failed to generate AI Rebalancing Report.", "error");
                 if (aiResult) {
-                    aiResult.innerHTML = `<p style="margin: 0; color: #ef4444; font-style: italic;">⚠️ AI generation failed. Verify Groq API connection or model availability.</p>`;
+                    aiResult.innerHTML = `<p style="margin: 0; color: #ef4444; font-style: italic;">⚠️ AI generation failed. Verify API connection or model availability.</p>`;
                 }
             } finally {
                 runAiBtn.disabled = false;
@@ -28173,7 +28209,7 @@ async function loadPortfolioNewsImpact(symbol, forceRefresh = false, runLLM = fa
     if (!newsFeed) return;
 
     // Show dynamic loaders
-    const loaderMsg = runLLM ? "Scraping news via Jina Reader & correlating with Groq Llama 3..." : "Fetching live RSS catalog...";
+    const loaderMsg = runLLM ? "Scraping news via Jina Reader & correlating with AI..." : "Fetching live RSS catalog...";
     newsFeed.innerHTML = `
         <div style="padding:40px; text-align: center; width: 100%; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 12px;">
             <div class="loader-spinner" style="border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid var(--color-primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; box-sizing: border-box;"></div>
@@ -28210,9 +28246,9 @@ async function loadPortfolioNewsImpact(symbol, forceRefresh = false, runLLM = fa
         if (newsDiagnostics) {
             if (data.has_audit) {
                 const timeStr = data.updated_at ? data.updated_at.split(' ')[1] : "";
-                newsDiagnostics.innerText = `Engine: Groq Llama 3 | Refreshed: ${timeStr || "Just Now"}`;
+                newsDiagnostics.innerText = `Engine: " + (window.llmConfig ? window.llmConfig.fast_label : "AI") + " | Refreshed: ${timeStr || "Just Now"}`;
             } else {
-                newsDiagnostics.innerText = "Engine: RSS | Groq Audit Pending";
+                newsDiagnostics.innerText = "Engine: RSS | AI Audit Pending";
             }
         }
 
@@ -28253,7 +28289,7 @@ async function loadPortfolioNewsImpact(symbol, forceRefresh = false, runLLM = fa
                 }
                 newsSentimentDesc.innerHTML = `Consensus: <strong>${descText}</strong>`;
             } else {
-                newsSentimentDesc.innerHTML = `Consensus: <strong>AI Sentiment Audit is available for this ticker. Click 'Run Groq Audit' below to analyze.</strong>`;
+                newsSentimentDesc.innerHTML = `Consensus: <strong>AI Sentiment Audit is available for this ticker. Click 'Run AI Audit' below to analyze.</strong>`;
             }
         }
 
@@ -28281,13 +28317,13 @@ async function loadPortfolioNewsImpact(symbol, forceRefresh = false, runLLM = fa
                     <span style="font-size: 20px;">🤖</span>
                     <div>
                         <strong style="display: block; font-size: 12.5px; color: var(--text-primary); font-family: 'Outfit', sans-serif;">AI Sentiment Audit Available</strong>
-                        <span style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px; line-height: 1.4;">Extract driver catalysts, sentiment scoring, and price anomaly correlation via Groq LLM & Jina Reader.</span>
+                        <span style="display: block; font-size: 10.5px; color: var(--text-muted); margin-top: 2px; line-height: 1.4;">Extract driver catalysts, sentiment scoring, and price anomaly correlation via AI & Jina Reader.</span>
                     </div>
                 </div>
                 <button id="run-groq-audit-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #ffffff; border: none; padding: 7px 14px; font-size: 11px; font-weight: 700; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3); white-space: nowrap; font-family: 'Outfit', sans-serif;"
                         onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(124, 58, 237, 0.5)';"
                         onmouseout="this.style.transform='none'; this.style.boxShadow='0 2px 8px rgba(124, 58, 237, 0.3)';">
-                    <span>✨</span> Run Groq Audit
+                    <span>✨</span> Run AI Audit
                 </button>
             `;
             newsFeed.appendChild(banner);
@@ -28479,7 +28515,7 @@ async function loadGlobalMarketNews(forceRefresh = false, runLLM = false) {
     if (!newsFeed) return;
 
     // Show dynamic loader
-    const loaderMsg = runLLM ? "Generating AI Market consensus briefing via Groq Llama 3..." : "Aggregating news from ET, LiveMint, Business Standard & Yahoo Finance...";
+    const loaderMsg = runLLM ? "Generating AI Market consensus briefing via AI..." : "Aggregating news from ET, LiveMint, Business Standard & Yahoo Finance...";
     newsFeed.innerHTML = `
         <div style="padding:40px; text-align: center; width: 100%; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 12px;">
             <div class="loader-spinner" style="border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid var(--color-primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; box-sizing: border-box;"></div>

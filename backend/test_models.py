@@ -1269,7 +1269,7 @@ class TestAlertsEnhancements(unittest.TestCase):
             self.assertEqual(alert["triggered"], 1 if expected_trigger else 0,
                              f"Alert {cond} with value {val} trigger state mismatch: expected {expected_trigger}, got {alert['triggered']}")
 
-    @patch("backend.agent.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_parse_natural_language_prompt(self, mock_call_llm):
         """Verifies parsing of plain English alert builder request."""
         mock_call_llm.return_value = '{"ticker_query": "RELIANCE", "condition_type": "PRICE", "operator": ">", "value": "3500"}'
@@ -1284,7 +1284,7 @@ class TestAlertsEnhancements(unittest.TestCase):
         self.assertEqual(data["operator"], ">")
         self.assertEqual(data["value"], "3500")
 
-    @patch("backend.agent.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     @patch("backend.main.get_complete_financial_profile")
     @patch("backend.main.fetch_history_df")
     def test_alerts_contextual_warning_generation(self, mock_fetch_history, mock_get_profile, mock_call_llm):
@@ -1450,7 +1450,7 @@ class TestRuleScannerAPI(unittest.TestCase):
 
     # ─── NL Prompt Parsing Tests ────────────────────────────────────────
 
-    @patch("backend.agent.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_parse_nl_scan_rsi_prompt(self, mock_llm):
         """Verifies NL parser correctly extracts RSI condition from plain English."""
         mock_llm.return_value = json.dumps({
@@ -1471,7 +1471,7 @@ class TestRuleScannerAPI(unittest.TestCase):
         self.assertEqual(data["value"], "35")
         self.assertEqual(data["universe"], "mid")
 
-    @patch("backend.agent.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_parse_nl_scan_golden_cross(self, mock_llm):
         """Verifies NL parser correctly extracts DMA_CROSS condition from crossover prompt."""
         mock_llm.return_value = '```json\n{"condition_type": "DMA_CROSS", "operator": ">", "value": "0.0", "universe": "large"}\n```'
@@ -1485,7 +1485,7 @@ class TestRuleScannerAPI(unittest.TestCase):
         self.assertEqual(data["operator"], ">")
         self.assertEqual(data["universe"], "large")
 
-    @patch("backend.agent.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_parse_nl_scan_handles_markdown_wrapping(self, mock_llm):
         """Verifies NL parser strips markdown code fences from LLM response."""
         mock_llm.return_value = '```json\n{"condition_type": "PE", "operator": "<", "value": "15", "universe": "all"}\n```'
@@ -1688,7 +1688,7 @@ class TestRuleScannerAPI(unittest.TestCase):
 
     # ─── Synthesis Tests ────────────────────────────────────────────────
 
-    @patch("backend.agent.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_scan_synthesis_generation(self, mock_llm):
         """Verifies AI synthesis endpoint generates a summary from scan results."""
         mock_llm.return_value = "The RSI < 30 scan reveals concentration in the Technology sector with INFY showing deep oversold momentum at RSI 28. Valuation remains attractive at PE 22 with strong institutional sentiment reflected in the BUY rating."
@@ -1705,7 +1705,7 @@ class TestRuleScannerAPI(unittest.TestCase):
         self.assertIn("Technology", data["synthesis"])
         self.assertIn("RSI", data["synthesis"])
 
-    @patch("backend.agent.call_groq_llm")
+    @patch("backend.llm_config.call_llm")
     def test_scan_synthesis_truncates_to_20_results(self, mock_llm):
         """Verifies synthesis endpoint caps input to 20 results maximum."""
         mock_llm.return_value = "Large scan synthesis."
@@ -1719,7 +1719,7 @@ class TestRuleScannerAPI(unittest.TestCase):
 
         # Verify the LLM was called with at most 20 results in the prompt
         call_args = mock_llm.call_args
-        user_prompt = call_args[0][1]
+        user_prompt = call_args[0][2]
         stock_lines = [line for line in user_prompt.split("\n") if line.strip().startswith("- STOCK")]
         self.assertLessEqual(len(stock_lines), 20)
 

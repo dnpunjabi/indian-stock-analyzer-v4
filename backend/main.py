@@ -525,7 +525,8 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 # Import analytical and agent engines
 from backend.financial_utils import get_complete_financial_profile, resolve_company_ticker, calculate_portfolio_backtest, calculate_dcf_valuation
-from backend.agent import run_cio_parent_agent, run_ai_stock_screener, run_comparison_synthesizer, run_conversational_chat, run_portfolio_doctor, call_groq_llm, run_single_stock_audit, generate_backtest_synthesis, calculate_portfolio_taxes
+from backend.agent import run_cio_parent_agent, run_ai_stock_screener, run_comparison_synthesizer, run_conversational_chat, run_portfolio_doctor, run_single_stock_audit, generate_backtest_synthesis, calculate_portfolio_taxes
+from backend.llm_config import call_llm, TASK_HEAVY, TASK_FAST, get_llm_config
 
 # Angel One SmartAPI — Real-time WebSocket streaming (optional)
 from backend.angel_connect import AngelOneConnector
@@ -1467,6 +1468,11 @@ async def shutdown_cleanup():
     stop_angel_upstream()
     logger.info("Application shutdown: Angel One WebSocket stopped.")
 
+@app.get("/api/llm-config")
+async def get_llm_configuration():
+    """Retrieve LLM configuration parameters to display active models on the frontend."""
+    return get_llm_config()
+
 @app.post("/api/admin/rebalance")
 async def trigger_index_rebalance():
     """Manual administration endpoint to fetch official NSE index constituent listings."""
@@ -1831,7 +1837,7 @@ async def analyze_sector_regime_ai(data: AISectorAnalysisRequest):
     try:
         from datetime import datetime
         import yfinance as yf
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         
         # 1. Fetch current standings
         with get_db() as conn:
@@ -1978,7 +1984,7 @@ async def analyze_sector_regime_ai(data: AISectorAnalysisRequest):
         """
         
         # 7. Call LLM
-        response_text = call_groq_llm(system_prompt, user_prompt, max_tokens=2000)
+        response_text = call_llm(TASK_FAST, system_prompt, user_prompt, max_tokens=2000)
         
         # Parse Response
         if "ERROR_401" in response_text or "ERROR:" in response_text:
@@ -2057,7 +2063,7 @@ async def chat_sector_regime_ai(data: AISectorChatRequest):
     Provides context-aware analysis based on current radar standings.
     """
     try:
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         
         system_prompt = (
             "You are the Chief Investment Officer (CIO) of a leading quantitative Indian equity fund.\n"
@@ -2080,7 +2086,7 @@ async def chat_sector_regime_ai(data: AISectorChatRequest):
                 
         messages.append({"role": "user", "content": data.question})
         
-        response_text = call_groq_llm(system_prompt, messages=messages, max_tokens=1000)
+        response_text = call_llm(TASK_FAST, system_prompt, messages=messages, max_tokens=1000)
         
         if "ERROR_401" in response_text or "ERROR:" in response_text:
             # Fallback reply
@@ -2728,7 +2734,7 @@ async def get_indicator_synthesis(
         atr_val = round(float(np.mean(tr[-14:])), 2)
         
         from backend.swing_utils import calculate_trendlines_with_breaks, calculate_mxwll_suite, calculate_lux_smc
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         
         system_prompt = (
             "You are a professional Technical Analyst and Senior Market Strategist specializing in the Indian Stock Markets.\n"
@@ -2877,7 +2883,7 @@ async def get_indicator_synthesis(
         
         user_prompt = "\n".join(user_prompt_parts)
         
-        synthesis = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
+        synthesis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
         return {
             "symbol": ticker,
             "indicator": indicator,
@@ -3434,7 +3440,7 @@ async def get_synthesis(
 {verdict_matrix_md}
         """
  
-        synthesis_text = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
+        synthesis_text = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
  
         # Failsafe programmatic fallback if LLM is unavailable or errors
         if "ERROR" in synthesis_text or not synthesis_text.strip():
@@ -3814,7 +3820,7 @@ async def get_pitchbook(
         - News headlines: {json.dumps(profile.get('news', [])[:3], indent=2)}
         """
 
-        markdown_memo = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
+        markdown_memo = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
         
         # Rule-based fallback if API is unavailable or limits exceeded
         if "ERROR" in markdown_memo or not markdown_memo.strip():
@@ -3934,7 +3940,7 @@ async def set_alert(data: AlertRequest):
 async def parse_nl_alert(data: ParseNLAlertRequest):
     """Parses a plain English prompt into a structured SQLite alert rule using Groq LLM."""
     try:
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         from backend.financial_utils import resolve_company_ticker
 
         fallback_context = ""
@@ -3988,7 +3994,7 @@ async def parse_nl_alert(data: ParseNLAlertRequest):
             "}"
         )
 
-        response = await asyncio.to_thread(call_groq_llm, sys_prompt, data.prompt)
+        response = await asyncio.to_thread(call_llm, TASK_FAST, sys_prompt, data.prompt)
         response = response.strip()
         if response.startswith("```json"):
             response = response[7:]
@@ -4466,7 +4472,7 @@ async def check_alerts():
                 # Generate AI Contextual Warning
                 ai_context = ""
                 try:
-                    from backend.agent import call_groq_llm
+                    from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
                     price_info = f"Current Price: Rs. {price_val:.2f}" if 'price_val' in locals() else ""
                     rsi_info = f"RSI: {t['technicals']['rsi']:.1f}" if 't' in locals() and 'rsi' in t['technicals'] else ""
                     sma_info = f"SMA200: Rs. {t['technicals']['sma_200']:.2f}" if 't' in locals() and 'sma_200' in t['technicals'] else ""
@@ -4485,7 +4491,7 @@ async def check_alerts():
                     )
                     
                     # Call LLM
-                    ai_context = await asyncio.to_thread(call_groq_llm, sys_prompt, user_prompt)
+                    ai_context = await asyncio.to_thread(call_llm, TASK_FAST, sys_prompt, user_prompt)
                     ai_context = ai_context.strip().strip('"').strip("'").strip()
                 except Exception as ai_err:
                     print(f"Failed to generate AI alert warning context: {ai_err}")
@@ -5711,7 +5717,7 @@ async def run_portfolio_stress_test(data: StressTestRequest):
             })
             
         # 2. Run LLM scenario simulation using Groq
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         
         system_prompt = (
             "You are an expert macroeconomic strategist and risk auditor for a major Indian hedge fund.\n"
@@ -5737,7 +5743,7 @@ async def run_portfolio_stress_test(data: StressTestRequest):
         {json.dumps(portfolio_summary, indent=2)}
         """
         
-        response_text = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt, max_tokens=1500)
+        response_text = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt, max_tokens=1500)
         
         # Parse JSON from response
         try:
@@ -5968,7 +5974,7 @@ class RiskSynthesisRequest(BaseModel):
 @app.post("/api/analyze/risk-synthesis")
 async def post_risk_synthesis(data: RiskSynthesisRequest):
     try:
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         
         system_prompt = (
             "You are an institutional-grade risk analyst and portfolio manager. "
@@ -5993,7 +5999,7 @@ async def post_risk_synthesis(data: RiskSynthesisRequest):
             f"the investor's risk profile and time horizon, and what action or warning checks do you recommend?"
         )
         
-        synthesis = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
+        synthesis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
         return {"synthesis": synthesis}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Risk Synthesis Error: {str(e)}")
@@ -6410,7 +6416,7 @@ class OptimizerSynthesisRequest(BaseModel):
 @app.post("/api/portfolio/optimizer-synthesis")
 async def post_optimizer_synthesis(data: OptimizerSynthesisRequest):
     try:
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         
         system_prompt = (
             "You are an elite quantitative portfolio manager and investment strategist. "
@@ -6443,7 +6449,7 @@ async def post_optimizer_synthesis(data: OptimizerSynthesisRequest):
             f"and warning metrics to watch in the current macro regime."
         )
         
-        synthesis = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
+        synthesis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
         return {"synthesis": synthesis}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Optimizer Synthesis Error: {str(e)}")
@@ -6569,7 +6575,7 @@ def fetch_jina_markdown(url: str) -> str:
 
 
 def run_groq_news_sentiment_analysis(symbol: str, news_list: list, anomalies_list: list) -> dict:
-    from backend.agent import call_groq_llm
+    from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
     import json
     
     system_prompt = (
@@ -6624,7 +6630,7 @@ def run_groq_news_sentiment_analysis(symbol: str, news_list: list, anomalies_lis
         f"Also calculate the aggregated overall sentiment_index rating from 0 to 100 based on all articles."
     )
     
-    raw_response = call_groq_llm(system_prompt, user_prompt, max_tokens=1500)
+    raw_response = call_llm(TASK_FAST, system_prompt, user_prompt, max_tokens=1500)
     
     try:
         clean_json = raw_response.strip()
@@ -7739,7 +7745,7 @@ async def post_swing_synthesis(data: SwingSynthesisRequest):
     Runs a swing or position strategist analysis using Groq Llama 3 on-demand.
     """
     try:
-        from backend.main import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         horizon_label = "Medium-Term Position Trading" if data.horizon == "medium" else "Short-Term Tactical Swing"
         backtest_label = "365-Day Strategy Simulation Backtest" if data.horizon == "medium" else "90-Day Strategy Simulation Backtest"
         atr_multiplier = "3x" if data.horizon == "medium" else "2x"
@@ -7793,7 +7799,7 @@ async def post_swing_synthesis(data: SwingSynthesisRequest):
                 f"Average Holding Time: {data.backtest_holddays} days\n"
             )
         
-        synthesis = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
+        synthesis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
         
         if "ERROR" in synthesis or not synthesis.strip():
             setup_word = "position" if data.horizon == "medium" else "swing"
@@ -8063,7 +8069,7 @@ async def get_stock_volume_dynamics(symbol: str, generate_ai: bool = False):
             poc_price = max_bin["price"]
             
         # 8. Call LLM for dynamic institutional summary
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         
         system_prompt = (
             "You are an expert institutional Chartist and Volume Spread Analysis (VSA) Auditor specializing in the Indian stock market. "
@@ -8103,7 +8109,7 @@ async def get_stock_volume_dynamics(symbol: str, generate_ai: bool = False):
         is_local_summary = True
         if generate_ai:
             try:
-                ai_summary = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
+                ai_summary = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
                 if ai_summary and "ERROR" not in ai_summary.upper():
                     is_local_summary = False
             except Exception as llm_err:
@@ -8142,7 +8148,7 @@ async def get_stock_volume_dynamics(symbol: str, generate_ai: bool = False):
 async def parse_nl_scan(data: ParseNLScanRequest):
     """Parses a plain English scanning prompt into structured scanner parameters using Groq LLM."""
     try:
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
 
         sys_prompt = (
             "You are an expert financial system developer parsing plain English stock scanning requests into structured JSON rules.\n"
@@ -8200,7 +8206,7 @@ async def parse_nl_scan(data: ParseNLScanRequest):
             "}"
         )
 
-        response = await asyncio.to_thread(call_groq_llm, sys_prompt, data.prompt)
+        response = await asyncio.to_thread(call_llm, TASK_FAST, sys_prompt, data.prompt)
         response = response.strip()
         if response.startswith("```json"):
             response = response[7:]
@@ -8236,7 +8242,7 @@ async def get_telemetry_synthesis(data: TelemetrySynthesisRequest):
     and its calculated proximity margin.
     """
     try:
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         system_prompt = (
             "You are an expert institutional risk desk manager and quantitative analyst specializing in the Indian stock market. "
             "Your job is to provide a highly professional, 1-2 sentence AI synthesis explaining the immediate momentum, risk, "
@@ -8251,7 +8257,7 @@ async def get_telemetry_synthesis(data: TelemetrySynthesisRequest):
             f"Proximity Calculation: {data.proximity}\n\n"
             f"Generate a 1-2 sentence institutional risk/momentum summary for this proximity setup."
         )
-        synthesis = await asyncio.to_thread(call_groq_llm, system_prompt, user_prompt)
+        synthesis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
         return {"synthesis": synthesis.strip()}
     except Exception as e:
         import traceback
@@ -8706,7 +8712,7 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
 async def scan_synthesis(data: ScanSynthesisRequest):
     """Generates an AI analyst synthesis summary for rule scanner results using Groq."""
     try:
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
 
         top_results = data.results[:20]
         results_text = "\n".join([
@@ -8727,7 +8733,7 @@ async def scan_synthesis(data: ScanSynthesisRequest):
             f"Top matching stocks:\n{results_text}"
         )
 
-        summary = await asyncio.to_thread(call_groq_llm, sys_prompt, user_prompt)
+        summary = await asyncio.to_thread(call_llm, TASK_FAST, sys_prompt, user_prompt)
         return {"status": "success", "synthesis": summary.strip()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Synthesis generation failed: {str(e)}")
@@ -8744,7 +8750,7 @@ async def explain_formula(data: ExplainFormulaRequest):
         except Exception as pe:
             raise HTTPException(status_code=400, detail=f"Formula Syntax Error: {str(pe)}")
             
-        from backend.agent import call_groq_llm
+        from backend.llm_config import call_llm, TASK_FAST, TASK_HEAVY
         
         sys_prompt = (
             "You are a professional quantitative finance and technical analysis expert.\n"
@@ -8754,7 +8760,7 @@ async def explain_formula(data: ExplainFormulaRequest):
         
         user_prompt = f"Stock Scanner Formula:\n{data.formula}"
         
-        explanation = await asyncio.to_thread(call_groq_llm, sys_prompt, user_prompt)
+        explanation = await asyncio.to_thread(call_llm, TASK_FAST, sys_prompt, user_prompt)
         return {"status": "success", "explanation": explanation.strip()}
     except HTTPException as he:
         raise he
@@ -9403,7 +9409,7 @@ async def learning_scenario(req: LearningScenarioRequest):
 
     try:
         response = await asyncio.to_thread(
-            call_groq_llm,
+            call_llm,
             system_prompt,
             user_prompt,
             max_tokens=1500
@@ -9468,7 +9474,7 @@ async def learning_ask(req: LearningAskRequest):
 
     try:
         response = await asyncio.to_thread(
-            call_groq_llm,
+            call_llm,
             system_prompt,
             user_prompt,
             max_tokens=1500
