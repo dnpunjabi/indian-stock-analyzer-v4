@@ -792,10 +792,6 @@ function updatePortfolioLedgerRealtime(ticksData) {
         }
     });
 
-    // Case Study button
-    const caseBtn = document.getElementById('academy-generate-scenario-btn');
-    if (caseBtn) caseBtn.addEventListener('click', generateAcademyCaseStudy);
-
     // Responsive chart resizing
     let academyResizeTimeout;
     window.addEventListener('resize', () => {
@@ -1831,14 +1827,6 @@ function resetWorkspace() {
     }
     activeStockProfile = null;
     chatHistory = [];
-    const chatMessagesBox = document.getElementById('chat-messages');
-    if (chatMessagesBox) {
-        chatMessagesBox.innerHTML = '';
-    }
-    const headerCard = document.getElementById('chat-header-stock-card');
-    if (headerCard) {
-        headerCard.style.display = 'none';
-    }
 
     // Close mobile menu sidebar if open
     const sidebar = document.getElementById('sidebar');
@@ -4073,47 +4061,6 @@ async function loadStockAnalyzer(query, force_llm = false) {
         }
         wsSubscribeSymbols([profile.ticker]);
         chatHistory = [];
-
-        // Render Stock Card Header inside Chat Panel
-        const headerCard = document.getElementById('chat-header-stock-card');
-        const headerTicker = document.getElementById('chat-header-ticker');
-        const headerName = document.getElementById('chat-header-name');
-        const headerPrice = document.getElementById('chat-header-price');
-        const headerLatency = document.getElementById('chat-header-latency');
-        if (headerCard && headerTicker && headerName && headerPrice && headerLatency) {
-            headerTicker.innerText = profile.ticker;
-            headerName.innerText = profile.company_name;
-            headerPrice.innerText = 'Rs. ' + profile.fundamentals.current_price;
-            headerLatency.innerText = 'Latency: --';
-            headerCard.style.display = 'flex';
-        }
-
-        // Clear chat container and render welcome message + dynamic pills
-        const chatMessagesBox = document.getElementById('chat-messages');
-        if (chatMessagesBox) {
-            chatMessagesBox.innerHTML = `
-                <div class="chat-message assistant">
-                    <div class="copilot-chat-intro">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 700; color: var(--text-primary); font-family: 'Outfit', sans-serif; font-size: 11px; letter-spacing: 0.03em;">
-                            <span>👨‍✈️</span> CO-PILOT CHAT ONLINE
-                        </div>
-                        Hello! I am your Equities AI Co-Pilot for <strong>${profile.company_name} (${profile.ticker})</strong>. Ask me anything about its valuation, solvency limits, or technical entries!
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Render dynamic interactive pills inside the suggestions container
-        const suggestionsContainer = document.querySelector('.chat-suggested-prompts');
-        if (suggestionsContainer) {
-            suggestionsContainer.innerHTML = `
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Check WACC & DCF valuation parameters')">💡 DCF Value</button>
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Analyze technical moving averages and RSI support levels')">📈 Technical Entry</button>
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Add this stock to my watchlist')">📥 Add to Watchlist</button>
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Create a price alert when the price crosses SMA-50')">🔔 Create Price Alert</button>
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Analyze recent catalyst news sentiment and red flags')">📰 News Sentiment</button>
-            `;
-        }
 
         // Reset dynamic chart select values to default when loading a new stock
         const chartPeriodEl = document.getElementById('chart-period');
@@ -10058,94 +10005,12 @@ function setupChatDrawer() {
         if (e.key === 'Enter') sendUserChatMessage();
     });
 
-    // Wire up Voice Input (Speech-to-Text)
-    const micBtn = document.getElementById('chat-mic-btn');
-    let isRecording = false;
-    let recognition = null;
-    
-    if (micBtn) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            micBtn.style.display = 'none';
-        } else {
-            recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.lang = 'en-IN';
-            
-            recognition.onstart = () => {
-                isRecording = true;
-                micBtn.innerText = '🔴';
-                micBtn.style.background = 'rgba(239, 68, 68, 0.2)';
-                micBtn.style.borderColor = 'rgba(239, 68, 68, 0.5)';
-                showToast("Voice input active. Speak your question...", "info");
-            };
-            
-            recognition.onend = () => {
-                isRecording = false;
-                micBtn.innerText = '🎤';
-                micBtn.style.background = 'rgba(255, 255, 255, 0.04)';
-                micBtn.style.borderColor = 'var(--border-glass)';
-            };
-            
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                const input = document.getElementById('chat-user-input');
-                if (input && transcript) {
-                    input.value = transcript;
-                    showToast("Speech recognized successfully.", "success");
-                }
-            };
-            
-            recognition.onerror = (e) => {
-                console.error("Speech recognition error:", e);
-                showToast("Speech recognition error: " + e.error, "error");
-            };
-            
-            micBtn.onclick = () => {
-                if (isRecording) {
-                    recognition.stop();
-                } else {
-                    recognition.start();
-                }
-            };
-        }
-    }
-
-    // Wire up Transcript Export
-    const exportBtn = document.getElementById('chat-export-btn');
-    if (exportBtn) {
-        exportBtn.onclick = () => {
-            if (!activeStockProfile || chatHistory.length === 0) {
-                showToast("No active conversation transcript to export.", "info");
-                return;
-            }
-            let text = `# AI Co-Pilot Transcript: ${activeStockProfile.company_name} (${activeStockProfile.ticker})\n\n`;
-            chatHistory.forEach(msg => {
-                const roleName = msg.role === 'user' ? 'Investor' : 'AI Co-Pilot';
-                text += `## [${roleName}]\n${msg.content}\n\n`;
-            });
-            
-            const blob = new Blob([text], { type: 'text/markdown;charset=utf-8;' });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", `copilot_transcript_${activeStockProfile.ticker.replace(".NS", "")}.md`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            showToast("Transcript exported successfully.", "success");
-        };
-    }
-
-    // Global helper for prompt suggestions
-    window.triggerPillAction = function(text) {
-        const input = document.getElementById('chat-user-input');
-        if (input) {
-            input.value = text;
+    document.querySelectorAll('.chat-prompt-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            document.getElementById('chat-user-input').value = pill.innerText;
             sendUserChatMessage();
-        }
-    };
+        });
+    });
 
     // Overhaul state machine tabs navigation
     const tabSynthesis = document.getElementById('tab-drawer-synthesis');
@@ -11066,7 +10931,6 @@ async function sendUserChatMessage() {
     chatHistory.push({ role: 'user', content: message });
 
     const typingId = appendChatMessage('assistant', 'Consulting AI stock advisor...');
-    const startTime = performance.now();
 
     try {
         const payload = {
@@ -11083,13 +10947,6 @@ async function sendUserChatMessage() {
 
         if (!response.ok) throw new Error("Chat transmission failed.");
         const data = await response.json();
-
-        // Calculate latency and update UI badge
-        const latencyMs = ((performance.now() - startTime) / 1000).toFixed(2);
-        const headerLatency = document.getElementById('chat-header-latency');
-        if (headerLatency) {
-            headerLatency.innerText = `Latency: ${latencyMs}s`;
-        }
 
         const chatReplyText = data.response || "No response received from Equities Advisor.";
         document.getElementById(typingId).remove();
@@ -11176,42 +11033,13 @@ function appendChatMessage(role, content) {
     msg.className = `chat-message ${role}`;
 
     if (role === 'assistant') {
-        // Escape HTML to prevent XSS but allow markdown formatting & tables
+        // Escape HTML to prevent XSS but allow specific markdown formatting
         let escaped = content
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
 
-        // Parse markdown tables dynamically
-        const lines = escaped.split('\n');
-        let inTable = false;
-        let tableHtml = '';
-        let parsedLines = [];
-        
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i].trim();
-            if (line.startsWith('|') && line.endsWith('|')) {
-                if (line.replace(/[\s\-|:|]/g, '') === '') {
-                    continue;
-                }
-                inTable = true;
-                const cells = line.split('|').slice(1, -1).map(c => c.trim());
-                const cellTag = tableHtml === '' ? 'th' : 'td';
-                tableHtml += '<tr>' + cells.map(c => `<${cellTag} style="padding: 6px 10px; border: 1px solid rgba(255,255,255,0.06);">${c}</${cellTag}>`).join('') + '</tr>';
-            } else {
-                if (inTable) {
-                    parsedLines.push(`<table class="synthesis-markdown-table" style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; background: rgba(0,0,0,0.15); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.04);">${tableHtml}</table>`);
-                    tableHtml = '';
-                    inTable = false;
-                }
-                parsedLines.push(lines[i]);
-            }
-        }
-        if (inTable) {
-            parsedLines.push(`<table class="synthesis-markdown-table" style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; background: rgba(0,0,0,0.15); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.04);">${tableHtml}</table>`);
-        }
-
-        let formatted = parsedLines.join('\n')
+        let formatted = escaped
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/### (.*?)(?:\n|$)/g, '<h3>$1</h3>')
             .replace(/\* (.*?)(?:\n|$)/g, '<li>$1</li>')
@@ -11222,30 +11050,7 @@ function appendChatMessage(role, content) {
             formatted = formatted.replace(/(<li>.*?<\/li>)/gs, '<ul>$1</ul>');
         }
 
-        msg.innerHTML = `
-            <div style="display: flex; justify-content: space-between; gap: 8px; width: 100%;">
-                <div class="chat-message-text" style="flex-grow: 1;">${formatted}</div>
-                <button class="chat-speech-btn" style="background: transparent; border: none; cursor: pointer; opacity: 0.6; align-self: flex-start; padding: 2px;" title="Listen to response">🔊</button>
-            </div>
-        `;
-
-        // Wire up dynamic text-to-speech triggers
-        setTimeout(() => {
-            const speechBtn = msg.querySelector('.chat-speech-btn');
-            if (speechBtn) {
-                speechBtn.onclick = () => {
-                    if (typeof speakNarrative === 'function') {
-                        const temp = document.createElement("div");
-                        temp.innerHTML = formatted;
-                        const plainText = temp.innerText || temp.textContent;
-                        speakNarrative(plainText);
-                    } else {
-                        const utterance = new SpeechSynthesisUtterance(content);
-                        window.speechSynthesis.speak(utterance);
-                    }
-                };
-            }
-        }, 50);
+        msg.innerHTML = `<p>${formatted}</p>`;
     } else {
         msg.innerText = content;
     }
@@ -14068,6 +13873,7 @@ function updateLightweightChartsThemeColors() {
     applyToLightweightChart(window.activeLightweightChart);
     applyToLightweightChart(window.activeFibLightweightChart);
     applyToLightweightChart(activeTVWorkstationChart);
+    applyToLightweightChart(window.activeAcademyLightweightChart);
 
     if (window.activeVolatilityLightweightCharts) {
         applyToLightweightChart(window.activeVolatilityLightweightCharts.bb);
@@ -28853,14 +28659,14 @@ const ACADEMY_CATALOG = [
 {id:'rsi',cat:'technical',emoji:'📊',title:'RSI (Relative Strength Index)',
  explanation:`<h5>What is RSI?</h5><p>The Relative Strength Index (RSI) is a momentum oscillator that measures the speed and magnitude of recent price changes to evaluate overbought or oversold conditions. Developed by J. Welles Wilder Jr. in 1978, it oscillates between 0 and 100.</p><h5>Interpretation Rules</h5><ul><li><b>RSI > 70</b> — Overbought (potential reversal down)</li><li><b>RSI < 30</b> — Oversold (potential reversal up)</li><li><b>RSI 40–60</b> — Neutral zone</li><li>Divergence between RSI and price signals trend exhaustion</li></ul><div class="academy-example-box">📌 <b>Example:</b> If Reliance Industries RSI drops to 25 after a sharp sell-off, it signals extreme oversold conditions — a potential bounce candidate for swing traders.</div>`,
  formula:`<div class="academy-formula-block">RSI = 100 − (100 / (1 + RS))</div><p>Where:</p><ul class="academy-formula-vars"><li><b>RS</b> = Average Gain over N periods / Average Loss over N periods</li><li><b>N</b> = Lookback period (default 14)</li><li>First RS uses simple average; subsequent values use exponential smoothing</li></ul>`,
- sandbox:{inputs:[{label:'Average Gain',key:'avgGain',val:1.5},{label:'Average Loss',key:'avgLoss',val:1.0}],calc:(v)=>{const rs=v.avgGain/Math.max(v.avgLoss,0.0001);return `RSI = ${(100-(100/(1+rs))).toFixed(2)}`;}},
+ sandbox:{inputs:[{label:'RSI Period',key:'length',val:14},{label:'Overbought level',key:'overbought',val:70},{label:'Oversold level',key:'oversold',val:30}],calc:(v)=>`RSI Period: ${v.length} | Overbought: ${v.overbought}% | Oversold: ${v.oversold}%`},
  quiz:[{q:'An RSI reading of 25 typically indicates:',opts:['Overbought','Oversold','Neutral','No signal'],ans:1},{q:'The default RSI period is:',opts:['7','14','21','50'],ans:1},{q:'RSI divergence occurs when:',opts:['Price and RSI move together','Price makes new high but RSI does not','RSI stays at 50','Volume increases'],ans:1}],
  chartType:'line',chartLabel:'RSI Value',chartData:[45,52,58,62,71,74,68,55,42,35,28,32,40,48,55,60,65,72,78,70,62,55,48,42,38]},
 
 {id:'macd',cat:'technical',emoji:'📈',title:'MACD (Moving Average Convergence Divergence)',
  explanation:`<h5>What is MACD?</h5><p>MACD is a trend-following momentum indicator that shows the relationship between two exponential moving averages of a security's price. It consists of the MACD line, signal line, and histogram.</p><h5>Components</h5><ul><li><b>MACD Line</b> = 12-period EMA − 26-period EMA</li><li><b>Signal Line</b> = 9-period EMA of MACD Line</li><li><b>Histogram</b> = MACD Line − Signal Line</li></ul><h5>Trading Signals</h5><ul><li><b>Bullish Crossover:</b> MACD crosses above Signal → Buy</li><li><b>Bearish Crossover:</b> MACD crosses below Signal → Sell</li><li><b>Zero Line Cross:</b> Confirms trend direction change</li></ul><div class="academy-example-box">📌 <b>Example:</b> TCS shows a MACD bullish crossover at −15 with histogram turning positive — early momentum shift signaling potential uptrend.</div>`,
  formula:`<div class="academy-formula-block">MACD Line = EMA(12) − EMA(26)<br>Signal = EMA(9) of MACD Line<br>Histogram = MACD − Signal</div><ul class="academy-formula-vars"><li><b>EMA(n)</b> = Exponential Moving Average over n periods</li><li>Multiplier = 2 / (n + 1)</li></ul>`,
- sandbox:{inputs:[{label:'EMA 12',key:'ema12',val:150},{label:'EMA 26',key:'ema26',val:145}],calc:(v)=>`MACD Line = ${(v.ema12-v.ema26).toFixed(2)}`},
+ sandbox:{inputs:[{label:'Fast Period',key:'fast',val:12},{label:'Slow Period',key:'slow',val:26},{label:'Signal Period',key:'signal',val:9}],calc:(v)=>`Fast: ${v.fast} | Slow: ${v.slow} | Signal: ${v.signal}`},
  quiz:[{q:'MACD is calculated as:',opts:['SMA(12) − SMA(26)','EMA(12) − EMA(26)','EMA(26) − EMA(12)','RSI(14) − RSI(26)'],ans:1},{q:'A bullish MACD crossover occurs when:',opts:['MACD crosses below signal','MACD crosses above signal','Histogram is zero','Signal crosses above zero'],ans:1}],
  chartType:'line',chartLabel:'MACD',chartData:[-5,-3,-1,1,3,5,7,8,6,4,2,0,-2,-4,-6,-4,-2,0,3,6,8,10,8,5,2]},
 
@@ -28881,7 +28687,7 @@ const ACADEMY_CATALOG = [
 {id:'bollinger',cat:'technical',emoji:'🎯',title:'Bollinger Bands',
  explanation:`<h5>What are Bollinger Bands?</h5><p>Bollinger Bands consist of a middle band (20-period SMA) with an upper and lower band set at 2 standard deviations above and below. They expand during high volatility and contract during low volatility.</p><h5>Trading Applications</h5><ul><li><b>Squeeze:</b> Bands narrow → Volatility contraction → Breakout imminent</li><li><b>Walk the Band:</b> Price riding the upper band = Strong uptrend</li><li><b>Mean Reversion:</b> Price touching lower band in a range = Buy signal</li><li>Bandwidth = (Upper − Lower) / Middle</li></ul>`,
  formula:`<div class="academy-formula-block">Middle Band = SMA(20)<br>Upper Band = SMA(20) + 2 × σ<br>Lower Band = SMA(20) − 2 × σ</div><ul class="academy-formula-vars"><li><b>σ</b> = Standard deviation of closing prices over 20 periods</li></ul>`,
- sandbox:{inputs:[{label:'SMA(20)',key:'sma',val:500},{label:'Std Dev',key:'std',val:15}],calc:(v)=>`Upper: ₹${(v.sma+2*v.std).toFixed(0)} | Lower: ₹${(v.sma-2*v.std).toFixed(0)} | Width: ₹${(4*v.std).toFixed(0)}`},
+ sandbox:{inputs:[{label:'MA Period',key:'period',val:20},{label:'Std Dev',key:'stddev',val:2.0}],calc:(v)=>`Middle Band = SMA(${v.period}) | Upper/Lower = ±${v.stddev}σ`},
  quiz:[{q:'Bollinger Band Squeeze indicates:',opts:['High volatility','Low volatility and potential breakout','Trend reversal','Overbought condition'],ans:1}],
  chartType:'line',chartLabel:'Price',chartData:[495,498,502,505,510,515,520,518,512,505,500,498,495,492,488,490,495,500,508,515,522,530,525,518,510]},
 
@@ -28909,7 +28715,7 @@ const ACADEMY_CATALOG = [
 {id:'fib_retracement',cat:'technical',emoji:'🌀',title:'Fibonacci Retracement',
  explanation:`<h5>What is Fibonacci Retracement?</h5><p>Fibonacci retracement levels are horizontal lines indicating where support and resistance are likely to occur. They are based on the Fibonacci sequence ratios: 23.6%, 38.2%, 50%, 61.8%, and 78.6%.</p><h5>How to Use</h5><ul><li>Draw from a significant swing low to swing high (uptrend) or high to low (downtrend)</li><li><b>38.2%</b> = Shallow pullback (strong trend)</li><li><b>50.0%</b> = Moderate retracement</li><li><b>61.8%</b> = Golden ratio, deep pullback (key support/resistance)</li></ul>`,
  formula:`<div class="academy-formula-block">Retracement Level = High − (High − Low) × Fib%<br><br>Key Levels: 23.6%, 38.2%, 50.0%, 61.8%, 78.6%</div>`,
- sandbox:{inputs:[{label:'Swing High',key:'high',val:2000},{label:'Swing Low',key:'low',val:1600}],calc:(v)=>{const r=v.high-v.low;return `23.6%: ₹${(v.high-r*0.236).toFixed(0)} | 38.2%: ₹${(v.high-r*0.382).toFixed(0)} | 50%: ₹${(v.high-r*0.5).toFixed(0)} | 61.8%: ₹${(v.high-r*0.618).toFixed(0)}`;}},
+ sandbox:{inputs:[{label:'Swing High',key:'high',val:2000},{label:'Swing Low',key:'low',val:1600}],calc:(v)=>{const r=v.high-v.low;return `23.6%: ₹${(v.high-r*0.236).toFixed(0)} | 38.2%: ₹${(v.high-r*0.382).toFixed(0)} | 50%: ₹${(v.high-r*0.5).toFixed(0)} | 61.8%: ₹${(v.high-r*0.618).toFixed(0)} | 78.6%: ₹${(v.high-r*0.786).toFixed(0)}`;}},
  quiz:[{q:'The "Golden Ratio" Fibonacci level is:',opts:['23.6%','38.2%','50.0%','61.8%'],ans:3}],
  chartType:'line',chartLabel:'Price',chartData:[1600,1650,1700,1750,1800,1850,1900,1950,2000,1950,1920,1880,1850,1800,1760,1780,1820,1860,1900,1880,1850,1820,1780,1810,1850]},
 
@@ -28956,33 +28762,82 @@ const ACADEMY_CATALOG = [
  quiz:[{q:'Head & Shoulders is a:',opts:['Continuation pattern','Reversal pattern','Consolidation pattern','Volume pattern'],ans:1}],
  chartType:'line',chartLabel:'Price Pattern',chartData:[100,110,120,115,105,115,130,140,130,115,105,115,125,120,110,100,95,90,85,80,75,78,82,85,88]},
 
-{id:'double_top_bottom',cat:'chart-patterns',emoji:'🔝',title:'Double Top & Double Bottom',
- explanation:`<h5>Double Top (Bearish Reversal)</h5><p>Price reaches a high twice with a moderate decline between. Second peak fails to break above first → breakdown below support.</p><h5>Double Bottom (Bullish Reversal)</h5><p>Price reaches a low twice with a moderate rally between. Second trough holds → breakout above resistance.</p>`,
- formula:`<div class="academy-formula-block">Target = Breakout Level ± Height of Pattern</div>`,
- sandbox:{inputs:[{label:'Peak Price',key:'peak',val:500},{label:'Trough Price',key:'trough',val:450}],calc:(v)=>`Double Top Target: ₹${(v.trough-(v.peak-v.trough)).toFixed(0)} | Double Bottom Target: ₹${(v.peak+(v.peak-v.trough)).toFixed(0)}`},
+{id:'inverse_head_shoulders',cat:'chart-patterns',emoji:'👤',title:'Inverse Head & Shoulders',
+ explanation:`<h5>What is Inverse Head & Shoulders?</h5><p>A bullish reversal pattern consisting of three troughs: two smaller "shoulders" flanking a deeper "head." The neckline connects the peaks between troughs.</p><h5>Trading Rules</h5><ul><li>Pattern completes when price breaks above neckline</li><li><b>Target:</b> Neckline + (Neckline − Head Price)</li><li>Volume typically increases on breakout above neckline</li></ul>`,
+ formula:`<div class="academy-formula-block">Price Target = Neckline + (Neckline − Head Price)</div>`,
+ sandbox:{inputs:[{label:'Head Price',key:'head',val:900},{label:'Neckline',key:'neck',val:1050}],calc:(v)=>`Target = ₹${(v.neck + (v.neck - v.head)).toFixed(0)} (upside: ₹${(v.neck - v.head).toFixed(0)})`},
+ quiz:[{q:'Inverse Head & Shoulders is a:',opts:['Bearish reversal','Bullish reversal','Bullish continuation','Neutral'],ans:1}],
+ chartType:'line',chartLabel:'Price Pattern',chartData:[1100,1050,1000,1050,1100,1000,950,900,950,1050,1100,1050,1000,1050,1100,1150,1200,1250,1300,1350,1400,1380,1420,1450,1480]},
+
+{id:'double_top',cat:'chart-patterns',emoji:'🔝',title:'Double Top',
+ explanation:`<h5>Double Top (Bearish Reversal)</h5><p>Price reaches a high twice with a moderate decline between. Second peak fails to break above first → breakdown below support.</p>`,
+ formula:`<div class="academy-formula-block">Target = Breakout Level − Height of Pattern</div>`,
+ sandbox:{inputs:[{label:'Peak Price',key:'peak',val:500},{label:'Trough Price',key:'trough',val:450}],calc:(v)=>`Double Top Target: ₹${(v.trough-(v.peak-v.trough)).toFixed(0)}`},
  quiz:[{q:'Double Top pattern signals:',opts:['Bullish continuation','Bearish reversal','Neutral','Bullish reversal'],ans:1}],
  chartType:'line',chartLabel:'Price',chartData:[420,440,460,480,500,490,470,450,460,480,500,495,480,460,440,430,420,410,405,400,395,390,385,388,392]},
 
-{id:'flag_pennant',cat:'chart-patterns',emoji:'🚩',title:'Bull & Bear Flags / Pennants',
- explanation:`<h5>Flags</h5><p>Short-term continuation patterns. A sharp price move (flagpole) followed by a rectangular consolidation (flag) that slopes against the trend.</p><h5>Pennants</h5><p>Similar to flags but the consolidation forms a small symmetrical triangle instead of a rectangle.</p><ul><li><b>Bull Flag:</b> Strong up-move → downward-sloping consolidation → breakout up</li><li><b>Bear Flag:</b> Strong down-move → upward-sloping consolidation → breakdown</li></ul>`,
+{id:'double_bottom',cat:'chart-patterns',emoji:'👣',title:'Double Bottom',
+ explanation:`<h5>Double Bottom (Bullish Reversal)</h5><p>Price reaches a low twice with a moderate rally between. Second trough holds → breakout above resistance.</p>`,
+ formula:`<div class="academy-formula-block">Target = Breakout Level + Height of Pattern</div>`,
+ sandbox:{inputs:[{label:'Peak Price',key:'peak',val:500},{label:'Trough Price',key:'trough',val:450}],calc:(v)=>`Double Bottom Target: ₹${(v.peak+(v.peak-v.trough)).toFixed(0)}`},
+ quiz:[{q:'Double Bottom pattern signals:',opts:['Bullish continuation','Bearish reversal','Neutral','Bullish reversal'],ans:3}],
+ chartType:'line',chartLabel:'Price',chartData:[500,480,460,450,470,490,500,480,460,450,455,470,490,500,510,520,530,525,530,535,540,545,550]},
+
+{id:'bull_flag',cat:'chart-patterns',emoji:'🚩',title:'Bull Flag',
+ explanation:`<h5>Bull Flag (Bullish Continuation)</h5><p>Short-term continuation pattern. A sharp price rise (flagpole) followed by a downward-sloping rectangular consolidation (flag) before breaking out upward.</p>`,
  formula:`<div class="academy-formula-block">Target = Breakout Point + Length of Flagpole</div>`,
  sandbox:{inputs:[{label:'Flagpole Start',key:'start',val:100},{label:'Flagpole End',key:'end',val:140},{label:'Breakout Point',key:'breakout',val:135}],calc:(v)=>`Target = ₹${(v.breakout+(v.end-v.start)).toFixed(0)}`},
- quiz:[{q:'Flags are classified as:',opts:['Reversal patterns','Continuation patterns','Neutral patterns','Volume patterns'],ans:1}],
+ quiz:[{q:'Bull flag is a:',opts:['Reversal pattern','Continuation pattern','Neutral pattern','Volume pattern'],ans:1}],
  chartType:'line',chartLabel:'Bull Flag',chartData:[100,105,115,125,135,140,138,136,134,132,130,128,130,132,135,140,145,150,155,160,165,170,175,178,180]},
 
-{id:'triangles',cat:'chart-patterns',emoji:'🔺',title:'Triangles (Symmetrical, Ascending, Descending)',
- explanation:`<h5>Symmetrical Triangle</h5><p>Converging trendlines with lower highs and higher lows. Breakout direction determines the trade.</p><h5>Ascending Triangle (Bullish)</h5><p>Flat resistance top with rising support bottom. Price typically breaks upward.</p><h5>Descending Triangle (Bearish)</h5><p>Flat support bottom with declining resistance top. Price typically breaks downward.</p>`,
+{id:'bear_flag',cat:'chart-patterns',emoji:'📉',title:'Bear Flag',
+ explanation:`<h5>Bear Flag (Bearish Continuation)</h5><p>Short-term continuation pattern. A sharp price drop (flagpole) followed by an upward-sloping rectangular consolidation (flag) before breaking down downward.</p>`,
+ formula:`<div class="academy-formula-block">Target = Breakout Point − Length of Flagpole</div>`,
+ sandbox:{inputs:[{label:'Flagpole Start',key:'start',val:140},{label:'Flagpole End',key:'end',val:100},{label:'Breakout Point',key:'breakout',val:105}],calc:(v)=>`Target = ₹${(v.breakout-(v.start-v.end)).toFixed(0)}`},
+ quiz:[{q:'Bear flag is a:',opts:['Reversal pattern','Continuation pattern','Neutral pattern','Volume pattern'],ans:1}],
+ chartType:'line',chartLabel:'Bear Flag',chartData:[140,135,125,115,105,100,102,104,106,108,110,112,110,108,105,100,95,90,85,80,75,70,65,62,60]},
+
+{id:'pennants',cat:'chart-patterns',emoji:'🎌',title:'Pennants',
+ explanation:`<h5>Pennants</h5><p>Similar to flags but the consolidation forms a small symmetrical triangle instead of a rectangle. Can be bullish or bearish depending on the prior trend.</p>`,
+ formula:`<div class="academy-formula-block">Target = Breakout Point ± Length of Flagpole</div>`,
+ sandbox:{inputs:[{label:'Flagpole Start',key:'start',val:100},{label:'Flagpole End',key:'end',val:140},{label:'Breakout Point',key:'breakout',val:135}],calc:(v)=>`Target = ₹${(v.breakout+(v.end-v.start)).toFixed(0)}`},
+ quiz:[{q:'Pennant consolidation resembles a:',opts:['Rectangle','Small symmetrical triangle','Wedge','Head and shoulders'],ans:1}],
+ chartType:'line',chartLabel:'Pennant',chartData:[100,105,115,125,135,140,138,136,134,132,130,128,130,132,135,140,145,150,155,160,165,170,175,178,180]},
+
+{id:'symmetrical_triangle',cat:'chart-patterns',emoji:'📐',title:'Symmetrical Triangle',
+ explanation:`<h5>Symmetrical Triangle</h5><p>Converging trendlines with lower highs and higher lows. Represents a period of consolidation before a breakout in either direction.</p>`,
  formula:`<div class="academy-formula-block">Target = Breakout Level ± Height of Triangle at widest point</div>`,
  sandbox:{inputs:[{label:'Triangle High',key:'high',val:520},{label:'Triangle Low',key:'low',val:480},{label:'Breakout Level',key:'bo',val:520}],calc:(v)=>`Upside Target: ₹${(v.bo+(v.high-v.low)).toFixed(0)} | Downside: ₹${(v.bo-(v.high-v.low)).toFixed(0)}`},
- quiz:[{q:'Ascending triangle is typically:',opts:['Bearish','Bullish','Neutral','Reversal'],ans:1}],
- chartType:'line',chartLabel:'Price',chartData:[480,500,520,510,490,505,520,512,495,508,520,514,500,512,520,515,505,513,520,522,530,540,550,555,560]},
+ quiz:[{q:'Symmetrical triangles indicate:',opts:['Immediate trend reversal','Consolidation before breakout','Exhaustion of all volume','Overbought conditions'],ans:1}],
+ chartType:'line',chartLabel:'Symmetrical Triangle',chartData:[480,500,520,510,490,505,520,512,495,508,520,514,500,512,520,515,505,513,520,522,530,540,550,555,560]},
 
-{id:'wedges',cat:'chart-patterns',emoji:'📐',title:'Rising & Falling Wedges',
- explanation:`<h5>Rising Wedge (Bearish)</h5><p>Both trendlines slope upward but converge. Higher highs and higher lows with decreasing momentum. Typically breaks down.</p><h5>Falling Wedge (Bullish)</h5><p>Both trendlines slope downward but converge. Lower lows and lower highs with decreasing selling pressure. Typically breaks up.</p>`,
- formula:`<div class="academy-formula-block">Target = Breakout Point ± Height of Wedge at Entry</div>`,
- sandbox:{inputs:[{label:'Wedge Width at Start',key:'width',val:50},{label:'Breakout Price',key:'bo',val:480}],calc:(v)=>`Falling Wedge Target: ₹${(v.bo+v.width).toFixed(0)} | Rising Wedge Target: ₹${(v.bo-v.width).toFixed(0)}`},
- quiz:[{q:'A falling wedge is generally:',opts:['Bearish','Bullish','Neutral','Continuation down'],ans:1}],
- chartType:'line',chartLabel:'Price',chartData:[550,540,535,530,528,525,520,518,515,510,508,505,500,498,495,492,490,488,485,490,500,510,520,530,540]},
+{id:'ascending_triangle',cat:'chart-patterns',emoji:'🔺',title:'Ascending Triangle',
+ explanation:`<h5>Ascending Triangle (Bullish)</h5><p>Flat resistance top with rising support bottom. Price typically breaks upward as buyers become more aggressive.</p>`,
+ formula:`<div class="academy-formula-block">Target = Resistance Level + Height of Triangle at widest point</div>`,
+ sandbox:{inputs:[{label:'Triangle High',key:'high',val:520},{label:'Triangle Low',key:'low',val:480},{label:'Breakout Level',key:'bo',val:520}],calc:(v)=>`Target = ₹${(v.bo+(v.high-v.low)).toFixed(0)}`},
+ quiz:[{q:'Ascending triangle is typically:',opts:['Bearish','Bullish','Neutral','Reversal'],ans:1}],
+ chartType:'line',chartLabel:'Ascending Triangle',chartData:[480,500,520,510,490,505,520,512,495,508,520,514,500,512,520,515,505,513,520,522,530,540,550,555,560]},
+
+{id:'descending_triangle',cat:'chart-patterns',emoji:'🔻',title:'Descending Triangle',
+ explanation:`<h5>Descending Triangle (Bearish)</h5><p>Flat support bottom with declining resistance top. Price typically breaks downward as sellers become more aggressive.</p>`,
+ formula:`<div class="academy-formula-block">Target = Support Level − Height of Triangle at widest point</div>`,
+ sandbox:{inputs:[{label:'Triangle High',key:'high',val:520},{label:'Triangle Low',key:'low',val:480},{label:'Breakout Level',key:'bo',val:480}],calc:(v)=>`Target = ₹${(v.bo-(v.high-v.low)).toFixed(0)}`},
+ quiz:[{q:'Descending triangle is typically:',opts:['Bearish','Bullish','Neutral','Reversal'],ans:0}],
+ chartType:'line',chartLabel:'Descending Triangle',chartData:[520,500,480,490,510,495,480,488,505,492,480,486,500,488,480,485,495,487,480,478,470,460,450,445,440]},
+
+{id:'rising_wedge',cat:'chart-patterns',emoji:'📐',title:'Rising Wedge',
+ explanation:`<h5>Rising Wedge (Bearish Reversal/Continuation)</h5><p>Both trendlines slope upward but converge. Higher highs and higher lows with decreasing momentum. Typically breaks down.</p>`,
+ formula:`<div class="academy-formula-block">Target = Breakout Point − Height of Wedge at Entry</div>`,
+ sandbox:{inputs:[{label:'Wedge Width at Start',key:'width',val:50},{label:'Breakout Price',key:'bo',val:480}],calc:(v)=>`Rising Wedge Target: ₹${(v.bo-v.width).toFixed(0)}`},
+ quiz:[{q:'A rising wedge in an uptrend usually signals:',opts:['Bullish reversal','Bearish reversal','Uptrend continuation','Overbought continuation'],ans:1}],
+ chartType:'line',chartLabel:'Rising Wedge',chartData:[450,470,465,485,480,495,490,502,498,508,505,512,510,515,512,508,495,480,470,460,450,440,430,425,420]},
+
+{id:'falling_wedge',cat:'chart-patterns',emoji:'📐',title:'Falling Wedge',
+ explanation:`<h5>Falling Wedge (Bullish Reversal/Continuation)</h5><p>Both trendlines slope downward but converge. Lower lows and lower highs with decreasing selling pressure. Typically breaks up.</p>`,
+ formula:`<div class="academy-formula-block">Target = Breakout Point + Height of Wedge at Entry</div>`,
+ sandbox:{inputs:[{label:'Wedge Width at Start',key:'width',val:50},{label:'Breakout Price',key:'bo',val:480}],calc:(v)=>`Falling Wedge Target: ₹${(v.bo+v.width).toFixed(0)}`},
+ quiz:[{q:'A falling wedge is generally considered:',opts:['Bearish','Bullish','Neutral','Continuation down'],ans:1}],
+ chartType:'line',chartLabel:'Falling Wedge',chartData:[550,540,535,530,528,525,520,518,515,510,508,505,500,498,495,492,490,488,485,490,500,510,520,530,540]},
 
 {id:'cup_handle',cat:'chart-patterns',emoji:'☕',title:'Cup & Handle',
  explanation:`<h5>What is Cup & Handle?</h5><p>A bullish continuation pattern. The \"cup\" is a rounded bottom formation, and the \"handle\" is a small pullback/consolidation before breakout.</p><ul><li>Cup depth typically 12–33% of the prior advance</li><li>Handle should retrace no more than 50% of cup depth</li><li>Breakout above handle resistance = Buy</li><li>Ideal duration: 7 weeks to 65 weeks for the cup</li></ul>`,
@@ -28991,12 +28846,26 @@ const ACADEMY_CATALOG = [
  quiz:[{q:'Cup & Handle is a:',opts:['Bearish reversal','Bullish continuation','Bearish continuation','Neutral'],ans:1}],
  chartType:'line',chartLabel:'Price',chartData:[200,195,185,175,168,162,160,162,168,175,185,195,200,198,195,193,195,198,200,205,210,215,220,225,230]},
 
-{id:'triple_top_bottom',cat:'chart-patterns',emoji:'3️⃣',title:'Triple Top & Triple Bottom',
- explanation:`<h5>Triple Top</h5><p>Three peaks at roughly the same level followed by a breakdown below support. Stronger reversal signal than double top.</p><h5>Triple Bottom</h5><p>Three troughs at roughly the same level followed by a breakout above resistance. Stronger than double bottom.</p>`,
- formula:`<div class="academy-formula-block">Target = Breakout Level ± Pattern Height</div>`,
- sandbox:{inputs:[{label:'Peak/Trough Level',key:'level',val:500},{label:'Support/Resist',key:'sr',val:460}],calc:(v)=>`Triple Top Target: ₹${(v.sr-(v.level-v.sr)).toFixed(0)} | Triple Bottom Target: ₹${(v.level+(v.level-v.sr)).toFixed(0)}`},
+{id:'inverse_cup_handle',cat:'chart-patterns',emoji:'☕',title:'Inverse Cup & Handle',
+ explanation:`<h5>What is Inverse Cup & Handle?</h5><p>A bearish continuation or reversal pattern. The "inverted cup" is a rounded top formation, and the "handle" is a small upward pullback/consolidation before breakdown.</p><ul><li>Inverted cup depth typically 12–33% of the prior decline</li><li>Breakdown below handle support = Sell / Short</li></ul>`,
+ formula:`<div class="academy-formula-block">Target = Breakout Price − Depth of Cup</div>`,
+ sandbox:{inputs:[{label:'Cup Rim Price',key:'rim',val:160},{label:'Cup Top',key:'top',val:200}],calc:(v)=>`Target = ₹${(v.rim - (v.top - v.rim)).toFixed(0)}`},
+ quiz:[{q:'Inverse Cup & Handle is generally:',opts:['Bullish reversal','Bearish continuation','Bullish continuation','Neutral'],ans:1}],
+ chartType:'line',chartLabel:'Price',chartData:[160,165,175,185,192,198,200,198,192,185,175,165,160,162,165,167,165,162,160,155,150,145,140,135,130]},
+
+{id:'triple_top',cat:'chart-patterns',emoji:'3️⃣',title:'Triple Top',
+ explanation:`<h5>Triple Top</h5><p>Three peaks at roughly the same level followed by a breakdown below support. Stronger bearish reversal signal than double top.</p>`,
+ formula:`<div class="academy-formula-block">Target = Support Level − Pattern Height</div>`,
+ sandbox:{inputs:[{label:'Peak Level',key:'level',val:500},{label:'Support Level',key:'sr',val:460}],calc:(v)=>`Triple Top Target: ₹${(v.sr-(v.level-v.sr)).toFixed(0)}`},
+ quiz:[{q:'Triple top is a:',opts:['Bullish reversal','Bearish reversal','Bullish continuation','Neutral'],ans:1}],
+ chartType:'line',chartLabel:'Triple Top',chartData:[460,475,490,500,490,475,460,475,490,500,488,475,460,475,490,500,485,470,455,445,435,430,425,420,415]},
+
+{id:'triple_bottom',cat:'chart-patterns',emoji:'🩲',title:'Triple Bottom',
+ explanation:`<h5>Triple Bottom</h5><p>Three troughs at roughly the same level followed by a breakout above resistance. Stronger bullish reversal than double bottom.</p>`,
+ formula:`<div class="academy-formula-block">Target = Resistance Level + Pattern Height</div>`,
+ sandbox:{inputs:[{label:'Trough Level',key:'level',val:460},{label:'Resistance Level',key:'sr',val:500}],calc:(v)=>`Triple Bottom Target: ₹${(v.sr+(v.sr-v.level)).toFixed(0)}`},
  quiz:[{q:'Triple bottom is a stronger signal than:',opts:['Head and Shoulders','Double bottom','Flags','Triangles'],ans:1}],
- chartType:'line',chartLabel:'Price',chartData:[460,475,490,500,490,475,460,475,490,500,488,475,460,475,490,500,485,470,455,445,435,430,425,420,415]},
+ chartType:'line',chartLabel:'Triple Bottom',chartData:[500,485,470,460,470,485,500,485,470,460,472,485,500,485,470,460,475,490,505,515,525,530,535,540,545]},
 
 {id:'rounding_bottom',cat:'chart-patterns',emoji:'🥣',title:'Rounding Bottom',explanation:`<h5>What is a Rounding Bottom?</h5><p>A long-term reversal pattern that resembles a "U" shape. It indicates a gradual shift from selling pressure to buying pressure over weeks or months.</p>`,formula:`<div class="academy-formula-block">Target = Resistance Breakout + Depth of Pattern</div>`,sandbox:{inputs:[{label:'Resistance',key:'r',val:300},{label:'Bottom',key:'b',val:220}],calc:(v)=>`Target: ₹${(v.r+(v.r-v.b)).toFixed(0)}`},quiz:[{q:'Rounding bottom indicates:',opts:['Bearish reversal','Bullish reversal','Continuation','No signal'],ans:1}],chartType:'line',chartLabel:'Price',chartData:[300,290,275,260,248,238,230,225,222,220,222,225,230,238,248,260,275,290,300,310,320,330,340,350,360]},
 
@@ -29011,28 +28880,44 @@ const ACADEMY_CATALOG = [
 // ── CANDLESTICK PATTERNS (10) ──
 {id:'doji',cat:'candlestick',emoji:'✝️',title:'Doji Variations',explanation:`<h5>What is a Doji?</h5><p>A candlestick where open and close are virtually equal, forming a cross. It signals indecision.</p><h5>Types</h5><ul><li><b>Standard Doji:</b> Cross shape — pure indecision</li><li><b>Long-Legged Doji:</b> Long upper and lower shadows</li><li><b>Dragonfly Doji:</b> Long lower shadow, no upper — bullish at bottoms</li><li><b>Gravestone Doji:</b> Long upper shadow, no lower — bearish at tops</li></ul>`,formula:`<div class="academy-formula-block">Doji: |Open − Close| ≤ 0.1% of Price Range</div>`,sandbox:{inputs:[{label:'Open',key:'o',val:150},{label:'Close',key:'c',val:150.1},{label:'High',key:'h',val:155},{label:'Low',key:'l',val:145}],calc:(v)=>{const body=Math.abs(v.o-v.c);const range=v.h-v.l;return `Body: ₹${body.toFixed(2)} | Range: ₹${range.toFixed(2)} | Doji: ${body/range<0.1?'YES':'NO'}`;}},quiz:[{q:'A Gravestone Doji at a top signals:',opts:['Bullish continuation','Bearish reversal','Indecision','Accumulation'],ans:1}],chartType:'bar',chartLabel:'Body Size',chartData:[5,8,12,3,0.5,0.2,10,15,8,0.3,0.1,12,8,5,0.4,0.2,10,15,12,0.5,0.1,8,5,3,0.3]},
 
-{id:'hammer_hangman',cat:'candlestick',emoji:'🔨',title:'Hammer & Hanging Man',explanation:`<h5>Hammer (Bullish)</h5><p>Small body at the top with a long lower shadow (2x+ body). Appears in downtrends — signals reversal.</p><h5>Hanging Man (Bearish)</h5><p>Same shape as hammer but appears in uptrends — signals potential reversal down.</p>`,formula:`<div class="academy-formula-block">Lower Shadow ≥ 2 × Body Size<br>Upper Shadow ≤ 10% of Range</div>`,sandbox:{inputs:[{label:'Open',key:'o',val:152},{label:'Close',key:'c',val:155},{label:'Low',key:'l',val:145}],calc:(v)=>{const body=Math.abs(v.c-v.o);const lowerShadow=Math.min(v.o,v.c)-v.l;return `Body: ₹${body.toFixed(1)} | Lower Shadow: ₹${lowerShadow.toFixed(1)} | Hammer: ${lowerShadow>=2*body?'YES':'NO'}`;}},quiz:[{q:'A hammer in a downtrend signals:',opts:['Continuation down','Bullish reversal','No signal','Bearish'],ans:1}],chartType:'bar',chartLabel:'Pattern',chartData:[8,10,12,15,18,20,18,15,10,5,8,12,15,18,20,22,20,18,15,12,8,5,3,5,8]},
+{id:'hammer',cat:'candlestick',emoji:'🔨',title:'Hammer',explanation:`<h5>Hammer (Bullish Reversal)</h5><p>Small body at the top with a long lower shadow (2x+ body). Appears in downtrends — signals buyers step in and push the price back up from lows.</p>`,formula:`<div class="academy-formula-block">Lower Shadow ≥ 2 × Body Size<br>Upper Shadow ≤ 10% of Range</div>`,sandbox:{inputs:[{label:'Open',key:'o',val:152},{label:'Close',key:'c',val:155},{label:'Low',key:'l',val:145}],calc:(v)=>{const body=Math.abs(v.c-v.o);const lowerShadow=Math.min(v.o,v.c)-v.l;return `Body: ₹${body.toFixed(1)} | Lower Shadow: ₹${lowerShadow.toFixed(1)} | Hammer: ${lowerShadow>=2*body?'YES':'NO'}`;}},quiz:[{q:'A hammer in a downtrend signals:',opts:['Continuation down','Bullish reversal','No signal','Bearish'],ans:1}],chartType:'bar',chartLabel:'Hammer Pattern',chartData:[8,10,12,15,18,20,18,15,10,5,8,12,15,18,20,22,20,18,15,12,8,5,3,5,8]},
 
-{id:'shooting_star',cat:'candlestick',emoji:'⭐',title:'Shooting Star & Inverted Hammer',explanation:`<h5>Shooting Star (Bearish)</h5><p>Small body at the bottom with a long upper shadow. Appears in uptrends — signals reversal.</p><h5>Inverted Hammer (Bullish)</h5><p>Same shape but appears in downtrends — potential bullish reversal pending confirmation.</p>`,formula:`<div class="academy-formula-block">Upper Shadow ≥ 2 × Body Size<br>Lower Shadow ≤ 10% of Range</div>`,sandbox:{inputs:[{label:'Open',key:'o',val:148},{label:'Close',key:'c',val:145},{label:'High',key:'h',val:158}],calc:(v)=>{const body=Math.abs(v.o-v.c);const uShadow=v.h-Math.max(v.o,v.c);return `Body: ₹${body.toFixed(1)} | Upper Shadow: ₹${uShadow.toFixed(1)} | Shooting Star: ${uShadow>=2*body?'YES':'NO'}`;}},quiz:[{q:'Shooting star appears in:',opts:['Downtrends','Uptrends','Sideways markets','Any market'],ans:1}],chartType:'bar',chartLabel:'Pattern',chartData:[5,8,12,15,18,20,22,25,28,30,28,25,22,18,15,12,10,8,6,5,8,10,12,14,16]},
+{id:'hanging_man',cat:'candlestick',emoji:'👤',title:'Hanging Man',explanation:`<h5>Hanging Man (Bearish Reversal)</h5><p>Same shape as hammer but appears at the top of an uptrend — signals that selling pressure is beginning to mount.</p>`,formula:`<div class="academy-formula-block">Lower Shadow ≥ 2 × Body Size<br>Upper Shadow ≤ 10% of Range</div>`,sandbox:{inputs:[{label:'Open',key:'o',val:155},{label:'Close',key:'c',val:152},{label:'Low',key:'l',val:145}],calc:(v)=>{const body=Math.abs(v.c-v.o);const lowerShadow=Math.min(v.o,v.c)-v.l;return `Body: ₹${body.toFixed(1)} | Lower Shadow: ₹${lowerShadow.toFixed(1)} | Hanging Man: ${lowerShadow>=2*body?'YES':'NO'}`;}},quiz:[{q:'Hanging Man appears in:',opts:['Downtrends','Uptrends','Sideways markets','Any market'],ans:1}],chartType:'bar',chartLabel:'Hanging Man Pattern',chartData:[8,10,12,15,18,20,18,15,10,5,8,12,15,18,20,22,20,18,15,12,8,5,3,5,8]},
 
-{id:'engulfing',cat:'candlestick',emoji:'🟢',title:'Bullish & Bearish Engulfing',explanation:`<h5>Bullish Engulfing</h5><p>A large green candle completely engulfs the previous red candle. Appears at bottoms — strong reversal signal.</p><h5>Bearish Engulfing</h5><p>A large red candle completely engulfs the previous green candle. Appears at tops — strong reversal signal.</p>`,formula:`<div class="academy-formula-block">Bullish: Green Body > Red Body (both open and close)<br>Bearish: Red Body > Green Body (both open and close)</div>`,sandbox:{inputs:[{label:'Prev Open',key:'po',val:152},{label:'Prev Close',key:'pc',val:148},{label:'Curr Open',key:'co',val:146},{label:'Curr Close',key:'cc',val:155}],calc:(v)=>`Engulfing: ${v.cc>v.po&&v.co<v.pc?'BULLISH ✅':v.cc<v.po&&v.co>v.pc?'BEARISH 🔴':'NO ENGULFING'}`},quiz:[{q:'Bullish engulfing is most significant when it appears:',opts:['At market tops','At market bottoms','In sideways markets','At any time'],ans:1}],chartType:'bar',chartLabel:'Candle Body',chartData:[-5,-3,-8,-2,10,5,3,-4,-6,-10,12,8,5,-3,-5,-8,15,10,5,-2,-4,-12,18,12,8]},
+{id:'shooting_star',cat:'candlestick',emoji:'⭐',title:'Shooting Star',explanation:`<h5>Shooting Star (Bearish Reversal)</h5><p>Small body at the bottom with a long upper shadow. Appears in uptrends — signals price opened, rallied strongly, but buyers failed to hold highs, closing near the open.</p>`,formula:`<div class="academy-formula-block">Upper Shadow ≥ 2 × Body Size<br>Lower Shadow ≤ 10% of Range</div>`,sandbox:{inputs:[{label:'Open',key:'o',val:155},{label:'Close',key:'c',val:152},{label:'High',key:'h',val:165}],calc:(v)=>{const body=Math.abs(v.o-v.c);const uShadow=v.h-Math.max(v.o,v.c);return `Body: ₹${body.toFixed(1)} | Upper Shadow: ₹${uShadow.toFixed(1)} | Shooting Star: ${uShadow>=2*body?'YES':'NO'}`;}},quiz:[{q:'Shooting star appears in:',opts:['Downtrends','Uptrends','Sideways markets','Any market'],ans:1}],chartType:'bar',chartLabel:'Shooting Star',chartData:[5,8,12,15,18,20,22,25,28,30,28,25,22,18,15,12,10,8,6,5,8,10,12,14,16]},
 
-{id:'harami',cat:'candlestick',emoji:'🤰',title:'Harami Patterns',explanation:`<h5>Bullish Harami</h5><p>A small green candle within the body of the previous large red candle. Signals potential reversal at bottoms.</p><h5>Bearish Harami</h5><p>A small red candle within the body of the previous large green candle. Signals potential reversal at tops.</p><p>\"Harami\" means \"pregnant\" in Japanese — the small candle is contained within the mother candle.</p>`,formula:`<div class="academy-formula-block">Second candle's body is completely inside first candle's body</div>`,sandbox:{inputs:[{label:'Mother Open',key:'mo',val:160},{label:'Mother Close',key:'mc',val:145},{label:'Baby Open',key:'bo',val:148},{label:'Baby Close',key:'bc',val:152}],calc:(v)=>{const mHigh=Math.max(v.mo,v.mc),mLow=Math.min(v.mo,v.mc),bHigh=Math.max(v.bo,v.bc),bLow=Math.min(v.bo,v.bc);return `Harami: ${bHigh<mHigh&&bLow>mLow?'YES ✅':'NO ❌'}`;}},quiz:[{q:'"Harami" means:',opts:['Hammer','Pregnant','Star','Cloud'],ans:1}],chartType:'bar',chartLabel:'Body',chartData:[-15,-10,-5,3,-12,-8,2,-10,-15,4,-8,-12,3,5,-10,-14,2,4,-8,-12,3,5,-10,-6,2]},
+{id:'inverted_hammer',cat:'candlestick',emoji:'🔨',title:'Inverted Hammer',explanation:`<h5>Inverted Hammer (Bullish Reversal)</h5><p>Same shape as shooting star but appears in downtrends — potential bullish reversal pending next-candle upward confirmation.</p>`,formula:`<div class="academy-formula-block">Upper Shadow ≥ 2 × Body Size<br>Lower Shadow ≤ 10% of Range</div>`,sandbox:{inputs:[{label:'Open',key:'o',val:145},{label:'Close',key:'c',val:148},{label:'High',key:'h',val:158}],calc:(v)=>{const body=Math.abs(v.o-v.c);const uShadow=v.h-Math.max(v.o,v.c);return `Body: ₹${body.toFixed(1)} | Upper Shadow: ₹${uShadow.toFixed(1)} | Inverted Hammer: ${uShadow>=2*body?'YES':'NO'}`;}},quiz:[{q:'Inverted hammer appears in:',opts:['Downtrends','Uptrends','Sideways markets','Breakouts'],ans:0}],chartType:'bar',chartLabel:'Inverted Hammer',chartData:[5,8,12,15,18,20,22,25,28,30,28,25,22,18,15,12,10,8,6,5,8,10,12,14,16]},
 
-{id:'morning_evening_star',cat:'candlestick',emoji:'🌟',title:'Morning & Evening Stars',explanation:`<h5>Morning Star (Bullish)</h5><p>Three-candle pattern: (1) Large red candle, (2) Small-bodied candle gapping down, (3) Large green candle closing above midpoint of first candle.</p><h5>Evening Star (Bearish)</h5><p>Opposite: (1) Large green candle, (2) Small-bodied candle gapping up, (3) Large red candle closing below midpoint of first candle.</p>`,formula:`<div class="academy-formula-block">3rd candle must close past midpoint of 1st candle's body</div>`,sandbox:{inputs:[{label:'1st Candle Open',key:'o1',val:160},{label:'1st Candle Close',key:'c1',val:145},{label:'3rd Candle Close',key:'c3',val:155}],calc:(v)=>{const mid=(v.o1+v.c1)/2;return `Midpoint: ₹${mid.toFixed(1)} | 3rd closes ${v.c3>mid?'above':'below'} → ${v.c1<v.o1&&v.c3>mid?'Morning Star ✅':'Check conditions'}`;}},quiz:[{q:'Morning Star is a:',opts:['Bearish pattern','1-candle pattern','3-candle bullish reversal','Continuation'],ans:2}],chartType:'bar',chartLabel:'Pattern',chartData:[10,8,-15,-2,12,8,5,-8,-12,-1,15,10,8,5,-10,-14,-1,12,10,8,-8,-12,-2,14,10]},
+{id:'bullish_engulfing',cat:'candlestick',emoji:'🟩',title:'Bullish Engulfing',explanation:`<h5>Bullish Engulfing (Bullish Reversal)</h5><p>A large green candle completely engulfs the body of the previous red candle. Appears at bottoms — signals a strong shift from sellers to buyers.</p>`,formula:`<div class="academy-formula-block">Green Close > Red Open AND Green Open < Red Close</div>`,sandbox:{inputs:[{label:'Prev Open',key:'po',val:152},{label:'Prev Close',key:'pc',val:148},{label:'Curr Open',key:'co',val:146},{label:'Curr Close',key:'cc',val:155}],calc:(v)=>`Engulfing: ${v.cc>v.po&&v.co<v.pc?'BULLISH ✅':'NO ENGULFING'}`},quiz:[{q:'Bullish engulfing appears at:',opts:['Market tops','Market bottoms','Sideways ranges','Any time'],ans:1}],chartType:'bar',chartLabel:'Candle Body',chartData:[-5,-3,-8,-2,10,5,3,-4,-6,-10,12,8,5,-3,-5,-8,15,10,5,-2,-4,-12,18,12,8]},
 
-{id:'piercing_darkcloud',cat:'candlestick',emoji:'☁️',title:'Piercing Line & Dark Cloud Cover',explanation:`<h5>Piercing Line (Bullish)</h5><p>Two-candle pattern: Red candle followed by a green candle that opens below the prior low but closes above the midpoint of the red candle.</p><h5>Dark Cloud Cover (Bearish)</h5><p>Two-candle pattern: Green candle followed by a red candle that opens above the prior high but closes below the midpoint of the green candle.</p>`,formula:`<div class="academy-formula-block">2nd candle must close past 50% of 1st candle's body</div>`,sandbox:{inputs:[{label:'Red Open',key:'ro',val:160},{label:'Red Close',key:'rc',val:148},{label:'Green Close',key:'gc',val:156}],calc:(v)=>{const mid=(v.ro+v.rc)/2;return `Midpoint: ₹${mid.toFixed(1)} | Piercing: ${v.gc>mid?'YES ✅':'NO'}`;}},quiz:[{q:'Piercing Line requires the green candle to close:',opts:['Above 50% of red body','At the red open','Below the red close','At any level'],ans:0}],chartType:'bar',chartLabel:'Body',chartData:[8,-15,12,5,-10,14,8,-12,-8,15,10,-14,-10,12,8,-15,14,10,-8,-12,15,8,-10,-14,12]},
+{id:'bearish_engulfing',cat:'candlestick',emoji:'🟥',title:'Bearish Engulfing',explanation:`<h5>Bearish Engulfing (Bearish Reversal)</h5><p>A large red candle completely engulfs the body of the previous green candle. Appears at tops — signals a strong shift from buyers to sellers.</p>`,formula:`<div class="academy-formula-block">Red Close < Green Open AND Red Open > Green Close</div>`,sandbox:{inputs:[{label:'Prev Open',key:'po',val:148},{label:'Prev Close',key:'pc',val:152},{label:'Curr Open',key:'co',val:155},{label:'Curr Close',key:'cc',val:146}],calc:(v)=>`Engulfing: ${v.cc<v.po&&v.co>v.pc?'BEARISH 🔴':'NO ENGULFING'}`},quiz:[{q:'Bearish engulfing appears at:',opts:['Market tops','Market bottoms','Sideways ranges','Any time'],ans:0}],chartType:'bar',chartLabel:'Candle Body',chartData:[-5,-3,-8,-2,10,5,3,-4,-6,-10,12,8,5,-3,-5,-8,15,10,5,-2,-4,-12,18,12,8]},
 
-{id:'tweezer',cat:'candlestick',emoji:'🔧',title:'Tweezer Tops & Bottoms',explanation:`<h5>Tweezer Top</h5><p>Two or more candles with matching highs at the top of an uptrend. The first is bullish, the second bearish.</p><h5>Tweezer Bottom</h5><p>Two or more candles with matching lows at the bottom of a downtrend. The first is bearish, the second bullish.</p>`,formula:`<div class="academy-formula-block">Matching Highs (Top) or Matching Lows (Bottom) ± 0.1%</div>`,sandbox:{inputs:[{label:'Candle 1 High',key:'h1',val:525},{label:'Candle 2 High',key:'h2',val:525}],calc:(v)=>`Match: ${Math.abs(v.h1-v.h2)/v.h1*100<0.1?'Tweezer Top ✅':'No match'}`},quiz:[{q:'Tweezer bottoms appear at:',opts:['Market tops','Market bottoms','Mid-trend','Any time'],ans:1}],chartType:'line',chartLabel:'Price',chartData:[490,500,510,518,525,525,520,515,510,505,500,495,490,488,485,483,480,478,475,478,482,488,495,500,505]},
+{id:'bullish_harami',cat:'candlestick',emoji:'🤰',title:'Bullish Harami',explanation:`<h5>Bullish Harami</h5><p>A small green candle forms inside the body of the previous large red candle. Signals a potential pause or reversal of a downtrend.</p>`,formula:`<div class="academy-formula-block">Baby body completely inside Mother body (Red Mother, Green Baby)</div>`,sandbox:{inputs:[{label:'Mother Open',key:'mo',val:160},{label:'Mother Close',key:'mc',val:145},{label:'Baby Open',key:'bo',val:148},{label:'Baby Close',key:'bc',val:152}],calc:(v)=>{const mHigh=Math.max(v.mo,v.mc),mLow=Math.min(v.mo,v.mc),bHigh=Math.max(v.bo,v.bc),bLow=Math.min(v.bo,v.bc);return `Harami: ${bHigh<mHigh&&bLow>mLow?'YES ✅':'NO ❌'}`;}},quiz:[{q:'In a bullish harami, the second candle is:',opts:['Larger than the first','Smaller and inside the first','A doji always','Gapping up'],ans:1}],chartType:'bar',chartLabel:'Body',chartData:[-15,-10,-5,3,-12,-8,2,-10,-15,4,-8,-12,3,5,-10,-14,2,4,-8,-12,3,5,-10,-6,2]},
 
-{id:'three_soldiers_crows',cat:'candlestick',emoji:'🪖',title:'Three White Soldiers & Three Black Crows',explanation:`<h5>Three White Soldiers (Bullish)</h5><p>Three consecutive long green candles with progressively higher closes. Each opens within the previous candle's body. Strong bullish reversal.</p><h5>Three Black Crows (Bearish)</h5><p>Three consecutive long red candles with progressively lower closes. Strong bearish reversal.</p>`,formula:`<div class="academy-formula-block">3 consecutive candles, each closing higher (soldiers) or lower (crows)</div>`,sandbox:{inputs:[{label:'Close 1',key:'c1',val:100},{label:'Close 2',key:'c2',val:108},{label:'Close 3',key:'c3',val:115}],calc:(v)=>`Pattern: ${v.c3>v.c2&&v.c2>v.c1?'Three White Soldiers ✅':v.c3<v.c2&&v.c2<v.c1?'Three Black Crows 🔴':'No pattern'}`},quiz:[{q:'Three White Soldiers is:',opts:['Bearish','A single candle','Strong bullish reversal','Neutral'],ans:2}],chartType:'bar',chartLabel:'Close',chartData:[95,92,88,85,90,95,100,108,115,120,122,118,115,112,108,105,100,95,88,82,78,82,88,95,102]},
+{id:'bearish_harami',cat:'candlestick',emoji:'🤰',title:'Bearish Harami',explanation:`<h5>Bearish Harami</h5><p>A small red candle forms inside the body of the previous large green candle. Signals a potential pause or reversal of an uptrend.</p>`,formula:`<div class="academy-formula-block">Baby body completely inside Mother body (Green Mother, Red Baby)</div>`,sandbox:{inputs:[{label:'Mother Open',key:'mo',val:145},{label:'Mother Close',key:'mc',val:160},{label:'Baby Open',key:'bo',val:152},{label:'Baby Close',key:'bc',val:148}],calc:(v)=>{const mHigh=Math.max(v.mo,v.mc),mLow=Math.min(v.mo,v.mc),bHigh=Math.max(v.bo,v.bc),bLow=Math.min(v.bo,v.bc);return `Harami: ${bHigh<mHigh&&bLow>mLow?'YES ✅':'NO ❌'}`;}},quiz:[{q:'A bearish harami appears at:',opts:['Market bottoms','Market tops','Breakout start','Nowhere'],ans:1}],chartType:'bar',chartLabel:'Body',chartData:[-15,-10,-5,3,-12,-8,2,-10,-15,4,-8,-12,3,5,-10,-14,2,4,-8,-12,3,5,-10,-6,2]},
+
+{id:'morning_star',cat:'candlestick',emoji:'🌅',title:'Morning Star',explanation:`<h5>Morning Star (Bullish Reversal)</h5><p>Three-candle pattern: (1) Large red candle, (2) Small-bodied candle gapping down, (3) Large green candle closing above midpoint of first candle.</p>`,formula:`<div class="academy-formula-block">3rd candle must close past midpoint of 1st candle's body</div>`,sandbox:{inputs:[{label:'1st Candle Open',key:'o1',val:160},{label:'1st Candle Close',key:'c1',val:145},{label:'3rd Candle Close',key:'c3',val:155}],calc:(v)=>{const mid=(v.o1+v.c1)/2;return `Midpoint: ₹${mid.toFixed(1)} | 3rd closes ${v.c3>mid?'above':'below'} → ${v.c1<v.o1&&v.c3>mid?'Morning Star ✅':'Check conditions'}`;}},quiz:[{q:'Morning Star is a:',opts:['Bearish pattern','1-candle pattern','3-candle bullish reversal','Continuation'],ans:2}],chartType:'bar',chartLabel:'Pattern',chartData:[10,8,-15,-2,12,8,5,-8,-12,-1,15,10,8,5,-10,-14,-1,12,10,8,-8,-12,-2,14,10]},
+
+{id:'evening_star',cat:'candlestick',emoji:'🌇',title:'Evening Star',explanation:`<h5>Evening Star (Bearish Reversal)</h5><p>Three-candle pattern: (1) Large green candle, (2) Small-bodied candle gapping up, (3) Large red candle closing below midpoint of first candle.</p>`,formula:`<div class="academy-formula-block">3rd candle must close past midpoint of 1st candle's body</div>`,sandbox:{inputs:[{label:'1st Candle Open',key:'o1',val:145},{label:'1st Candle Close',key:'c1',val:160},{label:'3rd Candle Close',key:'c3',val:150}],calc:(v)=>{const mid=(v.o1+v.c1)/2;return `Midpoint: ₹${mid.toFixed(1)} | 3rd closes ${v.c3<mid?'below':'above'} → ${v.c1>v.o1&&v.c3<mid?'Evening Star ✅':'Check conditions'}`;}},quiz:[{q:'Evening Star typically appears at:',opts:['Market bottoms','Market tops','Support levels','Nowhere'],ans:1}],chartType:'bar',chartLabel:'Pattern',chartData:[10,8,-15,-2,12,8,5,-8,-12,-1,15,10,8,5,-10,-14,-1,12,10,8,-8,-12,-2,14,10]},
+
+{id:'piercing_line',cat:'candlestick',emoji:'⛅',title:'Piercing Line',explanation:`<h5>Piercing Line (Bullish Reversal)</h5><p>Two-candle pattern: Red candle followed by a green candle that opens below the prior low but closes above the midpoint of the red candle.</p>`,formula:`<div class="academy-formula-block">2nd candle must close past 50% of 1st candle's body</div>`,sandbox:{inputs:[{label:'Red Open',key:'ro',val:160},{label:'Red Close',key:'rc',val:148},{label:'Green Close',key:'gc',val:156}],calc:(v)=>{const mid=(v.ro+v.rc)/2;return `Midpoint: ₹${mid.toFixed(1)} | Piercing: ${v.gc>mid?'YES ✅':'NO'}`;}},quiz:[{q:'Piercing Line requires the green candle to close:',opts:['Above 50% of red body','At the red open','Below the red close','At any level'],ans:0}],chartType:'bar',chartLabel:'Body',chartData:[8,-15,12,5,-10,14,8,-12,-8,15,10,-14,-10,12,8,-15,14,10,-8,-12,15,8,-10,-14,12]},
+
+{id:'dark_cloud_cover',cat:'candlestick',emoji:'⛈️',title:'Dark Cloud Cover',explanation:`<h5>Dark Cloud Cover (Bearish Reversal)</h5><p>Two-candle pattern: Green candle followed by a red candle that opens above the prior high but closes below the midpoint of the green candle.</p>`,formula:`<div class="academy-formula-block">2nd candle must close past 50% of 1st candle's body</div>`,sandbox:{inputs:[{label:'Green Open',key:'ro',val:148},{label:'Green Close',key:'rc',val:160},{label:'Red Close',key:'gc',val:152}],calc:(v)=>{const mid=(v.ro+v.rc)/2;return `Midpoint: ₹${mid.toFixed(1)} | Dark Cloud: ${v.gc<mid?'YES ✅':'NO'}`;}},quiz:[{q:'Dark Cloud Cover is a:',opts:['Bullish reversal','Bearish reversal','Continuation','Indecision'],ans:1}],chartType:'bar',chartLabel:'Body',chartData:[8,-15,12,5,-10,14,8,-12,-8,15,10,-14,-10,12,8,-15,14,10,-8,-12,15,8,-10,-14,12]},
+
+{id:'tweezer_tops',cat:'candlestick',emoji:'🔧',title:'Tweezer Tops',explanation:`<h5>Tweezer Top</h5><p>Two or more candles with matching highs at the top of an uptrend. The first is bullish, the second bearish.</p>`,formula:`<div class="academy-formula-block">Matching Highs (Top) or Matching Lows (Bottom) ± 0.1%</div>`,sandbox:{inputs:[{label:'Candle 1 High',key:'h1',val:525},{label:'Candle 2 High',key:'h2',val:525}],calc:(v)=>`Match: ${Math.abs(v.h1-v.h2)/v.h1*100<0.1?'Tweezer Top ✅':'No match'}`},quiz:[{q:'Tweezer tops appear at:',opts:['Market tops','Market bottoms','Mid-trend','Any time'],ans:0}],chartType:'line',chartLabel:'Price',chartData:[490,500,510,518,525,525,520,515,510,505,500,495,490,488,485,483,480,478,475,478,482,488,495,500,505]},
+
+{id:'tweezer_bottoms',cat:'candlestick',emoji:'🔧',title:'Tweezer Bottoms',explanation:`<h5>Tweezer Bottom</h5><p>Two or more candles with matching lows at the bottom of a downtrend. The first is bearish, the second bullish.</p>`,formula:`<div class="academy-formula-block">Matching Highs (Top) or Matching Lows (Bottom) ± 0.1%</div>`,sandbox:{inputs:[{label:'Candle 1 Low',key:'l1',val:480},{label:'Candle 2 Low',key:'l2',val:480}],calc:(v)=>`Match: ${Math.abs(v.l1-v.l2)/v.l1*100<0.1?'Tweezer Bottom ✅':'No match'}`},quiz:[{q:'Tweezer bottoms appear at:',opts:['Market tops','Market bottoms','Mid-trend','Any time'],ans:1}],chartType:'line',chartLabel:'Price',chartData:[520,510,500,490,480,480,488,495,500,505,510,515,520]},
+
+{id:'three_white_soldiers',cat:'candlestick',emoji:'💂',title:'Three White Soldiers',explanation:`<h5>Three White Soldiers (Bullish)</h5><p>Three consecutive long green candles with progressively higher closes. Each opens within the previous candle's body. Strong bullish reversal.</p>`,formula:`<div class="academy-formula-block">3 consecutive candles, each closing higher (soldiers)</div>`,sandbox:{inputs:[{label:'Close 1',key:'c1',val:100},{label:'Close 2',key:'c2',val:108},{label:'Close 3',key:'c3',val:115}],calc:(v)=>`Pattern: ${v.c3>v.c2&&v.c2>v.c1?'Three White Soldiers ✅':'No pattern'}`},quiz:[{q:'Three White Soldiers is:',opts:['Bearish','A single candle','Strong bullish reversal','Neutral'],ans:2}],chartType:'bar',chartLabel:'Close',chartData:[95,92,88,85,90,95,100,108,115,120,122,118,115,112,108,105,100,95,88,82,78,82,88,95,102]},
+
+{id:'three_black_crows',cat:'candlestick',emoji:'🐦',title:'Three Black Crows',explanation:`<h5>Three Black Crows (Bearish)</h5><p>Three consecutive long red candles with progressively lower closes. Strong bearish reversal.</p>`,formula:`<div class="academy-formula-block">3 consecutive candles, each closing lower (crows)</div>`,sandbox:{inputs:[{label:'Close 1',key:'c1',val:115},{label:'Close 2',key:'c2',val:108},{label:'Close 3',key:'c3',val:100}],calc:(v)=>`Pattern: ${v.c3<v.c2&&v.c2<v.c1?'Three Black Crows 🔴':'No pattern'}`},quiz:[{q:'Three Black Crows is:',opts:['Bearish reversal','Bullish reversal','Consolidation','No trend'],ans:0}],chartType:'bar',chartLabel:'Close',chartData:[95,98,105,110,115,112,108,100,95,90,88,92,95,98,100,105]},
 
 {id:'marubozu',cat:'candlestick',emoji:'🟩',title:'Marubozu',explanation:`<h5>What is Marubozu?</h5><p>A candlestick with no (or very small) shadows. The entire range is the body, indicating complete buyer or seller dominance.</p><ul><li><b>Green Marubozu:</b> Opens at low, closes at high — extreme bullish</li><li><b>Red Marubozu:</b> Opens at high, closes at low — extreme bearish</li></ul>`,formula:`<div class="academy-formula-block">Green: Open ≈ Low AND Close ≈ High<br>Red: Open ≈ High AND Close ≈ Low</div>`,sandbox:{inputs:[{label:'Open',key:'o',val:500},{label:'Close',key:'c',val:520},{label:'High',key:'h',val:520},{label:'Low',key:'l',val:500}],calc:(v)=>{const isBull=Math.abs(v.o-v.l)<1&&Math.abs(v.c-v.h)<1;const isBear=Math.abs(v.o-v.h)<1&&Math.abs(v.c-v.l)<1;return isBull?'Bullish Marubozu ✅':isBear?'Bearish Marubozu 🔴':'Not a Marubozu';}},quiz:[{q:'A green Marubozu indicates:',opts:['Seller dominance','Complete buyer dominance','Indecision','Reversal'],ans:1}],chartType:'bar',chartLabel:'Body',chartData:[20,15,10,5,-8,-15,-20,-10,5,15,25,20,10,-5,-15,-25,-20,-10,5,15,25,30,20,10,-5]},
 
 // ── FUNDAMENTAL ANALYSIS (10) ──
 {id:'three_statements',cat:'fundamental',emoji:'📑',title:'Three-Statement Financial Model',explanation:`<h5>The Three Core Statements</h5><ul><li><b>Income Statement:</b> Revenue → COGS → Gross Profit → EBITDA → EBIT → PAT (Profit After Tax)</li><li><b>Balance Sheet:</b> Assets = Liabilities + Shareholders' Equity</li><li><b>Cash Flow Statement:</b> CFO (Operating) + CFI (Investing) + CFF (Financing) = Net Change in Cash</li></ul><p>These three statements are interconnected: Net Income flows to Retained Earnings, Capex links Income Statement to Balance Sheet, and Depreciation is a non-cash adjustment in CFO.</p>`,formula:`<div class="academy-formula-block">Net Profit Margin = PAT / Revenue × 100<br>Operating Margin = EBIT / Revenue × 100</div>`,sandbox:{inputs:[{label:'Revenue (Cr)',key:'rev',val:10000},{label:'PAT (Cr)',key:'pat',val:1500}],calc:(v)=>`Net Margin = ${(v.pat/v.rev*100).toFixed(2)}%`},quiz:[{q:'The accounting equation is:',opts:['Assets = Revenue − Expenses','Assets = Liabilities + Equity','Revenue = Expenses + Profit','Cash = Assets − Liabilities'],ans:1}],chartType:'bar',chartLabel:'Margins (%)',chartData:[12,13,14,15,14,13,15,16,17,18,17,16,18,19,20,19,18,20,21,22,21,20,22,23,24]},
 
-{id:'valuation_multiples',cat:'fundamental',emoji:'📊',title:'Valuation Multiples (P/E, P/B, EV/EBITDA)',explanation:`<h5>Key Valuation Ratios</h5><ul><li><b>P/E Ratio:</b> Price / Earnings Per Share — most widely used equity valuation metric</li><li><b>P/B Ratio:</b> Price / Book Value per share — useful for banks and asset-heavy companies</li><li><b>EV/EBITDA:</b> Enterprise Value / EBITDA — capital-structure neutral comparison</li></ul><p>Compare to sector median and historical averages to assess premium/discount.</p>`,formula:`<div class="academy-formula-block">P/E = Market Price / EPS<br>P/B = Market Price / Book Value per Share<br>EV = Market Cap + Debt − Cash<br>EV/EBITDA = EV / EBITDA</div>`,sandbox:{inputs:[{label:'Price (₹)',key:'price',val:2500},{label:'EPS (₹)',key:'eps',val:80},{label:'Book Value',key:'bv',val:450}],calc:(v)=>`P/E = ${(v.price/v.eps).toFixed(2)}x | P/B = ${(v.price/v.bv).toFixed(2)}x`},quiz:[{q:'EV/EBITDA is preferred over P/E because:',opts:['It includes dividends','It is capital-structure neutral','It uses cash flow','It ignores debt'],ans:1}],chartType:'line',chartLabel:'P/E Ratio',chartData:[18,20,22,25,28,30,28,25,22,20,18,20,22,25,30,35,32,28,25,22,20,22,25,28,30]},
+{id:'valuation_multiples',cat:'fundamental',emoji:'📊',title:'Valuation Multiples (P/E, P/B, EV/EBITDA)',explanation:`<h5>Key Valuation Ratios</h5><ul><li><b>P/E Ratio:</b> Price / Earnings Per Share — most widely used equity valuation metric</li><li><b>P/B Ratio:</b> Price / Book Value per share — useful for banks and asset-heavy companies</li><li><b>EV/EBITDA:</b> Enterprise Value / EBITDA — capital-structure neutral comparison</li></ul><p>Compare to sector median and historical averages to assess premium/discount.</p>`,formula:`<div class="academy-formula-block">P/E = Market Price / EPS<br>P/B = Market Price / Book Value per Share<br>EV = Market Cap + Debt − Cash<br>EV/EBITDA = EV / EBITDA</div>`,sandbox:{inputs:[{label:'Price (₹)',key:'price',val:2500},{label:'EPS (₹)',key:'eps',val:80},{label:'Book Value (₹)',key:'bv',val:450},{label:'EBITDA/Share (₹)',key:'ebitda',val:200},{label:'Net Debt/Share (₹)',key:'debt',val:150}],calc:(v)=>`P/E = ${(v.price/v.eps).toFixed(2)}x | P/B = ${(v.price/v.bv).toFixed(2)}x | EV/EBITDA = ${((v.price+v.debt)/v.ebitda).toFixed(2)}x`},quiz:[{q:'EV/EBITDA is preferred over P/E because:',opts:['It includes dividends','It is capital-structure neutral','It uses cash flow','It ignores debt'],ans:1}],chartType:'line',chartLabel:'P/E Ratio',chartData:[18,20,22,25,28,30,28,25,22,20,18,20,22,25,30,35,32,28,25,22,20,22,25,28,30]},
 
 {id:'return_ratios',cat:'fundamental',emoji:'💹',title:'Return Ratios (ROE, ROCE, ROA)',explanation:`<h5>Return on Equity (ROE)</h5><p>Measures profitability relative to shareholders' equity. High ROE (>15%) indicates efficient capital usage.</p><h5>Return on Capital Employed (ROCE)</h5><p>Measures returns generated on total capital (equity + debt). Better for comparing companies with different capital structures.</p><h5>Return on Assets (ROA)</h5><p>Measures how efficiently assets generate profits.</p>`,formula:`<div class="academy-formula-block">ROE = PAT / Shareholders' Equity × 100<br>ROCE = EBIT / Capital Employed × 100<br>ROA = PAT / Total Assets × 100</div>`,sandbox:{inputs:[{label:'PAT (Cr)',key:'pat',val:1500},{label:'Equity (Cr)',key:'equity',val:8000},{label:'EBIT (Cr)',key:'ebit',val:2200},{label:'Capital Employed',key:'ce',val:12000}],calc:(v)=>`ROE = ${(v.pat/v.equity*100).toFixed(2)}% | ROCE = ${(v.ebit/v.ce*100).toFixed(2)}%`},quiz:[{q:'ROCE is better than ROE for comparing companies with:',opts:['Same sector','Different capital structures','Same size','High growth'],ans:1}],chartType:'line',chartLabel:'ROE (%)',chartData:[14,15,16,18,20,22,21,19,17,16,18,20,22,24,23,21,19,20,22,24,26,25,23,21,22]},
 
@@ -29057,7 +28942,9 @@ const ACADEMY_CATALOG = [
 
 {id:'yield_curve',cat:'bonds',emoji:'📉',title:'Yield Curve Structure',explanation:`<h5>What is the Yield Curve?</h5><p>A graph plotting yields of bonds with equal credit quality but differing maturities.</p><h5>Shapes</h5><ul><li><b>Normal:</b> Upward sloping — longer maturities pay higher yields (economy healthy)</li><li><b>Inverted:</b> Downward sloping — short-term yields > long-term (recession signal)</li><li><b>Flat:</b> Similar yields across maturities (transition period)</li><li><b>Humped:</b> Medium-term yields highest (uncertainty)</li></ul><div class="academy-example-box">📌 An inverted yield curve has predicted every US recession in the last 50 years with a lead time of 6–18 months.</div>`,formula:`<div class="academy-formula-block">Spread = Long-term Yield − Short-term Yield<br>Positive Spread = Normal | Negative = Inverted</div>`,sandbox:{inputs:[{label:'2Y Yield (%)',key:'y2',val:7.0},{label:'10Y Yield (%)',key:'y10',val:7.5}],calc:(v)=>`Spread = ${(v.y10-v.y2).toFixed(2)}% → ${v.y10>v.y2?'Normal Curve':'Inverted Curve ⚠️'}`},quiz:[{q:'An inverted yield curve typically signals:',opts:['Economic boom','Potential recession','Inflation','Bull market'],ans:1}],chartType:'line',chartLabel:'Yield (%)',chartData:[6.5,6.6,6.7,6.8,7.0,7.1,7.2,7.3,7.4,7.5,7.55,7.6,7.62,7.63,7.64,7.65,7.66,7.67,7.68,7.69,7.7,7.71,7.72,7.73,7.74]},
 
-{id:'duration_convexity',cat:'bonds',emoji:'⏱️',title:'Duration & Convexity',explanation:`<h5>Duration</h5><p>Measures a bond's price sensitivity to interest rate changes. Higher duration = more sensitivity.</p><h5>Modified Duration</h5><p>Approximate percentage change in price for a 1% change in yield.</p><h5>Convexity</h5><p>Measures the curvature of the price-yield relationship. Positive convexity means bonds gain more from rate drops than they lose from rate increases.</p>`,formula:`<div class="academy-formula-block">Modified Duration = Macaulay Duration / (1 + YTM/n)<br>ΔP/P ≈ −Duration × Δy + ½ × Convexity × (Δy)²</div>`,sandbox:{inputs:[{label:'Duration (yrs)',key:'dur',val:5.2},{label:'Yield Change (%)',key:'dy',val:-0.5},{label:'Convexity',key:'conv',val:28}],calc:(v)=>{const priceChange=-v.dur*v.dy+0.5*v.conv*Math.pow(v.dy/100,2)*10000;return `Approx Price Change = ${priceChange.toFixed(2)}%`;}},quiz:[{q:'Higher duration means bond price is:',opts:['Less sensitive to rates','More sensitive to rates','Unaffected','More volatile intraday'],ans:1}],chartType:'line',chartLabel:'Duration',chartData:[2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,7,6.5,6,5.5,5,4.5,4,3.5,3,3.5,4,4.5,5]},
+{id:'bond_duration',cat:'bonds',emoji:'⏱️',title:'Bond Duration',explanation:`<h5>Duration</h5><p>Measures a bond's price sensitivity to interest rate changes. Higher duration = more sensitivity.</p><h5>Modified Duration</h5><p>Approximate percentage change in price for a 1% change in yield. Relates Macaulay Duration to yield.</p>`,formula:`<div class="academy-formula-block">Modified Duration = Macaulay Duration / (1 + YTM/n)</div>`,sandbox:{inputs:[{label:'Face Value (₹)',key:'fv',val:1000},{label:'Coupon Rate (%)',key:'coupon',val:8},{label:'Yield to Maturity (%)',key:'yield',val:7},{label:'Years',key:'n',val:5}],calc:(v)=>{const c=v.fv*v.coupon/100;let w=0,p=0;for(let t=1;t<=v.n;t++){const cf=(t===v.n)?(c+v.fv):c;const pv=cf/Math.pow(1+v.yield/100,t);p+=pv;w+=t*pv;}const mac=w/p;const mod=mac/(1+v.yield/100);return `Macaulay: ${mac.toFixed(2)} yrs | Modified: ${mod.toFixed(2)}%`;}},quiz:[{q:'When interest rates rise, bond prices with higher duration:',opts:['Rise more','Fall more','Stay same','Double'],ans:1}],chartType:'line',chartLabel:'Duration',chartData:[2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,7,6.5,6,5.5,5,4.5,4,3.5,3,3.5,4,4.5,5]},
+
+{id:'bond_convexity',cat:'bonds',emoji:'⏱️',title:'Bond Convexity',explanation:`<h5>Convexity</h5><p>Measures the curvature of the price-yield relationship. It improves price sensitivity approximations for larger rate shifts.</p><h5>Positive Convexity</h5><p>Bonds gain more from rate drops than they lose from rate increases. Positive convexity is highly valued by investors.</p>`,formula:`<div class="academy-formula-block">ΔP/P ≈ −Duration × Δy + ½ × Convexity × (Δy)²</div>`,sandbox:{inputs:[{label:'Duration (yrs)',key:'dur',val:5.2},{label:'Yield Change (%)',key:'dy',val:-0.5},{label:'Convexity',key:'conv',val:28}],calc:(v)=>{const priceChange=-v.dur*v.dy+0.5*v.conv*Math.pow(v.dy/100,2)*10000;return `Approx Price Change = ${priceChange.toFixed(2)}%`;}},quiz:[{q:'Convexity is a measure of:',opts:['Linear price change','Curvature of the price-yield relationship','Interest rate risk only','Credit risk'],ans:1}],chartType:'line',chartLabel:'Convexity',chartData:[2,2.5,3,3.5,4,4.5,5,5.5,6,6.5,7,7.5,7,6.5,6,5.5,5,4.5,4,3.5,3,3.5,4,4.5,5]},
 
 {id:'credit_spreads',cat:'bonds',emoji:'⚠️',title:'Credit Risk & Spreads',explanation:`<h5>Credit Spread</h5><p>The difference in yield between a corporate bond and a risk-free government bond of the same maturity. Wider spreads indicate higher perceived credit risk.</p><ul><li><b>AAA Spread:</b> ~0.3–0.8% above G-Sec</li><li><b>BBB Spread:</b> ~1.5–3.0% above G-Sec</li><li>Spreads widen during market stress and narrow during confidence</li></ul>`,formula:`<div class="academy-formula-block">Credit Spread = Corporate Bond Yield − Risk-Free Yield<br>Wider Spread = Higher Risk Premium</div>`,sandbox:{inputs:[{label:'Corporate Yield (%)',key:'corp',val:9.5},{label:'G-Sec Yield (%)',key:'gsec',val:7.2}],calc:(v)=>`Credit Spread = ${(v.corp-v.gsec).toFixed(2)}% (${(v.corp-v.gsec)>2?'Wide — High Risk':'Normal'})`},quiz:[{q:'Wider credit spreads indicate:',opts:['Lower risk','Higher risk perception','Economic boom','Low inflation'],ans:1}],chartType:'line',chartLabel:'Spread (bps)',chartData:[120,110,100,95,90,85,80,90,100,120,150,180,160,140,120,100,90,85,80,90,100,110,120,115,105]},
 
@@ -29092,6 +28979,39 @@ function setupLearningAcademy() {
     setupAcademyDrawCanvas();
     setupAcademyAICoach();
 
+    // Collapsible Navigator list toggle
+    const navToggleBtn = document.getElementById('academy-navigator-toggle-btn');
+    const academyLayout = document.querySelector('.academy-layout');
+    if (navToggleBtn && academyLayout) {
+        const isCollapsed = localStorage.getItem('academy-navigator-collapsed') === 'true';
+        if (isCollapsed) {
+            academyLayout.classList.add('navigator-collapsed');
+            navToggleBtn.textContent = '📁 Show List';
+            navToggleBtn.style.background = 'var(--academy-accent-hover)';
+        }
+        
+        navToggleBtn.addEventListener('click', () => {
+            const collapsed = academyLayout.classList.toggle('navigator-collapsed');
+            localStorage.setItem('academy-navigator-collapsed', collapsed);
+            navToggleBtn.textContent = collapsed ? '📁 Show List' : '📁 Hide List';
+            if (collapsed) {
+                navToggleBtn.style.background = 'var(--academy-accent-hover)';
+            } else {
+                navToggleBtn.style.background = 'var(--academy-accent-focus)';
+            }
+            window.dispatchEvent(new Event('resize'));
+        });
+    }
+
+    // Back to list button on mobile Master-Detail flow
+    const backBtn = document.getElementById('academy-back-to-list-btn');
+    const tabLearning = document.getElementById('tab-learning');
+    if (backBtn && tabLearning) {
+        backBtn.addEventListener('click', () => {
+            tabLearning.classList.remove('academy-show-detail');
+        });
+    }
+
     // Mark complete button
     const markBtn = document.getElementById('academy-mark-complete-btn');
     if (markBtn) markBtn.addEventListener('click', () => {
@@ -29117,10 +29037,20 @@ function setupLearningAcademy() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         }
+        if (window.activeAcademyLightweightChart) {
+            window.activeAcademyLightweightChart.applyOptions({
+                handleScroll: !academyDrawMode,
+                handleScale: !academyDrawMode,
+            });
+        }
         if (toolbar) toolbar.style.display = academyDrawMode ? 'flex' : 'none';
         drawBtn.style.color = academyDrawMode ? 'var(--color-primary)' : '';
         drawBtn.style.borderColor = academyDrawMode ? 'var(--color-primary)' : '';
     });
+
+    // Case Study button
+    const caseBtn = document.getElementById('academy-generate-scenario-btn');
+    if (caseBtn) caseBtn.addEventListener('click', generateAcademyCaseStudy);
 }
 
 function renderAcademyNavigator(filter='all', search='') {
@@ -29184,6 +29114,11 @@ function setupAcademyFilters() {
 function loadAcademyTopic(topicId) {
     const module = ACADEMY_CATALOG.find(m => m.id === topicId);
     if (!module) return;
+
+    const tabLearning = document.getElementById('tab-learning');
+    if (tabLearning) {
+        tabLearning.classList.add('academy-show-detail');
+    }
 
     academyActiveTopicId = topicId;
     academyActiveSandboxValues = {}; // Reset sandbox values to defaults for the new topic
@@ -29280,6 +29215,9 @@ function loadAcademyTopic(topicId) {
     // Scroll workbench to top
     const wb = document.getElementById('academy-workbench');
     if (wb) wb.scrollTop = 0;
+
+    // Render prompt suggestions
+    renderAcademyPromptSuggestions(module);
 }
 
 const ACADEMY_BASE_PRICES = [
@@ -29343,101 +29281,172 @@ function computeEMA(prices, period) {
 }
 
 function renderAcademyChart(module) {
-    const canvas = document.getElementById('academy-widget-canvas');
-    if (!canvas) return;
+    const chartWorkspace = document.getElementById('academy-widget-container');
+    const customWorkspace = document.getElementById('academy-custom-widget-workspace');
+    const controls = document.getElementById('academy-chart-controls');
+    const drawToolbar = document.getElementById('academy-draw-toolbar');
+    
+    if (module.cat === 'fundamental' || module.cat === 'bonds' || ['adr_atr', 'adx', 'stochastic', 'ichimoku', 'vwap', 'obv', 'mfi', 'cci', 'parabolic_sar'].includes(module.id)) {
+        if (chartWorkspace) chartWorkspace.style.display = 'none';
+        if (controls) controls.style.display = 'none';
+        if (drawToolbar) drawToolbar.style.display = 'none';
+        if (customWorkspace) customWorkspace.style.display = 'flex';
+        
+        // Clean up previous chart instance
+        if (window.activeAcademyLightweightChart) {
+            window.activeAcademyLightweightChart.remove();
+            window.activeAcademyLightweightChart = null;
+        }
+        
+        const sbVals = { ...academyActiveSliderValues, ...academyActiveSandboxValues };
+        renderCustomAcademyWidget(module, sbVals);
+        return;
+    }
+    
+    if (chartWorkspace) chartWorkspace.style.display = 'block';
+    if (controls) controls.style.display = 'flex';
+    if (drawToolbar) drawToolbar.style.display = academyDrawMode ? 'flex' : 'none';
+    if (customWorkspace) customWorkspace.style.display = 'none';
 
-    const container = document.getElementById('academy-widget-container');
-    if (container) {
-        canvas.width = container.clientWidth || 700;
-        canvas.height = 300;
-        const drawCanvas = document.getElementById('academy-draw-canvas');
-        if (drawCanvas) { drawCanvas.width = canvas.width; drawCanvas.height = canvas.height; }
+    const container = document.getElementById('academy-lightweight-chart-container');
+    if (!container) return;
+
+    // Clean up previous chart instance
+    if (window.activeAcademyLightweightChart) {
+        window.activeAcademyLightweightChart.remove();
+        window.activeAcademyLightweightChart = null;
     }
 
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width, h = canvas.height;
-    const padding = { top: 40, right: 30, bottom: 30, left: 50 };
-    const chartW = w - padding.left - padding.right;
-    const chartH = h - padding.top - padding.bottom;
-
-    ctx.clearRect(0, 0, w, h);
+    const parentContainer = document.getElementById('academy-widget-container');
+    const drawCanvas = document.getElementById('academy-draw-canvas');
+    if (parentContainer && drawCanvas) {
+        drawCanvas.width = parentContainer.clientWidth || 700;
+        drawCanvas.height = 300;
+    }
 
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light' && !document.body.classList.contains('light-mode');
-    ctx.fillStyle = isDark ? 'rgba(6,9,19,0.9)' : 'rgba(248,250,252,0.95)';
-    ctx.fillRect(0, 0, w, h);
+    
+    // Choose colors based on theme
+    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const textColor = isDark ? '#9ca3af' : '#4b5563';
+    
+    // Initialize chart
+    const chart = LightweightCharts.createChart(container, {
+        width: parentContainer.clientWidth || 700,
+        height: 300,
+        layout: {
+            background: { type: LightweightCharts.ColorType.Solid, color: 'transparent' },
+            textColor: textColor,
+        },
+        grid: {
+            vertLines: { color: gridColor },
+            horzLines: { color: gridColor },
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        handleScroll: !academyDrawMode,
+        handleScale: !academyDrawMode,
+    });
+    
+    window.activeAcademyLightweightChart = chart;
+    
+    // Track series to populate tooltip
+    const activeSeriesMap = {};
 
-    // Initialize interactive points store
-    academyActiveChartData = {
-        module: module,
-        padding: padding,
-        chartW: chartW,
-        chartH: chartH,
-        w: w,
-        h: h,
-        isDark: isDark,
-        points: []
-    };
+    // Get active values (Indicators use academyActiveSliderValues, Candlesticks/patterns use academyActiveSandboxValues)
+    const sbVals = { ...academyActiveSliderValues, ...academyActiveSandboxValues };
+    const activeSub = academyActiveSubPattern[module.id] || (ACADEMY_SUB_PATTERNS[module.id] ? ACADEMY_SUB_PATTERNS[module.id][0] : null);
 
-    let drawGridAndLabels = (minVal, maxVal) => {
-        const range = maxVal - minVal || 1;
-        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
-        ctx.lineWidth = 0.5;
-        for (let i = 0; i <= 5; i++) {
-            const y = padding.top + (chartH / 5) * i;
-            ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
-            const label = (maxVal - (range / 5) * i).toFixed(1);
-            ctx.fillStyle = isDark ? '#9ca3af' : '#6b7280';
-            ctx.font = '9px Inter';
-            ctx.textAlign = 'right';
-            ctx.fillText(label, padding.left - 6, y + 3);
+    // Render depending on topic type or category
+    if (module.cat === 'candlestick') {
+        const candles = getDynamicCandleData(module, activeSub, sbVals);
+        const formattedCandles = candles.map((c, idx) => {
+            const date = new Date(2026, 5, idx + 1);
+            return {
+                time: date.toISOString().split('T')[0],
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close
+            };
+        });
+        
+        const candleSeries = chart.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: true,
+            wickVisible: true,
+            borderUpColor: '#10b981',
+            borderDownColor: '#ef4444',
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444',
+        });
+        candleSeries.setData(formattedCandles);
+        activeSeriesMap['Candle'] = candleSeries;
+
+        // Set native markers on target candles if applicable
+        if (formattedCandles.length > 0) {
+            let targetIdx = formattedCandles.length - 1;
+            if (module.id === 'doji') targetIdx = 2;
+            else if (['hammer', 'hanging_man', 'bullish_engulfing', 'bearish_engulfing', 'morning_star', 'evening_star'].includes(module.id)) targetIdx = 4;
+            else if (['shooting_star', 'inverted_hammer', 'bullish_harami', 'bearish_harami', 'piercing_line', 'dark_cloud_cover'].includes(module.id)) targetIdx = 3;
+            else if (['three_white_soldiers', 'three_black_crows'].includes(module.id)) targetIdx = 5;
+            else if (module.id === 'marubozu') targetIdx = 1;
+            if (formattedCandles[targetIdx]) {
+                candleSeries.setMarkers([
+                    {
+                        time: formattedCandles[targetIdx].time,
+                        position: 'aboveBar',
+                        color: '#f59e0b',
+                        shape: 'arrowDown',
+                        text: module.emoji + ' ' + (activeSub || module.title),
+                    }
+                ]);
+            }
         }
-    };
-
-    if (module.id === 'rsi') {
-        const length = academyActiveSliderValues['rsi_length'] || 14;
-        const overbought = academyActiveSliderValues['rsi_overbought'] || 70;
-        const oversold = academyActiveSliderValues['rsi_oversold'] || 30;
+    } 
+    else if (module.id === 'rsi') {
+        const length = sbVals['rsi_length'] !== undefined ? sbVals['rsi_length'] : 14;
+        const overbought = sbVals['rsi_overbought'] !== undefined ? sbVals['rsi_overbought'] : 70;
+        const oversold = sbVals['rsi_oversold'] !== undefined ? sbVals['rsi_oversold'] : 30;
         const rsiData = computeRSI(ACADEMY_BASE_PRICES, length);
 
-        drawGridAndLabels(0, 100);
-
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([5, 5]);
-        const yOB = padding.top + chartH - (overbought / 100) * chartH;
-        ctx.beginPath(); ctx.moveTo(padding.left, yOB); ctx.lineTo(w - padding.right, yOB); ctx.stroke();
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
-        ctx.font = '9px Inter';
-        ctx.textAlign = 'left';
-        ctx.fillText(`OB (${overbought})`, padding.left + 5, yOB - 4);
-
-        ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
-        const yOS = padding.top + chartH - (oversold / 100) * chartH;
-        ctx.beginPath(); ctx.moveTo(padding.left, yOS); ctx.lineTo(w - padding.right, yOS); ctx.stroke();
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.8)';
-        ctx.fillText(`OS (${oversold})`, padding.left + 5, yOS + 12);
-        ctx.setLineDash([]);
-
-        ctx.beginPath();
-        ctx.strokeStyle = '#8b5cf6';
-        ctx.lineWidth = 2;
-        rsiData.forEach((v, i) => {
-            const x = padding.left + (chartW / (rsiData.length - 1)) * i;
-            const y = padding.top + chartH - (v / 100) * chartH;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-
-            academyActiveChartData.points.push({
-                x: x,
-                y: y,
-                values: { 'RSI': v.toFixed(2) }
-            });
+        const rsiSeries = chart.addLineSeries({
+            color: '#8b5cf6',
+            lineWidth: 2,
         });
-        ctx.stroke();
+        const formattedData = rsiData.map((v, idx) => {
+            const date = new Date(2026, 5, idx + 1);
+            return { time: date.toISOString().split('T')[0], value: v };
+        });
+        rsiSeries.setData(formattedData);
+        activeSeriesMap['RSI'] = rsiSeries;
 
-    } else if (module.id === 'macd') {
-        const fast = academyActiveSliderValues['macd_fast'] || 12;
-        const slow = academyActiveSliderValues['macd_slow'] || 26;
-        const signal = academyActiveSliderValues['macd_signal'] || 9;
+        // Overbought PriceLine
+        rsiSeries.createPriceLine({
+            price: overbought,
+            color: 'rgba(239, 68, 68, 0.6)',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `OB (${overbought})`,
+        });
+
+        // Oversold PriceLine
+        rsiSeries.createPriceLine({
+            price: oversold,
+            color: 'rgba(16, 185, 129, 0.6)',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `OS (${oversold})`,
+        });
+    } 
+    else if (module.id === 'macd') {
+        const fast = sbVals['macd_fast'] !== undefined ? sbVals['macd_fast'] : 12;
+        const slow = sbVals['macd_slow'] !== undefined ? sbVals['macd_slow'] : 26;
+        const signal = sbVals['macd_signal'] !== undefined ? sbVals['macd_signal'] : 9;
 
         const fastEMA = computeEMA(ACADEMY_BASE_PRICES, fast);
         const slowEMA = computeEMA(ACADEMY_BASE_PRICES, slow);
@@ -29453,55 +29462,37 @@ function renderAcademyChart(module) {
             hist.push(macdLine[i] - signalLine[i]);
         }
 
-        const allVals = [...macdLine, ...signalLine, ...hist];
-        const minVal = Math.min(...allVals);
-        const maxVal = Math.max(...allVals);
-        const range = Math.max(Math.abs(minVal), Math.abs(maxVal)) * 2;
-
-        drawGridAndLabels(-range / 2, range / 2);
-
-        const barW = chartW / hist.length * 0.6;
-        const gap = chartW / hist.length;
-        hist.forEach((v, i) => {
-            const x = padding.left + gap * i + (gap - barW) / 2;
-            const barH = (v / (range / 2)) * (chartH / 2);
-            ctx.fillStyle = v >= 0 ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)';
-            ctx.fillRect(x, padding.top + chartH / 2 - (v >= 0 ? barH : 0), barW, Math.abs(barH));
+        const macdSeries = chart.addLineSeries({
+            color: '#3b82f6',
+            lineWidth: 1.5,
+            title: 'MACD'
+        });
+        const sigSeries = chart.addLineSeries({
+            color: '#f97316',
+            lineWidth: 1.5,
+            title: 'Signal'
+        });
+        const histSeries = chart.addHistogramSeries({
+            color: '#10b981',
+            title: 'Histogram'
         });
 
-        ctx.beginPath();
-        ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 1.5;
-        macdLine.forEach((v, i) => {
-            const x = padding.left + (chartW / (macdLine.length - 1)) * i;
-            const y = padding.top + chartH / 2 - (v / (range / 2)) * (chartH / 2);
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        const dates = ACADEMY_BASE_PRICES.map((_, idx) => new Date(2026, 5, idx + 1).toISOString().split('T')[0]);
+        macdSeries.setData(macdLine.map((v, i) => ({ time: dates[i], value: v })));
+        sigSeries.setData(signalLine.map((v, i) => ({ time: dates[i], value: v })));
+        histSeries.setData(hist.map((v, i) => ({ 
+            time: dates[i], 
+            value: v,
+            color: v >= 0 ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)'
+        })));
 
-            academyActiveChartData.points.push({
-                x: x,
-                y: y,
-                values: {
-                    'MACD': v.toFixed(3),
-                    'Signal': signalLine[i].toFixed(3),
-                    'Histogram': hist[i].toFixed(3)
-                }
-            });
-        });
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.strokeStyle = '#f97316';
-        ctx.lineWidth = 1.5;
-        signalLine.forEach((v, i) => {
-            const x = padding.left + (chartW / (signalLine.length - 1)) * i;
-            const y = padding.top + chartH / 2 - (v / (range / 2)) * (chartH / 2);
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-
-    } else if (module.id === 'bollinger') {
-        const period = academyActiveSliderValues['bb_period'] || 20;
-        const stddevVal = academyActiveSliderValues['bb_stddev'] || 2.0;
+        activeSeriesMap['MACD'] = macdSeries;
+        activeSeriesMap['Signal'] = sigSeries;
+        activeSeriesMap['Histogram'] = histSeries;
+    } 
+    else if (module.id === 'bollinger') {
+        const period = sbVals['bb_period'] !== undefined ? sbVals['bb_period'] : 20;
+        const stddevVal = sbVals['bb_stddev'] !== undefined ? sbVals['bb_stddev'] : 2.0;
 
         let middle = computeSMA(ACADEMY_BASE_PRICES, period);
         let upper = [];
@@ -29522,138 +29513,2727 @@ function renderAcademyChart(module) {
             lower.push(mean - stddevVal * std);
         }
 
-        const minVal = Math.min(...lower, ...ACADEMY_BASE_PRICES);
-        const maxVal = Math.max(...upper, ...ACADEMY_BASE_PRICES);
-        const range = maxVal - minVal || 1;
-
-        drawGridAndLabels(minVal, maxVal);
-
-        ctx.beginPath();
-        upper.forEach((v, i) => {
-            const x = padding.left + (chartW / (upper.length - 1)) * i;
-            const y = padding.top + chartH - ((v - minVal) / range) * chartH;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        const priceSeries = chart.addAreaSeries({
+            color: '#6366f1',
+            topColor: 'rgba(99, 102, 241, 0.05)',
+            bottomColor: 'rgba(99, 102, 241, 0)',
+            lineWidth: 2,
+            title: 'Price'
         });
-        for (let i = lower.length - 1; i >= 0; i--) {
-            const x = padding.left + (chartW / (lower.length - 1)) * i;
-            const y = padding.top + chartH - ((lower[i] - minVal) / range) * chartH;
-            ctx.lineTo(x, y);
+        const midSeries = chart.addLineSeries({
+            color: 'rgba(245, 158, 11, 0.6)',
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            title: 'Basis'
+        });
+        const upperSeries = chart.addLineSeries({
+            color: 'rgba(99, 102, 241, 0.4)',
+            lineWidth: 1,
+            title: 'Upper'
+        });
+        const lowerSeries = chart.addLineSeries({
+            color: 'rgba(99, 102, 241, 0.4)',
+            lineWidth: 1,
+            title: 'Lower'
+        });
+
+        const dates = ACADEMY_BASE_PRICES.map((_, idx) => new Date(2026, 5, idx + 1).toISOString().split('T')[0]);
+        priceSeries.setData(ACADEMY_BASE_PRICES.map((v, i) => ({ time: dates[i], value: v })));
+        midSeries.setData(middle.map((v, i) => ({ time: dates[i], value: v })));
+        upperSeries.setData(upper.map((v, i) => ({ time: dates[i], value: v })));
+        lowerSeries.setData(lower.map((v, i) => ({ time: dates[i], value: v })));
+
+        activeSeriesMap['Stock Price'] = priceSeries;
+        activeSeriesMap['Middle Band'] = midSeries;
+        activeSeriesMap['Upper Band'] = upperSeries;
+        activeSeriesMap['Lower Band'] = lowerSeries;
+    } 
+    else if (module.id === 'sma_ema') {
+        const n = sbVals['n'] !== undefined ? sbVals['n'] : 5;
+
+        let sma = computeSMA(ACADEMY_BASE_PRICES, n);
+        let ema = computeEMA(ACADEMY_BASE_PRICES, n);
+
+        const priceSeries = chart.addAreaSeries({
+            color: '#6366f1',
+            topColor: 'rgba(99, 102, 241, 0.05)',
+            bottomColor: 'rgba(99, 102, 241, 0)',
+            lineWidth: 2,
+            title: 'Price'
+        });
+        const smaSeries = chart.addLineSeries({
+            color: 'rgba(245, 158, 11, 0.8)',
+            lineWidth: 1.5,
+            title: `SMA (${n})`
+        });
+        const emaSeries = chart.addLineSeries({
+            color: 'rgba(16, 185, 129, 0.8)',
+            lineWidth: 1.5,
+            title: `EMA (${n})`
+        });
+
+        const dates = ACADEMY_BASE_PRICES.map((_, idx) => new Date(2026, 5, idx + 1).toISOString().split('T')[0]);
+        priceSeries.setData(ACADEMY_BASE_PRICES.map((v, i) => ({ time: dates[i], value: v })));
+        smaSeries.setData(sma.map((v, i) => ({ time: dates[i], value: v })));
+        emaSeries.setData(ema.map((v, i) => ({ time: dates[i], value: v })));
+
+        activeSeriesMap['Stock Price'] = priceSeries;
+        activeSeriesMap['SMA'] = smaSeries;
+        activeSeriesMap['EMA'] = emaSeries;
+    }
+    else if (module.id === 'dcf_wacc') {
+        const fcf = sbVals['fcf'] !== undefined ? sbVals['fcf'] : 500;
+        const wacc = sbVals['wacc'] !== undefined ? sbVals['wacc'] : 12;
+        const g = sbVals['g'] !== undefined ? sbVals['g'] : 5;
+
+        const fcfSeries = chart.addHistogramSeries({
+            color: 'rgba(16, 185, 129, 0.6)',
+            title: 'FCF (Cr)'
+        });
+        const pvSeries = chart.addLineSeries({
+            color: '#3b82f6',
+            lineWidth: 2.5,
+            title: 'PV of FCF (Cr)'
+        });
+
+        const fcfData = [];
+        const pvData = [];
+        const dates = Array.from({length: 5}, (_, i) => new Date(2026, 5, i + 1).toISOString().split('T')[0]);
+
+        for (let i = 0; i < 5; i++) {
+            const f = fcf * Math.pow(1 + g / 100, i);
+            const pv = f / Math.pow(1 + wacc / 100, i + 1);
+            fcfData.push({ time: dates[i], value: f });
+            pvData.push({ time: dates[i], value: pv });
         }
-        ctx.closePath();
-        ctx.fillStyle = isDark ? 'rgba(99, 102, 241, 0.05)' : 'rgba(99, 102, 241, 0.08)';
-        ctx.fill();
 
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(99, 102, 241, 0.5)';
-        ctx.lineWidth = 1;
-        upper.forEach((v, i) => {
-            const x = padding.left + (chartW / (upper.length - 1)) * i;
-            const y = padding.top + chartH - ((v - minVal) / range) * chartH;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        fcfSeries.setData(fcfData);
+        pvSeries.setData(pvData);
+
+        activeSeriesMap['Proj FCF'] = fcfSeries;
+        activeSeriesMap['Discounted PV'] = pvSeries;
+    }
+    else if (module.id === 'three_statements') {
+        const rev = sbVals['rev'] !== undefined ? sbVals['rev'] : 10000;
+        const pat = sbVals['pat'] !== undefined ? sbVals['pat'] : 1500;
+        const ebitda = rev * 0.22; // simulated EBITDA
+
+        const statementsSeries = chart.addHistogramSeries({
+            color: '#3b82f6',
+            title: '₹ Cr'
         });
-        ctx.stroke();
+        const dates = ['2026-06-01', '2026-06-02', '2026-06-03'];
+        const data = [
+            { time: dates[0], value: rev, color: '#3b82f6' },      // Revenue
+            { time: dates[1], value: ebitda, color: '#f59e0b' },   // EBITDA
+            { time: dates[2], value: pat, color: '#10b981' }       // PAT
+        ];
+        statementsSeries.setData(data);
+        activeSeriesMap['Financial Value'] = statementsSeries;
+    }
+    else if (module.id === 'dupont') {
+        const nm = sbVals['nm'] !== undefined ? sbVals['nm'] : 15;
+        const at = sbVals['at'] !== undefined ? sbVals['at'] : 0.8;
+        const em = sbVals['em'] !== undefined ? sbVals['em'] : 1.5;
+        const roe = nm * at * em;
 
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(99, 102, 241, 0.5)';
-        ctx.lineWidth = 1;
-        lower.forEach((v, i) => {
-            const x = padding.left + (chartW / (lower.length - 1)) * i;
-            const y = padding.top + chartH - ((v - minVal) / range) * chartH;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        const dupontSeries = chart.addHistogramSeries({
+            color: '#8b5cf6',
+            title: 'DuPont Drivers'
         });
-        ctx.stroke();
+        const dates = ['2026-06-01', '2026-06-02', '2026-06-03', '2026-06-04'];
+        const data = [
+            { time: dates[0], value: nm, color: '#3b82f6' },             // Net Margin %
+            { time: dates[1], value: at * 10, color: '#f59e0b' },        // Asset Turnover x10
+            { time: dates[2], value: em * 10, color: '#10b981' },        // Equity Multiplier x10
+            { time: dates[3], value: roe, color: '#8b5cf6' }             // Resulting ROE %
+        ];
+        dupontSeries.setData(data);
+        activeSeriesMap['DuPont Driver'] = dupontSeries;
+    }
+    else if (module.id === 'bond_basics') {
+        const fv = sbVals['fv'] !== undefined ? sbVals['fv'] : 1000;
+        const couponRate = sbVals['coupon'] !== undefined ? sbVals['coupon'] : 8;
+        const currentYield = sbVals['yield'] !== undefined ? sbVals['yield'] : 7;
+        const n = sbVals['n'] !== undefined ? sbVals['n'] : 5;
 
-        ctx.beginPath();
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.6)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        middle.forEach((v, i) => {
-            const x = padding.left + (chartW / (middle.length - 1)) * i;
-            const y = padding.top + chartH - ((v - minVal) / range) * chartH;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        const priceSeries = chart.addLineSeries({
+            color: '#3b82f6',
+            lineWidth: 2.5,
+            title: 'Price vs Yield'
         });
-        ctx.stroke();
-        ctx.setLineDash([]);
 
-        ctx.beginPath();
-        ctx.strokeStyle = '#6366f1';
-        ctx.lineWidth = 2;
-        ACADEMY_BASE_PRICES.forEach((v, i) => {
-            const x = padding.left + (chartW / (ACADEMY_BASE_PRICES.length - 1)) * i;
-            const y = padding.top + chartH - ((v - minVal) / range) * chartH;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        const curveData = [];
+        const couponVal = fv * couponRate / 100;
+        
+        // Generate yields from 2% to 15%
+        for (let y = 2; y <= 15; y += 0.5) {
+            let price = 0;
+            for (let t = 1; t <= n; t++) {
+                price += couponVal / Math.pow(1 + y / 100, t);
+            }
+            price += fv / Math.pow(1 + y / 100, n);
+            
+            const date = new Date(2026, 5, Math.floor((y - 2) * 2) + 1).toISOString().split('T')[0];
+            curveData.push({ time: date, value: price });
+        }
 
-            academyActiveChartData.points.push({
-                x: x,
-                y: y,
-                values: {
-                    'Stock Price': '₹' + v.toFixed(2),
-                    'Upper Band': '₹' + upper[i].toFixed(2),
-                    'Middle Band': '₹' + middle[i].toFixed(2),
-                    'Lower Band': '₹' + lower[i].toFixed(2)
-                }
-            });
+        priceSeries.setData(curveData);
+        activeSeriesMap['Bond Price'] = priceSeries;
+
+        // Draw a price line at the CURRENT yield's price
+        let currentPrice = 0;
+        for (let t = 1; t <= n; t++) {
+            currentPrice += couponVal / Math.pow(1 + currentYield / 100, t);
+        }
+        currentPrice += fv / Math.pow(1 + currentYield / 100, n);
+
+        priceSeries.createPriceLine({
+            price: currentPrice,
+            color: '#ef4444',
+            lineWidth: 1.5,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            axisLabelVisible: true,
+            title: `Price at ${currentYield}% Yield (₹${currentPrice.toFixed(0)})`,
         });
-        ctx.stroke();
-
-    } else {
+    }
+    else {
         const data = getDynamicChartData(module);
-        if (!data || data.length === 0) return;
-        const minVal = Math.min(...data);
-        const maxVal = Math.max(...data);
-        const range = maxVal - minVal || 1;
-
-        drawGridAndLabels(minVal, maxVal);
-
-        if (module.chartType === 'bar') {
-            const barW = chartW / data.length * 0.7;
-            const gap = chartW / data.length;
-            data.forEach((v, i) => {
-                const x = padding.left + gap * i + (gap - barW) / 2;
-                const barH = (Math.abs(v) / range) * chartH;
-                const y = v >= 0 ? padding.top + chartH - (v - minVal) / range * chartH : padding.top + chartH - (-minVal) / range * chartH;
-                ctx.fillStyle = v >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)';
-                ctx.fillRect(x, y, barW, v >= 0 ? (v - Math.max(0, minVal)) / range * chartH : Math.abs(v) / range * chartH);
-
-                academyActiveChartData.points.push({
-                    x: x + barW / 2,
-                    y: y + (v >= 0 ? 0 : barH),
-                    values: { 'Value': v.toFixed(2) }
+        if (data && data.length > 0) {
+            const dates = data.map((_, idx) => new Date(2026, 5, idx + 1).toISOString().split('T')[0]);
+            
+            if (module.chartType === 'bar') {
+                const barSeries = chart.addHistogramSeries({
+                    color: '#10b981',
                 });
-            });
-        } else {
-            ctx.beginPath();
-            ctx.strokeStyle = '#6366f1';
-            ctx.lineWidth = 2;
-            data.forEach((v, i) => {
-                const x = padding.left + (chartW / (data.length - 1)) * i;
-                const y = padding.top + chartH - ((v - minVal) / range) * chartH;
-                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                barSeries.setData(data.map((v, i) => ({
+                    time: dates[i],
+                    value: v,
+                    color: v >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)'
+                })));
+                activeSeriesMap[module.chartLabel || 'Value'] = barSeries;
+            } 
+            else if (module.id === 'valuation_multiples') {
+                const peSeries = chart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'P/E' });
+                const pbSeries = chart.addLineSeries({ color: '#f97316', lineWidth: 2, title: 'P/B' });
+                const evSeries = chart.addLineSeries({ color: '#8b5cf6', lineWidth: 2, title: 'EV/EBITDA' });
 
-                academyActiveChartData.points.push({
-                    x: x,
-                    y: y,
-                    values: { 'Value': v.toFixed(2) }
+                const peData = [];
+                const pbData = [];
+                const evData = [];
+
+                const basePrice = sbVals['price'] !== undefined ? sbVals['price'] : 2500;
+                const eps = sbVals['eps'] !== undefined ? sbVals['eps'] : 80;
+                const bv = sbVals['bv'] !== undefined ? sbVals['bv'] : 450;
+                const ebitda = sbVals['ebitda'] !== undefined ? sbVals['ebitda'] : 200;
+                const debt = sbVals['debt'] !== undefined ? sbVals['debt'] : 150;
+
+                dates.forEach((date, i) => {
+                    const fluctuation = Math.sin(i / 3) * 0.15;
+                    const price = basePrice * (1 + fluctuation);
+                    
+                    peData.push({ time: date, value: price / Math.max(eps, 0.1) });
+                    pbData.push({ time: date, value: price / Math.max(bv, 0.1) });
+                    evData.push({ time: date, value: (price + debt) / Math.max(ebitda, 0.1) });
                 });
-            });
-            ctx.stroke();
 
-            const gradient = ctx.createLinearGradient(0, padding.top, 0, h - padding.bottom);
-            gradient.addColorStop(0, 'rgba(99,102,241,0.15)');
-            gradient.addColorStop(1, 'rgba(99,102,241,0)');
-            ctx.lineTo(padding.left + chartW, h - padding.bottom);
-            ctx.lineTo(padding.left, h - padding.bottom);
-            ctx.closePath();
-            ctx.fillStyle = gradient;
-            ctx.fill();
+                peSeries.setData(peData);
+                pbSeries.setData(pbData);
+                evSeries.setData(evData);
+
+                activeSeriesMap['P/E Ratio'] = peSeries;
+                activeSeriesMap['P/B Ratio'] = pbSeries;
+                activeSeriesMap['EV/EBITDA'] = evSeries;
+            }
+            else if (module.id === 'return_ratios') {
+                const roeSeries = chart.addLineSeries({ color: '#10b981', lineWidth: 2, title: 'ROE' });
+                const roceSeries = chart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'ROCE' });
+                
+                const pat = sbVals['pat'] !== undefined ? sbVals['pat'] : 1500;
+                const equity = sbVals['equity'] !== undefined ? sbVals['equity'] : 8000;
+                const ebit = sbVals['ebit'] !== undefined ? sbVals['ebit'] : 2200;
+                const ce = sbVals['ce'] !== undefined ? sbVals['ce'] : 12000;
+
+                const roeData = [];
+                const roceData = [];
+                dates.forEach((date, i) => {
+                    const fluctuation = Math.sin(i / 4) * 0.1;
+                    roeData.push({ time: date, value: (pat * (1 + fluctuation)) / Math.max(equity, 1) * 100 });
+                    roceData.push({ time: date, value: (ebit * (1 + fluctuation)) / Math.max(ce, 1) * 100 });
+                });
+                roeSeries.setData(roeData);
+                roceSeries.setData(roceData);
+                activeSeriesMap['ROE (%)'] = roeSeries;
+                activeSeriesMap['ROCE (%)'] = roceSeries;
+            }
+            else if (module.id === 'solvency_liquidity') {
+                const deSeries = chart.addLineSeries({ color: '#f59e0b', lineWidth: 2, title: 'D/E' });
+                const icrSeries = chart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'ICR' });
+
+                const debt = sbVals['debt'] !== undefined ? sbVals['debt'] : 3000;
+                const equity = sbVals['equity'] !== undefined ? sbVals['equity'] : 8000;
+                const ebit = sbVals['ebit'] !== undefined ? sbVals['ebit'] : 2200;
+                const interest = sbVals['interest'] !== undefined ? sbVals['interest'] : 300;
+
+                const deData = [];
+                const icrData = [];
+                dates.forEach((date, i) => {
+                    const fluctuation = Math.sin(i / 5) * 0.08;
+                    deData.push({ time: date, value: (debt * (1 + fluctuation)) / Math.max(equity, 1) });
+                    icrData.push({ time: date, value: (ebit * (1 + fluctuation)) / Math.max(interest, 1) });
+                });
+                deSeries.setData(deData);
+                icrSeries.setData(icrData);
+                activeSeriesMap['Debt-to-Equity'] = deSeries;
+                activeSeriesMap['Interest Coverage'] = icrSeries;
+            }
+            else if (module.id === 'dividend_metrics') {
+                const yieldSeries = chart.addLineSeries({ color: '#10b981', lineWidth: 2, title: 'Yield' });
+                const payoutSeries = chart.addLineSeries({ color: '#3b82f6', lineWidth: 2, title: 'Payout' });
+
+                const dps = sbVals['dps'] !== undefined ? sbVals['dps'] : 20;
+                const price = sbVals['price'] !== undefined ? sbVals['price'] : 800;
+                const eps = sbVals['eps'] !== undefined ? sbVals['eps'] : 50;
+
+                const yieldData = [];
+                const payoutData = [];
+                dates.forEach((date, i) => {
+                    const fluctuation = Math.sin(i / 6) * 0.12;
+                    const curPrice = price * (1 + fluctuation);
+                    yieldData.push({ time: date, value: dps / curPrice * 100 });
+                    payoutData.push({ time: date, value: dps / eps * 100 });
+                });
+                yieldSeries.setData(yieldData);
+                payoutSeries.setData(payoutData);
+                activeSeriesMap['Yield (%)'] = yieldSeries;
+                activeSeriesMap['Payout Ratio (%)'] = payoutSeries;
+            }
+            else if (module.id === 'yield_curve') {
+                const curveSeries = chart.addAreaSeries({ 
+                    color: '#3b82f6', 
+                    topColor: 'rgba(59, 130, 246, 0.2)',
+                    bottomColor: 'rgba(59, 130, 246, 0)',
+                    lineWidth: 3, 
+                    title: 'Yield Curve' 
+                });
+                const y2 = sbVals['y2'] !== undefined ? sbVals['y2'] : 7.0;
+                const y10 = sbVals['y10'] !== undefined ? sbVals['y10'] : 7.5;
+                
+                const yields = [
+                    y2 - 0.5, y2 - 0.3, y2 - 0.1, y2, 
+                    y2 + (y10 - y2) * 0.2, y2 + (y10 - y2) * 0.5, y10, y10 + 0.1, y10 + 0.2
+                ];
+                const datesCustom = yields.map((_, idx) => new Date(2026, 5, idx + 1).toISOString().split('T')[0]);
+                curveSeries.setData(yields.map((val, idx) => ({ time: datesCustom[idx], value: val })));
+                activeSeriesMap['Yield (%)'] = curveSeries;
+            }
+            else if (module.id === 'credit_spreads') {
+                const corpSeries = chart.addLineSeries({ color: '#ef4444', lineWidth: 2, title: 'Corporate' });
+                const gsecSeries = chart.addLineSeries({ color: '#10b981', lineWidth: 2, title: 'G-Sec' });
+
+                const corp = sbVals['corp'] !== undefined ? sbVals['corp'] : 9.5;
+                const gsec = sbVals['gsec'] !== undefined ? sbVals['gsec'] : 7.2;
+
+                const corpData = [];
+                const gsecData = [];
+                dates.forEach((date, i) => {
+                    const fluctuation = Math.sin(i / 4) * 0.2;
+                    corpData.push({ time: date, value: corp + fluctuation });
+                    gsecData.push({ time: date, value: gsec + fluctuation * 0.6 });
+                });
+                corpSeries.setData(corpData);
+                gsecSeries.setData(gsecData);
+                activeSeriesMap['Corporate Yield (%)'] = corpSeries;
+                activeSeriesMap['G-Sec Yield (%)'] = gsecSeries;
+            }
+            else if (module.id === 'fib_retracement') {
+                const priceSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2,
+                    title: 'Price'
+                });
+                
+                const high = sbVals['high'] !== undefined ? sbVals['high'] : 2000;
+                const low = sbVals['low'] !== undefined ? sbVals['low'] : 1600;
+                const diff = high - low;
+
+                priceSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = priceSeries;
+
+                const levels = [
+                    { lvl: 0, color: 'rgba(156, 163, 175, 0.4)' },
+                    { lvl: 0.236, color: 'rgba(245, 158, 11, 0.5)' },
+                    { lvl: 0.382, color: 'rgba(234, 179, 8, 0.5)' },
+                    { lvl: 0.5, color: 'rgba(99, 102, 241, 0.5)' },
+                    { lvl: 0.618, color: 'rgba(34, 197, 94, 0.6)' },
+                    { lvl: 0.786, color: 'rgba(148, 163, 184, 0.5)' },
+                    { lvl: 1.0, color: 'rgba(156, 163, 175, 0.4)' }
+                ];
+                levels.forEach(item => {
+                    priceSeries.createPriceLine({
+                        price: high - diff * item.lvl,
+                        color: item.color,
+                        lineWidth: item.lvl === 0.618 ? 1.5 : 1,
+                        lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true,
+                        title: `${(100 * item.lvl).toFixed(1)}% Fib (${(high - diff * item.lvl).toFixed(0)})`,
+                    });
+                });
+            }
+            else if (module.id === 'symmetrical_triangle') {
+                const high = sbVals['high'] !== undefined ? sbVals['high'] : 520;
+                const low = sbVals['low'] !== undefined ? sbVals['low'] : 480;
+                const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 520;
+                const mid = (high + low) / 2;
+                
+                const priceSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                const resSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Resistance'
+                });
+                const supSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Support'
+                });
+
+                const priceData = [];
+                const resData = [];
+                const supData = [];
+                const datesCustom = Array.from({length: 20}, (_, i) => new Date(2026, 5, i + 1).toISOString().split('T')[0]);
+
+                for (let i = 0; i < 15; i++) {
+                    const progress = i / 14;
+                    const curHigh = high - progress * (high - mid);
+                    const curLow = low + progress * (mid - low);
+                    
+                    resData.push({ time: datesCustom[i], value: curHigh });
+                    supData.push({ time: datesCustom[i], value: curLow });
+
+                    let val;
+                    if (i === 0) val = low + 5;
+                    else if (i % 2 === 0) val = curHigh - 2;
+                    else val = curLow + 2;
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                const target = bo >= mid ? bo + (high - low) : bo - (high - low);
+                for (let i = 15; i < 20; i++) {
+                    const progress = (i - 14) / 5;
+                    const val = bo + progress * (target - bo);
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                priceSeries.setData(priceData);
+                resSeries.setData(resData);
+                supSeries.setData(supData);
+
+                activeSeriesMap['Price'] = priceSeries;
+                activeSeriesMap['Resistance'] = resSeries;
+                activeSeriesMap['Support'] = supSeries;
+            }
+            else if (module.id === 'ascending_triangle') {
+                const high = sbVals['high'] !== undefined ? sbVals['high'] : 520;
+                const low = sbVals['low'] !== undefined ? sbVals['low'] : 480;
+                const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 520;
+                
+                const priceSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                const resSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Resistance'
+                });
+                const supSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Support'
+                });
+
+                const priceData = [];
+                const resData = [];
+                const supData = [];
+                const datesCustom = Array.from({length: 20}, (_, i) => new Date(2026, 5, i + 1).toISOString().split('T')[0]);
+
+                for (let i = 0; i < 15; i++) {
+                    const progress = i / 14;
+                    const curHigh = high;
+                    const curLow = low + progress * (high - low);
+                    
+                    resData.push({ time: datesCustom[i], value: curHigh });
+                    supData.push({ time: datesCustom[i], value: curLow });
+
+                    let val;
+                    if (i === 0) val = low + 5;
+                    else if (i % 2 === 0) val = curHigh - 2;
+                    else val = curLow + 2;
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                const target = bo + (high - low);
+                for (let i = 15; i < 20; i++) {
+                    const progress = (i - 14) / 5;
+                    const val = bo + progress * (target - bo);
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                priceSeries.setData(priceData);
+                resSeries.setData(resData);
+                supSeries.setData(supData);
+
+                activeSeriesMap['Price'] = priceSeries;
+                activeSeriesMap['Resistance'] = resSeries;
+                activeSeriesMap['Support'] = supSeries;
+            }
+            else if (module.id === 'descending_triangle') {
+                const high = sbVals['high'] !== undefined ? sbVals['high'] : 520;
+                const low = sbVals['low'] !== undefined ? sbVals['low'] : 480;
+                const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 480;
+                
+                const priceSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                const resSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Resistance'
+                });
+                const supSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Support'
+                });
+
+                const priceData = [];
+                const resData = [];
+                const supData = [];
+                const datesCustom = Array.from({length: 20}, (_, i) => new Date(2026, 5, i + 1).toISOString().split('T')[0]);
+
+                for (let i = 0; i < 15; i++) {
+                    const progress = i / 14;
+                    const curHigh = high - progress * (high - low);
+                    const curLow = low;
+                    
+                    resData.push({ time: datesCustom[i], value: curHigh });
+                    supData.push({ time: datesCustom[i], value: curLow });
+
+                    let val;
+                    if (i === 0) val = high - 5;
+                    else if (i % 2 === 0) val = curHigh - 2;
+                    else val = curLow + 2;
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                const target = bo - (high - low);
+                for (let i = 15; i < 20; i++) {
+                    const progress = (i - 14) / 5;
+                    const val = bo + progress * (target - bo);
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                priceSeries.setData(priceData);
+                resSeries.setData(resData);
+                supSeries.setData(supData);
+
+                activeSeriesMap['Price'] = priceSeries;
+                activeSeriesMap['Resistance'] = resSeries;
+                activeSeriesMap['Support'] = supSeries;
+            }
+            else if (module.id === 'rising_wedge') {
+                const width = sbVals['width'] !== undefined ? sbVals['width'] : 50;
+                const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 480;
+                
+                const priceSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                const resSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Resistance'
+                });
+                const supSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Support'
+                });
+
+                const priceData = [];
+                const resData = [];
+                const supData = [];
+                const datesCustom = Array.from({length: 20}, (_, i) => new Date(2026, 5, i + 1).toISOString().split('T')[0]);
+
+                for (let i = 0; i < 15; i++) {
+                    const progress = i / 14;
+                    const curSup = (bo - width) + progress * (width + 40);
+                    const curRes = bo + progress * 60;
+                    
+                    resData.push({ time: datesCustom[i], value: curRes });
+                    supData.push({ time: datesCustom[i], value: curSup });
+
+                    let val;
+                    if (i === 0) val = curSup + 5;
+                    else if (i % 2 === 0) val = curRes - 2;
+                    else val = curSup + 2;
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                const target = bo - width;
+                for (let i = 15; i < 20; i++) {
+                    const progress = (i - 14) / 5;
+                    const val = bo + progress * (target - bo);
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                priceSeries.setData(priceData);
+                resSeries.setData(resData);
+                supSeries.setData(supData);
+
+                activeSeriesMap['Price'] = priceSeries;
+                activeSeriesMap['Resistance'] = resSeries;
+                activeSeriesMap['Support'] = supSeries;
+            }
+            else if (module.id === 'falling_wedge') {
+                const width = sbVals['width'] !== undefined ? sbVals['width'] : 50;
+                const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 480;
+                
+                const priceSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                const resSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Resistance'
+                });
+                const supSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.7)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Support'
+                });
+
+                const priceData = [];
+                const resData = [];
+                const supData = [];
+                const datesCustom = Array.from({length: 20}, (_, i) => new Date(2026, 5, i + 1).toISOString().split('T')[0]);
+
+                for (let i = 0; i < 15; i++) {
+                    const progress = i / 14;
+                    const curRes = (bo + width) - progress * (width + 40);
+                    const curSup = bo - progress * 60;
+                    
+                    resData.push({ time: datesCustom[i], value: curRes });
+                    supData.push({ time: datesCustom[i], value: curSup });
+
+                    let val;
+                    if (i === 0) val = curRes - 5;
+                    else if (i % 2 === 0) val = curRes - 2;
+                    else val = curSup + 2;
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                const target = bo + width;
+                for (let i = 15; i < 20; i++) {
+                    const progress = (i - 14) / 5;
+                    const val = bo + progress * (target - bo);
+                    priceData.push({ time: datesCustom[i], value: val });
+                }
+
+                priceSeries.setData(priceData);
+                resSeries.setData(resData);
+                supSeries.setData(supData);
+
+                activeSeriesMap['Price'] = priceSeries;
+                activeSeriesMap['Resistance'] = resSeries;
+                activeSeriesMap['Support'] = supSeries;
+            }
+            else if (module.id === 'gap_dynamics') {
+                const yc = sbVals['yc'] !== undefined ? sbVals['yc'] : 500;
+                const to = sbVals['to'] !== undefined ? sbVals['to'] : 515;
+
+                const candleSeries = chart.addCandlestickSeries({
+                    upColor: '#10b981',
+                    downColor: '#ef4444',
+                    borderVisible: true,
+                    wickVisible: true,
+                    borderUpColor: '#10b981',
+                    borderDownColor: '#ef4444',
+                    wickUpColor: '#10b981',
+                    wickDownColor: '#ef4444',
+                });
+                
+                const datesCustom = Array.from({length: 6}, (_, i) => new Date(2026, 5, i + 1).toISOString().split('T')[0]);
+                const isBullishGap = to >= yc;
+
+                const formattedCandles = [
+                    { time: datesCustom[0], open: yc - 20, high: yc - 15, low: yc - 22, close: yc - 18 },
+                    { time: datesCustom[1], open: yc - 18, high: yc - 8, low: yc - 20, close: yc - 10 },
+                    { time: datesCustom[2], open: yc - 10, high: yc + 2, low: yc - 12, close: yc },
+                    { time: datesCustom[3], open: to, high: isBullishGap ? to + 10 : to + 2, low: isBullishGap ? to - 2 : to - 10, close: isBullishGap ? to + 8 : to - 8 },
+                    { time: datesCustom[4], open: isBullishGap ? to + 8 : to - 8, high: isBullishGap ? to + 15 : to - 5, low: isBullishGap ? to + 5 : to - 15, close: isBullishGap ? to + 12 : to - 12 },
+                    { time: datesCustom[5], open: isBullishGap ? to + 12 : to - 12, high: isBullishGap ? to + 22 : to - 8, low: isBullishGap ? to + 10 : to - 20, close: isBullishGap ? to + 18 : to - 16 }
+                ];
+
+                candleSeries.setData(formattedCandles);
+                activeSeriesMap['Candle'] = candleSeries;
+
+                candleSeries.createPriceLine({
+                    price: yc,
+                    color: 'rgba(245, 158, 11, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Yesterday Close (₹${yc})`,
+                });
+
+                candleSeries.createPriceLine({
+                    price: to,
+                    color: '#3b82f6',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Today Open (₹${to})`,
+                });
+            }
+            else if (module.id === 'double_top') {
+                const peak = sbVals['peak'] !== undefined ? sbVals['peak'] : 500;
+                const trough = sbVals['trough'] !== undefined ? sbVals['trough'] : 450;
+                const targetVal = trough - (peak - trough);
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                // Resistance line (at peaks)
+                areaSeries.createPriceLine({
+                    price: peak,
+                    color: 'rgba(239, 68, 68, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Resistance (₹${peak.toFixed(0)})`,
+                });
+
+                // Support / Neckline
+                areaSeries.createPriceLine({
+                    price: trough,
+                    color: 'rgba(245, 158, 11, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Neckline (₹${trough.toFixed(0)})`,
+                });
+
+                // Projected Target
+                areaSeries.createPriceLine({
+                    price: targetVal,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Target (₹${targetVal.toFixed(0)})`,
+                });
+            }
+            else if (module.id === 'double_bottom') {
+                const peak = sbVals['peak'] !== undefined ? sbVals['peak'] : 500;
+                const trough = sbVals['trough'] !== undefined ? sbVals['trough'] : 450;
+                const targetVal = peak + (peak - trough);
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                // Support line (at troughs)
+                areaSeries.createPriceLine({
+                    price: trough,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Support (₹${trough.toFixed(0)})`,
+                });
+
+                // Resistance / Neckline
+                areaSeries.createPriceLine({
+                    price: peak,
+                    color: 'rgba(245, 158, 11, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Neckline (₹${peak.toFixed(0)})`,
+                });
+
+                // Projected Target
+                areaSeries.createPriceLine({
+                    price: targetVal,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Target (₹${targetVal.toFixed(0)})`,
+                });
+            }
+            else if (module.id === 'triple_top') {
+                const level = sbVals['level'] !== undefined ? sbVals['level'] : 500;
+                const sr = sbVals['sr'] !== undefined ? sbVals['sr'] : 460;
+                const targetVal = sr - (level - sr);
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                // Resistance
+                areaSeries.createPriceLine({
+                    price: level,
+                    color: 'rgba(239, 68, 68, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Resistance (₹${level.toFixed(0)})`,
+                });
+
+                // Support / Neckline
+                areaSeries.createPriceLine({
+                    price: sr,
+                    color: 'rgba(245, 158, 11, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Support (₹${sr.toFixed(0)})`,
+                });
+
+                // Target
+                areaSeries.createPriceLine({
+                    price: targetVal,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Target (₹${targetVal.toFixed(0)})`,
+                });
+            }
+            else if (module.id === 'triple_bottom') {
+                const level = sbVals['level'] !== undefined ? sbVals['level'] : 460;
+                const sr = sbVals['sr'] !== undefined ? sbVals['sr'] : 500;
+                const targetVal = sr + (sr - level);
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                // Support
+                areaSeries.createPriceLine({
+                    price: level,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Support (₹${level.toFixed(0)})`,
+                });
+
+                // Resistance / Neckline
+                areaSeries.createPriceLine({
+                    price: sr,
+                    color: 'rgba(245, 158, 11, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Resistance (₹${sr.toFixed(0)})`,
+                });
+
+                // Target
+                areaSeries.createPriceLine({
+                    price: targetVal,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Target (₹${targetVal.toFixed(0)})`,
+                });
+            }
+            else if (module.id === 'head_shoulders') {
+                const head = sbVals['head'] !== undefined ? sbVals['head'] : 1200;
+                const neck = sbVals['neck'] !== undefined ? sbVals['neck'] : 1050;
+                const targetVal = neck - (head - neck);
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                // Head
+                areaSeries.createPriceLine({
+                    price: head,
+                    color: 'rgba(239, 68, 68, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Head (₹${head.toFixed(0)})`,
+                });
+
+                // Neckline
+                areaSeries.createPriceLine({
+                    price: neck,
+                    color: 'rgba(245, 158, 11, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Neckline (₹${neck.toFixed(0)})`,
+                });
+
+                // Target
+                areaSeries.createPriceLine({
+                    price: targetVal,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Target (₹${targetVal.toFixed(0)})`,
+                });
+            }
+            else if (module.id === 'inverse_head_shoulders') {
+                const head = sbVals['head'] !== undefined ? sbVals['head'] : 900;
+                const neck = sbVals['neck'] !== undefined ? sbVals['neck'] : 1050;
+                const targetVal = neck + (neck - head);
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                // Head Trough
+                areaSeries.createPriceLine({
+                    price: head,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Head Trough (₹${head.toFixed(0)})`,
+                });
+
+                // Neckline
+                areaSeries.createPriceLine({
+                    price: neck,
+                    color: 'rgba(245, 158, 11, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Neckline (₹${neck.toFixed(0)})`,
+                });
+
+                // Target
+                areaSeries.createPriceLine({
+                    price: targetVal,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Target (₹${targetVal.toFixed(0)})`,
+                });
+            }
+            else if (module.id === 'cup_handle') {
+                const rim = sbVals['rim'] !== undefined ? sbVals['rim'] : 200;
+                const bottom = sbVals['bottom'] !== undefined ? sbVals['bottom'] : 160;
+                const targetVal = rim + (rim - bottom);
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                // Rim
+                areaSeries.createPriceLine({
+                    price: rim,
+                    color: 'rgba(245, 158, 11, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Cup Rim (₹${rim.toFixed(0)})`,
+                });
+
+                // Bottom
+                areaSeries.createPriceLine({
+                    price: bottom,
+                    color: 'rgba(239, 68, 68, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Cup Bottom (₹${bottom.toFixed(0)})`,
+                });
+
+                // Target
+                areaSeries.createPriceLine({
+                    price: targetVal,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Target (₹${targetVal.toFixed(0)})`,
+                });
+            }
+            else if (module.id === 'inverse_cup_handle') {
+                const rim = sbVals['rim'] !== undefined ? sbVals['rim'] : 160;
+                const top = sbVals['top'] !== undefined ? sbVals['top'] : 200;
+                const targetVal = rim - (top - rim);
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                // Rim
+                areaSeries.createPriceLine({
+                    price: rim,
+                    color: 'rgba(245, 158, 11, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Cup Rim (₹${rim.toFixed(0)})`,
+                });
+
+                // Top
+                areaSeries.createPriceLine({
+                    price: top,
+                    color: 'rgba(239, 68, 68, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Cup Top (₹${top.toFixed(0)})`,
+                });
+
+                // Target
+                areaSeries.createPriceLine({
+                    price: targetVal,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Target (₹${targetVal.toFixed(0)})`,
+                });
+            }
+            else if (module.id === 'rounding_bottom') {
+                const r = sbVals['r'] !== undefined ? sbVals['r'] : 300;
+                const b = sbVals['b'] !== undefined ? sbVals['b'] : 220;
+                const targetVal = r + (r - b);
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                // Resistance
+                areaSeries.createPriceLine({
+                    price: r,
+                    color: 'rgba(245, 158, 11, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Resistance (₹${r.toFixed(0)})`,
+                });
+
+                // Bottom
+                areaSeries.createPriceLine({
+                    price: b,
+                    color: 'rgba(239, 68, 68, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: `Bottom (₹${b.toFixed(0)})`,
+                });
+
+                // Target
+                areaSeries.createPriceLine({
+                    price: targetVal,
+                    color: 'rgba(16, 185, 129, 0.65)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true,
+                    title: `Target (₹${targetVal.toFixed(0)})`,
+                });
+            }
+            else if (module.id === 'price_channels') {
+                const upper = sbVals['upper'] !== undefined ? sbVals['upper'] : 520;
+                const lower = sbVals['lower'] !== undefined ? sbVals['lower'] : 480;
+                const width = upper - lower;
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                const upperSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Upper Boundary'
+                });
+                const lowerSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Lower Boundary'
+                });
+
+                const upperData = [];
+                const lowerData = [];
+
+                dates.forEach((date, i) => {
+                    let uVal, lVal;
+                    if (activeSub === 'Descending Channel') {
+                        uVal = upper - width * 0.1 * i;
+                        lVal = lower - width * 0.1 * i;
+                    } else {
+                        uVal = upper + width * 0.1 * i;
+                        lVal = lower + width * 0.1 * i;
+                    }
+                    upperData.push({ time: date, value: uVal });
+                    lowerData.push({ time: date, value: lVal });
+                });
+
+                upperSeries.setData(upperData);
+                lowerSeries.setData(lowerData);
+
+                activeSeriesMap['Upper Channel'] = upperSeries;
+                activeSeriesMap['Lower Channel'] = lowerSeries;
+            }
+            else if (module.id === 'megaphone') {
+                const h = sbVals['h'] !== undefined ? sbVals['h'] : 550;
+                const l = sbVals['l'] !== undefined ? sbVals['l'] : 440;
+                const mid = (h + l) / 2;
+                const range = h - l;
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                const upperSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Upper Boundary'
+                });
+                const lowerSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Lower Boundary'
+                });
+
+                const upperData = [];
+                const lowerData = [];
+
+                dates.forEach((date, i) => {
+                    let uVal, lVal;
+                    if (activeSub === 'Narrowing Wedge') {
+                        uVal = mid + range * 0.5 * (1 - i / 10);
+                        lVal = mid - range * 0.5 * (1 - i / 10);
+                    } else {
+                        uVal = mid + range * 0.5 * (i / 10);
+                        lVal = mid - range * 0.5 * (i / 10);
+                    }
+                    upperData.push({ time: date, value: uVal });
+                    lowerData.push({ time: date, value: lVal });
+                });
+
+                upperSeries.setData(upperData);
+                lowerSeries.setData(lowerData);
+
+                activeSeriesMap['Upper Boundary'] = upperSeries;
+                activeSeriesMap['Lower Boundary'] = lowerSeries;
+            }
+            else if (module.id === 'diamond') {
+                const h = sbVals['h'] !== undefined ? sbVals['h'] : 560;
+                const l = sbVals['l'] !== undefined ? sbVals['l'] : 500;
+                const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 500;
+                const mid = (h + l) / 2;
+                const range = h - l;
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                const upperSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Upper Boundary'
+                });
+                const lowerSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Lower Boundary'
+                });
+
+                const upperData = [];
+                const lowerData = [];
+
+                dates.forEach((date, i) => {
+                    let uVal, lVal;
+                    if (i <= 3) {
+                        uVal = mid + range * 0.5 * (i / 3);
+                        lVal = mid - range * 0.5 * (i / 3);
+                    } else if (i <= 7) {
+                        const progress = (i - 3) / 4;
+                        uVal = mid + range * 0.5 * (1 - progress * 0.8);
+                        lVal = mid - range * 0.5 * (1 - progress * 0.8);
+                    } else {
+                        uVal = bo;
+                        lVal = bo;
+                    }
+                    upperData.push({ time: date, value: uVal });
+                    lowerData.push({ time: date, value: lVal });
+                });
+
+                upperSeries.setData(upperData);
+                lowerSeries.setData(lowerData);
+
+                activeSeriesMap['Upper Diamond'] = upperSeries;
+                activeSeriesMap['Lower Diamond'] = lowerSeries;
+            }
+            else if (module.id === 'bull_flag') {
+                const start = sbVals['start'] !== undefined ? sbVals['start'] : 100;
+                const end = sbVals['end'] !== undefined ? sbVals['end'] : 140;
+                const breakout = sbVals['breakout'] !== undefined ? sbVals['breakout'] : 135;
+                const diff = end - start;
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                const upperSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Flag Resistance'
+                });
+                const lowerSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Flag Support'
+                });
+
+                const upperData = [];
+                const lowerData = [];
+
+                dates.forEach((date, i) => {
+                    let uVal, lVal;
+                    if (i < 4) {
+                        uVal = start + (diff / 4) * i;
+                        lVal = start + (diff / 4) * i;
+                    } else if (i <= 9) {
+                        const progress = i - 4;
+                        uVal = end - progress * 1.6;
+                        lVal = end - 5 - progress * 1.6;
+                    } else {
+                        uVal = breakout + diff * 0.3 * (i - 10);
+                        lVal = breakout + diff * 0.3 * (i - 10);
+                    }
+                    upperData.push({ time: date, value: uVal });
+                    lowerData.push({ time: date, value: lVal });
+                });
+
+                upperSeries.setData(upperData);
+                lowerSeries.setData(lowerData);
+
+                activeSeriesMap['Upper Boundary'] = upperSeries;
+                activeSeriesMap['Lower Boundary'] = lowerSeries;
+            }
+            else if (module.id === 'bear_flag') {
+                const start = sbVals['start'] !== undefined ? sbVals['start'] : 140;
+                const end = sbVals['end'] !== undefined ? sbVals['end'] : 100;
+                const breakout = sbVals['breakout'] !== undefined ? sbVals['breakout'] : 105;
+                const diff = start - end;
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                const upperSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Flag Resistance'
+                });
+                const lowerSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Flag Support'
+                });
+
+                const upperData = [];
+                const lowerData = [];
+
+                dates.forEach((date, i) => {
+                    let uVal, lVal;
+                    if (i < 4) {
+                        uVal = start - (diff / 4) * i;
+                        lVal = start - (diff / 4) * i;
+                    } else if (i <= 9) {
+                        const progress = i - 4;
+                        uVal = end + 5 + progress * 1.6;
+                        lVal = end + progress * 1.6;
+                    } else {
+                        uVal = breakout - diff * 0.3 * (i - 10);
+                        lVal = breakout - diff * 0.3 * (i - 10);
+                    }
+                    upperData.push({ time: date, value: uVal });
+                    lowerData.push({ time: date, value: lVal });
+                });
+
+                upperSeries.setData(upperData);
+                lowerSeries.setData(lowerData);
+
+                activeSeriesMap['Upper Boundary'] = upperSeries;
+                activeSeriesMap['Lower Boundary'] = lowerSeries;
+            }
+            else if (module.id === 'pennants') {
+                const start = sbVals['start'] !== undefined ? sbVals['start'] : 100;
+                const end = sbVals['end'] !== undefined ? sbVals['end'] : 140;
+                const breakout = sbVals['breakout'] !== undefined ? sbVals['breakout'] : 135;
+                const isBear = activeSub && activeSub.includes('Bear');
+
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.1)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2.5,
+                    title: 'Price'
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap['Price'] = areaSeries;
+
+                const upperSeries = chart.addLineSeries({
+                    color: 'rgba(245, 158, 11, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Pennant Resistance'
+                });
+                const lowerSeries = chart.addLineSeries({
+                    color: 'rgba(16, 185, 129, 0.8)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Pennant Support'
+                });
+
+                const upperData = [];
+                const lowerData = [];
+
+                if (isBear) {
+                    const diff = start - end;
+                    dates.forEach((date, i) => {
+                        let uVal, lVal;
+                        if (i < 4) {
+                            uVal = start - (diff / 4) * i;
+                            lVal = start - (diff / 4) * i;
+                        } else if (i <= 8) {
+                            const progress = i - 4;
+                            uVal = end + 12 - progress * 2.5;
+                            lVal = end + progress * 1.5;
+                        } else {
+                            uVal = breakout - diff * 0.3 * (i - 9);
+                            lVal = breakout - diff * 0.3 * (i - 9);
+                        }
+                        upperData.push({ time: date, value: uVal });
+                        lowerData.push({ time: date, value: lVal });
+                    });
+                } else {
+                    const diff = end - start;
+                    dates.forEach((date, i) => {
+                        let uVal, lVal;
+                        if (i < 4) {
+                            uVal = start + (diff / 4) * i;
+                            lVal = start + (diff / 4) * i;
+                        } else if (i <= 8) {
+                            const progress = i - 4;
+                            uVal = end - progress * 1.5;
+                            lVal = end - 12 + progress * 2.5;
+                        } else {
+                            uVal = breakout + diff * 0.3 * (i - 9);
+                            lVal = breakout + diff * 0.3 * (i - 9);
+                        }
+                        upperData.push({ time: date, value: uVal });
+                        lowerData.push({ time: date, value: lVal });
+                    });
+                }
+
+                upperSeries.setData(upperData);
+                lowerSeries.setData(lowerData);
+
+                activeSeriesMap['Upper Boundary'] = upperSeries;
+                activeSeriesMap['Lower Boundary'] = lowerSeries;
+            }
+            else {
+                const areaSeries = chart.addAreaSeries({
+                    color: '#6366f1',
+                    topColor: 'rgba(99, 102, 241, 0.15)',
+                    bottomColor: 'rgba(99, 102, 241, 0)',
+                    lineWidth: 2,
+                });
+                areaSeries.setData(data.map((v, i) => ({ time: dates[i], value: v })));
+                activeSeriesMap[module.chartLabel || 'Price'] = areaSeries;
+            }
         }
     }
 
-    ctx.fillStyle = isDark ? '#f3f4f6' : '#1f2937';
-    ctx.font = 'bold 11px Outfit';
-    ctx.textAlign = 'left';
-    ctx.fillText(module.chartLabel || module.title, padding.left, 20);
+    // Set custom HTML floating tooltip on hover
+    const tooltip = document.getElementById('academy-chart-tooltip');
+    chart.subscribeCrosshairMove(param => {
+        if (!tooltip) return;
+        if (academyDrawMode || !param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
+            tooltip.style.display = 'none';
+            return;
+        }
+
+        let html = `<div style="font-weight:bold; margin-bottom:6px; color:var(--text-primary); font-family:var(--font-heading); border-bottom:1px solid var(--border-glass); padding-bottom:4px;">${module.title}</div>`;
+        let hasData = false;
+        
+        for (const [name, series] of Object.entries(activeSeriesMap)) {
+            const data = param.seriesData.get(series);
+            if (data !== undefined) {
+                hasData = true;
+                if (data.open !== undefined) {
+                    html += `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px; color:var(--text-muted);">
+                            <span>O:</span><span style="font-weight:bold; color:var(--text-primary);">₹${data.open.toFixed(1)}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px; color:var(--text-muted);">
+                            <span>H:</span><span style="font-weight:bold; color:var(--color-emerald);">₹${data.high.toFixed(1)}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px; color:var(--text-muted);">
+                            <span>L:</span><span style="font-weight:bold; color:var(--color-rose);">₹${data.low.toFixed(1)}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; color:var(--text-muted);">
+                            <span>C:</span><span style="font-weight:bold; color:var(--text-primary);">₹${data.close.toFixed(1)}</span>
+                        </div>
+                    `;
+                } else {
+                    const val = data.value !== undefined ? data.value : 0;
+                    let color = 'var(--text-primary)';
+                    if (name.includes('RSI')) color = '#8b5cf6';
+                    else if (name.includes('MACD')) color = '#3b82f6';
+                    else if (name.includes('Signal')) color = '#f97316';
+                    else if (name.includes('Histogram')) color = val >= 0 ? '#10b981' : '#ef4444';
+                    else if (name.includes('Upper')) color = 'rgba(99, 102, 241, 0.8)';
+                    else if (name.includes('Lower')) color = 'rgba(99, 102, 241, 0.8)';
+                    else if (name.includes('Middle') || name.includes('Basis')) color = 'rgba(245, 158, 11, 0.8)';
+                    
+                    html += `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:2px; color:var(--text-muted);">
+                            <span>${name}:</span><span style="font-weight:bold; color:${color};">${val.toFixed(2)}</span>
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        if (hasData) {
+            tooltip.innerHTML = html;
+            tooltip.style.display = 'block';
+            
+            let tx = param.point.x + 15;
+            let ty = param.point.y + 15;
+            const tooltipW = 160;
+            const tooltipH = tooltip.offsetHeight || 120;
+            const containerW = container.clientWidth || 700;
+            
+            if (tx + tooltipW > containerW) {
+                tx = param.point.x - tooltipW - 15;
+            }
+            if (ty + tooltipH > 300) {
+                ty = 300 - tooltipH - 10;
+            }
+            
+            tooltip.style.left = tx + 'px';
+            tooltip.style.top = ty + 'px';
+        } else {
+            tooltip.style.display = 'none';
+        }
+    });
+
+    const resizeObserver = new ResizeObserver(entries => {
+        for (let entry of entries) {
+            if (window.activeAcademyLightweightChart) {
+                window.activeAcademyLightweightChart.resize(entry.contentRect.width, 300);
+            }
+            if (drawCanvas) {
+                drawCanvas.width = entry.contentRect.width;
+                drawCanvas.height = 300;
+            }
+        }
+    });
+    resizeObserver.observe(container);
 }
+
+
+// ==================== LEARNING ACADEMY CUSTOM WORKSPACE WIDGETS ====================
+
+const ACADEMY_PRESETS = {
+    dupont: [
+        { name: 'TCS (High Margin Compounder)', values: { nm: 21.5, at: 0.82, em: 1.3 } },
+        { name: 'HDFC Bank (Leveraged Finance)', values: { nm: 16.0, at: 0.12, em: 9.5 } },
+        { name: 'Reliance Industries (Capital Intensive)', values: { nm: 9.5, at: 0.55, em: 2.1 } }
+    ],
+    three_statements: [
+        { name: 'Steady Growth (TCS)', values: { rev: 10000, pat: 1500 } },
+        { name: 'High Leverage Expansion', values: { rev: 15000, pat: 1200 } }
+    ],
+    valuation_multiples: [
+        { name: 'Value Stock (Undervalued)', values: { price: 1800, eps: 95, bv: 450, ebitda: 140, debt: 80 } },
+        { name: 'Premium Tech (Overvalued)', values: { price: 3400, eps: 65, bv: 320, ebitda: 110, debt: 200 } }
+    ],
+    dcf_wacc: [
+        { name: 'Infosys (Stable Compounder)', values: { fcf: 1000, wacc: 9.5, g: 6 } },
+        { name: 'Zomato (High Hurdle Growth)', values: { fcf: 400, wacc: 14.5, g: 18 } }
+    ],
+    yield_curve: [
+        { name: 'Normal Yield Curve (Growth)', values: { y2: 6.8, y10: 7.4 } },
+        { name: 'Inverted Yield Curve (Stress)', values: { y2: 7.9, y10: 7.1 } },
+        { name: 'Flat Yield Curve (Transition)', values: { y2: 7.2, y10: 7.2 } }
+    ],
+    credit_spreads: [
+        { name: 'Sovereign Grade (Low Spread)', values: { corp: 7.5, gsec: 7.2 } },
+        { name: 'High Yield Junk Grade (High Spread)', values: { corp: 11.8, gsec: 7.2 } }
+    ],
+    central_bank: [
+        { name: 'Inflation Fight (Rate Hike)', values: { repo: 6.5 } },
+        { name: 'Economic Stimulus (Rate Cut)', values: { repo: 4.0 } }
+    ]
+};
+
+function renderCustomAcademyWidget(module, sbVals) {
+    const board = document.getElementById('academy-custom-visual-board');
+    const select = document.getElementById('academy-preset-select');
+    const toolbar = document.getElementById('academy-preset-toolbar');
+    const auditorText = document.getElementById('academy-ai-auditor-text');
+    
+    if (!board) return;
+
+    // Set up Presets select
+    const presets = ACADEMY_PRESETS[module.id];
+    if (presets && toolbar && select) {
+        toolbar.style.display = 'flex';
+        let options = '<option value="">-- Choose a Preset --</option>';
+        presets.forEach((p, idx) => {
+            options += `<option value="${idx}">${p.name}</option>`;
+        });
+        select.innerHTML = options;
+        
+        // Remove old change listeners by cloning
+        const newSelect = select.cloneNode(true);
+        select.parentNode.replaceChild(newSelect, select);
+        
+        newSelect.addEventListener('change', (e) => {
+            const idx = e.target.value;
+            if (idx === "") return;
+            const chosen = presets[idx];
+            
+            // Set sandbox slider values
+            for (const [key, val] of Object.entries(chosen.values)) {
+                const slider = document.getElementById('academy-sb-' + key);
+                if (slider) {
+                    slider.value = val;
+                    academyActiveSandboxValues[key] = val;
+                    const valEl = document.getElementById('academy-sb-val-' + key);
+                    if (valEl) valEl.textContent = val;
+                }
+            }
+            // Trigger calculation recalculation & re-render
+            const calcEl = document.getElementById('academy-sandbox-body');
+            if (calcEl) {
+                const inputs = calcEl.querySelectorAll('.academy-slider-input');
+                const vals = {};
+                inputs.forEach(inp => {
+                    const key = inp.id.replace('academy-sb-', '');
+                    vals[key] = parseFloat(inp.value);
+                });
+                const res = module.sandbox.calc(vals);
+                const resEl = document.getElementById('academy-sb-result');
+                if (resEl) resEl.textContent = res;
+            }
+            renderCustomAcademyWidget(module, { ...academyActiveSliderValues, ...academyActiveSandboxValues });
+        });
+    } else if (toolbar) {
+        toolbar.style.display = 'none';
+    }
+
+    let html = '';
+    let audit = '';
+
+    // Render by module ID
+    if (module.id === 'dupont') {
+        const nm = sbVals['nm'] !== undefined ? sbVals['nm'] : 15;
+        const at = sbVals['at'] !== undefined ? sbVals['at'] : 0.8;
+        const em = sbVals['em'] !== undefined ? sbVals['em'] : 1.5;
+        const roe = nm * at * em;
+        
+        html = `
+            <div class="dupont-tree-container">
+                <div class="dupont-node primary">
+                    <div class="dupont-node-title">Return on Equity (ROE)</div>
+                    <div class="dupont-node-value">${roe.toFixed(2)}%</div>
+                </div>
+                <div class="dupont-operator">＝</div>
+                <div class="dupont-row">
+                    <div class="dupont-node">
+                        <div class="dupont-node-title">Profit Margin</div>
+                        <div class="dupont-node-value">${nm.toFixed(1)}%</div>
+                    </div>
+                    <div class="dupont-operator">✕</div>
+                    <div class="dupont-node">
+                        <div class="dupont-node-title">Asset Turnover</div>
+                        <div class="dupont-node-value">${at.toFixed(2)}x</div>
+                    </div>
+                    <div class="dupont-operator">✕</div>
+                    <div class="dupont-node">
+                        <div class="dupont-node-title">Leverage (EM)</div>
+                        <div class="dupont-node-value">${em.toFixed(2)}x</div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        audit = roe > 20 
+            ? `ROE is premium (${roe.toFixed(1)}%). Profitability driven by a ${(nm/roe*100).toFixed(0)}% contribution from margins and asset turns. Leverage is balanced.` 
+            : `ROE is conservative (${roe.toFixed(1)}%). Consider boosting profit margins or optimizing assets to drive premium returns.`;
+    }
+    else if (module.id === 'three_statements') {
+        const rev = sbVals['rev'] !== undefined ? sbVals['rev'] : 10000;
+        const pat = sbVals['pat'] !== undefined ? sbVals['pat'] : 1500;
+        const growth = 0.10;
+        const tax = 0.25;
+
+        const cal = (r, p) => {
+            let ys = [];
+            for (let i = 0; i < 3; i++) {
+                const c = r * 0.60;
+                const e = r * 0.22;
+                const ebt = p / (1 - tax);
+                const tx = ebt * tax;
+                ys.push({ rev: r, cogs: c, ebitda: e, ebt: ebt, tax: tx, pat: p });
+                r *= (1 + growth);
+                p *= (1 + growth);
+            }
+            return ys;
+        };
+        const ys = cal(rev, pat);
+        
+        html = `
+            <table class="spreadsheet-table">
+                <thead>
+                    <tr>
+                        <th>Financial Item</th>
+                        <th>Year 1 (Base)</th>
+                        <th>Year 2 (+10%)</th>
+                        <th>Year 3 (+21%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Revenue (Sales)</td><td>₹${ys[0].rev.toFixed(0)} Cr</td><td>₹${ys[1].rev.toFixed(0)} Cr</td><td>₹${ys[2].rev.toFixed(0)} Cr</td></tr>
+                    <tr><td>COGS (60% cost)</td><td>₹${ys[0].cogs.toFixed(0)} Cr</td><td>₹${ys[1].cogs.toFixed(0)} Cr</td><td>₹${ys[2].cogs.toFixed(0)} Cr</td></tr>
+                    <tr class="spreadsheet-total-row"><td>EBITDA (22%)</td><td>₹${ys[0].ebitda.toFixed(0)} Cr</td><td>₹${ys[1].ebitda.toFixed(0)} Cr</td><td>₹${ys[2].ebitda.toFixed(0)} Cr</td></tr>
+                    <tr><td>EBT</td><td>₹${ys[0].ebt.toFixed(0)} Cr</td><td>₹${ys[1].ebt.toFixed(0)} Cr</td><td>₹${ys[2].ebt.toFixed(0)} Cr</td></tr>
+                    <tr><td>Tax (25%)</td><td>₹${ys[0].tax.toFixed(0)} Cr</td><td>₹${ys[1].tax.toFixed(0)} Cr</td><td>₹${ys[2].tax.toFixed(0)} Cr</td></tr>
+                    <tr class="spreadsheet-total-row" style="background:rgba(16,185,129,0.12) !important;"><td>PAT (Net Income)</td><td>₹${ys[0].pat.toFixed(0)} Cr</td><td>₹${ys[1].pat.toFixed(0)} Cr</td><td>₹${ys[2].pat.toFixed(0)} Cr</td></tr>
+                </tbody>
+            </table>
+        `;
+        audit = `Flow-through model is working. Base Year 1 PAT margins are ${(pat/rev*100).toFixed(1)}%. Revenue growth compounding expands PAT to ₹${ys[2].pat.toFixed(0)} Cr by Year 3.`;
+    }
+    else if (module.id === 'valuation_multiples') {
+        const price = sbVals['price'] !== undefined ? sbVals['price'] : 2500;
+        const eps = sbVals['eps'] !== undefined ? sbVals['eps'] : 80;
+        const bv = sbVals['bv'] !== undefined ? sbVals['bv'] : 450;
+        const ebitda = sbVals['ebitda'] !== undefined ? sbVals['ebitda'] : 200;
+        const debt = sbVals['debt'] !== undefined ? sbVals['debt'] : 150;
+        
+        const pe = price / Math.max(eps, 0.1);
+        const pb = price / Math.max(bv, 0.1);
+        const ev = price + debt;
+        const evEbit = ev / Math.max(ebitda, 0.1);
+        
+        const peBadge = pe < 15 ? 'safe' : pe < 30 ? 'warning' : 'danger';
+        const peText = pe < 15 ? 'Undervalued' : pe < 30 ? 'Fair Value' : 'Premium';
+        
+        const pbBadge = pb < 2.5 ? 'safe' : pb < 5 ? 'warning' : 'danger';
+        const pbText = pb < 2.5 ? 'Value' : pb < 5 ? 'Fair' : 'Premium';
+        
+        const evBadge = evEbit < 8 ? 'safe' : evEbit < 15 ? 'warning' : 'danger';
+        const evText = evEbit < 8 ? 'Value' : evEbit < 15 ? 'Fair' : 'Premium';
+        
+        html = `
+            <div class="custom-metrics-grid">
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">P/E Ratio</div>
+                    <div class="custom-metric-value">${pe.toFixed(1)}x</div>
+                    <span class="custom-badge ${peBadge}">${peText}</span>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">P/B Ratio</div>
+                    <div class="custom-metric-value">${pb.toFixed(1)}x</div>
+                    <span class="custom-badge ${pbBadge}">${pbText}</span>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">EV/EBITDA</div>
+                    <div class="custom-metric-value">${evEbit.toFixed(1)}x</div>
+                    <span class="custom-badge ${evBadge}">${evText}</span>
+                </div>
+            </div>
+        `;
+        audit = pe > 30 
+            ? `Warning: P/E is high (${pe.toFixed(1)}x). This implies valuation discounts a high structural growth run. Consider if PEG < 1.5 to justify.` 
+            : `P/E ratio (${pe.toFixed(1)}x) suggests healthy valuation multiples compared to peer group index.`;
+    }
+    else if (module.id === 'solvency_liquidity') {
+        const debt = sbVals['debt'] !== undefined ? sbVals['debt'] : 3000;
+        const equity = sbVals['equity'] !== undefined ? sbVals['equity'] : 8000;
+        const ebit = sbVals['ebit'] !== undefined ? sbVals['ebit'] : 2200;
+        const interest = sbVals['interest'] !== undefined ? sbVals['interest'] : 300;
+        
+        const de = debt / Math.max(equity, 1);
+        const icr = ebit / Math.max(interest, 1);
+        
+        const deBadge = de < 1.0 ? 'safe' : de < 2.0 ? 'warning' : 'danger';
+        const icrBadge = icr > 3.0 ? 'safe' : icr > 1.5 ? 'warning' : 'danger';
+        
+        html = `
+            <div class="custom-metrics-grid">
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Debt-to-Equity</div>
+                    <div class="custom-metric-value">${de.toFixed(2)}x</div>
+                    <span class="custom-badge ${deBadge}">${de < 1.0 ? 'Comfortable' : 'Leveraged'}</span>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Interest Coverage Ratio</div>
+                    <div class="custom-metric-value">${icr.toFixed(2)}x</div>
+                    <span class="custom-badge ${icrBadge}">${icr > 3.0 ? 'Safe Cushion' : 'Tight'}</span>
+                </div>
+            </div>
+        `;
+        audit = de > 1.5 
+            ? `Caution: High debt-to-equity ratio of ${de.toFixed(2)}x indicates significant solvency risk. Interest coverage of ${icr.toFixed(1)}x offers some operational cushion.` 
+            : `Solvency metrics are robust, with comfortable leverage (${de.toFixed(2)}x) and a healthy interest coverage cushion (${icr.toFixed(1)}x).`;
+    }
+    else if (module.id === 'return_ratios') {
+        const pat = sbVals['pat'] !== undefined ? sbVals['pat'] : 1500;
+        const equity = sbVals['equity'] !== undefined ? sbVals['equity'] : 8000;
+        const ebit = sbVals['ebit'] !== undefined ? sbVals['ebit'] : 2200;
+        const ce = sbVals['ce'] !== undefined ? sbVals['ce'] : 12000;
+        
+        const roe = (pat / Math.max(equity, 1)) * 100;
+        const roce = (ebit / Math.max(ce, 1)) * 100;
+        
+        const c = (val) => val > 15 ? '#10b981' : val > 8 ? '#f59e0b' : '#ef4444';
+        const t = (val) => val > 15 ? 'Premium' : val > 8 ? 'Fair' : 'Substandard';
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:12px; width:100%;">
+                <div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span style="font-weight:600;">ROE (Equity Return)</span>
+                        <span style="font-weight:700; color:${c(roe)};">${roe.toFixed(1)}% (${t(roe)})</span>
+                    </div>
+                    <div class="custom-progress-bar"><div class="custom-progress-fill" style="width: ${Math.min(roe*2.5, 100)}%; background: ${c(roe)};"></div></div>
+                </div>
+                <div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span style="font-weight:600;">ROCE (Capital Return)</span>
+                        <span style="font-weight:700; color:${c(roce)};">${roce.toFixed(1)}% (${t(roce)})</span>
+                    </div>
+                    <div class="custom-progress-bar"><div class="custom-progress-fill" style="width: ${Math.min(roce*2.5, 100)}%; background: ${c(roce)};"></div></div>
+                </div>
+            </div>
+        `;
+        audit = roce > roe 
+            ? `ROCE (${roce.toFixed(1)}%) exceeds ROE (${roe.toFixed(1)}%), suggesting capital is highly optimized, but low debt levels suppress leverage multiplier gains.`
+            : `ROE (${roe.toFixed(1)}%) exceeds ROCE (${roce.toFixed(1)}%), verifying leverage amplifies shareholder equity gains. Watch solvency levels.`;
+    }
+    else if (module.id === 'dcf_wacc') {
+        const fcf = sbVals['fcf'] !== undefined ? sbVals['fcf'] : 1000;
+        const wacc = sbVals['wacc'] !== undefined ? sbVals['wacc'] : 12;
+        const g = sbVals['g'] !== undefined ? sbVals['g'] : 5;
+        const tg = 4; // terminal growth
+        
+        let years = '';
+        let total = 0;
+        for (let t = 1; t <= 5; t++) {
+            const projected = fcf * Math.pow(1 + g / 100, t);
+            const df = 1 / Math.pow(1 + wacc / 100, t);
+            const pv = projected * df;
+            total += pv;
+            years += `<tr><td>Year ${t}</td><td>₹${projected.toFixed(0)} Cr</td><td>${df.toFixed(3)}</td><td>₹${pv.toFixed(0)} Cr</td></tr>`;
+        }
+        const tv = (fcf * Math.pow(1 + g / 100, 5) * (1 + tg / 100)) / (wacc / 100 - tg / 100);
+        const pvTV = tv / Math.pow(1 + wacc / 100, 5);
+        const iv = total + pvTV;
+        const price = fcf * 14;
+        const safety = ((iv - price) / iv) * 100;
+        
+        html = `
+            <table class="spreadsheet-table" style="margin-bottom:10px;">
+                <thead>
+                    <tr><th>Year</th><th>FCF</th><th>DF</th><th>PV</th></tr>
+                </thead>
+                <tbody>
+                    ${years}
+                    <tr><td>Terminal Value</td><td>₹${tv.toFixed(0)} Cr</td><td>${(1 / Math.pow(1 + wacc / 100, 5)).toFixed(3)}</td><td>₹${pvTV.toFixed(0)} Cr</td></tr>
+                    <tr class="spreadsheet-total-row"><td>Intrinsic Value</td><td colspan="2">-</td><td>₹${iv.toFixed(0)} Cr</td></tr>
+                </tbody>
+            </table>
+        `;
+        audit = wacc > 13 
+            ? `High discount rate (${wacc.toFixed(1)}%) penalizes cash flows heavily, requiring massive growth rates (g=${g}%) to sustain margins.` 
+            : `Standard discount rate used. Implied margin of safety is ${safety > 0 ? safety.toFixed(1) + '%' : 'None (Overvalued)'}.`;
+    }
+    else if (module.id === 'solvency_liquidity') {
+        const debt = sbVals['debt'] !== undefined ? sbVals['debt'] : 3000;
+        const equity = sbVals['equity'] !== undefined ? sbVals['equity'] : 8000;
+        const de = debt / Math.max(equity, 1);
+        const deB = de < 1.5 ? 'safe' : de < 2.5 ? 'warning' : 'danger';
+        
+        const ebit = sbVals['ebit'] !== undefined ? sbVals['ebit'] : 2200;
+        const interest = sbVals['interest'] !== undefined ? sbVals['interest'] : 300;
+        const icr = ebit / Math.max(interest, 0.1);
+        const icrB = icr > 3.0 ? 'safe' : icr > 1.5 ? 'warning' : 'danger';
+        
+        html = `
+            <div class="custom-metrics-grid">
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Debt/Equity (D/E)</div>
+                    <div class="custom-metric-value">${de.toFixed(2)}x</div>
+                    <span class="custom-badge ${deB}">${de < 1.5 ? 'Healthy' : 'Highly Leveraged'}</span>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Interest Coverage (ICR)</div>
+                    <div class="custom-metric-value">${icr.toFixed(1)}x</div>
+                    <span class="custom-badge ${icrB}">${icr > 3.0 ? 'Safe' : 'Default Risk'}</span>
+                </div>
+            </div>
+        `;
+        audit = icr < 1.5 
+            ? `Warning: Interest coverage ratio (${icr.toFixed(1)}x) is below safe target. Operating profits barely buffer against debt obligations.` 
+            : `Solvency metrics are safe. Interest coverage ratio is ${icr.toFixed(1)}x, indicating healthy interest repayment buffer.`;
+    }
+    else if (module.id === 'dividend_metrics') {
+        const dps = sbVals['dps'] !== undefined ? sbVals['dps'] : 20;
+        const price = sbVals['price'] !== undefined ? sbVals['price'] : 800;
+        const eps = sbVals['eps'] !== undefined ? sbVals['eps'] : 50;
+        
+        const divYield = (dps / price) * 100;
+        const payout = (dps / eps) * 100;
+        const payoutB = payout < 50 ? 'safe' : payout < 80 ? 'warning' : 'danger';
+        
+        html = `
+            <div class="custom-metrics-grid" style="margin-bottom:10px;">
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Dividend Yield</div>
+                    <div class="custom-metric-value">${divYield.toFixed(2)}%</div>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Payout Ratio</div>
+                    <div class="custom-metric-value">${payout.toFixed(1)}%</div>
+                    <span class="custom-badge ${payoutB}">${payout < 60 ? 'Sustainable' : 'High Risk'}</span>
+                </div>
+            </div>
+        `;
+        audit = payout > 80 
+            ? `Caution: Dividend payout ratio is high (${payout.toFixed(1)}%). Retained earnings are insufficient to fund capital expansion.` 
+            : `Dividend payout ratio of ${payout.toFixed(1)}% is healthy and sustainable.`;
+    }
+    else if (module.id === 'earnings_quality') {
+        const ni = sbVals['ni'] !== undefined ? sbVals['ni'] : 1500;
+        const ocf = sbVals['ocf'] !== undefined ? sbVals['ocf'] : 1800;
+        const assets = sbVals['assets'] !== undefined ? sbVals['assets'] : 10000;
+        
+        const sloan = ((ni - ocf) / assets) * 100;
+        const sloanAbs = Math.abs(sloan);
+        const q = sloanAbs < 4 ? 'safe' : sloanAbs < 10 ? 'warning' : 'danger';
+        const qText = sloanAbs < 4 ? 'High Quality' : sloanAbs < 10 ? 'Moderate' : 'Accruals Risk';
+        
+        html = `
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                <div style="font-size:11px; color:var(--text-muted);">Sloan Accrual Ratio</div>
+                <div style="font-size:24px; font-weight:800; color:${sloanAbs < 4 ? '#10b981' : sloanAbs < 10 ? '#f59e0b' : '#ef4444'};">${sloan.toFixed(2)}%</div>
+                <span class="custom-badge ${q}">${qText}</span>
+            </div>
+        `;
+        audit = sloanAbs > 10 
+            ? `Accrual ratio is high (${sloan.toFixed(1)}%), suggesting non-cash accounting items make up a large portion of reported net profits.` 
+            : `Earnings quality is high. Cash flow from operations backs reported net profits.`;
+    }
+    else if (module.id === 'peg_ratio') {
+        const pe = sbVals['pe'] !== undefined ? sbVals['pe'] : 25;
+        const growth = sbVals['g'] !== undefined ? sbVals['g'] : (sbVals['growth'] !== undefined ? sbVals['growth'] : 20);
+        const peg = pe / Math.max(growth, 0.1);
+        const pegB = peg < 1.0 ? 'safe' : peg < 2.0 ? 'warning' : 'danger';
+        
+        html = `
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                <div style="font-size:11px; color:var(--text-muted);">PEG Ratio</div>
+                <div style="font-size:24px; font-weight:800; color:${peg < 1 ? '#10b981' : '#ef4444'};">${peg.toFixed(2)}x</div>
+                <span class="custom-badge ${pegB}">${peg < 1 ? 'Undervalued GARP' : 'Overvalued'}</span>
+            </div>
+        `;
+        audit = peg < 1.0 
+            ? `At a PEG of ${peg.toFixed(2)}, the stock represents a GARP (Growth at a Reasonable Price) play, offering cheap growth.` 
+            : `At a PEG of ${peg.toFixed(2)}, valuations are slightly stretched relative to implied growth rates.`;
+    }
+    else if (module.id === 'ev_equity') {
+        const mcap = sbVals['mcap'] !== undefined ? sbVals['mcap'] : 50000;
+        const debt = sbVals['debt'] !== undefined ? sbVals['debt'] : 8000;
+        const cash = sbVals['cash'] !== undefined ? sbVals['cash'] : 3000;
+        const ev = mcap + debt - cash;
+        
+        const capPct = (mcap / (mcap + debt)) * 100;
+        const debtPct = (debt / (mcap + debt)) * 100;
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:12px; width:100%;">
+                <div style="display:flex; justify-content:space-between;">
+                    <span>Enterprise Value (EV):</span>
+                    <span style="font-weight:700; color:#3b82f6;">₹${ev.toFixed(0)} Cr</span>
+                </div>
+                <div style="display:flex; height:20px; border-radius:4px; overflow:hidden; border:1px solid var(--border-glass);">
+                    <div style="width:${capPct}%; background:#3b82f6; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold;">Equity (${capPct.toFixed(0)}%)</div>
+                    <div style="width:${debtPct}%; background:#ef4444; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:bold;">Debt (${debtPct.toFixed(0)}%)</div>
+                </div>
+            </div>
+        `;
+        audit = `Net debt additions contribute ${(debt-cash).toFixed(0)} Cr to corporate enterprise value calculations.`;
+    }
+    else if (module.id === 'bond_basics') {
+        const fv = sbVals['fv'] !== undefined ? sbVals['fv'] : 1000;
+        const coupon = sbVals['coupon'] !== undefined ? sbVals['coupon'] : 8;
+        const currentYield = sbVals['yield'] !== undefined ? sbVals['yield'] : 7;
+        const n = sbVals['n'] !== undefined ? sbVals['n'] : 5;
+        
+        const couponVal = fv * coupon / 100;
+        let ledger = '';
+        let totalPV = 0;
+        
+        for (let t = 1; t <= n; t++) {
+            const isLast = (t === n);
+            const cf = isLast ? (couponVal + fv) : couponVal;
+            const df = 1 / Math.pow(1 + currentYield / 100, t);
+            const pv = cf * df;
+            totalPV += pv;
+            ledger += `<tr><td>Year ${t}</td><td>₹${cf.toFixed(0)}</td><td>${df.toFixed(3)}</td><td>₹${pv.toFixed(0)}</td></tr>`;
+        }
+        
+        html = `
+            <table class="spreadsheet-table">
+                <thead><tr><th>Year</th><th>Cash Flow</th><th>DF</th><th>PV</th></tr></thead>
+                <tbody>
+                    ${ledger}
+                    <tr class="spreadsheet-total-row"><td>Bond Price</td><td colspan="2">-</td><td>₹${totalPV.toFixed(0)}</td></tr>
+                </tbody>
+            </table>
+        `;
+        audit = totalPV > fv 
+            ? `Bond trades at a Premium (₹${totalPV.toFixed(0)}) because coupon rate (${coupon}%) exceeds current yield (${currentYield}%).` 
+            : `Bond trades at a Discount (₹${totalPV.toFixed(0)}) because coupon rate (${coupon}%) is below current yield (${currentYield}%).`;
+    }
+    else if (module.id === 'ytm') {
+        const fv = sbVals['fv'] !== undefined ? sbVals['fv'] : 1000;
+        const price = sbVals['p'] !== undefined ? sbVals['p'] : 950;
+        const coupon = sbVals['c'] !== undefined ? sbVals['c'] : 8;
+        const n = sbVals['n'] !== undefined ? sbVals['n'] : 5;
+        
+        const cVal = fv * coupon / 100;
+        const ytm = (cVal + (fv - price)/n) / ((fv + price)/2) * 100;
+        
+        html = `
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                <div style="font-size:11px; color:var(--text-muted);">Approximated Yield to Maturity (YTM)</div>
+                <div style="font-size:26px; font-weight:800; color:#10b981;">${ytm.toFixed(2)}%</div>
+                <span class="custom-badge safe">${price < fv ? 'Discount Buy' : 'Premium'}</span>
+            </div>
+        `;
+        audit = price < fv 
+            ? `Buying the bond below par value (₹${price}) expands the YTM to ${ytm.toFixed(1)}%, creating capital gain opportunities at maturity.` 
+            : `Paying premium yields lower return than standard coupons.`;
+    }
+    else if (module.id === 'yield_curve') {
+        const y2 = sbVals['y2'] !== undefined ? sbVals['y2'] : 7.0;
+        const y10 = sbVals['y10'] !== undefined ? sbVals['y10'] : 7.5;
+        
+        const svgH = 150;
+        const svgW = 400;
+        
+        const getX = (idx) => 30 + (idx / 4) * 340;
+        const getY = (y) => svgH - 20 - ((y - 5.0) / (10.0 - 5.0)) * (svgH - 40);
+        
+        const pts = [
+            { label: '3M', yield: y2 - 0.4 },
+            { label: '1Y', yield: y2 - 0.2 },
+            { label: '2Y', yield: y2 },
+            { label: '5Y', yield: y2 + (y10 - y2) * 0.5 },
+            { label: '10Y', yield: y10 }
+        ];
+        
+        let path = `M ${getX(0)} ${getY(pts[0].yield)}`;
+        let dots = '';
+        let labels = '';
+        pts.forEach((p, idx) => {
+            const x = getX(idx);
+            const y = getY(p.yield);
+            if (idx > 0) path += ` L ${x} ${y}`;
+            dots += `<circle cx="${x}" cy="${y}" r="4" fill="#3b82f6"/>`;
+            labels += `
+                <text x="${x}" y="${svgH - 4}" fill="#9ca3af" font-size="9" text-anchor="middle">${p.label}</text>
+                <text x="${x}" y="${y - 8}" fill="var(--text-primary)" font-size="9" font-weight="bold" text-anchor="middle">${p.yield.toFixed(1)}%</text>
+            `;
+        });
+        
+        const isInverted = y2 > y10;
+        
+        html = `
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                <svg width="100%" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}">
+                    <line x1="30" y1="${svgH - 20}" x2="380" y2="${svgH - 20}" stroke="var(--border-glass)" stroke-width="1.5"/>
+                    <path d="${path}" fill="none" stroke="#3b82f6" stroke-width="2.5"/>
+                    ${dots}
+                    ${labels}
+                </svg>
+            </div>
+        `;
+        audit = isInverted 
+            ? "Alert: The yield curve is INVERTED. Short-term yields exceeding long-term sovereign rates is a reliable historical indicator of tight money markets and economic slowdown." 
+            : "The yield curve is normal, showing typical expansionary term structure spreads.";
+    }
+    else if (module.id === 'bond_duration') {
+        const fv = sbVals['fv'] !== undefined ? sbVals['fv'] : 1000;
+        const coupon = sbVals['coupon'] !== undefined ? sbVals['coupon'] : 8;
+        const yieldVal = sbVals['yield'] !== undefined ? sbVals['yield'] : 7;
+        const n = sbVals['n'] !== undefined ? sbVals['n'] : 5;
+        
+        const cVal = fv * coupon / 100;
+        let weighted = 0, pvs = 0;
+        for (let t = 1; t <= n; t++) {
+            const cf = (t === n) ? (cVal + fv) : cVal;
+            const pv = cf / Math.pow(1 + yieldVal / 100, t);
+            pvs += pv;
+            weighted += t * pv;
+        }
+        const mac = weighted / pvs;
+        const mod = mac / (1 + yieldVal / 100);
+        
+        html = `
+            <div class="custom-metrics-grid">
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Macaulay Duration</div>
+                    <div class="custom-metric-value">${mac.toFixed(2)} yrs</div>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Modified Duration</div>
+                    <div class="custom-metric-value">${mod.toFixed(2)}%</div>
+                </div>
+            </div>
+        `;
+        audit = `Modified duration of ${mod.toFixed(1)}% indicates high yield volatility sensitivity. A 1% yield rise causes bond price contraction of ~${mod.toFixed(1)}%.`;
+    }
+    else if (module.id === 'bond_convexity') {
+        const dur = sbVals['dur'] !== undefined ? sbVals['dur'] : 5.2;
+        const dy = sbVals['dy'] !== undefined ? sbVals['dy'] : -0.5;
+        const conv = sbVals['conv'] !== undefined ? sbVals['conv'] : 28;
+
+        const durEffect = -dur * dy;
+        const convEffect = 0.5 * conv * Math.pow(dy / 100, 2) * 10000;
+        const totalChange = durEffect + convEffect;
+
+        html = `
+            <div class="custom-metrics-grid" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Duration Effect</div>
+                    <div class="custom-metric-value">${(durEffect >= 0 ? '+' : '')}${durEffect.toFixed(2)}%</div>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Convexity Effect</div>
+                    <div class="custom-metric-value">${(convEffect >= 0 ? '+' : '')}${convEffect.toFixed(4)}%</div>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Total Est. Change</div>
+                    <div class="custom-metric-value" style="color: ${totalChange >= 0 ? '#10b981' : '#ef4444'};">${(totalChange >= 0 ? '+' : '')}${totalChange.toFixed(2)}%</div>
+                </div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; margin-top:12px;">
+                <svg width="100%" height="100" viewBox="0 0 400 100" style="background: rgba(255,255,255,0.03); border-radius: 6px; border: 1px solid var(--border-glass);">
+                    <line x1="30" y1="80" x2="370" y2="80" stroke="var(--border-glass)" stroke-width="1"/>
+                    <line x1="200" y1="10" x2="200" y2="90" stroke="var(--border-glass)" stroke-width="1" stroke-dasharray="2"/>
+                    <path d="M 50 75 Q 200 45 350 25" fill="none" stroke="#10b981" stroke-width="2"/>
+                    <line x1="100" y1="70" x2="300" y2="40" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4"/>
+                    <circle cx="200" cy="45" r="4" fill="#3b82f6"/>
+                    <text x="205" y="42" fill="#3b82f6" font-size="8">Current Yield</text>
+                    <text x="310" y="20" fill="#10b981" font-size="8">Price (Convex)</text>
+                    <text x="270" y="65" fill="#f59e0b" font-size="8">Duration (Linear)</text>
+                </svg>
+            </div>
+        `;
+        audit = `A ${dy >= 0 ? 'rise' : 'fall'} of ${Math.abs(dy)}% in yield results in an estimated price change of ${totalChange.toFixed(2)}% (includes +${convEffect.toFixed(3)}% from convexity overlay).`;
+    }
+    else if (module.id === 'credit_spreads') {
+        const corp = sbVals['corp'] !== undefined ? sbVals['corp'] : 9.5;
+        const gsec = sbVals['gsec'] !== undefined ? sbVals['gsec'] : 7.2;
+        const spread = (corp - gsec) * 100;
+        
+        html = `
+            <div class="credit-ladder-container">
+                <div class="credit-ladder-row active"><span>G-Sec Yield:</span><span>${gsec.toFixed(2)}%</span></div>
+                <div class="credit-ladder-row active" style="border-color:#ef4444;"><span>Corporate Bond Yield:</span><span>${corp.toFixed(2)}%</span></div>
+                <div style="display:flex; justify-content:space-between; background:rgba(255,255,255,0.03); padding:8px 12px; border-radius:6px; border:1px solid var(--border-glass); margin-top:8px;">
+                    <span style="font-weight:600;">Credit Spread:</span><span style="font-weight:700; color:#f59e0b;">${spread.toFixed(0)} bps</span>
+                </div>
+            </div>
+        `;
+        audit = spread > 300 
+            ? `Credit spreads are wide (${spread.toFixed(0)} bps). High risk premiums suggested, typically showing stress in credit markets.` 
+            : `Credit spreads are narrow (${spread.toFixed(0)} bps), indicating confidence in corporate loan default risk profiles.`;
+    }
+    else if (module.id === 'tips_real_yields') {
+        const nominal = sbVals['nom'] !== undefined ? sbVals['nom'] : 7.5;
+        const inflation = sbVals['inf'] !== undefined ? sbVals['inf'] : 5.0;
+        
+        const real = ((1 + nominal / 100) / (1 + inflation / 100) - 1) * 100;
+        const approxReal = nominal - inflation;
+        const compoundingDrag = approxReal - real;
+        
+        html = `
+            <div class="custom-metrics-grid" style="grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Nominal Yield</div>
+                    <div class="custom-metric-value">${nominal.toFixed(2)}%</div>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Inflation Rate</div>
+                    <div class="custom-metric-value" style="color: #ef4444;">${inflation.toFixed(2)}%</div>
+                </div>
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Fisher Real Yield</div>
+                    <div class="custom-metric-value" style="color: ${real >= 0 ? '#10b981' : '#ef4444'};">${real.toFixed(2)}%</div>
+                </div>
+            </div>
+            <div style="margin-top: 12px; font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px;">
+                <div style="display:flex; justify-content:space-between;">
+                    <span>Linear Approximation (Nominal − Inflation):</span>
+                    <span style="font-weight: 600;">${approxReal.toFixed(2)}%</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span>Fisher Compounding Adjustment (Drag):</span>
+                    <span style="color: #f59e0b; font-weight: 600;">-${compoundingDrag.toFixed(2)}%</span>
+                </div>
+            </div>
+        `;
+        audit = real < 0 
+            ? `Negative real yield of ${real.toFixed(2)}% indicates capital purchasing power decay. Nominal assets fail to outpace inflation.` 
+            : `Positive real yield protects purchasing power gains at ${real.toFixed(2)}% above inflation.`;
+    }
+    else if (module.id === 'central_bank') {
+        const repo = sbVals['repo'] !== undefined ? sbVals['repo'] : 6.5;
+        const change = sbVals['change'] !== undefined ? sbVals['change'] : -25;
+        
+        const newRepo = repo + change / 100;
+        
+        let action = 'Neutral Stance';
+        let actionColor = '#f59e0b';
+        let infl = 'Balanced Monitoring';
+        let bonds = 'Stable / Rangebound';
+        let stocks = 'Neutral Liquidity';
+        
+        if (change < 0) {
+            action = `Rate Cut (-${Math.abs(change)} bps)`;
+            actionColor = '#10b981';
+            infl = 'Expansionary Focus';
+            bonds = 'Yields Down (Prices UP 📈)';
+            stocks = 'Liquidity Boost (Bullish 🚀)';
+        } else if (change > 0) {
+            action = `Rate Hike (+${change} bps)`;
+            actionColor = '#ef4444';
+            infl = 'Taming Inflation';
+            bonds = 'Yields Up (Prices DOWN 📉)';
+            stocks = 'Liquidity Drain (Bearish ⚠️)';
+        }
+        
+        html = `
+            <div class="custom-metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div class="custom-metric-card">
+                    <div class="custom-metric-title">Current Repo Rate</div>
+                    <div class="custom-metric-value">${repo.toFixed(2)}%</div>
+                </div>
+                <div class="custom-metric-card" style="border-color: ${actionColor};">
+                    <div class="custom-metric-title">Policy Action / New Repo</div>
+                    <div class="custom-metric-value" style="color: ${actionColor};">${newRepo.toFixed(2)}%</div>
+                </div>
+            </div>
+            <div style="margin-top: 12px; padding: 10px; border-radius: 6px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass);">
+                <div style="font-weight: 600; font-size: 11px; margin-bottom: 8px; color: ${actionColor};">${action} Impact Flow:</div>
+                <div class="repo-flow-container" style="display: flex; align-items: center; justify-content: space-between; font-size: 10px;">
+                    <div class="repo-flow-step" style="text-align: center;"><div style="color:var(--text-muted);">Macro Focus</div><div style="font-weight:bold; margin-top:2px;">${infl}</div></div>
+                    <div class="repo-flow-arrow" style="color: var(--text-muted);">➔</div>
+                    <div class="repo-flow-step" style="text-align: center;"><div style="color:var(--text-muted);">Bonds</div><div style="font-weight:bold; margin-top:2px; color: ${change < 0 ? '#10b981' : (change > 0 ? '#ef4444' : 'inherit')}">${bonds}</div></div>
+                    <div class="repo-flow-arrow" style="color: var(--text-muted);">➔</div>
+                    <div class="repo-flow-step" style="text-align: center;"><div style="color:var(--text-muted);">Equities</div><div style="font-weight:bold; margin-top:2px; color: ${change < 0 ? '#10b981' : (change > 0 ? '#ef4444' : 'inherit')}">${stocks}</div></div>
+                </div>
+            </div>
+        `;
+        audit = change === 0
+            ? `Central bank holds rates at ${repo.toFixed(2)}%. Markets continue to price in standard macro variables without policy deviation.`
+            : `Central Bank executes a ${action.toLowerCase()}, leading to a new policy repo benchmark of ${newRepo.toFixed(2)}%. This shifts the sovereign yield curve and directly affects cost of capital.`;
+    }
+    else if (module.id === 'pv_bond_math') {
+        const fv = sbVals['fv'] !== undefined ? sbVals['fv'] : 1000;
+        const rate = sbVals['r'] !== undefined ? sbVals['r'] : 8;
+        const n = sbVals['n'] !== undefined ? sbVals['n'] : 5;
+        
+        const pvFinal = fv / Math.pow(1 + rate / 100, n);
+        
+        let decay = '';
+        const limit = Math.max(1, Math.min(20, Math.round(n)));
+        for (let t = 1; t <= limit; t++) {
+            const pv = fv / Math.pow(1 + rate / 100, t);
+            const pct = (pv / fv) * 100;
+            decay += `
+                <div style="margin-bottom:6px;">
+                    <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:2px;">
+                        <span>Year ${t} PV:</span><span>₹${pv.toFixed(2)}</span>
+                    </div>
+                    <div class="custom-progress-bar"><div class="custom-progress-fill" style="width: ${pct}%; background:#8b5cf6;"></div></div>
+                </div>
+            `;
+        }
+        
+        html = `
+            <div class="custom-metric-card" style="margin-bottom: 12px;">
+                <div class="custom-metric-title">Discounted Intrinsic PV (Year ${n})</div>
+                <div class="custom-metric-value" style="font-size: 18px; color: #8b5cf6;">₹${pvFinal.toFixed(2)}</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+                <div style="font-weight: 600; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Time Decay Schedule (Future Value: ₹${fv}):</div>
+                ${decay}
+            </div>
+        `;
+        audit = `Time value of money decay visual: A future value of ₹${fv.toLocaleString()} in year ${n} decays to a present value of ₹${pvFinal.toFixed(2)} at an annualized discount rate of ${rate}%.`;
+    }
+    else if (module.id === 'adr_atr') {
+        const high = sbVals['high'] !== undefined ? sbVals['high'] : 1550;
+        const low = sbVals['low'] !== undefined ? sbVals['low'] : 1520;
+        const prevClose = sbVals['prevClose'] !== undefined ? sbVals['prevClose'] : 1510;
+        
+        const hl = high - low;
+        const hpc = Math.abs(high - prevClose);
+        const lpc = Math.abs(low - prevClose);
+        const tr = Math.max(hl, hpc, lpc);
+        
+        const hlActive = hl === tr;
+        const hpcActive = hpc === tr;
+        const lpcActive = lpc === tr;
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:16px; width:100%;">
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">
+                    <div class="custom-metric-card" style="border-color:${hlActive ? 'var(--color-emerald)' : 'var(--border-glass)'};">
+                        <div class="custom-metric-title">High − Low</div>
+                        <div class="custom-metric-value">₹${hl.toFixed(1)}</div>
+                        <span class="custom-badge ${hlActive ? 'safe' : 'neutral'}">${hlActive ? 'True Range' : 'Standard'}</span>
+                    </div>
+                    <div class="custom-metric-card" style="border-color:${hpcActive ? 'var(--color-emerald)' : 'var(--border-glass)'};">
+                        <div class="custom-metric-title">|High − Prev Close|</div>
+                        <div class="custom-metric-value">₹${hpc.toFixed(1)}</div>
+                        <span class="custom-badge ${hpcActive ? 'safe' : 'neutral'}">${hpcActive ? 'True Range (Gap Up)' : 'Standard'}</span>
+                    </div>
+                    <div class="custom-metric-card" style="border-color:${lpcActive ? 'var(--color-emerald)' : 'var(--border-glass)'};">
+                        <div class="custom-metric-title">|Low − Prev Close|</div>
+                        <div class="custom-metric-value">₹${lpc.toFixed(1)}</div>
+                        <span class="custom-badge ${lpcActive ? 'safe' : 'neutral'}">${lpcActive ? 'True Range (Gap Down)' : 'Standard'}</span>
+                    </div>
+                </div>
+                
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:12px; border-radius:8px;">
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; font-family:var(--font-heading); text-transform:uppercase;">True Range Calculation</div>
+                    <div style="font-size:14px; font-weight:700; color:var(--text-primary); font-family:monospace; margin-bottom:8px;">
+                        TR = max(${hl.toFixed(1)}, ${hpc.toFixed(1)}, ${lpc.toFixed(1)}) = <span style="color:var(--color-emerald);">₹${tr.toFixed(1)}</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted); line-height:1.4;">
+                        Standard high-low range is ₹${hl.toFixed(1)}. ATR incorporates gaps. By including the previous close of ₹${prevClose.toFixed(1)}, the True Range is expanded by <span style="font-weight:600; color:var(--text-primary);">₹${(tr - hl).toFixed(1)}</span>.
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        audit = tr > hl 
+            ? `Price gap detected! True Range (₹${tr.toFixed(1)}) is larger than the standard High-Low range (₹${hl.toFixed(1)}) due to overnight gaps. Use ATR for robust stop-loss sizing.` 
+            : `No overnight gap expansion. True Range is identical to standard High-Low range (₹${tr.toFixed(1)}). Volatility is stable.`;
+    }
+    else if (module.id === 'adx') {
+        const pdi = sbVals['pdi'] !== undefined ? sbVals['pdi'] : 28;
+        const ndi = sbVals['ndi'] !== undefined ? sbVals['ndi'] : 18;
+        const dx = Math.abs(pdi - ndi) / Math.max(pdi + ndi, 1) * 100;
+        
+        const trendStrength = dx < 20 ? 'Weak / Consolidation' : dx < 40 ? 'Strong Trend' : 'Extreme Trend';
+        const trendColor = dx < 20 ? '#ef4444' : dx < 40 ? '#3b82f6' : '#10b981';
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:16px; width:100%; align-items:center;">
+                <svg width="100%" height="100" viewBox="0 0 300 100" style="max-width:300px;">
+                    <path d="M 30 80 A 110 110 0 0 1 270 80" fill="none" stroke="var(--border-glass)" stroke-width="12" stroke-linecap="round"/>
+                    <path d="M 30 80 A 110 110 0 0 1 ${30 + (dx/100)*240} 80" fill="none" stroke="${trendColor}" stroke-width="12" stroke-linecap="round" style="transition: stroke 0.3s;"/>
+                    <line x1="150" y1="80" x2="${150 + Math.cos((1 - dx/100) * Math.PI) * 90}" y2="${80 - Math.sin((1 - dx/100) * Math.PI) * 90}" stroke="var(--text-primary)" stroke-width="3" stroke-linecap="round"/>
+                    <circle cx="150" cy="80" r="8" fill="var(--bg-card)" stroke="var(--text-primary)" stroke-width="3"/>
+                    <text x="150" y="98" fill="var(--text-muted)" font-size="10" text-anchor="middle" font-family="var(--font-heading)">Trend Index (DX)</text>
+                </svg>
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; width:100%;">
+                    <div class="custom-metric-card" style="text-align:center;">
+                        <div class="custom-metric-title">+DI (Bullish)</div>
+                        <div class="custom-metric-value" style="color:var(--color-emerald);">${pdi}%</div>
+                    </div>
+                    <div class="custom-metric-card" style="text-align:center;">
+                        <div class="custom-metric-title">−DI (Bearish)</div>
+                        <div class="custom-metric-value" style="color:var(--color-rose);">${ndi}%</div>
+                    </div>
+                </div>
+                
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:10px 14px; border-radius:8px; width:100%; text-align:center;">
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:2px;">Calculated DX</div>
+                    <div style="font-size:20px; font-weight:800; color:${trendColor}; font-family:var(--font-heading);">${dx.toFixed(1)}%</div>
+                    <div style="font-size:11px; color:var(--text-muted); font-weight:600; margin-top:2px;">${trendStrength}</div>
+                </div>
+            </div>
+        `;
+        
+        audit = dx < 20 
+            ? `Weak trend environment (DX = ${dx.toFixed(1)}%). Swing systems are prone to whipsaws; prioritize rangebound trading oscillators like Stochastics.` 
+            : `Trend is active (DX = ${dx.toFixed(1)}%). Direction is ${pdi > ndi ? 'Bullish (+DI > -DI)' : 'Bearish (-DI > +DI)'}. Breakouts are highly reliable in this phase.`;
+    }
+    else if (module.id === 'stochastic') {
+        const close = sbVals['close'] !== undefined ? sbVals['close'] : 155;
+        const low14 = sbVals['low14'] !== undefined ? sbVals['low14'] : 140;
+        const high14 = sbVals['high14'] !== undefined ? sbVals['high14'] : 165;
+        
+        const k = ((close - low14) / Math.max(high14 - low14, 1)) * 100;
+        const isOverbought = k > 80;
+        const isOversold = k < 20;
+        const badgeClass = isOverbought ? 'danger' : isOversold ? 'safe' : 'warning';
+        const badgeText = isOverbought ? 'Overbought (>80)' : isOversold ? 'Oversold (<20)' : 'Neutral';
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:16px; width:100%;">
+                <div style="position:relative; padding:10px 0 20px 0;">
+                    <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text-muted); margin-bottom:4px;">
+                        <span>14D Low (₹${low14})</span>
+                        <span>14D High (₹${high14})</span>
+                    </div>
+                    <div style="height:8px; background:var(--border-glass); border-radius:4px; position:relative; overflow:hidden;">
+                        <div style="position:absolute; right:0; top:0; bottom:0; width:20%; background:rgba(239, 68, 68, 0.15);"></div>
+                        <div style="position:absolute; left:0; top:0; bottom:0; width:20%; background:rgba(16, 185, 129, 0.15);"></div>
+                    </div>
+                    
+                    <div style="position:absolute; left:${k}%; top:22px; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; transition: left 0.3s;">
+                        <div style="width:12px; height:12px; border-radius:50%; background:#8b5cf6; border:2px solid #fff; box-shadow:0 0 8px rgba(139,92,246,0.8);"></div>
+                        <span style="font-size:11px; font-weight:800; color:var(--text-primary); margin-top:2px;">₹${close}</span>
+                    </div>
+                </div>
+                
+                <div style="display:grid; grid-template-columns: 2fr 1fr; gap:12px; align-items:center; margin-top:10px;">
+                    <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:10px; border-radius:8px;">
+                        <div style="font-size:10px; color:var(--text-muted); margin-bottom:2px; font-family:monospace;">%K = (Close − Low) / (High − Low) * 100</div>
+                        <div style="font-size:14px; font-weight:700; color:var(--text-primary); font-family:monospace;">
+                            %K = (${close} − ${low14}) / (${high14} - ${low14}) = <span style="color:#8b5cf6;">${k.toFixed(1)}%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="custom-metric-card" style="text-align:center; padding:12px;">
+                        <span class="custom-badge ${badgeClass}" style="padding:6px 10px; border-radius:6px; font-size:11px; font-weight:bold;">${badgeText}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        audit = isOverbought 
+            ? `Stochastic oscillator is overbought (%K = ${k.toFixed(1)}%). Buying pressure is near local exhaustion; watch for a bearish crossover below 80 for short trigger confirmations.` 
+            : isOversold 
+            ? `Stochastic oscillator is oversold (%K = ${k.toFixed(1)}%). Selling momentum is depleted; watch for a bullish crossover above 20 to trigger long positions.` 
+            : `Stochastic is at a neutral zone (%K = ${k.toFixed(1)}%). Price is trading inside its recent historical range.`;
+    }
+    else if (module.id === 'ichimoku') {
+        const h9 = sbVals['h9'] !== undefined ? sbVals['h9'] : 165;
+        const l9 = sbVals['l9'] !== undefined ? sbVals['l9'] : 155;
+        const h26 = sbVals['h26'] !== undefined ? sbVals['h26'] : 170;
+        const l26 = sbVals['l26'] !== undefined ? sbVals['l26'] : 148;
+        
+        const tenkan = (h9 + l9) / 2;
+        const kijun = (h26 + l26) / 2;
+        const spanA = (tenkan + kijun) / 2;
+        const spanB = (h26 + l26) / 2;
+        
+        const isBullishCross = tenkan > kijun;
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:16px; width:100%;">
+                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+                    <div class="custom-metric-card">
+                        <div class="custom-metric-title">Tenkan-sen (Conversion)</div>
+                        <div class="custom-metric-value" style="color:#ef4444; font-size:18px;">₹${tenkan.toFixed(1)}</div>
+                        <span style="font-size:9.5px; color:var(--text-muted);">(9-day High-Low Mid)</span>
+                    </div>
+                    <div class="custom-metric-card">
+                        <div class="custom-metric-title">Kijun-sen (Base Line)</div>
+                        <div class="custom-metric-value" style="color:#3b82f6; font-size:18px;">₹${kijun.toFixed(1)}</div>
+                        <span style="font-size:9.5px; color:var(--text-muted);">(26-day High-Low Mid)</span>
+                    </div>
+                </div>
+                
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:11px; color:var(--text-muted); font-family:var(--font-heading); text-transform:uppercase;">Cloud Boundaries (Kumo)</div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px;">
+                        <span>Senkou Span A: <strong>₹${spanA.toFixed(1)}</strong></span>
+                        <span>Senkou Span B: <strong>₹${spanB.toFixed(1)}</strong></span>
+                    </div>
+                    <div style="height:24px; border-radius:4px; background:${spanA >= spanB ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)'}; display:flex; align-items:center; justify-content:center; border: 1px dashed ${spanA >= spanB ? '#10b981' : '#ef4444'}; margin-top:4px;">
+                        <span style="font-size:10px; font-weight:700; color:${spanA >= spanB ? '#10b981' : '#ef4444'};">
+                            Kumo Cloud: ${spanA >= spanB ? 'Bullish (Green)' : 'Bearish (Red)'} Cloud Zone
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        audit = isBullishCross 
+            ? `Tenkan-sen (₹${tenkan.toFixed(1)}) is trading ABOVE Kijun-sen (₹${kijun.toFixed(1)}). Bullish crossover momentum is confirmed. Trend favors buy-on-pullbacks.` 
+            : `Tenkan-sen (₹${tenkan.toFixed(1)}) is trading BELOW Kijun-sen (₹${kijun.toFixed(1)}). Bearish crossover momentum indicates selling pressure dominates.`;
+    }
+    else if (module.id === 'vwap') {
+        const pv = sbVals['pv'] !== undefined ? sbVals['pv'] : 15000000;
+        const vol = sbVals['vol'] !== undefined ? sbVals['vol'] : 100000;
+        const vwap = pv / Math.max(vol, 1);
+        
+        const mktPrice = vwap * 1.015;
+        const premium = ((mktPrice - vwap) / vwap) * 100;
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:16px; width:100%;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="custom-metric-card" style="border-color:#3b82f6;">
+                        <div class="custom-metric-title">Volume-Weighted Price</div>
+                        <div class="custom-metric-value" style="color:#3b82f6;">₹${vwap.toFixed(2)}</div>
+                        <span class="custom-badge safe">VWAP Target</span>
+                    </div>
+                    <div class="custom-metric-card">
+                        <div class="custom-metric-title">Simulated Close</div>
+                        <div class="custom-metric-value">₹${mktPrice.toFixed(2)}</div>
+                        <span class="custom-badge ${premium > 0 ? 'danger' : 'safe'}">${premium > 0 ? 'Premium Execution' : 'Discount Execution'}</span>
+                    </div>
+                </div>
+                
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:12px; border-radius:8px;">
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; font-family:var(--font-heading); text-transform:uppercase;">Volume math calculation</div>
+                    <div style="font-size:14px; font-weight:700; color:var(--text-primary); font-family:monospace; margin-bottom:8px;">
+                        VWAP = Σ(P × V) / Σ(V) = ₹${pv.toLocaleString()} / ${vol.toLocaleString()} = <span style="color:#3b82f6;">₹${vwap.toFixed(2)}</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted); line-height:1.4;">
+                        Institutional execution benchmarks price relative to the VWAP. Executing at ₹${mktPrice.toFixed(2)} is a <span style="font-weight:600; color:var(--text-primary);">${premium.toFixed(2)}% premium</span> to intraday fair value.
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        audit = premium > 0 
+            ? `Close (₹${mktPrice.toFixed(2)}) is trading above VWAP (₹${vwap.toFixed(2)}). Intraday bias is bullish. Institutional buyers are buying at a premium, indicating high demand.` 
+            : `Close (₹${mktPrice.toFixed(2)}) is trading below VWAP (₹${vwap.toFixed(2)}). Intraday bias is bearish. Look for support consolidation before initiating long entries.`;
+    }
+    else if (module.id === 'obv') {
+        const prevObv = sbVals['prevObv'] !== undefined ? sbVals['prevObv'] : 1000000;
+        const vol = sbVals['vol'] !== undefined ? sbVals['vol'] : 50000;
+        const change = sbVals['change'] !== undefined ? sbVals['change'] : 2;
+        
+        const dir = change > 0 ? 1 : change < 0 ? -1 : 0;
+        const newObv = prevObv + (vol * dir);
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:16px; width:100%;">
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+                    <div class="custom-metric-card" style="padding:10px 6px; text-align:center;">
+                        <div class="custom-metric-title">Previous OBV</div>
+                        <div class="custom-metric-value" style="font-size:13px;">${prevObv.toLocaleString()}</div>
+                    </div>
+                    <div class="custom-metric-card" style="padding:10px 6px; text-align:center;">
+                        <div class="custom-metric-title">Today's Volume</div>
+                        <div class="custom-metric-value" style="font-size:13px; color:#8b5cf6;">${vol.toLocaleString()}</div>
+                    </div>
+                    <div class="custom-metric-card" style="padding:10px 6px; text-align:center;">
+                        <div class="custom-metric-title">Price Change</div>
+                        <div class="custom-metric-value" style="font-size:13px; color:${dir > 0 ? 'var(--color-emerald)' : dir < 0 ? 'var(--color-rose)' : 'var(--text-primary)'};">
+                            ${dir > 0 ? '+UP' : dir < 0 ? '−DOWN' : 'UNCH'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:12px; border-radius:8px;">
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; font-family:var(--font-heading); text-transform:uppercase;">Cumulative Volume Accumulation</div>
+                    <div style="font-size:15px; font-weight:700; color:var(--text-primary); font-family:monospace; margin-bottom:4px;">
+                        New OBV = ${prevObv.toLocaleString()} ${dir >= 0 ? '+' : '−'} ${vol.toLocaleString()} = <span style="color:#8b5cf6;">${newObv.toLocaleString()}</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted);">
+                        ${dir > 0 ? 'Volume is accumulated (added) because today closed positive.' : dir < 0 ? 'Volume is distributed (subtracted) because today closed negative.' : 'Volume remains unchanged.'}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        audit = dir > 0 
+            ? `Bullish volume expansion: OBV has expanded to ${newObv.toLocaleString()}, confirming volume support behind price increments.` 
+            : dir < 0 
+            ? `Bearish volume distribution: OBV has contracted to ${newObv.toLocaleString()}, highlighting institutional capital outflows.` 
+            : `Price is unchanged; volume does not impact cumulative On-Balance Volume calculation.`;
+    }
+    else if (module.id === 'mfi') {
+        const pmf = sbVals['pmf'] !== undefined ? sbVals['pmf'] : 5000000;
+        const nmf = sbVals['nmf'] !== undefined ? sbVals['nmf'] : 3000000;
+        
+        const mr = pmf / Math.max(nmf, 1);
+        const mfi = 100 - (100 / (1 + mr));
+        
+        const isOverbought = mfi > 80;
+        const isOversold = mfi < 20;
+        const badgeClass = isOverbought ? 'danger' : isOversold ? 'safe' : 'warning';
+        const badgeText = isOverbought ? 'Overbought (>80)' : isOversold ? 'Oversold (<20)' : 'Neutral';
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:16px; width:100%;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                    <div class="custom-metric-card">
+                        <div class="custom-metric-title">Positive Money Flow</div>
+                        <div class="custom-metric-value" style="color:var(--color-emerald); font-size:15px;">₹${(pmf/1000000).toFixed(1)}M</div>
+                    </div>
+                    <div class="custom-metric-card">
+                        <div class="custom-metric-title">Negative Money Flow</div>
+                        <div class="custom-metric-value" style="color:var(--color-rose); font-size:15px;">₹${(nmf/1000000).toFixed(1)}M</div>
+                    </div>
+                </div>
+                
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:12px; border-radius:8px; display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:11px; color:var(--text-muted); font-family:var(--font-heading); text-transform:uppercase;">Volume-Weighted Oscillator</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:13px; font-weight:700; color:var(--text-primary);">Money Ratio: ${mr.toFixed(2)}</span>
+                        <span style="font-size:18px; font-weight:800; color:#8b5cf6;">MFI = ${mfi.toFixed(1)}%</span>
+                    </div>
+                    <div style="margin-top:6px;">
+                        <span class="custom-badge ${badgeClass}" style="display:inline-block; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:10px;">${badgeText}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        audit = isOverbought 
+            ? `Money Flow Index is overbought (MFI = ${mfi.toFixed(1)}%). Buying volume is unsustainably high; watch for exhaustion.` 
+            : isOversold 
+            ? `Money Flow Index is oversold (MFI = ${mfi.toFixed(1)}%). Selling volume is depleted; low risk entry candidate.` 
+            : `Money Flow Index indicates stable capital flows (MFI = ${mfi.toFixed(1)}%).`;
+    }
+    else if (module.id === 'cci') {
+        const tp = sbVals['tp'] !== undefined ? sbVals['tp'] : 155;
+        const smaTP = sbVals['smaTP'] !== undefined ? sbVals['smaTP'] : 150;
+        const md = sbVals['md'] !== undefined ? sbVals['md'] : 3;
+        
+        const cci = (tp - smaTP) / (0.015 * Math.max(md, 0.01));
+        const isOverbought = cci > 100;
+        const isOversold = cci < -100;
+        const badgeClass = isOverbought ? 'danger' : isOversold ? 'safe' : 'warning';
+        const badgeText = isOverbought ? 'Bullish Breakout (>100)' : isOversold ? 'Bearish Breakout (<−100)' : 'Neutral';
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:16px; width:100%;">
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+                    <div class="custom-metric-card" style="padding:10px 4px; text-align:center;">
+                        <div class="custom-metric-title">Typical Price</div>
+                        <div class="custom-metric-value" style="font-size:14px;">₹${tp.toFixed(1)}</div>
+                    </div>
+                    <div class="custom-metric-card" style="padding:10px 4px; text-align:center;">
+                        <div class="custom-metric-title">SMA of TP</div>
+                        <div class="custom-metric-value" style="font-size:14px;">₹${smaTP.toFixed(1)}</div>
+                    </div>
+                    <div class="custom-metric-card" style="padding:10px 4px; text-align:center;">
+                        <div class="custom-metric-title">Mean Deviation</div>
+                        <div class="custom-metric-value" style="font-size:14px;">₹${md.toFixed(1)}</div>
+                    </div>
+                </div>
+                
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:12px; border-radius:8px; text-align:center;">
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:2px;">CCI Value</div>
+                    <div style="font-size:24px; font-weight:800; color:#8b5cf6; font-family:var(--font-heading);">${cci.toFixed(1)}</div>
+                    <div style="margin-top:6px;">
+                        <span class="custom-badge ${badgeClass}" style="padding:4px 8px; border-radius:4px; font-weight:bold; font-size:10px;">${badgeText}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        audit = isOverbought 
+            ? `CCI is in a strong bullish acceleration phase (${cci.toFixed(1)} > +100). Momentum is extremely strong.` 
+            : isOversold 
+            ? `CCI is in a strong bearish breakdown phase (${cci.toFixed(1)} < -100). Selling pressure is severe.` 
+            : `CCI is within standard channel levels (${cci.toFixed(1)}), suggesting price action is consolidative around averages.`;
+    }
+    else if (module.id === 'parabolic_sar') {
+        const sar = sbVals['sar'] !== undefined ? sbVals['sar'] : 145;
+        const af = sbVals['af'] !== undefined ? sbVals['af'] : 0.02;
+        const ep = sbVals['ep'] !== undefined ? sbVals['ep'] : 160;
+        
+        const nextSar = sar + af * (ep - sar);
+        
+        html = `
+            <div style="display:flex; flex-direction:column; gap:16px; width:100%;">
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;">
+                    <div class="custom-metric-card" style="padding:10px 4px; text-align:center;">
+                        <div class="custom-metric-title">Current SAR</div>
+                        <div class="custom-metric-value" style="font-size:14px;">₹${sar.toFixed(2)}</div>
+                    </div>
+                    <div class="custom-metric-card" style="padding:10px 4px; text-align:center;">
+                        <div class="custom-metric-title">Accel Factor (AF)</div>
+                        <div class="custom-metric-value" style="font-size:14px; color:#8b5cf6;">${af.toFixed(2)}</div>
+                    </div>
+                    <div class="custom-metric-card" style="padding:10px 4px; text-align:center;">
+                        <div class="custom-metric-title">Extreme Point (EP)</div>
+                        <div class="custom-metric-value" style="font-size:14px;">₹${ep.toFixed(2)}</div>
+                    </div>
+                </div>
+                
+                <div style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); padding:12px; border-radius:8px;">
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:4px; font-family:var(--font-heading); text-transform:uppercase;">Trailing Stop Tightening</div>
+                    <div style="font-size:14px; font-weight:700; color:var(--text-primary); font-family:monospace; margin-bottom:4px;">
+                        Next SAR = ${sar.toFixed(2)} + ${af.toFixed(2)} × (${ep.toFixed(2)} − ${sar.toFixed(2)}) = <span style="color:var(--color-emerald);">₹${nextSar.toFixed(2)}</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted);">
+                        The Parabolic SAR steps closer to the extreme price high/low by <span style="font-weight:600; color:var(--text-primary);">₹${(nextSar - sar).toFixed(2)}</span>. As the trend persists, the stop-loss accelerates to lock in profits.
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        audit = `Parabolic SAR trail calculation is updated. Next SAR stop is locked at ₹${nextSar.toFixed(2)}. Ensure position stop floors are updated accordingly.`;
+    }
+    else {
+        html = `<div style="color:var(--text-muted); font-size:12px; text-align:center; padding:20px;">No customized interactive workspace available for this topic yet. Check back soon!</div>`;
+        audit = `No dynamic insights available.`;
+    }
+
+    board.innerHTML = html;
+    if (auditorText) auditorText.textContent = audit;
+}
+
 
 function renderAcademySandbox(module) {
     const body = document.getElementById('academy-sandbox-body');
@@ -29715,6 +32295,19 @@ function renderAcademySandbox(module) {
             vals[inp.key] = val;
             academyActiveSandboxValues[inp.key] = val;
             
+            // Sync sandbox values with chart prefixes so sliders impact chart calculations directly
+            if (module.id === 'rsi') {
+                academyActiveSliderValues['rsi_' + inp.key] = val;
+            } else if (module.id === 'macd') {
+                academyActiveSliderValues['macd_' + inp.key] = val;
+            } else if (module.id === 'bollinger') {
+                if (inp.key === 'period') {
+                    academyActiveSliderValues['bb_period'] = val;
+                } else if (inp.key === 'stddev') {
+                    academyActiveSliderValues['bb_stddev'] = val;
+                }
+            }
+            
             const readEl = document.getElementById('academy-sb-val-' + inp.key);
             if (readEl) readEl.textContent = val;
         }
@@ -29724,6 +32317,11 @@ function renderAcademySandbox(module) {
         
         // Redraw chart dynamically in response to slider changes
         renderAcademyChart(module);
+
+        // Update suggested prompts dynamically to match the current sandbox settings
+        if (typeof renderAcademyPromptSuggestions === 'function') {
+            renderAcademyPromptSuggestions(module);
+        }
     };
 
     calcAndDisplay();
@@ -29814,6 +32412,11 @@ function updateAcademyHUD() {
     const fill = document.getElementById('academy-hud-progress-fill');
     if (fill) fill.style.width = pct.toFixed(1) + '%';
 
+    const summaryProgress = document.getElementById('academy-hud-summary-progress');
+    if (summaryProgress) {
+        summaryProgress.textContent = `${pct.toFixed(0)}% Completed (${completed}/${total})`;
+    }
+
     // Tier
     let tier = 'Beginner';
     if (completed >= 40) tier = 'Master';
@@ -29870,7 +32473,10 @@ function setupAcademyDrawCanvas() {
         const rect = canvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: (clientX - rect.left) * (canvas.width / rect.width), y: (clientY - rect.top) * (canvas.height / rect.height) };
+        return { 
+            x: (clientX - rect.left) * (canvas.width / rect.width), 
+            y: (clientY - rect.top) * (canvas.height / rect.height) 
+        };
     };
 
     const startDraw = (e) => {
@@ -29894,6 +32500,7 @@ function setupAcademyDrawCanvas() {
             ctx.strokeStyle = color;
             ctx.lineWidth = width;
             ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
             ctx.beginPath();
             ctx.moveTo(academyDrawLastX, academyDrawLastY);
             ctx.lineTo(pos.x, pos.y);
@@ -29931,110 +32538,6 @@ function setupAcademyDrawCanvas() {
     canvas.addEventListener('touchmove', moveDraw, { passive: false });
     canvas.addEventListener('touchend', endDraw);
 
-    const handleHover = (e) => {
-        if (academyDrawMode) return;
-        if (!academyActiveChartData || !academyActiveChartData.points || academyActiveChartData.points.length === 0) return;
-
-        const pos = getPos(e);
-        const mx = pos.x;
-        const my = pos.y;
-
-        const padding = academyActiveChartData.padding;
-        const w = academyActiveChartData.w;
-        const h = academyActiveChartData.h;
-
-        if (mx < padding.left || mx > w - padding.right || my < padding.top || my > h - padding.bottom) {
-            ctx.clearRect(0, 0, w, h);
-            return;
-        }
-
-        let closestPt = null;
-        let minDist = Infinity;
-        let closestIdx = -1;
-        academyActiveChartData.points.forEach((pt, idx) => {
-            const dist = Math.abs(pt.x - mx);
-            if (dist < minDist) {
-                minDist = dist;
-                closestPt = pt;
-                closestIdx = idx;
-            }
-        });
-
-        if (!closestPt) return;
-
-        ctx.clearRect(0, 0, w, h);
-
-        ctx.strokeStyle = academyActiveChartData.isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.15)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(closestPt.x, padding.top);
-        ctx.lineTo(closestPt.x, h - padding.bottom);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(padding.left, closestPt.y);
-        ctx.lineTo(w - padding.right, closestPt.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = '#6366f1';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(closestPt.x, closestPt.y, 5, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.stroke();
-
-        const keys = Object.keys(closestPt.values);
-        const tooltipW = 160;
-        const tooltipH = 22 + keys.length * 15;
-        let tx = closestPt.x + 12;
-        let ty = closestPt.y - 12;
-
-        if (tx + tooltipW > w) tx = closestPt.x - tooltipW - 12;
-        if (ty + tooltipH > h - padding.bottom) ty = h - padding.bottom - tooltipH;
-        if (ty < padding.top) ty = padding.top;
-
-        ctx.fillStyle = academyActiveChartData.isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)';
-        ctx.strokeStyle = academyActiveChartData.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(tx, ty, tooltipW, tooltipH, 6);
-        } else {
-            ctx.rect(tx, ty, tooltipW, tooltipH);
-        }
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.font = 'bold 9px Inter';
-        ctx.fillStyle = academyActiveChartData.isDark ? '#e2e8f0' : '#1e293b';
-        ctx.textAlign = 'left';
-        ctx.fillText(`Day Index: ${closestIdx + 1}`, tx + 8, ty + 12);
-
-        ctx.font = '9px Inter';
-        let yOffset = 26;
-        keys.forEach(key => {
-            ctx.fillStyle = academyActiveChartData.isDark ? '#94a3b8' : '#64748b';
-            ctx.fillText(key + ':', tx + 8, ty + yOffset);
-            
-            ctx.fillStyle = academyActiveChartData.isDark ? '#f8fafc' : '#0f172a';
-            ctx.textAlign = 'right';
-            ctx.fillText(closestPt.values[key], tx + tooltipW - 8, ty + yOffset);
-            ctx.textAlign = 'left';
-            yOffset += 14;
-        });
-    };
-
-    const handleMouseLeave = () => {
-        if (academyDrawMode) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    };
-
-    canvas.addEventListener('mousemove', handleHover);
-    canvas.addEventListener('mouseleave', handleMouseLeave);
-
     // Tool buttons
     document.querySelectorAll('.academy-draw-tool-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -30048,6 +32551,148 @@ function setupAcademyDrawCanvas() {
             btn.classList.add('active');
         });
     });
+
+    // Composite Chart and Drawings Snapshot Download
+    const snapshotBtn = document.getElementById('academy-snapshot-btn');
+    if (snapshotBtn) {
+        snapshotBtn.addEventListener('click', () => {
+            if (module.cat === 'fundamental' || module.cat === 'bonds') {
+                const board = document.getElementById('academy-custom-visual-board');
+                const auditText = document.getElementById('academy-ai-auditor-text')?.textContent || '';
+                const boardHtml = board ? board.innerHTML : '';
+                
+                const isDark = document.documentElement.getAttribute('data-theme') !== 'light' && !document.body.classList.contains('light-mode');
+                const bgColor = isDark ? '#060913' : '#ffffff';
+                const textColor = isDark ? '#f3f4f6' : '#111827';
+                const cardColor = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+                const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+                
+                const memoHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Institutional Research Memo - ${module.title}</title>
+    <style>
+        body {
+            background-color: ${bgColor};
+            color: ${textColor};
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+            border: 1px solid ${borderColor};
+            border-radius: 8px;
+            margin-top: 40px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h1 { font-size: 24px; border-bottom: 2px solid ${borderColor}; padding-bottom: 10px; margin-top: 0; }
+        .meta { display: flex; justify-content: space-between; font-size: 12px; color: #9ca3af; margin-bottom: 20px; }
+        .board-container { background: ${cardColor}; border: 1px solid ${borderColor}; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .auditor-box { background: rgba(59, 130, 246, 0.08); border-left: 4px solid #3b82f6; padding: 15px; border-radius: 4px; font-size: 13px; line-height: 1.5; margin-bottom: 20px; }
+        .spreadsheet-table { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 13px; margin: 15px 0; }
+        .spreadsheet-table th, .spreadsheet-table td { padding: 8px 12px; border: 1px solid ${borderColor}; text-align: right; }
+        .spreadsheet-table th { background: rgba(255, 255, 255, 0.05); text-align: center; }
+        .spreadsheet-table td:first-child, .spreadsheet-table th:first-child { text-align: left; }
+        .spreadsheet-total-row { background: rgba(59, 130, 246, 0.1) !important; font-weight: bold; }
+        .dupont-tree-container { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .dupont-row { display: flex; justify-content: space-around; width: 100%; }
+        .dupont-node { border: 1px solid ${borderColor}; border-radius: 6px; padding: 10px 15px; min-width: 120px; text-align: center; background: ${bgColor}; }
+        .dupont-node.primary { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.05); }
+        .dupont-node-title { font-size: 10px; color: #9ca3af; text-transform: uppercase; }
+        .dupont-node-value { font-size: 16px; font-weight: bold; }
+        .dupont-operator { font-size: 20px; align-self: center; color: #9ca3af; }
+        .custom-metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
+        .custom-metric-card { border: 1px solid ${borderColor}; border-radius: 6px; padding: 15px; text-align: center; background: ${bgColor}; }
+        .custom-metric-title { font-size: 12px; color: #9ca3af; }
+        .custom-metric-value { font-size: 18px; font-weight: bold; }
+        .custom-badge { display: inline-block; padding: 2px 8px; font-size: 10px; font-weight: bold; border-radius: 4px; margin-top: 6px; }
+        .custom-badge.safe { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+        .custom-badge.warning { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+        .custom-badge.danger { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+        .custom-progress-bar { width: 100%; height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+        .custom-progress-fill { height: 100%; background: #3b82f6; }
+        .credit-ladder-container { display: flex; flex-direction: column; gap: 8px; }
+        .credit-ladder-row { display: flex; justify-content: space-between; border: 1px solid ${borderColor}; padding: 8px 15px; border-radius: 6px; }
+        .credit-ladder-row.active { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); font-weight: bold; }
+        .repo-flow-container { display: flex; align-items: center; justify-content: space-around; width: 100%; gap: 15px; }
+        .repo-flow-step { flex: 1; border: 1px solid ${borderColor}; border-radius: 6px; padding: 10px; text-align: center; }
+        circle { fill: #3b82f6; }
+        path { stroke: #3b82f6; }
+        text { fill: ${textColor}; }
+    </style>
+</head>
+<body>
+    <h1>${module.title}</h1>
+    <div class="meta">
+        <span>Category: ${module.cat.toUpperCase()}</span>
+        <span>Date: ${new Date().toLocaleDateString('en-IN')}</span>
+    </div>
+    
+    <div class="auditor-box">
+        <strong>🔍 AI Auditor Insights</strong>
+        <p>${auditText}</p>
+    </div>
+    
+    <div class="board-container">
+        ${boardHtml}
+    </div>
+    
+    <div style="font-size: 11px; text-align: center; color: #9ca3af; margin-top: 40px; border-top: 1px solid ${borderColor}; padding-top: 15px;">
+        Generated via Indian Stock Analysis AI Workstation v2.0
+    </div>
+</body>
+</html>`;
+                
+                const blob = new Blob([memoHtml], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ResearchNote_${module.id}.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('📝 Investment Research Note exported successfully!');
+                return;
+            }
+
+            const chartContainer = document.getElementById('academy-lightweight-chart-container');
+            if (!chartContainer) return;
+            const chartCanvases = chartContainer.querySelectorAll('canvas');
+            if (chartCanvases.length === 0) {
+                showToast('❌ No active chart found to capture!');
+                return;
+            }
+
+            // The main canvas is the first one, which defines the correct size
+            const baseCanvas = chartCanvases[0];
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = baseCanvas.width;
+            tempCanvas.height = baseCanvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Draw current theme background
+            const isDark = document.documentElement.getAttribute('data-theme') !== 'light' && !document.body.classList.contains('light-mode');
+            tempCtx.fillStyle = isDark ? '#060913' : '#ffffff';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+            // Draw all chart canvases in order
+            chartCanvases.forEach(c => {
+                tempCtx.drawImage(c, 0, 0);
+            });
+
+            // Overlay user drawings
+            tempCtx.drawImage(canvas, 0, 0, tempCanvas.width, tempCanvas.height);
+
+            // Trigger download
+            const link = document.createElement('a');
+            link.download = `academy-${academyActiveTopicId || 'chart'}-snapshot.png`;
+            link.href = tempCanvas.toDataURL('image/png');
+            link.click();
+            showToast('📷 Chart snapshot saved to downloads!');
+        });
+    }
 }
 
 // ── AI Coach ──
@@ -30074,13 +32719,18 @@ function setupAcademyAICoach() {
         messagesEl.scrollTop = messagesEl.scrollHeight;
 
         try {
+            const activeSub = academyActiveSubPattern[academyActiveTopicId] || (module && ACADEMY_SUB_PATTERNS[academyActiveTopicId] ? ACADEMY_SUB_PATTERNS[academyActiveTopicId][0] : null);
+            const sbVals = { ...academyActiveSliderValues, ...academyActiveSandboxValues };
+
             const res = await fetch('/api/learning/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     question: question,
                     topic: module ? module.title : null,
-                    category: module ? module.cat : null
+                    category: module ? module.cat : null,
+                    sandbox_values: sbVals,
+                    sub_pattern: activeSub
                 })
             });
             const data = await res.json();
@@ -30105,224 +32755,238 @@ let academyActiveSandboxValues = {};
 let academyActiveSubPattern = {};
 
 const ACADEMY_SUB_PATTERNS = {
-    'head_shoulders': ['Head & Shoulders', 'Inverse Head & Shoulders'],
-    'double_top_bottom': ['Double Top', 'Double Bottom'],
-    'flag_pennant': ['Bull Flag', 'Bear Flag', 'Bull Pennant', 'Bear Pennant'],
-    'triangles': ['Symmetrical Triangle', 'Ascending Triangle', 'Descending Triangle'],
-    'wedges': ['Rising Wedge', 'Falling Wedge'],
-    'cup_handle': ['Cup & Handle', 'Inverse Cup & Handle'],
-    'triple_top_bottom': ['Triple Top', 'Triple Bottom'],
-    'rounding_bottom': ['Rounding Bottom', 'Rounding Top'],
-    'megaphone': ['Broadening Megaphone', 'Narrowing Wedge'],
-    'price_channels': ['Ascending Channel', 'Descending Channel'],
-    'diamond': ['Diamond Top', 'Diamond Bottom'],
-    
-    // Candlesticks
-    'doji': ['Standard Doji', 'Dragonfly Doji', 'Gravestone Doji', 'Long-Legged Doji'],
-    'hammer_hangman': ['Hammer', 'Hanging Man'],
-    'shooting_star': ['Shooting Star', 'Inverted Hammer'],
-    'engulfing': ['Bullish Engulfing', 'Bearish Engulfing'],
-    'harami': ['Bullish Harami', 'Bearish Harami'],
-    'morning_evening_star': ['Morning Star', 'Evening Star'],
-    'piercing_darkcloud': ['Piercing Line', 'Dark Cloud Cover'],
-    'tweezer': ['Tweezer Bottoms', 'Tweezer Tops'],
-    'three_soldiers_crows': ['Three White Soldiers', 'Three Black Crows'],
-    'marubozu': ['Bullish Marubozu', 'Bearish Marubozu']
-};
+        'head_shoulders': ['Head & Shoulders', 'Inverse Head & Shoulders'],
+        'pennants': ['Bull Pennant', 'Bear Pennant'],
+        'cup_handle': ['Cup & Handle', 'Inverse Cup & Handle'],
+        'rounding_bottom': ['Rounding Bottom', 'Rounding Top'],
+        'megaphone': ['Broadening Megaphone', 'Narrowing Wedge'],
+        'price_channels': ['Ascending Channel', 'Descending Channel'],
+        'diamond': ['Diamond Top', 'Diamond Bottom'],
+        
+        // Candlesticks
+        'doji': ['Standard Doji', 'Dragonfly Doji', 'Gravestone Doji', 'Long-Legged Doji'],
+        'marubozu': ['Bullish Marubozu', 'Bearish Marubozu']
+    };
 
 function getDynamicChartData(module) {
-    const activeSub = academyActiveSubPattern[module.id] || (ACADEMY_SUB_PATTERNS[module.id] ? ACADEMY_SUB_PATTERNS[module.id][0] : null);
-    const sbVals = academyActiveSandboxValues;
-
-    if (module.id === 'head_shoulders') {
-        const head = sbVals['head'] !== undefined ? sbVals['head'] : 1200;
-        const neck = sbVals['neck'] !== undefined ? sbVals['neck'] : 1050;
-        if (activeSub === 'Inverse Head & Shoulders') {
-            const sh = neck - (neck - head) * 0.5;
-            return [neck, neck - 20, sh, neck - 10, neck, neck - 15, head, neck + 5, neck, neck - 10, sh, neck - 15, neck, neck + 40, neck + 80, neck + 100];
-        } else {
-            const sh = neck + (head - neck) * 0.5;
-            return [neck, neck + 20, sh, neck + 10, neck, neck + 15, head, neck - 5, neck, neck + 10, sh, neck + 15, neck, neck - 40, neck - 80, neck - 100];
-        }
-    }
+        const activeSub = academyActiveSubPattern[module.id] || (ACADEMY_SUB_PATTERNS[module.id] ? ACADEMY_SUB_PATTERNS[module.id][0] : null);
+        const sbVals = academyActiveSandboxValues;
     
-    if (module.id === 'double_top_bottom') {
-        const peak = sbVals['peak'] !== undefined ? sbVals['peak'] : 500;
-        const trough = sbVals['trough'] !== undefined ? sbVals['trough'] : 450;
-        if (activeSub === 'Double Bottom') {
-            return [trough + 40, trough + 20, trough, trough + 15, peak, trough + 20, trough, trough + 10, peak, peak + 25, peak + 50];
-        } else {
+        if (module.id === 'head_shoulders') {
+            const head = sbVals['head'] !== undefined ? sbVals['head'] : 1200;
+            const neck = sbVals['neck'] !== undefined ? sbVals['neck'] : 1050;
+            if (activeSub === 'Inverse Head & Shoulders') {
+                const sh = neck - (neck - head) * 0.5;
+                return [neck, neck - 20, sh, neck - 10, neck, neck - 15, head, neck + 5, neck, neck - 10, sh, neck - 15, neck, neck + 40, neck + 80, neck + 100];
+            } else {
+                const sh = neck + (head - neck) * 0.5;
+                return [neck, neck + 20, sh, neck + 10, neck, neck + 15, head, neck - 5, neck, neck + 10, sh, neck + 15, neck, neck - 40, neck - 80, neck - 100];
+            }
+        }
+        
+        if (module.id === 'double_top') {
+            const peak = sbVals['peak'] !== undefined ? sbVals['peak'] : 500;
+            const trough = sbVals['trough'] !== undefined ? sbVals['trough'] : 450;
             return [peak - 40, peak - 20, peak, peak - 15, trough, peak - 20, peak, peak - 10, trough, trough - 25, trough - 50];
         }
-    }
-
-    if (module.id === 'triple_top_bottom') {
-        const level = sbVals['level'] !== undefined ? sbVals['level'] : 500;
-        const sr = sbVals['sr'] !== undefined ? sbVals['sr'] : 460;
-        if (activeSub === 'Triple Bottom') {
-            return [sr + 30, sr + 10, level, sr - 10, sr, level + 5, level, sr - 15, sr, level + 10, level, sr, sr + 25, sr + 45];
-        } else {
+        
+        if (module.id === 'double_bottom') {
+            const peak = sbVals['peak'] !== undefined ? sbVals['peak'] : 500;
+            const trough = sbVals['trough'] !== undefined ? sbVals['trough'] : 450;
+            return [trough + 40, trough + 20, trough, trough + 15, peak, trough + 20, trough, trough + 10, peak, peak + 25, peak + 50];
+        }
+    
+        if (module.id === 'triple_top') {
+            const level = sbVals['level'] !== undefined ? sbVals['level'] : 500;
+            const sr = sbVals['sr'] !== undefined ? sbVals['sr'] : 460;
             return [sr - 30, sr - 10, level, sr + 10, sr, level - 5, level, sr + 15, sr, level - 10, level, sr, sr - 25, sr - 45];
         }
-    }
-
-    if (module.id === 'flag_pennant') {
-        const start = sbVals['start'] !== undefined ? sbVals['start'] : 100;
-        const end = sbVals['end'] !== undefined ? sbVals['end'] : 140;
-        const breakout = sbVals['breakout'] !== undefined ? sbVals['breakout'] : 135;
-        const isBear = activeSub && activeSub.includes('Bear');
-        const isPennant = activeSub && activeSub.includes('Pennant');
-        if (isBear) {
-            const diff = start - end;
-            const step = diff / 5;
-            let data = [start, start - step, start - step*2, start - step*3, end];
-            if (isPennant) {
-                data.push(end + 12, end + 4, end + 9, end + 6, end + 7);
-            } else {
-                data.push(end + 8, end + 3, end + 11, end + 6, end + 13, end + 8);
-            }
-            data.push(breakout, breakout - diff*0.3, breakout - diff*0.6, breakout - diff);
-            return data;
-        } else {
+        
+        if (module.id === 'triple_bottom') {
+            const level = sbVals['level'] !== undefined ? sbVals['level'] : 460;
+            const sr = sbVals['sr'] !== undefined ? sbVals['sr'] : 500;
+            return [sr + 30, sr + 10, level, sr - 10, sr, level + 5, level, sr - 15, sr, level + 10, level, sr, sr + 25, sr + 45];
+        }
+    
+        if (module.id === 'bull_flag') {
+            const start = sbVals['start'] !== undefined ? sbVals['start'] : 100;
+            const end = sbVals['end'] !== undefined ? sbVals['end'] : 140;
+            const breakout = sbVals['breakout'] !== undefined ? sbVals['breakout'] : 135;
             const diff = end - start;
             const step = diff / 5;
             let data = [start, start + step, start + step*2, start + step*3, end];
-            if (isPennant) {
-                data.push(end - 12, end - 4, end - 9, end - 6, end - 7);
-            } else {
-                data.push(end - 8, end - 3, end - 11, end - 6, end - 13, end - 8);
-            }
+            data.push(end - 8, end - 3, end - 11, end - 6, end - 13, end - 8);
             data.push(breakout, breakout + diff*0.3, breakout + diff*0.6, breakout + diff);
             return data;
         }
-    }
-
-    if (module.id === 'triangles') {
-        const ceiling = sbVals['ceiling'] !== undefined ? sbVals['ceiling'] : 500;
-        const floor = sbVals['floor'] !== undefined ? sbVals['floor'] : 420;
-        const range = ceiling - floor;
-        const mid = (ceiling + floor) / 2;
-        if (activeSub === 'Ascending Triangle') {
-            return [floor, ceiling - 10, floor + range*0.25, ceiling - 5, floor + range*0.5, ceiling, floor + range*0.75, ceiling, ceiling + range*0.4];
-        } else if (activeSub === 'Descending Triangle') {
-            return [ceiling, floor + 10, ceiling - range*0.25, floor + 5, ceiling - range*0.5, floor, ceiling - range*0.75, floor, floor - range*0.4];
-        } else {
+        
+        if (module.id === 'bear_flag') {
+            const start = sbVals['start'] !== undefined ? sbVals['start'] : 140;
+            const end = sbVals['end'] !== undefined ? sbVals['end'] : 100;
+            const breakout = sbVals['breakout'] !== undefined ? sbVals['breakout'] : 105;
+            const diff = start - end;
+            const step = diff / 5;
+            let data = [start, start - step, start - step*2, start - step*3, end];
+            data.push(end + 8, end + 3, end + 11, end + 6, end + 13, end + 8);
+            data.push(breakout, breakout - diff*0.3, breakout - diff*0.6, breakout - diff);
+            return data;
+        }
+    
+        if (module.id === 'pennants') {
+            const start = sbVals['start'] !== undefined ? sbVals['start'] : 100;
+            const end = sbVals['end'] !== undefined ? sbVals['end'] : 140;
+            const breakout = sbVals['breakout'] !== undefined ? sbVals['breakout'] : 135;
+            const isBear = activeSub && activeSub.includes('Bear');
+            if (isBear) {
+                const diff = start - end;
+                const step = diff / 5;
+                let data = [start, start - step, start - step*2, start - step*3, end];
+                data.push(end + 12, end + 4, end + 9, end + 6, end + 7);
+                data.push(breakout, breakout - diff*0.3, breakout - diff*0.6, breakout - diff);
+                return data;
+            } else {
+                const diff = end - start;
+                const step = diff / 5;
+                let data = [start, start + step, start + step*2, start + step*3, end];
+                data.push(end - 12, end - 4, end - 9, end - 6, end - 7);
+                data.push(breakout, breakout + diff*0.3, breakout + diff*0.6, breakout + diff);
+                return data;
+            }
+        }
+    
+        if (module.id === 'symmetrical_triangle') {
+            const ceiling = sbVals['ceiling'] !== undefined ? sbVals['ceiling'] : 500;
+            const floor = sbVals['floor'] !== undefined ? sbVals['floor'] : 420;
+            const range = ceiling - floor;
+            const mid = (ceiling + floor) / 2;
             return [floor, ceiling, floor + range*0.15, ceiling - range*0.15, floor + range*0.3, ceiling - range*0.3, floor + range*0.4, ceiling - range*0.4, mid, mid + range*0.3, mid + range*0.6];
         }
-    }
-
-    if (module.id === 'wedges') {
-        const start = sbVals['start'] !== undefined ? sbVals['start'] : 50;
-        const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 480;
-        if (activeSub === 'Falling Wedge') {
-            return [bo + start * 2, bo + start * 1.5, bo + start * 0.8, bo + start * 1.2, bo + start * 0.5, bo + start * 0.9, bo + start * 0.3, bo + start * 0.6, bo + start * 0.1, bo + start * 0.4, bo, bo + start * 0.5, bo + start, bo + start * 1.5];
-        } else {
+    
+        if (module.id === 'ascending_triangle') {
+            const ceiling = sbVals['ceiling'] !== undefined ? sbVals['ceiling'] : 500;
+            const floor = sbVals['floor'] !== undefined ? sbVals['floor'] : 420;
+            const range = ceiling - floor;
+            return [floor, ceiling - 10, floor + range*0.25, ceiling - 5, floor + range*0.5, ceiling, floor + range*0.75, ceiling, ceiling + range*0.4];
+        }
+    
+        if (module.id === 'descending_triangle') {
+            const ceiling = sbVals['ceiling'] !== undefined ? sbVals['ceiling'] : 500;
+            const floor = sbVals['floor'] !== undefined ? sbVals['floor'] : 420;
+            const range = ceiling - floor;
+            return [ceiling, floor + 10, ceiling - range*0.25, floor + 5, ceiling - range*0.5, floor, ceiling - range*0.75, floor, floor - range*0.4];
+        }
+    
+        if (module.id === 'rising_wedge') {
+            const start = sbVals['start'] !== undefined ? sbVals['start'] : 50;
+            const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 480;
             return [bo - start * 2, bo - start * 1.5, bo - start * 0.8, bo - start * 1.2, bo - start * 0.5, bo - start * 0.9, bo - start * 0.3, bo - start * 0.6, bo - start * 0.1, bo - start * 0.4, bo, bo - start * 0.5, bo - start, bo - start * 1.5];
         }
-    }
-
-    if (module.id === 'cup_handle') {
-        const rim = sbVals['rim'] !== undefined ? sbVals['rim'] : 200;
-        const bottom = sbVals['bottom'] !== undefined ? sbVals['bottom'] : 160;
-        const depth = rim - bottom;
-        if (activeSub === 'Inverse Cup & Handle') {
-            return [rim, rim + depth*0.2, rim + depth*0.5, rim + depth*0.8, rim + depth, rim + depth*0.8, rim + depth*0.5, rim + depth*0.2, rim, rim + depth*0.1, rim + depth*0.25, rim, rim - depth*0.3, rim - depth*0.7, rim - depth];
-        } else {
-            return [rim, rim - depth*0.2, rim - depth*0.5, rim - depth*0.8, bottom, rim - depth*0.8, rim - depth*0.5, rim - depth*0.2, rim, rim - depth*0.1, rim - depth*0.25, rim, rim + depth*0.3, rim + depth*0.7, rim + depth];
+    
+        if (module.id === 'falling_wedge') {
+            const start = sbVals['start'] !== undefined ? sbVals['start'] : 50;
+            const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 480;
+            return [bo + start * 2, bo + start * 1.5, bo + start * 0.8, bo + start * 1.2, bo + start * 0.5, bo + start * 0.9, bo + start * 0.3, bo + start * 0.6, bo + start * 0.1, bo + start * 0.4, bo, bo + start * 0.5, bo + start, bo + start * 1.5];
         }
-    }
-
-    if (module.id === 'rounding_bottom') {
-        const r = sbVals['r'] !== undefined ? sbVals['r'] : 300;
-        const b = sbVals['b'] !== undefined ? sbVals['b'] : 220;
-        const depth = r - b;
-        if (activeSub === 'Rounding Top') {
-            return [b, b + depth*0.2, b + depth*0.45, b + depth*0.7, b + depth*0.9, r, b + depth*0.9, b + depth*0.7, b + depth*0.45, b + depth*0.2, b, b - depth*0.3, b - depth*0.6];
-        } else {
-            return [r, r - depth*0.3, r - depth*0.6, r - depth*0.8, b, r - depth*0.8, r - depth*0.6, r - depth*0.3, r, r + depth*0.3, r + depth*0.6];
+    
+        if (module.id === 'cup_handle') {
+            const rim = sbVals['rim'] !== undefined ? sbVals['rim'] : 200;
+            const bottom = sbVals['bottom'] !== undefined ? sbVals['bottom'] : 160;
+            const depth = rim - bottom;
+            if (activeSub === 'Inverse Cup & Handle') {
+                return [rim, rim + depth*0.2, rim + depth*0.5, rim + depth*0.8, rim + depth, rim + depth*0.8, rim + depth*0.5, rim + depth*0.2, rim, rim + depth*0.1, rim + depth*0.25, rim, rim - depth*0.3, rim - depth*0.7, rim - depth];
+            } else {
+                return [rim, rim - depth*0.2, rim - depth*0.5, rim - depth*0.8, bottom, rim - depth*0.8, rim - depth*0.5, rim - depth*0.2, rim, rim - depth*0.1, rim - depth*0.25, rim, rim + depth*0.3, rim + depth*0.7, rim + depth];
+            }
         }
-    }
-
-    if (module.id === 'megaphone') {
-        const h = sbVals['h'] !== undefined ? sbVals['h'] : 550;
-        const l = sbVals['l'] !== undefined ? sbVals['l'] : 440;
-        const mid = (h + l) / 2;
-        const range = h - l;
-        if (activeSub === 'Narrowing Wedge') {
-            return [mid - range*0.5, mid + range*0.5, mid - range*0.4, mid + range*0.4, mid - range*0.3, mid + range*0.3, mid - range*0.2, mid + range*0.2, mid - range*0.1, mid + range*0.1, mid];
-        } else {
-            return [mid, mid + range*0.1, mid - range*0.1, mid + range*0.2, mid - range*0.2, mid + range*0.3, mid - range*0.3, mid + range*0.4, mid - range*0.4, mid + range*0.5, mid - range*0.5];
+    
+        if (module.id === 'inverse_cup_handle') {
+            const rim = sbVals['rim'] !== undefined ? sbVals['rim'] : 160;
+            const top = sbVals['top'] !== undefined ? sbVals['top'] : 200;
+            const depth = top - rim;
+            return [rim, rim + depth*0.2, rim + depth*0.5, rim + depth*0.8, top, rim + depth*0.8, rim + depth*0.5, rim + depth*0.2, rim, rim + depth*0.1, rim + depth*0.25, rim, rim - depth*0.3, rim - depth*0.7, rim - depth];
         }
-    }
-
-    if (module.id === 'price_channels') {
-        const upper = sbVals['upper'] !== undefined ? sbVals['upper'] : 520;
-        const lower = sbVals['lower'] !== undefined ? sbVals['lower'] : 480;
-        const width = upper - lower;
-        if (activeSub === 'Descending Channel') {
-            return [upper, lower, upper - width*0.2, lower - width*0.2, upper - width*0.4, lower - width*0.4, upper - width*0.6, lower - width*0.6, upper - width*0.8, lower - width*0.8];
-        } else {
-            return [lower, upper, lower + width*0.2, upper + width*0.2, lower + width*0.4, upper + width*0.4, lower + width*0.6, upper + width*0.6, lower + width*0.8, upper + width*0.8];
+    
+        if (module.id === 'rounding_bottom') {
+            const r = sbVals['r'] !== undefined ? sbVals['r'] : 300;
+            const b = sbVals['b'] !== undefined ? sbVals['b'] : 220;
+            const depth = r - b;
+            if (activeSub === 'Rounding Top') {
+                return [b, b + depth*0.2, b + depth*0.45, b + depth*0.7, b + depth*0.9, r, b + depth*0.9, b + depth*0.7, b + depth*0.45, b + depth*0.2, b, b - depth*0.3, b - depth*0.6];
+            } else {
+                return [r, r - depth*0.3, r - depth*0.6, r - depth*0.8, b, r - depth*0.8, r - depth*0.6, r - depth*0.3, r, r + depth*0.3, r + depth*0.6];
+            }
         }
-    }
-
-    if (module.id === 'diamond') {
-        const h = sbVals['h'] !== undefined ? sbVals['h'] : 560;
-        const l = sbVals['l'] !== undefined ? sbVals['l'] : 500;
-        const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 500;
-        const mid = (h + l) / 2;
-        const range = h - l;
-        if (activeSub === 'Diamond Bottom') {
-            return [mid + 10, mid - range*0.2, mid + range*0.2, mid - range*0.5, mid + range*0.5, mid - range*0.3, mid + range*0.3, mid - range*0.1, bo, bo + range*0.3, bo + range*0.6];
-        } else {
-            return [mid - 10, mid + range*0.2, mid - range*0.2, mid + range*0.5, mid - range*0.5, mid + range*0.3, mid - range*0.3, mid + range*0.1, bo, bo - range*0.3, bo - range*0.6];
+    
+        if (module.id === 'megaphone') {
+            const h = sbVals['h'] !== undefined ? sbVals['h'] : 550;
+            const l = sbVals['l'] !== undefined ? sbVals['l'] : 440;
+            const mid = (h + l) / 2;
+            const range = h - l;
+            if (activeSub === 'Narrowing Wedge') {
+                return [mid - range*0.5, mid + range*0.5, mid - range*0.4, mid + range*0.4, mid - range*0.3, mid + range*0.3, mid - range*0.2, mid + range*0.2, mid - range*0.1, mid + range*0.1, mid];
+            } else {
+                return [mid, mid + range*0.1, mid - range*0.1, mid + range*0.2, mid - range*0.2, mid + range*0.3, mid - range*0.3, mid + range*0.4, mid - range*0.4, mid + range*0.5, mid - range*0.5];
+            }
         }
+    
+        if (module.id === 'price_channels') {
+            const upper = sbVals['upper'] !== undefined ? sbVals['upper'] : 520;
+            const lower = sbVals['lower'] !== undefined ? sbVals['lower'] : 480;
+            const width = upper - lower;
+            if (activeSub === 'Descending Channel') {
+                return [upper, lower, upper - width*0.2, lower - width*0.2, upper - width*0.4, lower - width*0.4, upper - width*0.6, lower - width*0.6, upper - width*0.8, lower - width*0.8];
+            } else {
+                return [lower, upper, lower + width*0.2, upper + width*0.2, lower + width*0.4, upper + width*0.4, lower + width*0.6, upper + width*0.6, lower + width*0.8, upper + width*0.8];
+            }
+        }
+    
+        if (module.id === 'diamond') {
+            const h = sbVals['h'] !== undefined ? sbVals['h'] : 560;
+            const l = sbVals['l'] !== undefined ? sbVals['l'] : 500;
+            const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 500;
+            const mid = (h + l) / 2;
+            const range = h - l;
+            if (activeSub === 'Diamond Bottom') {
+                return [mid + 10, mid - range*0.2, mid + range*0.2, mid - range*0.5, mid + range*0.5, mid - range*0.3, mid + range*0.3, mid - range*0.1, bo, bo + range*0.3, bo + range*0.6];
+            } else {
+                return [mid - 10, mid + range*0.2, mid - range*0.2, mid + range*0.5, mid - range*0.5, mid + range*0.3, mid - range*0.3, mid + range*0.1, bo, bo - range*0.3, bo - range*0.6];
+            }
+        }
+    
+        return module.chartData;
     }
-
-    return module.chartData;
-}
 
 function getDynamicCandleData(module, activeSub, sbVals) {
-    const candles = [];
-    const makeCandle = (open, close, high, low) => ({ open, close, high, low });
-
-    if (module.id === 'doji') {
-        const o = sbVals['o'] !== undefined ? sbVals['o'] : 150;
-        const c = sbVals['c'] !== undefined ? sbVals['c'] : 150.1;
-        const h = sbVals['h'] !== undefined ? sbVals['h'] : 155;
-        const l = sbVals['l'] !== undefined ? sbVals['l'] : 145;
-        const mid = (h + l) / 2;
-        
-        let to = o, tc = c, th = h, tl = l;
-        if (activeSub === 'Dragonfly Doji') {
-            to = h; tc = h - 0.1; th = h; tl = l;
-        } else if (activeSub === 'Gravestone Doji') {
-            to = l + 0.1; tc = l; th = h; tl = l;
-        } else if (activeSub === 'Long-Legged Doji') {
-            to = mid; tc = mid + 0.1; th = h + 5; tl = l - 5;
+        const candles = [];
+        const makeCandle = (open, close, high, low) => ({ open, close, high, low });
+    
+        if (module.id === 'doji') {
+            const o = sbVals['o'] !== undefined ? sbVals['o'] : 150;
+            const c = sbVals['c'] !== undefined ? sbVals['c'] : 150.1;
+            const h = sbVals['h'] !== undefined ? sbVals['h'] : 155;
+            const l = sbVals['l'] !== undefined ? sbVals['l'] : 145;
+            const mid = (h + l) / 2;
+            
+            let to = o, tc = c, th = h, tl = l;
+            if (activeSub === 'Dragonfly Doji') {
+                to = h; tc = h - 0.1; th = h; tl = l;
+            } else if (activeSub === 'Gravestone Doji') {
+                to = l + 0.1; tc = l; th = h; tl = l;
+            } else if (activeSub === 'Long-Legged Doji') {
+                to = mid; tc = mid + 0.1; th = h + 5; tl = l - 5;
+            }
+            
+            candles.push(makeCandle(142, 146, 148, 140));
+            candles.push(makeCandle(145, 149, 151, 144));
+            candles.push(makeCandle(to, tc, th, tl));
+            candles.push(makeCandle(149, 153, 155, 148));
         }
-        
-        candles.push(makeCandle(142, 146, 148, 140));
-        candles.push(makeCandle(145, 149, 151, 144));
-        candles.push(makeCandle(to, tc, th, tl));
-        candles.push(makeCandle(149, 153, 155, 148));
-    }
-    else if (module.id === 'hammer_hangman') {
-        const o = sbVals['o'] !== undefined ? sbVals['o'] : 152;
-        const c = sbVals['c'] !== undefined ? sbVals['c'] : 155;
-        const l = sbVals['l'] !== undefined ? sbVals['l'] : 145;
-        const body = Math.abs(c - o);
-        const h = Math.max(o, c) + body * 0.1;
-
-        if (activeSub === 'Hanging Man') {
-            candles.push(makeCandle(130, 134, 135, 129));
-            candles.push(makeCandle(133, 138, 139, 132));
-            candles.push(makeCandle(137, 142, 143, 136));
-            candles.push(makeCandle(141, 146, 148, 140));
-            candles.push(makeCandle(o, c, h, l));
-            candles.push(makeCandle(Math.min(o, c) - 2, Math.min(o, c) - 10, Math.min(o, c) - 1, Math.min(o, c) - 12));
-            candles.push(makeCandle(Math.min(o, c) - 9, Math.min(o, c) - 18, Math.min(o, c) - 8, Math.min(o, c) - 20));
-        } else {
+        else if (module.id === 'hammer') {
+            const o = sbVals['o'] !== undefined ? sbVals['o'] : 152;
+            const c = sbVals['c'] !== undefined ? sbVals['c'] : 155;
+            const l = sbVals['l'] !== undefined ? sbVals['l'] : 145;
+            const body = Math.abs(c - o);
+            const h = Math.max(o, c) + body * 0.1;
             candles.push(makeCandle(170, 165, 172, 164));
             candles.push(makeCandle(166, 161, 167, 160));
             candles.push(makeCandle(162, 157, 163, 155));
@@ -30331,21 +32995,25 @@ function getDynamicCandleData(module, activeSub, sbVals) {
             candles.push(makeCandle(Math.max(o, c) + 2, Math.max(o, c) + 10, Math.max(o, c) + 11, Math.max(o, c) + 1));
             candles.push(makeCandle(Math.max(o, c) + 9, Math.max(o, c) + 18, Math.max(o, c) + 19, Math.max(o, c) + 8));
         }
-    }
-    else if (module.id === 'shooting_star') {
-        const o = sbVals['o'] !== undefined ? sbVals['o'] : 155;
-        const c = sbVals['c'] !== undefined ? sbVals['c'] : 152;
-        const h = sbVals['h'] !== undefined ? sbVals['h'] : 165;
-        const l = sbVals['l'] !== undefined ? sbVals['l'] : 151;
-
-        if (activeSub === 'Inverted Hammer') {
-            candles.push(makeCandle(170, 165, 172, 164));
-            candles.push(makeCandle(166, 161, 167, 160));
-            candles.push(makeCandle(162, 157, 163, 155));
+        else if (module.id === 'hanging_man') {
+            const o = sbVals['o'] !== undefined ? sbVals['o'] : 155;
+            const c = sbVals['c'] !== undefined ? sbVals['c'] : 152;
+            const l = sbVals['l'] !== undefined ? sbVals['l'] : 145;
+            const body = Math.abs(c - o);
+            const h = Math.max(o, c) + body * 0.1;
+            candles.push(makeCandle(130, 134, 135, 129));
+            candles.push(makeCandle(133, 138, 139, 132));
+            candles.push(makeCandle(137, 142, 143, 136));
+            candles.push(makeCandle(141, 146, 148, 140));
             candles.push(makeCandle(o, c, h, l));
-            candles.push(makeCandle(Math.max(o, c) + 2, Math.max(o, c) + 10, Math.max(o, c) + 11, Math.max(o, c) + 1));
-            candles.push(makeCandle(Math.max(o, c) + 9, Math.max(o, c) + 18, Math.max(o, c) + 19, Math.max(o, c) + 8));
-        } else {
+            candles.push(makeCandle(Math.min(o, c) - 2, Math.min(o, c) - 10, Math.min(o, c) - 1, Math.min(o, c) - 12));
+            candles.push(makeCandle(Math.min(o, c) - 9, Math.min(o, c) - 18, Math.min(o, c) - 8, Math.min(o, c) - 20));
+        }
+        else if (module.id === 'shooting_star') {
+            const o = sbVals['o'] !== undefined ? sbVals['o'] : 155;
+            const c = sbVals['c'] !== undefined ? sbVals['c'] : 152;
+            const h = sbVals['h'] !== undefined ? sbVals['h'] : 165;
+            const l = sbVals['l'] !== undefined ? sbVals['l'] : 151;
             candles.push(makeCandle(130, 134, 135, 129));
             candles.push(makeCandle(133, 138, 139, 132));
             candles.push(makeCandle(137, 142, 143, 136));
@@ -30353,278 +33021,195 @@ function getDynamicCandleData(module, activeSub, sbVals) {
             candles.push(makeCandle(Math.min(o, c) - 2, Math.min(o, c) - 10, Math.min(o, c) - 1, Math.min(o, c) - 12));
             candles.push(makeCandle(Math.min(o, c) - 9, Math.min(o, c) - 18, Math.min(o, c) - 8, Math.min(o, c) - 20));
         }
-    }
-    else if (module.id === 'engulfing') {
-        const isBear = activeSub && activeSub.includes('Bearish');
-        if (isBear) {
-            candles.push(makeCandle(100, 105, 107, 99));
-            candles.push(makeCandle(104, 108, 110, 103));
-            candles.push(makeCandle(107, 111, 112, 106));
-            candles.push(makeCandle(110, 112, 113, 109)); // small green
-            candles.push(makeCandle(113, 105, 114, 104)); // giant red (engulfs)
-            candles.push(makeCandle(104, 98, 105, 96));
-            candles.push(makeCandle(98, 92, 99, 90));
-        } else {
+        else if (module.id === 'inverted_hammer') {
+            const o = sbVals['o'] !== undefined ? sbVals['o'] : 145;
+            const c = sbVals['c'] !== undefined ? sbVals['c'] : 148;
+            const h = sbVals['h'] !== undefined ? sbVals['h'] : 158;
+            const l = sbVals['l'] !== undefined ? sbVals['l'] : 141;
+            candles.push(makeCandle(170, 165, 172, 164));
+            candles.push(makeCandle(166, 161, 167, 160));
+            candles.push(makeCandle(162, 157, 163, 155));
+            candles.push(makeCandle(o, c, h, l));
+            candles.push(makeCandle(Math.max(o, c) + 2, Math.max(o, c) + 10, Math.max(o, c) + 11, Math.max(o, c) + 1));
+            candles.push(makeCandle(Math.max(o, c) + 9, Math.max(o, c) + 18, Math.max(o, c) + 19, Math.max(o, c) + 8));
+        }
+        else if (module.id === 'bullish_engulfing') {
+            const po = sbVals['po'] !== undefined ? sbVals['po'] : 152;
+            const pc = sbVals['pc'] !== undefined ? sbVals['pc'] : 148;
+            const co = sbVals['co'] !== undefined ? sbVals['co'] : 146;
+            const cc = sbVals['cc'] !== undefined ? sbVals['cc'] : 155;
             candles.push(makeCandle(120, 115, 121, 114));
             candles.push(makeCandle(116, 112, 117, 111));
             candles.push(makeCandle(113, 109, 114, 108));
-            candles.push(makeCandle(110, 108, 111, 107)); // small red
-            candles.push(makeCandle(107, 115, 116, 106)); // giant green (engulfs)
-            candles.push(makeCandle(115, 121, 122, 114));
-            candles.push(makeCandle(121, 128, 129, 120));
+            candles.push(makeCandle(po, pc, Math.max(po, pc) + 1, Math.min(po, pc) - 1)); // small red
+            candles.push(makeCandle(co, cc, Math.max(co, cc) + 1, Math.min(co, cc) - 1)); // giant green
+            candles.push(makeCandle(cc, cc + 6, cc + 7, cc - 1));
+            candles.push(makeCandle(cc + 6, cc + 13, cc + 14, cc + 5));
         }
-    }
-    else if (module.id === 'harami') {
-        const mo = sbVals['mo'] !== undefined ? sbVals['mo'] : 160;
-        const mc = sbVals['mc'] !== undefined ? sbVals['mc'] : 145;
-        const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 148;
-        const bc = sbVals['bc'] !== undefined ? sbVals['bc'] : 152;
-        const isBear = activeSub && activeSub.includes('Bearish');
-        
-        let motherOpen = mo, motherClose = mc, babyOpen = bo, babyClose = bc;
-        if (isBear) {
-            motherOpen = Math.min(mo, mc);
-            motherClose = Math.max(mo, mc);
-            babyOpen = Math.max(bo, bc);
-            babyClose = Math.min(bo, bc);
-            
-            candles.push(makeCandle(130, 134, 136, 128));
-            candles.push(makeCandle(133, 139, 140, 132));
-            candles.push(makeCandle(motherOpen, motherClose, motherClose + 2, motherOpen - 1));
-            candles.push(makeCandle(babyOpen, babyClose, Math.max(babyOpen, babyClose) + 1, Math.min(babyOpen, babyClose) - 1));
-            candles.push(makeCandle(babyClose - 2, babyClose - 10, babyClose - 1, babyClose - 12));
-        } else {
-            motherOpen = Math.max(mo, mc);
-            motherClose = Math.min(mo, mc);
-            babyOpen = Math.min(bo, bc);
-            babyClose = Math.max(bo, bc);
-            
+        else if (module.id === 'bearish_engulfing') {
+            const po = sbVals['po'] !== undefined ? sbVals['po'] : 148;
+            const pc = sbVals['pc'] !== undefined ? sbVals['pc'] : 152;
+            const co = sbVals['co'] !== undefined ? sbVals['co'] : 155;
+            const cc = sbVals['cc'] !== undefined ? sbVals['cc'] : 146;
+            candles.push(makeCandle(100, 105, 107, 99));
+            candles.push(makeCandle(104, 108, 110, 103));
+            candles.push(makeCandle(107, 111, 112, 106));
+            candles.push(makeCandle(po, pc, Math.max(po, pc) + 1, Math.min(po, pc) - 1)); // small green
+            candles.push(makeCandle(co, cc, Math.max(co, cc) + 1, Math.min(co, cc) - 1)); // giant red
+            candles.push(makeCandle(cc, cc - 6, cc + 1, cc - 7));
+            candles.push(makeCandle(cc - 6, cc - 12, cc - 5, cc - 14));
+        }
+        else if (module.id === 'bullish_harami') {
+            const mo = sbVals['mo'] !== undefined ? sbVals['mo'] : 160;
+            const mc = sbVals['mc'] !== undefined ? sbVals['mc'] : 145;
+            const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 148;
+            const bc = sbVals['bc'] !== undefined ? sbVals['bc'] : 152;
             candles.push(makeCandle(170, 164, 171, 163));
             candles.push(makeCandle(165, 159, 166, 158));
-            candles.push(makeCandle(motherOpen, motherClose, motherOpen + 2, motherClose - 1));
-            candles.push(makeCandle(babyOpen, babyClose, Math.max(babyOpen, babyClose) + 1, Math.min(babyOpen, babyClose) - 1));
-            candles.push(makeCandle(babyClose + 2, babyClose + 10, babyClose + 11, babyClose + 1));
+            candles.push(makeCandle(mo, mc, mo + 2, mc - 1));
+            candles.push(makeCandle(bo, bc, bc + 1, bo - 1));
+            candles.push(makeCandle(bc + 2, bc + 10, bc + 11, bc + 1));
         }
-    }
-    else if (module.id === 'morning_evening_star') {
-        const o1 = sbVals['o1'] !== undefined ? sbVals['o1'] : 160;
-        const c1 = sbVals['c1'] !== undefined ? sbVals['c1'] : 145;
-        const c3 = sbVals['c3'] !== undefined ? sbVals['c3'] : 155;
-        const isBear = activeSub && activeSub.includes('Evening');
-        
-        if (isBear) {
+        else if (module.id === 'bearish_harami') {
+            const mo = sbVals['mo'] !== undefined ? sbVals['mo'] : 145;
+            const mc = sbVals['mc'] !== undefined ? sbVals['mc'] : 160;
+            const bo = sbVals['bo'] !== undefined ? sbVals['bo'] : 152;
+            const bc = sbVals['bc'] !== undefined ? sbVals['bc'] : 148;
             candles.push(makeCandle(130, 134, 136, 128));
-            candles.push(makeCandle(133, 138, 140, 132));
-            candles.push(makeCandle(Math.min(o1, c1), Math.max(o1, c1), Math.max(o1, c1) + 2, Math.min(o1, c1) - 1));
-            const starBase = Math.max(o1, c1);
-            candles.push(makeCandle(starBase + 2, starBase + 3, starBase + 6, starBase + 1));
-            candles.push(makeCandle(starBase + 1, c3, starBase + 2, c3 - 3));
-            candles.push(makeCandle(c3 - 1, c3 - 10, c3, c3 - 12));
-        } else {
+            candles.push(makeCandle(133, 139, 140, 132));
+            candles.push(makeCandle(mo, mc, mc + 2, mo - 1));
+            candles.push(makeCandle(bo, bc, bo + 1, bc - 1));
+            candles.push(makeCandle(bc - 2, bc - 10, bc - 1, bc - 12));
+        }
+        else if (module.id === 'morning_star') {
+            const o1 = sbVals['o1'] !== undefined ? sbVals['o1'] : 160;
+            const c1 = sbVals['c1'] !== undefined ? sbVals['c1'] : 145;
+            const c3 = sbVals['c3'] !== undefined ? sbVals['c3'] : 155;
             candles.push(makeCandle(170, 165, 172, 164));
             candles.push(makeCandle(166, 161, 167, 160));
-            candles.push(makeCandle(Math.max(o1, c1), Math.min(o1, c1), Math.max(o1, c1) + 2, Math.min(o1, c1) - 1));
-            const starBase = Math.min(o1, c1);
+            candles.push(makeCandle(o1, c1, o1 + 2, c1 - 1));
+            const starBase = c1;
             candles.push(makeCandle(starBase - 2, starBase - 3, starBase - 1, starBase - 6));
             candles.push(makeCandle(starBase - 1, c3, c3 + 3, starBase - 2));
             candles.push(makeCandle(c3 + 1, c3 + 10, c3 + 12, c3));
         }
-    }
-    else if (module.id === 'piercing_darkcloud') {
-        const ro = sbVals['ro'] !== undefined ? sbVals['ro'] : 160;
-        const rc = sbVals['rc'] !== undefined ? sbVals['rc'] : 148;
-        const gc = sbVals['gc'] !== undefined ? sbVals['gc'] : 156;
-        const isBear = activeSub && activeSub.includes('Dark');
-        
-        if (isBear) {
+        else if (module.id === 'evening_star') {
+            const o1 = sbVals['o1'] !== undefined ? sbVals['o1'] : 145;
+            const c1 = sbVals['c1'] !== undefined ? sbVals['c1'] : 160;
+            const c3 = sbVals['c3'] !== undefined ? sbVals['c3'] : 150;
             candles.push(makeCandle(130, 134, 136, 128));
             candles.push(makeCandle(133, 138, 140, 132));
-            candles.push(makeCandle(rc, ro, ro + 2, rc - 1));
-            candles.push(makeCandle(ro + 2, gc, ro + 3, gc - 2));
-            candles.push(makeCandle(gc - 2, gc - 10, gc - 1, gc - 12));
-        } else {
+            candles.push(makeCandle(o1, c1, c1 + 2, o1 - 1));
+            const starBase = c1;
+            candles.push(makeCandle(starBase + 2, starBase + 3, starBase + 6, starBase + 1));
+            candles.push(makeCandle(starBase + 1, c3, starBase + 2, c3 - 3));
+            candles.push(makeCandle(c3 - 1, c3 - 10, c3, c3 - 12));
+        }
+        else if (module.id === 'piercing_line') {
+            const ro = sbVals['ro'] !== undefined ? sbVals['ro'] : 160;
+            const rc = sbVals['rc'] !== undefined ? sbVals['rc'] : 148;
+            const gc = sbVals['gc'] !== undefined ? sbVals['gc'] : 156;
             candles.push(makeCandle(170, 165, 172, 164));
             candles.push(makeCandle(166, 161, 167, 160));
             candles.push(makeCandle(ro, rc, ro + 2, rc - 2));
             candles.push(makeCandle(rc - 2, gc, gc + 2, rc - 3));
             candles.push(makeCandle(gc + 2, gc + 10, gc + 12, gc + 1));
         }
-    }
-    else if (module.id === 'tweezer') {
-        const h1 = sbVals['h1'] !== undefined ? sbVals['h1'] : 525;
-        const h2 = sbVals['h2'] !== undefined ? sbVals['h2'] : 525;
-        const isBottom = activeSub && activeSub.includes('Bottom');
-        
-        if (isBottom) {
-            candles.push(makeCandle(540, 530, 542, 528));
-            candles.push(makeCandle(532, 515, 534, 510));
-            candles.push(makeCandle(518, h1, 520, h1));
-            candles.push(makeCandle(h2, h2 + 15, h2 + 18, h2));
-            candles.push(makeCandle(h2 + 12, h2 + 25, h2 + 28, h2 + 10));
-        } else {
+        else if (module.id === 'dark_cloud_cover') {
+            const ro = sbVals['ro'] !== undefined ? sbVals['ro'] : 148;
+            const rc = sbVals['rc'] !== undefined ? sbVals['rc'] : 160;
+            const gc = sbVals['gc'] !== undefined ? sbVals['gc'] : 152;
+            candles.push(makeCandle(130, 134, 136, 128));
+            candles.push(makeCandle(133, 138, 140, 132));
+            candles.push(makeCandle(rc, ro, ro + 2, rc - 1));
+            candles.push(makeCandle(ro + 2, gc, ro + 3, gc - 2));
+            candles.push(makeCandle(gc - 2, gc - 10, gc - 1, gc - 12));
+        }
+        else if (module.id === 'tweezer_tops') {
+            const h1 = sbVals['h1'] !== undefined ? sbVals['h1'] : 525;
+            const h2 = sbVals['h2'] !== undefined ? sbVals['h2'] : 525;
             candles.push(makeCandle(490, 500, 502, 488));
             candles.push(makeCandle(498, 515, 518, 495));
             candles.push(makeCandle(512, h1, h1, 510));
             candles.push(makeCandle(h2, h2 - 15, h2, h2 - 18));
             candles.push(makeCandle(h2 - 12, h2 - 25, h2 - 10, h2 - 28));
         }
-    }
-    else if (module.id === 'three_soldiers_crows') {
-        const isCrows = activeSub && activeSub.includes('Crows');
-        if (isCrows) {
-            candles.push(makeCandle(100, 105, 107, 99));
-            candles.push(makeCandle(104, 108, 110, 103));
-            candles.push(makeCandle(110, 102, 111, 100));
-            candles.push(makeCandle(104, 95, 105, 93));
-            candles.push(makeCandle(97, 88, 98, 86));
-            candles.push(makeCandle(89, 82, 90, 80));
-        } else {
-            candles.push(makeCandle(120, 115, 121, 114));
-            candles.push(makeCandle(116, 112, 117, 111));
-            candles.push(makeCandle(110, 118, 119, 109));
-            candles.push(makeCandle(116, 125, 126, 115));
-            candles.push(makeCandle(123, 132, 133, 122));
-            candles.push(makeCandle(131, 138, 140, 130));
+        else if (module.id === 'tweezer_bottoms') {
+            const l1 = sbVals['l1'] !== undefined ? sbVals['l1'] : 480;
+            const l2 = sbVals['l2'] !== undefined ? sbVals['l2'] : 480;
+            candles.push(makeCandle(540, 530, 542, 528));
+            candles.push(makeCandle(532, 515, 534, 510));
+            candles.push(makeCandle(518, l1, 520, l1));
+            candles.push(makeCandle(l2, l2 + 15, l2 + 18, l2));
+            candles.push(makeCandle(l2 + 12, l2 + 25, l2 + 28, l2 + 10));
         }
-    }
-    else if (module.id === 'marubozu') {
-        const o = sbVals['o'] !== undefined ? sbVals['o'] : 500;
-        const c = sbVals['c'] !== undefined ? sbVals['c'] : 520;
-        const h = sbVals['h'] !== undefined ? sbVals['h'] : 520;
-        const l = sbVals['l'] !== undefined ? sbVals['l'] : 500;
-        const isBear = activeSub && activeSub.includes('Bear');
-        
-        let to = o, tc = c, th = h, tl = l;
-        if (isBear) {
-            to = h; tc = l; th = h; tl = l;
-            candles.push(makeCandle(515, 522, 524, 513));
-            candles.push(makeCandle(to, tc, th, tl));
-            candles.push(makeCandle(502, 495, 504, 492));
-        } else {
-            to = l; tc = h; th = h; tl = l;
-            candles.push(makeCandle(505, 498, 507, 496));
-            candles.push(makeCandle(to, tc, th, tl));
-            candles.push(makeCandle(518, 525, 527, 516));
+        else if (module.id === 'three_white_soldiers') {
+            const c1 = sbVals['c1'] !== undefined ? sbVals['c1'] : 100;
+            const c2 = sbVals['c2'] !== undefined ? sbVals['c2'] : 108;
+            const c3 = sbVals['c3'] !== undefined ? sbVals['c3'] : 115;
+            
+            // Prior candles showing a downtrend
+            candles.push(makeCandle(120, 112, 121, 111));
+            candles.push(makeCandle(113, 105, 114, 104));
+            candles.push(makeCandle(106, 96, 107, 95));
+            // The three soldiers
+            candles.push(makeCandle(95, c1, c1 + 1, 94));
+            candles.push(makeCandle(c1 - 4, c2, c2 + 1, c1 - 5));
+            candles.push(makeCandle(c2 - 4, c3, c3 + 1, c2 - 5));
         }
+        else if (module.id === 'three_black_crows') {
+            const c1 = sbVals['c1'] !== undefined ? sbVals['c1'] : 115;
+            const c2 = sbVals['c2'] !== undefined ? sbVals['c2'] : 108;
+            const c3 = sbVals['c3'] !== undefined ? sbVals['c3'] : 100;
+            
+            // Prior candles showing an uptrend
+            candles.push(makeCandle(85, 92, 93, 84));
+            candles.push(makeCandle(90, 98, 99, 89));
+            candles.push(makeCandle(96, 106, 107, 95));
+            // The three crows
+            candles.push(makeCandle(104, c1, 105, c1 - 1));
+            candles.push(makeCandle(c1 + 4, c2, c1 + 5, c2 - 1));
+            candles.push(makeCandle(c2 + 4, c3, c2 + 5, c3 - 1));
+        }
+        else if (module.id === 'marubozu') {
+            const o = sbVals['o'] !== undefined ? sbVals['o'] : 500;
+            const c = sbVals['c'] !== undefined ? sbVals['c'] : 520;
+            const h = sbVals['h'] !== undefined ? sbVals['h'] : 520;
+            const l = sbVals['l'] !== undefined ? sbVals['l'] : 500;
+            const isBear = activeSub && activeSub.includes('Bear');
+            
+            if (isBear) {
+                candles.push(makeCandle(h - 5, h + 2, h + 4, h - 7));
+                candles.push(makeCandle(o, c, h, l));
+                candles.push(makeCandle(l + 2, l - 5, l + 4, l - 8));
+            } else {
+                candles.push(makeCandle(l + 5, l - 2, l + 7, l - 4));
+                candles.push(makeCandle(o, c, h, l));
+                candles.push(makeCandle(h - 2, h + 5, h + 7, h - 4));
+            }
+        }
+        else {
+            const data = module.chartData || [100, 105, 110, 105, 115, 120];
+            data.forEach((v, i) => {
+                const isUp = i % 2 === 0;
+                const open = isUp ? v - 2 : v + 2;
+                const close = v;
+                const high = Math.max(open, close) + 3;
+                const low = Math.min(open, close) - 3;
+                candles.push(makeCandle(open, close, high, low));
+            });
+        }
+    
+        return candles;
     }
-    else {
-        const data = module.chartData || [100, 105, 110, 105, 115, 120];
-        data.forEach((v, i) => {
-            const isUp = i % 2 === 0;
-            const open = isUp ? v - 2 : v + 2;
-            const close = v;
-            const high = Math.max(open, close) + 3;
-            const low = Math.min(open, close) - 3;
-            candles.push(makeCandle(open, close, high, low));
-        });
-    }
-
-    return candles;
-}
 
 let academyActiveSliderValues = {};
 
 function renderAcademyChartControls(module) {
     const container = document.getElementById('academy-chart-controls');
     if (!container) return;
+    container.style.display = 'none';
     container.innerHTML = '';
-
-    let controlsHTML = '';
-    if (module.id === 'rsi') {
-        controlsHTML = `
-            <div class="academy-slider-group">
-                <div class="academy-slider-label">
-                    <span>RSI Length</span>
-                    <span id="val-rsi_length" class="academy-slider-value">14</span>
-                </div>
-                <input type="range" class="academy-slider-input" id="slide-rsi_length" min="2" max="50" value="${academyActiveSliderValues['rsi_length'] || 14}">
-            </div>
-            <div class="academy-slider-group">
-                <div class="academy-slider-label">
-                    <span>Overbought Level</span>
-                    <span id="val-rsi_overbought" class="academy-slider-value">70</span>
-                </div>
-                <input type="range" class="academy-slider-input" id="slide-rsi_overbought" min="50" max="90" value="${academyActiveSliderValues['rsi_overbought'] || 70}">
-            </div>
-            <div class="academy-slider-group">
-                <div class="academy-slider-label">
-                    <span>Oversold Level</span>
-                    <span id="val-rsi_oversold" class="academy-slider-value">30</span>
-                </div>
-                <input type="range" class="academy-slider-input" id="slide-rsi_oversold" min="10" max="50" value="${academyActiveSliderValues['rsi_oversold'] || 30}">
-            </div>
-        `;
-    } else if (module.id === 'macd') {
-        controlsHTML = `
-            <div class="academy-slider-group">
-                <div class="academy-slider-label">
-                    <span>Fast Period</span>
-                    <span id="val-macd_fast" class="academy-slider-value">12</span>
-                </div>
-                <input type="range" class="academy-slider-input" id="slide-macd_fast" min="5" max="25" value="${academyActiveSliderValues['macd_fast'] || 12}">
-            </div>
-            <div class="academy-slider-group">
-                <div class="academy-slider-label">
-                    <span>Slow Period</span>
-                    <span id="val-macd_slow" class="academy-slider-value">26</span>
-                </div>
-                <input type="range" class="academy-slider-input" id="slide-macd_slow" min="20" max="50" value="${academyActiveSliderValues['macd_slow'] || 26}">
-            </div>
-            <div class="academy-slider-group">
-                <div class="academy-slider-label">
-                    <span>Signal Period</span>
-                    <span id="val-macd_signal" class="academy-slider-value">9</span>
-                </div>
-                <input type="range" class="academy-slider-input" id="slide-macd_signal" min="3" max="15" value="${academyActiveSliderValues['macd_signal'] || 9}">
-            </div>
-        `;
-    } else if (module.id === 'bollinger') {
-        controlsHTML = `
-            <div class="academy-slider-group">
-                <div class="academy-slider-label">
-                    <span>MA Period</span>
-                    <span id="val-bb_period" class="academy-slider-value">20</span>
-                </div>
-                <input type="range" class="academy-slider-input" id="slide-bb_period" min="5" max="50" value="${academyActiveSliderValues['bb_period'] || 20}">
-            </div>
-            <div class="academy-slider-group">
-                <div class="academy-slider-label">
-                    <span>Std Devs</span>
-                    <span id="val-bb_stddev" class="academy-slider-value">2.0</span>
-                </div>
-                <input type="range" class="academy-slider-input" id="slide-bb_stddev" min="0.5" max="4.0" step="0.1" value="${academyActiveSliderValues['bb_stddev'] || 2.0}">
-            </div>
-        `;
-    }
-
-    if (!controlsHTML) {
-        container.style.display = 'none';
-        return;
-    }
-
-    container.style.display = 'block';
-    container.innerHTML = `
-        <div class="academy-chart-controls-title">🔧 Parameter Tuner</div>
-        <div class="academy-chart-controls-grid">${controlsHTML}</div>
-    `;
-
-    const sliders = container.querySelectorAll('.academy-slider-input');
-    sliders.forEach(slider => {
-        const id = slider.id.replace('slide-', '');
-        const valEl = document.getElementById(`val-${id}`);
-        
-        academyActiveSliderValues[id] = parseFloat(slider.value);
-        if (valEl) valEl.textContent = slider.value;
-
-        slider.addEventListener('input', (e) => {
-            const val = parseFloat(e.target.value);
-            academyActiveSliderValues[id] = val;
-            if (valEl) valEl.textContent = val;
-            
-            renderAcademyChart(module);
-            syncSlidersWithSandbox(module, id, val);
-        });
-    });
 }
 
 function syncSlidersWithSandbox(module, sliderId, value) {
@@ -30704,3 +33289,136 @@ function formatMarkdown(md) {
 
     return html;
 }
+
+function getPromptTemplatesForModule(module) {
+    const title = module.title || module.id;
+    const cat = module.cat || 'technical';
+    
+    // Retrieve current values from sandbox inputs if they exist
+    const inputs = {};
+    let inputsText = '';
+    if (module.sandbox && module.sandbox.inputs) {
+        const parts = [];
+        module.sandbox.inputs.forEach(inp => {
+            const val = academyActiveSandboxValues[inp.key] !== undefined ? academyActiveSandboxValues[inp.key] : inp.val;
+            inputs[inp.key] = val;
+            parts.push(`${inp.label}: ${val}`);
+        });
+        inputsText = parts.join(', ');
+    }
+
+    // Try to load distinct module-specific prompts from academy_prompts.js
+    if (window.ACADEMY_MODULE_PROMPTS && window.ACADEMY_MODULE_PROMPTS[module.id]) {
+        return window.ACADEMY_MODULE_PROMPTS[module.id].map(template => {
+            return template
+                .replace(/{title}/g, title)
+                .replace(/{inputsText}/g, inputsText)
+                .replace(/{inputs\.([a-zA-Z0-9_-]+)}/g, (match, key) => inputs[key] !== undefined ? inputs[key] : '');
+        });
+    }
+
+    const templates = [];
+
+    if (cat === 'technical') {
+        templates.push(`Explain how to interpret ${title} in a volatile market like India's Nifty 50.`);
+        templates.push(`How does changing the inputs (currently ${inputsText}) affect the sensitivity and false signal rate of ${title}?`);
+        templates.push(`Can you explain the mathematical calculation behind ${title} and how it derives its values?`);
+        templates.push(`What are the key differences between SMA and EMA when using them alongside ${title}?`);
+        templates.push(`How do I spot bullish and bearish divergences using ${title} on a daily chart?`);
+        templates.push(`Under what market conditions does ${title} fail or give the most false signals?`);
+        templates.push(`Explain a complete swing trading strategy combining ${title} with volume analysis.`);
+        templates.push(`What are the recommended stop-loss and target placement rules when trading based on ${title} crossovers?`);
+        templates.push(`Can you provide a simple Python code snippet using pandas to calculate ${title} for a stock's historical data?`);
+        templates.push(`How can I use ${title} to determine if a trend is exhausted or has strong momentum?`);
+        templates.push(`Explain how the current active settings (${inputsText}) compare to the industry standard settings.`);
+        templates.push(`What other momentum indicators (like RSI or MACD) complement ${title} best to form a reliable trading system?`);
+    } else if (cat === 'candlestick') {
+        const o = inputs.open !== undefined ? inputs.open : 100;
+        const h = inputs.high !== undefined ? inputs.high : 105;
+        const l = inputs.low !== undefined ? inputs.low : 95;
+        const c = inputs.close !== undefined ? inputs.close : 102;
+        const body = Math.abs(c - o);
+        const lowerWick = l < Math.min(o, c) ? Math.min(o, c) - l : 0;
+        const ratio = body > 0 ? (lowerWick / body).toFixed(1) : 0;
+
+        templates.push(`Analyze the current candlestick parameters: Open=${o}, High=${h}, Low=${l}, Close=${c}. Is this a strong ${title} pattern?`);
+        templates.push(`Is this a strong hammer? Let's analyze the body size (${body}) vs the lower shadow (${lowerWick}) ratio of ${ratio}x.`);
+        templates.push(`What is the market psychology behind the formation of a ${title} pattern?`);
+        templates.push(`Explain the significance of the upper and lower shadows in a ${title} candle.`);
+        templates.push(`How does trading volume during the formation of ${title} validate or invalidate its reversal signal?`);
+        templates.push(`Can you compare ${title} with its opposite pattern and explain their differences in reliability?`);
+        templates.push(`What confirmation candle should I wait for after detecting a ${title} before entering a trade?`);
+        templates.push(`How do I set stop-loss levels and profit targets based on the high/low of a ${title} pattern?`);
+        templates.push(`Can you write a Python snippet to scan a stock chart's daily candles for a ${title} pattern?`);
+        templates.push(`Does ${title} work better on higher timeframes (like Daily/Weekly) compared to intraday (5-minute) charts?`);
+        templates.push(`What is the failure rate of the ${title} pattern in Indian stock markets, and what causes it to fail?`);
+        templates.push(`How do support and resistance levels act as a multiplier for ${title} pattern accuracy?`);
+        templates.push(`Explain how a trend change is confirmed when ${title} appears after a long downtrend or uptrend.`);
+    } else if (cat === 'fundamental') {
+        templates.push(`Based on the current sandbox inputs (${inputsText}), explain how these numbers affect the overall health of the business.`);
+        templates.push(`What are the target benchmarks for ${title} in Indian banking vs IT vs manufacturing sectors?`);
+        templates.push(`How would a 10% decline in sales or operating profit impact the calculated ${title} value?`);
+        templates.push(`What are the common accounting manipulation tricks that companies use to inflate ${title}?`);
+        templates.push(`Explain how a long-term investor uses ${title} to select high-quality compounding stocks.`);
+        templates.push(`How does capital structure (debt vs equity) affect the calculation and interpretation of ${title}?`);
+        templates.push(`If ${title} is improving year-over-year but cash flows are negative, what does that indicate?`);
+        templates.push(`Compare ${title} with similar valuation ratios. When is ${title} the superior metric?`);
+        templates.push(`Provide a real-world case study of an Indian listed company that had a deteriorating ${title} before its stock crashed.`);
+        templates.push(`How does inflation and interest rate hikes in India impact ${title} across capital-intensive industries?`);
+        templates.push(`Can you show me a step-by-step Excel/Python model to calculate ${title} using raw balance sheet/PL statement data?`);
+        templates.push(`What are the structural limitations of relying on ${title} for evaluating fast-growing startup companies?`);
+    } else if (cat === 'bonds') {
+        templates.push(`Given the current bond settings (${inputsText}), explain why the bond is priced this way.`);
+        templates.push(`How will a 100 basis point (1%) increase in RBI repo rate affect the price or yield of this bond?`);
+        templates.push(`What is the difference between current yield, coupon rate, and yield to maturity (YTM) for this bond?`);
+        templates.push(`Explain Macaulay duration and Modified duration. How do they measure the interest rate risk of this bond?`);
+        templates.push(`How does the maturity profile of this bond affect its price volatility when yields fluctuate?`);
+        templates.push(`Explain the relationship between bond prices, coupons, and market interest rates in simple terms.`);
+        templates.push(`What is credit rating (AAA, AA, etc.) and how does a downgrade affect the yield spread of this bond?`);
+        templates.push(`How does the shape of the yield curve (normal, inverted, flat) reflect the Indian economy's future outlook?`);
+        templates.push(`What is bond convexity, and why is it a positive characteristic for bond investors?`);
+        templates.push(`If inflation in India rises to 6%, what strategy should a fixed-income portfolio manager adopt?`);
+        templates.push(`Can you write a Python code block using numpy-financial to calculate the YTM and price of this bond?`);
+        templates.push(`Explain how corporate bonds differ from government securities (G-Secs) in terms of liquidity and default risk.`);
+    } else {
+        templates.push(`Explain how to interpret ${title} in a volatile market like India's Nifty 50.`);
+        templates.push(`Under what market conditions does ${title} fail or give the most false signals?`);
+        templates.push(`Provide a real-world case study of an Indian listed company related to ${title}.`);
+        templates.push(`Can you provide a simple Python code snippet to calculate or simulate ${title}?`);
+        templates.push(`What are the recommended risk management rules when using ${title}?`);
+    }
+
+    return templates;
+}
+
+function renderAcademyPromptSuggestions(module) {
+    const listContainer = document.getElementById('academy-prompt-suggestions-list');
+    if (!listContainer) return;
+
+    const templates = getPromptTemplatesForModule(module);
+    
+    let html = '';
+    templates.forEach(prompt => {
+        const escapedPrompt = prompt.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+        html += `
+            <button class="academy-suggestion-chip" onclick="selectAcademyPrompt('${escapedPrompt}')">
+                ✨ ${prompt}
+            </button>
+        `;
+    });
+    
+    listContainer.innerHTML = html;
+}
+
+window.selectAcademyPrompt = function(promptText) {
+    const input = document.getElementById('academy-ai-input');
+    if (input) {
+        input.value = promptText;
+        input.focus();
+        input.style.border = '1px solid var(--color-primary)';
+        setTimeout(() => {
+            input.style.border = '';
+        }, 800);
+    }
+};
+

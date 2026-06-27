@@ -1831,14 +1831,6 @@ function resetWorkspace() {
     }
     activeStockProfile = null;
     chatHistory = [];
-    const chatMessagesBox = document.getElementById('chat-messages');
-    if (chatMessagesBox) {
-        chatMessagesBox.innerHTML = '';
-    }
-    const headerCard = document.getElementById('chat-header-stock-card');
-    if (headerCard) {
-        headerCard.style.display = 'none';
-    }
 
     // Close mobile menu sidebar if open
     const sidebar = document.getElementById('sidebar');
@@ -4073,47 +4065,6 @@ async function loadStockAnalyzer(query, force_llm = false) {
         }
         wsSubscribeSymbols([profile.ticker]);
         chatHistory = [];
-
-        // Render Stock Card Header inside Chat Panel
-        const headerCard = document.getElementById('chat-header-stock-card');
-        const headerTicker = document.getElementById('chat-header-ticker');
-        const headerName = document.getElementById('chat-header-name');
-        const headerPrice = document.getElementById('chat-header-price');
-        const headerLatency = document.getElementById('chat-header-latency');
-        if (headerCard && headerTicker && headerName && headerPrice && headerLatency) {
-            headerTicker.innerText = profile.ticker;
-            headerName.innerText = profile.company_name;
-            headerPrice.innerText = 'Rs. ' + profile.fundamentals.current_price;
-            headerLatency.innerText = 'Latency: --';
-            headerCard.style.display = 'flex';
-        }
-
-        // Clear chat container and render welcome message + dynamic pills
-        const chatMessagesBox = document.getElementById('chat-messages');
-        if (chatMessagesBox) {
-            chatMessagesBox.innerHTML = `
-                <div class="chat-message assistant">
-                    <div class="copilot-chat-intro">
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 700; color: var(--text-primary); font-family: 'Outfit', sans-serif; font-size: 11px; letter-spacing: 0.03em;">
-                            <span>👨‍✈️</span> CO-PILOT CHAT ONLINE
-                        </div>
-                        Hello! I am your Equities AI Co-Pilot for <strong>${profile.company_name} (${profile.ticker})</strong>. Ask me anything about its valuation, solvency limits, or technical entries!
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Render dynamic interactive pills inside the suggestions container
-        const suggestionsContainer = document.querySelector('.chat-suggested-prompts');
-        if (suggestionsContainer) {
-            suggestionsContainer.innerHTML = `
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Check WACC & DCF valuation parameters')">💡 DCF Value</button>
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Analyze technical moving averages and RSI support levels')">📈 Technical Entry</button>
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Add this stock to my watchlist')">📥 Add to Watchlist</button>
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Create a price alert when the price crosses SMA-50')">🔔 Create Price Alert</button>
-                <button class="chat-prompt-pill" onclick="triggerPillAction('Analyze recent catalyst news sentiment and red flags')">📰 News Sentiment</button>
-            `;
-        }
 
         // Reset dynamic chart select values to default when loading a new stock
         const chartPeriodEl = document.getElementById('chart-period');
@@ -10058,94 +10009,12 @@ function setupChatDrawer() {
         if (e.key === 'Enter') sendUserChatMessage();
     });
 
-    // Wire up Voice Input (Speech-to-Text)
-    const micBtn = document.getElementById('chat-mic-btn');
-    let isRecording = false;
-    let recognition = null;
-    
-    if (micBtn) {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            micBtn.style.display = 'none';
-        } else {
-            recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.lang = 'en-IN';
-            
-            recognition.onstart = () => {
-                isRecording = true;
-                micBtn.innerText = '🔴';
-                micBtn.style.background = 'rgba(239, 68, 68, 0.2)';
-                micBtn.style.borderColor = 'rgba(239, 68, 68, 0.5)';
-                showToast("Voice input active. Speak your question...", "info");
-            };
-            
-            recognition.onend = () => {
-                isRecording = false;
-                micBtn.innerText = '🎤';
-                micBtn.style.background = 'rgba(255, 255, 255, 0.04)';
-                micBtn.style.borderColor = 'var(--border-glass)';
-            };
-            
-            recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                const input = document.getElementById('chat-user-input');
-                if (input && transcript) {
-                    input.value = transcript;
-                    showToast("Speech recognized successfully.", "success");
-                }
-            };
-            
-            recognition.onerror = (e) => {
-                console.error("Speech recognition error:", e);
-                showToast("Speech recognition error: " + e.error, "error");
-            };
-            
-            micBtn.onclick = () => {
-                if (isRecording) {
-                    recognition.stop();
-                } else {
-                    recognition.start();
-                }
-            };
-        }
-    }
-
-    // Wire up Transcript Export
-    const exportBtn = document.getElementById('chat-export-btn');
-    if (exportBtn) {
-        exportBtn.onclick = () => {
-            if (!activeStockProfile || chatHistory.length === 0) {
-                showToast("No active conversation transcript to export.", "info");
-                return;
-            }
-            let text = `# AI Co-Pilot Transcript: ${activeStockProfile.company_name} (${activeStockProfile.ticker})\n\n`;
-            chatHistory.forEach(msg => {
-                const roleName = msg.role === 'user' ? 'Investor' : 'AI Co-Pilot';
-                text += `## [${roleName}]\n${msg.content}\n\n`;
-            });
-            
-            const blob = new Blob([text], { type: 'text/markdown;charset=utf-8;' });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", `copilot_transcript_${activeStockProfile.ticker.replace(".NS", "")}.md`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            showToast("Transcript exported successfully.", "success");
-        };
-    }
-
-    // Global helper for prompt suggestions
-    window.triggerPillAction = function(text) {
-        const input = document.getElementById('chat-user-input');
-        if (input) {
-            input.value = text;
+    document.querySelectorAll('.chat-prompt-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            document.getElementById('chat-user-input').value = pill.innerText;
             sendUserChatMessage();
-        }
-    };
+        });
+    });
 
     // Overhaul state machine tabs navigation
     const tabSynthesis = document.getElementById('tab-drawer-synthesis');
@@ -11066,7 +10935,6 @@ async function sendUserChatMessage() {
     chatHistory.push({ role: 'user', content: message });
 
     const typingId = appendChatMessage('assistant', 'Consulting AI stock advisor...');
-    const startTime = performance.now();
 
     try {
         const payload = {
@@ -11083,13 +10951,6 @@ async function sendUserChatMessage() {
 
         if (!response.ok) throw new Error("Chat transmission failed.");
         const data = await response.json();
-
-        // Calculate latency and update UI badge
-        const latencyMs = ((performance.now() - startTime) / 1000).toFixed(2);
-        const headerLatency = document.getElementById('chat-header-latency');
-        if (headerLatency) {
-            headerLatency.innerText = `Latency: ${latencyMs}s`;
-        }
 
         const chatReplyText = data.response || "No response received from Equities Advisor.";
         document.getElementById(typingId).remove();
@@ -11176,42 +11037,13 @@ function appendChatMessage(role, content) {
     msg.className = `chat-message ${role}`;
 
     if (role === 'assistant') {
-        // Escape HTML to prevent XSS but allow markdown formatting & tables
+        // Escape HTML to prevent XSS but allow specific markdown formatting
         let escaped = content
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
 
-        // Parse markdown tables dynamically
-        const lines = escaped.split('\n');
-        let inTable = false;
-        let tableHtml = '';
-        let parsedLines = [];
-        
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i].trim();
-            if (line.startsWith('|') && line.endsWith('|')) {
-                if (line.replace(/[\s\-|:|]/g, '') === '') {
-                    continue;
-                }
-                inTable = true;
-                const cells = line.split('|').slice(1, -1).map(c => c.trim());
-                const cellTag = tableHtml === '' ? 'th' : 'td';
-                tableHtml += '<tr>' + cells.map(c => `<${cellTag} style="padding: 6px 10px; border: 1px solid rgba(255,255,255,0.06);">${c}</${cellTag}>`).join('') + '</tr>';
-            } else {
-                if (inTable) {
-                    parsedLines.push(`<table class="synthesis-markdown-table" style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; background: rgba(0,0,0,0.15); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.04);">${tableHtml}</table>`);
-                    tableHtml = '';
-                    inTable = false;
-                }
-                parsedLines.push(lines[i]);
-            }
-        }
-        if (inTable) {
-            parsedLines.push(`<table class="synthesis-markdown-table" style="width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 10px; background: rgba(0,0,0,0.15); border-radius: 6px; overflow: hidden; border: 1px solid rgba(255,255,255,0.04);">${tableHtml}</table>`);
-        }
-
-        let formatted = parsedLines.join('\n')
+        let formatted = escaped
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/### (.*?)(?:\n|$)/g, '<h3>$1</h3>')
             .replace(/\* (.*?)(?:\n|$)/g, '<li>$1</li>')
@@ -11222,30 +11054,7 @@ function appendChatMessage(role, content) {
             formatted = formatted.replace(/(<li>.*?<\/li>)/gs, '<ul>$1</ul>');
         }
 
-        msg.innerHTML = `
-            <div style="display: flex; justify-content: space-between; gap: 8px; width: 100%;">
-                <div class="chat-message-text" style="flex-grow: 1;">${formatted}</div>
-                <button class="chat-speech-btn" style="background: transparent; border: none; cursor: pointer; opacity: 0.6; align-self: flex-start; padding: 2px;" title="Listen to response">🔊</button>
-            </div>
-        `;
-
-        // Wire up dynamic text-to-speech triggers
-        setTimeout(() => {
-            const speechBtn = msg.querySelector('.chat-speech-btn');
-            if (speechBtn) {
-                speechBtn.onclick = () => {
-                    if (typeof speakNarrative === 'function') {
-                        const temp = document.createElement("div");
-                        temp.innerHTML = formatted;
-                        const plainText = temp.innerText || temp.textContent;
-                        speakNarrative(plainText);
-                    } else {
-                        const utterance = new SpeechSynthesisUtterance(content);
-                        window.speechSynthesis.speak(utterance);
-                    }
-                };
-            }
-        }, 50);
+        msg.innerHTML = `<p>${formatted}</p>`;
     } else {
         msg.innerText = content;
     }

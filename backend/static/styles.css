@@ -3870,11 +3870,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 @media (max-width: 768px) {
     .mobile-header {
-        display: flex !important;
-        padding-top: env(safe-area-inset-top, 0px) !important;
-        padding-left: calc(20px + env(safe-area-inset-left, 0px)) !important;
-        padding-right: calc(20px + env(safe-area-inset-right, 0px)) !important;
-        height: calc(60px + env(safe-area-inset-top, 0px)) !important;
+        display: flex;
     }
 
     body, html {
@@ -3912,22 +3908,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
     }
 
     .main-content {
-        padding: 16px !important;
-        padding-left: calc(16px + env(safe-area-inset-left, 0px)) !important;
-        padding-right: calc(16px + env(safe-area-inset-right, 0px)) !important;
-        padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
-        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+        padding: 20px;
         height: auto !important;
         max-height: none !important;
         overflow: visible !important;
-    }
-
-    .card {
-        padding: 16px !important;
-    }
-
-    .alerts-grid {
-        gap: 15px !important;
     }
 
     .workspace-tab {
