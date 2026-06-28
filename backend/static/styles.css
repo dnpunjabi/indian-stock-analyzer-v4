@@ -14165,3 +14165,35 @@ details[open] .academy-hud-arrow {
     border-color: #ef4444 !important;
 }
 
+@media (max-width: 600px) {
+    /* Optimize Touch Targets for Utilities Bar */
+    .header-bell-wrapper, .header-settings-wrapper, .header-links-wrapper {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 16px !important;
+        border-radius: 10px !important;
+    }
+    
+    /* Disable Hover transform on mobile to prevent containing block constraints */
+    .header-bell-wrapper:hover, .header-settings-wrapper:hover, .header-links-wrapper:hover {
+        transform: none !important;
+    }
+    
+    /* Transform Dropdown into a Centered Floating Card */
+    .header-dropdown.notification-dropdown {
+        position: fixed !important;
+        top: 75px !important;
+        left: 12px !important;
+        right: 12px !important;
+        width: auto !important;
+        max-width: calc(100vw - 24px) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        z-index: 100001 !important;
+    }
+}
+
+
