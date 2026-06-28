@@ -1827,6 +1827,9 @@ function resetWorkspace() {
     }
     activeStockProfile = null;
     chatHistory = [];
+    if (typeof updateChatHeaderStockCard === 'function') {
+        updateChatHeaderStockCard(null);
+    }
 
     // Close mobile menu sidebar if open
     const sidebar = document.getElementById('sidebar');
@@ -4051,6 +4054,9 @@ async function loadStockAnalyzer(query, force_llm = false) {
 
         const oldTicker = activeStockProfile ? activeStockProfile.ticker : null;
         activeStockProfile = profile;
+        if (typeof updateChatHeaderStockCard === 'function') {
+            updateChatHeaderStockCard(profile);
+        }
         if (oldTicker && oldTicker !== profile.ticker) {
             // Unsubscribe from old ticker if it's not in the watchlist
             const activeWatch = (typeof watchlistsList !== 'undefined') ? watchlistsList.find(w => w.id === activeWatchlistId) : null;
@@ -9998,6 +10004,9 @@ function setupChatDrawer() {
         if (typeof pauseAudioPlayback === 'function') {
             pauseAudioPlayback();
         }
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
     });
 
     document.getElementById('send-chat-btn').addEventListener('click', sendUserChatMessage);
@@ -10011,6 +10020,86 @@ function setupChatDrawer() {
             sendUserChatMessage();
         });
     });
+
+    // Setup Microphone Speech-to-Text
+    const micBtn = document.getElementById('chat-mic-btn');
+    let recognition = null;
+    let isListening = false;
+
+    if (micBtn) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            micBtn.style.display = 'none'; // Hide if browser doesn't support
+        } else {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.innerHTML = '🔴';
+                micBtn.classList.add('mic-listening');
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                micBtn.innerHTML = '🎙️';
+                micBtn.classList.remove('mic-listening');
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                const input = document.getElementById('chat-user-input');
+                if (input) {
+                    input.value = (input.value ? input.value + ' ' : '') + transcript;
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error:", event.error);
+                showToast(`Voice input error: ${event.error}`, "error");
+            };
+
+            micBtn.addEventListener('click', () => {
+                if (isListening) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            });
+        }
+    }
+
+    // Setup Export Transcript
+    const exportBtn = document.getElementById('chat-export-transcript-btn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            if (chatHistory.length === 0) {
+                showToast("No active conversation transcript to export.", "warning");
+                return;
+            }
+            const ticker = activeStockProfile ? activeStockProfile.ticker.replace('.NS', '').replace('.BO', '') : 'WORKSPACE';
+            let markdown = `# Equities Advisor Chat Transcript - ${ticker}\n`;
+            markdown += `Generated on: ${new Date().toLocaleString()}\n\n`;
+            markdown += `---\n\n`;
+
+            chatHistory.forEach(msg => {
+                const roleName = msg.role === 'user' ? 'INVESTOR' : 'CO-PILOT';
+                markdown += `### 🤖 ${roleName}\n${msg.content}\n\n`;
+            });
+
+            const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', `copilot_transcript_${ticker}_${Date.now()}.md`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("📥 Chat transcript exported to downloads!");
+        });
+    }
+
 
     // Overhaul state machine tabs navigation
     const tabSynthesis = document.getElementById('tab-drawer-synthesis');
@@ -10073,15 +10162,27 @@ function setupChatDrawer() {
         });
     }
 
+    // Prevent clicks inside the drawer from bubbling up and triggering the click-outside handler
+    if (drawer) {
+        drawer.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
+
     // Close drawer on clicking outside the drawer boundaries
     document.addEventListener('click', (e) => {
         if (!drawer || !drawer.classList.contains('open')) return;
 
-        const isClickInsideDrawer = drawer.contains(e.target);
+        // If the element was detached from the DOM during click handling, do not close the drawer
+        if (!document.body.contains(e.target)) return;
+
+        // If the click occurred inside the chat drawer or any of its children, do not close the drawer
+        if (e.target.closest('#chat-drawer')) return;
+
         const isClickOnPill = convictionTrigger && convictionTrigger.contains(e.target);
         const isClickOnOpenBtn = openBtn && openBtn.contains(e.target);
 
-        if (!isClickInsideDrawer && !isClickOnPill && !isClickOnOpenBtn) {
+        if (!isClickOnPill && !isClickOnOpenBtn) {
             drawer.classList.remove('open');
             if (typeof pauseAudioPlayback === 'function') {
                 pauseAudioPlayback();
@@ -10921,6 +11022,208 @@ async function loadStockSynthesis(symbol) {
     }
 }
 
+/* --- ADVISOR CHAT HELPER FUNCTIONS --- */
+let currentAdvisorUtterance = null;
+let currentAdvisorSpeechButton = null;
+
+function toggleSpeechForMessage(text, button) {
+    if (!window.speechSynthesis) {
+        showToast("Speech synthesis is not supported on this browser.", "warning");
+        return;
+    }
+    
+    if (window.speechSynthesis.speaking && currentAdvisorSpeechButton === button) {
+        window.speechSynthesis.cancel();
+        return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const cleanText = text
+        .replace(/<\/?[^>]+(>|$)/g, "") // strip html tags
+        .replace(/\*\*|###|\*|\|/g, "")  // strip basic markdown symbols
+        .replace(/\[ACTIONS_PAYLOAD\].*$/g, "") // strip action payloads
+        .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    currentAdvisorUtterance = utterance;
+    currentAdvisorSpeechButton = button;
+
+    utterance.onstart = () => {
+        button.innerHTML = '⏹️ Stop';
+        button.style.color = '#ef4444';
+        button.style.opacity = '1';
+    };
+
+    const restoreButton = () => {
+        button.innerHTML = '🔊 Read Aloud';
+        button.style.color = '';
+        button.style.opacity = '';
+        if (currentAdvisorSpeechButton === button) {
+            currentAdvisorSpeechButton = null;
+            currentAdvisorUtterance = null;
+        }
+    };
+
+    utterance.onend = restoreButton;
+    utterance.onerror = restoreButton;
+
+    window.speechSynthesis.speak(utterance);
+}
+
+function parseMarkdownTables(text) {
+    const lines = text.split('\n');
+    let inTable = false;
+    let tableRows = [];
+    let output = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        
+        if (line.startsWith('|') && line.endsWith('|')) {
+            inTable = true;
+            tableRows.push(line);
+        } else {
+            if (inTable) {
+                output.push(renderHTMLTable(tableRows));
+                tableRows = [];
+                inTable = false;
+            }
+            output.push(line);
+        }
+    }
+    
+    if (inTable && tableRows.length > 0) {
+        output.push(renderHTMLTable(tableRows));
+    }
+
+    return output.join('\n');
+}
+
+function renderHTMLTable(rows) {
+    if (rows.length === 0) return '';
+    
+    let html = '<div class="table-container" style="overflow-x:auto; margin: 10px 0;"><table class="synthesis-markdown-table" style="width:100%; border-collapse:collapse; font-size:11px; font-family:\'Inter\',sans-serif; text-align:left;">';
+    
+    let hasHeader = false;
+    if (rows.length > 1) {
+        const separatorLine = rows[1].replace(/[\s|-|:]/g, '');
+        if (separatorLine === '||' || separatorLine === '|') {
+            hasHeader = true;
+        }
+    }
+    
+    rows.forEach((row, idx) => {
+        if (hasHeader && idx === 1) return;
+        
+        const cells = row.split('|').map(c => c.trim()).filter((c, cellIdx, arr) => {
+            return cellIdx > 0 && cellIdx < arr.length - 1;
+        });
+        
+        html += '<tr style="border-bottom: 1px solid var(--border-glass);">';
+        cells.forEach(cell => {
+            if (hasHeader && idx === 0) {
+                html += `<th style="padding: 8px 10px; font-weight: bold; background: rgba(255,255,255,0.03); color: var(--color-primary-light); border-bottom: 2px solid var(--border-glass);">${cell}</th>`;
+            } else {
+                html += `<td style="padding: 6px 10px; color: var(--text-primary);">${cell}</td>`;
+            }
+        });
+        html += '</tr>';
+    });
+    
+    html += '</table></div>';
+    return html;
+}
+
+function updateSuggestedPromptsForStock(ticker) {
+    const container = document.querySelector('.chat-suggested-prompts');
+    if (!container) return;
+
+    let prompts = [];
+    if (ticker) {
+        const cleanTicker = ticker.replace('.NS', '').replace('.BO', '');
+        prompts = [
+            { text: `🔍 WACC & DCF Sensitivity for ${cleanTicker}`, action: `Analyze valuation, cost of capital (WACC) and DCF fair value sensitivity metrics for ${ticker}` },
+            { text: `⚖️ Peer Multiples for ${cleanTicker}`, action: `Compare valuation metrics and pricing premium/discount of ${ticker} against sector peers` },
+            { text: `🔮 Growth Outlook for ${cleanTicker}`, action: `Evaluate strategic growth vectors, revenue trend catalysts and risks for ${ticker}` },
+            { text: `⭐ Add to Watchlist`, action: `Add ${ticker} to my active watchlist` },
+            { text: `🔔 Create Price Alert`, action: `Create a price alert for ${ticker} if the price changes by 5%` },
+            { text: `🛑 Solvency Audit for ${cleanTicker}`, action: `Run operational solvency, debt burden, and Altman Z score bankruptcy risk audit for ${ticker}` },
+            { text: `💸 Cash Quality for ${cleanTicker}`, action: `Audit earnings quality, comparing PAT (Profit After Tax) to CFO (Cash Flow from Operations) for ${ticker}` },
+            { text: `📈 Technical Signals for ${cleanTicker}`, action: `Summarize technical chart indicators, EMA/SMA crossovers and RSI status for ${ticker}` },
+            { text: `📰 News Sentiment for ${cleanTicker}`, action: `Perform a sentiment sweep and flag critical corporate risk indicators from recent news for ${ticker}` }
+        ];
+    } else {
+        prompts = [
+            { text: `🔍 Run Fundamental Health Audit`, action: `Explain how to evaluate a company's fundamental health and solvency` },
+            { text: `📊 Evaluate PE Bands`, action: `Explain how to interpret historical PE bands and deviation ranges` },
+            { text: `🔮 Growth Vector Checklist`, action: `List the key metrics for analyzing a company's long term growth capability` },
+            { text: `💸 Cash Quality Checklist`, action: `What are the flags of poor earnings quality when comparing cash flows?` }
+        ];
+    }
+
+    container.innerHTML = '';
+    prompts.forEach(p => {
+        const button = document.createElement('button');
+        button.className = 'chat-prompt-pill';
+        button.innerText = p.text;
+        button.addEventListener('click', () => {
+            const input = document.getElementById('chat-user-input');
+            if (input) {
+                input.value = p.action;
+                sendUserChatMessage();
+            }
+        });
+        container.appendChild(button);
+    });
+}
+
+function updateChatHeaderStockCard(profile) {
+    const card = document.getElementById('chat-header-stock-card');
+    const tickerEl = document.getElementById('chat-header-ticker');
+    const nameEl = document.getElementById('chat-header-name');
+    const priceEl = document.getElementById('chat-header-price');
+    const latencyEl = document.getElementById('chat-header-latency');
+    const messagesContainer = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-user-input');
+
+    if (chatInput) {
+        chatInput.value = '';
+    }
+
+    if (messagesContainer) {
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+        messagesContainer.innerHTML = `
+            <div class="chat-message assistant">
+                <div class="copilot-chat-intro">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 700; color: var(--text-primary); font-family: 'Outfit', sans-serif; font-size: 11px; letter-spacing: 0.03em;">
+                        <span>👨‍✈️</span> CO-PILOT CHAT ONLINE
+                    </div>
+                    Hello! I am your Equities AI Co-Pilot, operating your autonomous flight guidance system. Ask me anything about the loaded stock's operational solvency, cross-wind peer multiples, intrinsic DCF parameters, or dynamic catalyst news sweeps.
+                </div>
+            </div>
+        `;
+    }
+
+    if (!card) return;
+
+    if (profile) {
+        if (tickerEl) tickerEl.innerText = (profile.ticker || '').replace('.NS', '').replace('.BO', '');
+        if (nameEl) nameEl.innerText = profile.company_name || '--';
+        if (priceEl && profile.fundamentals && profile.fundamentals.current_price !== undefined) {
+            priceEl.innerText = `Rs. ${profile.fundamentals.current_price.toLocaleString('en-IN')}`;
+        }
+        if (latencyEl) latencyEl.innerText = 'Latency: --';
+        card.style.display = 'flex';
+        updateSuggestedPromptsForStock(profile.ticker);
+    } else {
+        card.style.display = 'none';
+        updateSuggestedPromptsForStock(null);
+    }
+}
+
 async function sendUserChatMessage() {
     const input = document.getElementById('chat-user-input');
     const message = input.value.trim();
@@ -10931,6 +11234,7 @@ async function sendUserChatMessage() {
     chatHistory.push({ role: 'user', content: message });
 
     const typingId = appendChatMessage('assistant', 'Consulting AI stock advisor...');
+    const startTime = performance.now();
 
     try {
         const payload = {
@@ -10947,6 +11251,21 @@ async function sendUserChatMessage() {
 
         if (!response.ok) throw new Error("Chat transmission failed.");
         const data = await response.json();
+        const endTime = performance.now();
+        const latencySec = ((endTime - startTime) / 1000).toFixed(2);
+
+        const latencyEl = document.getElementById('chat-header-latency');
+        if (latencyEl) {
+            latencyEl.innerText = `Latency: ${latencySec}s`;
+            const seconds = parseFloat(latencySec);
+            if (seconds < 1.5) {
+                latencyEl.style.color = '#10b981';
+            } else if (seconds <= 3.0) {
+                latencyEl.style.color = '#f59e0b';
+            } else {
+                latencyEl.style.color = '#f43f5e';
+            }
+        }
 
         const chatReplyText = data.response || "No response received from Equities Advisor.";
         document.getElementById(typingId).remove();
@@ -11050,13 +11369,32 @@ function appendChatMessage(role, content) {
             formatted = formatted.replace(/(<li>.*?<\/li>)/gs, '<ul>$1</ul>');
         }
 
-        msg.innerHTML = `<p>${formatted}</p>`;
+        if (typeof parseMarkdownTables === 'function') {
+            formatted = parseMarkdownTables(formatted);
+        }
+
+        msg.innerHTML = `
+            <p>${formatted}</p>
+            <button class="chat-speech-btn" title="Speak Response" style="background: transparent; border: none; cursor: pointer; font-size: 11px; padding: 2px 4px; display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); opacity: 0.6; transition: all 0.2s; margin-top: 6px;">🔊 Read Aloud</button>
+        `;
+
+        const speechBtn = msg.querySelector('.chat-speech-btn');
+        if (speechBtn) {
+            speechBtn.addEventListener('click', () => {
+                if (typeof toggleSpeechForMessage === 'function') {
+                    toggleSpeechForMessage(content, speechBtn);
+                }
+            });
+        }
     } else {
         msg.innerText = content;
     }
 
     box.appendChild(msg);
-    box.scrollTop = box.scrollHeight;
+    box.scrollTo({
+        top: box.scrollHeight,
+        behavior: 'smooth'
+    });
 
     return msgId;
 }

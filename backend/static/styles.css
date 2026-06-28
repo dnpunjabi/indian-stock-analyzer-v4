@@ -14016,3 +14016,152 @@ details[open] .academy-hud-arrow {
         margin-bottom: 15px !important;
     }
 }
+
+/* --- LEARNING ACADEMY PREMIUM RESPONSIVE SPACING & CONTRAST UPGRADES --- */
+
+/* Centered & Responsive HUD status details on desktop */
+@media (min-width: 993px) {
+    #tab-learning {
+        margin-top: -20px !important; /* Pull the entire academy content layout higher on Desktop */
+    }
+
+    #academy-hud-details {
+        width: 70% !important;
+        margin: 0 auto 12px auto !important;
+    }
+    
+    /* Compact padding and vertical spacing on desktop to optimize viewport real estate */
+    .academy-hud-summary {
+        padding: 8px 16px !important;
+    }
+    
+    .academy-hud {
+        padding: 10px 16px !important;
+    }
+    
+    .academy-hud-stats {
+        margin-bottom: 4px !important;
+    }
+}
+
+/* Light Theme Contrast Overrides for Topic Header Cards, Badges, and Action Buttons */
+[data-theme="light"] .academy-topic-header,
+[data-mode="light"] .academy-topic-header {
+    background: #ffffff !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] #academy-topic-title,
+[data-mode="light"] #academy-topic-title {
+    color: #0f172a !important;
+}
+
+[data-theme="light"] .academy-action-btn,
+[data-mode="light"] .academy-action-btn {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: #1e293b !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="light"] .academy-action-btn:hover,
+[data-mode="light"] .academy-action-btn:hover {
+    background: var(--color-primary) !important;
+    color: #ffffff !important;
+    border-color: var(--color-primary) !important;
+}
+
+[data-theme="light"] .academy-category-badge,
+[data-mode="light"] .academy-category-badge {
+    background: rgba(59, 130, 246, 0.15) !important;
+    color: #1d4ed8 !important;
+}
+
+/* Light Theme Contrast Improvements for Prompt Suggestions & Pills */
+[data-theme="light"] .chat-prompt-pill,
+[data-mode="light"] .chat-prompt-pill {
+    background-color: rgba(37, 99, 235, 0.05) !important;
+    border: 1px solid rgba(37, 99, 235, 0.18) !important;
+    color: #1d4ed8 !important;
+}
+
+[data-theme="light"] .chat-prompt-pill:hover,
+[data-mode="light"] .chat-prompt-pill:hover {
+    background-color: rgba(37, 99, 235, 0.12) !important;
+    color: #1e40af !important;
+    border-color: rgba(37, 99, 235, 0.35) !important;
+}
+
+[data-theme="light"] .academy-suggestion-chip,
+[data-mode="light"] .academy-suggestion-chip {
+    background: rgba(37, 99, 235, 0.06) !important;
+    border-color: rgba(37, 99, 235, 0.18) !important;
+    color: #1d4ed8 !important;
+}
+
+[data-theme="light"] .academy-suggestion-chip:hover,
+[data-mode="light"] .academy-suggestion-chip:hover {
+    background: rgba(37, 99, 235, 0.12) !important;
+    border-color: rgba(37, 99, 235, 0.35) !important;
+    color: #1e40af !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12) !important;
+}
+
+/* Restoring the Mobile Header/Alerts responsive sizing */
+@media (max-width: 768px) {
+    .mobile-header {
+        display: flex !important;
+        padding-top: env(safe-area-inset-top, 0px) !important;
+        padding-left: calc(20px + env(safe-area-inset-left, 0px)) !important;
+        padding-right: calc(20px + env(safe-area-inset-right, 0px)) !important;
+        height: calc(60px + env(safe-area-inset-top, 0px)) !important;
+    }
+
+    body, html {
+        height: auto !important;
+        overflow: visible !important;
+    }
+
+    .main-content {
+        padding: 16px !important;
+        padding-left: calc(16px + env(safe-area-inset-left, 0px)) !important;
+        padding-right: calc(16px + env(safe-area-inset-right, 0px)) !important;
+        padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    .card {
+        padding: 16px !important;
+    }
+
+    .alerts-grid {
+        gap: 15px !important;
+    }
+
+    .workspace-tab {
+        overflow-y: visible !important;
+        height: auto !important;
+    }
+}
+
+/* --- ADVISOR CHAT MIC PULSE VISUALIZER --- */
+@keyframes micPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+.mic-listening {
+    animation: micPulse 1.5s infinite;
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: #ef4444 !important;
+    border-color: #ef4444 !important;
+}
+
