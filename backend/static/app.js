@@ -12,6 +12,13 @@
                          (location.port !== '8000' && location.port !== '8001' && location.port !== '8002' && location.port !== '5000'));
     const apiBaseUrl = isCapacitor ? 'https://my-stock-advisor.duckdns.org' : '';
     
+    // Expose print fallback if running inside native Android WebView
+    if (window.AndroidPrint && typeof window.AndroidPrint.print === 'function') {
+        window.print = function() {
+            window.AndroidPrint.print();
+        };
+    }
+    
     let isLoginModalOpen = false;
     function showServerLoginModal() {
         if (isLoginModalOpen) return;
@@ -11082,6 +11089,7 @@ function toggleSpeechForMessage(text, button) {
         .trim();
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'en-US';
     currentAdvisorUtterance = utterance;
     currentAdvisorSpeechButton = button;
 
@@ -24783,6 +24791,7 @@ function speakNextSegment() {
     }
 
     currentUtterance = new SpeechSynthesisUtterance(segment.text);
+    currentUtterance.lang = 'en-US';
 
     // Bind selected voice preference if configured
     const voiceSelect = document.getElementById('audio-voice-select');
