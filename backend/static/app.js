@@ -23,15 +23,6 @@
     window.onAndroidTtsDone = function() {
         if (window.SpeechPlayer && window.SpeechPlayer.isActive && window.SpeechPlayer.isPlaying) {
             window.SpeechPlayer.onAndroidTtsDone();
-        } else if (window.AndroidSpeechSpeaking && window.currentAdvisorSpeechButton) {
-            const originalText = window.currentAdvisorSpeechButton.getAttribute('data-original-text') || '🔊 Read Aloud';
-            window.currentAdvisorSpeechButton.innerHTML = originalText;
-            window.currentAdvisorSpeechButton.style.color = '';
-            window.currentAdvisorSpeechButton.style.opacity = '';
-            window.currentAdvisorSpeechButton = null;
-            window.AndroidSpeechSpeaking = false;
-        } else if (typeof speakNextSegment === 'function') {
-            speakNextSegment();
         }
     };
 
@@ -12158,8 +12149,8 @@ function appendChatMessage(role, content) {
         const speechBtn = msg.querySelector('.chat-speech-btn');
         if (speechBtn) {
             speechBtn.addEventListener('click', () => {
-                if (typeof toggleSpeechForMessage === 'function') {
-                    toggleSpeechForMessage(content, speechBtn);
+                if (window.SpeechPlayer) {
+                    window.SpeechPlayer.startSpeakingSection(content, "Co-Pilot Chat", true);
                 }
             });
         }
@@ -25475,300 +25466,76 @@ function injectMetricTooltips(htmlText) {
     return recombined;
 }
 
-let speechQueue = [];
-let currentSpeechIndex = -1;
-let isSpeechPlaying = false;
-let currentUtterance = null;
-
-function stopAudioPlayback() {
-    const playPauseBtn = document.getElementById('audio-play-pause-btn');
-    const statusText = document.getElementById('audio-playback-status');
-
-    if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-    }
-    if (window.AndroidTts && typeof window.AndroidTts.stop === 'function') {
-        window.AndroidTts.stop();
-    }
-    isSpeechPlaying = false;
-    currentSpeechIndex = -1;
-    currentUtterance = null;
-
-    if (playPauseBtn) {
-        playPauseBtn.innerHTML = '<span>▶️</span> Play';
-        playPauseBtn.classList.remove('active');
-    }
-    if (statusText) {
-        statusText.innerText = 'Playback stopped';
-    }
-}
-
-function pauseAudioPlayback() {
-    const playPauseBtn = document.getElementById('audio-play-pause-btn');
-    const statusText = document.getElementById('audio-playback-status');
-
-    if (window.speechSynthesis) {
-        window.speechSynthesis.pause();
-    }
-    if (window.AndroidTts && typeof window.AndroidTts.stop === 'function') {
-        window.AndroidTts.stop();
-    }
-    isSpeechPlaying = false;
-
-    if (playPauseBtn) {
-        playPauseBtn.innerHTML = '<span>▶️</span> Resume';
-    }
-    if (statusText) {
-        statusText.innerText = 'Playback paused';
-    }
-}
-
-function speakNextSegment() {
-    if (!isSpeechPlaying) return;
-
-    currentSpeechIndex++;
-    const statusText = document.getElementById('audio-playback-status');
-
-    if (currentSpeechIndex >= speechQueue.length) {
-        stopAudioPlayback();
-        if (statusText) {
-            statusText.innerText = 'Playback completed';
-        }
-        return;
-    }
-
-    const segment = speechQueue[currentSpeechIndex];
-    if (statusText) {
-        statusText.innerText = `Speaking: ${segment.agentName}`;
-    }
-
-    if (window.AndroidTts && typeof window.AndroidTts.speak === 'function') {
-        window.AndroidTts.speak(segment.text, "segment_" + currentSpeechIndex);
-        return;
-    }
-
-    currentUtterance = new SpeechSynthesisUtterance(segment.text);
-    currentUtterance.lang = 'en-US';
-
-    // Bind selected voice preference if configured
-    const voiceSelect = document.getElementById('audio-voice-select');
-    if (voiceSelect && voiceSelect.value !== 'default') {
-        const voices = window.speechSynthesis.getVoices();
-        const selectedIndex = parseInt(voiceSelect.value);
-        if (!isNaN(selectedIndex) && voices[selectedIndex]) {
-            currentUtterance.voice = voices[selectedIndex];
-        }
-    }
-
-    // Microsoft voices on Windows (OneCore/SAPI5) fail with synthesis error if pitch is not 1.0
-    const isMicrosoftVoice = currentUtterance.voice && currentUtterance.voice.name.includes("Microsoft");
-    if (isMicrosoftVoice) {
-        currentUtterance.pitch = 1.0;
-    } else {
-        currentUtterance.pitch = segment.pitch;
-    }
-
-    // Bind selected speed rate if configured
-    const rateSelect = document.getElementById('audio-rate-select');
-    if (rateSelect) {
-        const selectedRate = parseFloat(rateSelect.value);
-        if (!isNaN(selectedRate)) {
-            currentUtterance.rate = selectedRate;
-        } else {
-            currentUtterance.rate = 1.0;
-        }
-    } else {
-        currentUtterance.rate = 1.0;
-    }
-
-    currentUtterance.onend = () => {
-        speakNextSegment();
-    };
-
-    currentUtterance.onerror = (e) => {
-        console.error("Speech synthesis error:", e);
-        speakNextSegment();
-    };
-
-    window.speechSynthesis.speak(currentUtterance);
-}
-
-function startAudioPlayback() {
-    const playPauseBtn = document.getElementById('audio-play-pause-btn');
-    const statusText = document.getElementById('audio-playback-status');
-
-    const isAndroidTts = window.AndroidTts && typeof window.AndroidTts.speak === 'function';
-    if (!window.speechSynthesis && !isAndroidTts) {
-        showToast("Web Speech API is not supported in this browser.", "warning");
-        return;
-    }
-
-    // If paused, resume
-    if (window.speechSynthesis && window.speechSynthesis.paused && currentSpeechIndex !== -1) {
-        window.speechSynthesis.resume();
-        isSpeechPlaying = true;
-        if (playPauseBtn) {
-            playPauseBtn.innerHTML = '<span>⏸️</span> Pause';
-            playPauseBtn.classList.add('active');
-        }
-        if (statusText) {
-            statusText.innerText = `Speaking: ${speechQueue[currentSpeechIndex].agentName}`;
-        }
-        return;
-    } else if (isAndroidTts && currentSpeechIndex !== -1 && !isSpeechPlaying) {
-        // Resume fallback for native Android TTS (restart current segment)
-        isSpeechPlaying = true;
-        if (playPauseBtn) {
-            playPauseBtn.innerHTML = '<span>⏸️</span> Pause';
-            playPauseBtn.classList.add('active');
-        }
-        if (statusText) {
-            statusText.innerText = `Speaking: ${speechQueue[currentSpeechIndex].agentName}`;
-        }
-        window.AndroidTts.speak(speechQueue[currentSpeechIndex].text, "segment_" + currentSpeechIndex);
-        return;
-    }
-
-    // Build speech queue from active synthesis report
-    const reportTextEl = document.getElementById('synthesis-report-text');
-    if (!reportTextEl) return;
-
-    const debateBlocks = reportTextEl.querySelectorAll('.agent-debate-block');
-    if (debateBlocks.length === 0) {
-        showToast("No AI agent debate comments found to play.", "warning");
-        return;
-    }
-
-    speechQueue = [];
-    debateBlocks.forEach(block => {
-        const commentEl = block.querySelector('.agent-comment');
-        if (!commentEl) return;
-
-        let pitch = 1.0;
-        let agentName = "Agent";
-
-        if (block.classList.contains('fundamental')) {
-            pitch = 0.85;
-            agentName = "Fundamental Analyst";
-        } else if (block.classList.contains('technical')) {
-            pitch = 1.15;
-            agentName = "Technical Tactician";
-        } else if (block.classList.contains('sentiment')) {
-            pitch = 1.0;
-            agentName = "Sentiment Auditor";
-        } else if (block.classList.contains('cio')) {
-            pitch = 0.9;
-            agentName = "Lead CIO Referee";
-        }
-
-        speechQueue.push({
-            text: commentEl.innerText,
-            pitch: pitch,
-            agentName: agentName
-        });
-    });
-
-    if (speechQueue.length === 0) {
-        showToast("No agent comments compiled.", "warning");
-        return;
-    }
-
-    isSpeechPlaying = true;
-    currentSpeechIndex = -1;
-
-    if (playPauseBtn) {
-        playPauseBtn.innerHTML = '<span>⏸️</span> Pause';
-        playPauseBtn.classList.add('active');
-    }
-
-    speakNextSegment();
-}
-
-function populateVoiceList() {
-    if (!window.speechSynthesis) return;
-    const voiceSelect = document.getElementById('audio-voice-select');
-    if (!voiceSelect) return;
-
-    const voices = window.speechSynthesis.getVoices();
-    voiceSelect.innerHTML = '<option value="default">Default System Voice</option>';
-
-    const indianVoices = [];
-    const otherVoices = [];
-
-    voices.forEach((voice, index) => {
-        const isIndian = voice.lang === 'en-IN' || voice.name.toLowerCase().includes('india') || voice.name.toLowerCase().includes('in-');
-        if (isIndian) {
-            indianVoices.push({ voice, index });
-        } else if (voice.lang.startsWith('en') || voice.lang.startsWith('en-')) {
-            otherVoices.push({ voice, index });
-        }
-    });
-
-    // Populate Indian English voices first with flag indicators
-    indianVoices.forEach(item => {
-        const option = document.createElement('option');
-        option.textContent = `🇮🇳 ${item.voice.name} (${item.voice.lang})`;
-        option.value = item.index;
-        voiceSelect.appendChild(option);
-    });
-
-    // Populate other English voices
-    otherVoices.forEach(item => {
-        const option = document.createElement('option');
-        option.textContent = `🌐 ${item.voice.name} (${item.voice.lang})`;
-        option.value = item.index;
-        voiceSelect.appendChild(option);
-    });
-}
-
-function setupAudioConsoleBindings() {
-    const playPauseBtn = document.getElementById('audio-play-pause-btn');
-    const stopBtn = document.getElementById('audio-stop-btn');
-    const audioConsole = document.getElementById('synthesis-audio-console');
-
-    if (audioConsole) {
-        audioConsole.addEventListener('click', (e) => {
+function setupDebateSpeakBtn() {
+    const btn = document.getElementById('synthesis-debate-speak-btn');
+    if (btn) {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
-        });
-    }
 
-    // Bind dynamic voice loader
-    populateVoiceList();
-    if (window.speechSynthesis && typeof window.speechSynthesis.addEventListener === 'function') {
-        window.speechSynthesis.addEventListener('voiceschanged', populateVoiceList);
-    } else if (window.speechSynthesis) {
-        window.speechSynthesis.onvoiceschanged = populateVoiceList;
-    }
-
-    if (playPauseBtn) {
-        playPauseBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (isSpeechPlaying) {
-                pauseAudioPlayback();
-            } else {
-                startAudioPlayback();
+            const reportTextEl = document.getElementById('synthesis-report-text');
+            if (!reportTextEl) {
+                if (typeof showToast === 'function') {
+                    showToast("No analysis available to read yet. Please load a stock first.", "warning");
+                }
+                return;
             }
-        });
-    }
 
-    if (stopBtn) {
-        stopBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            stopAudioPlayback();
+            const debateBlocks = reportTextEl.querySelectorAll('.agent-debate-block');
+            if (debateBlocks.length === 0) {
+                if (typeof showToast === 'function') {
+                    showToast("No AI agent debate comments found to play.", "warning");
+                }
+                return;
+            }
+
+            let fullText = "";
+            debateBlocks.forEach(block => {
+                const commentEl = block.querySelector('.agent-comment');
+                if (!commentEl) return;
+
+                let agentName = "Agent";
+                if (block.classList.contains('fundamental')) {
+                    agentName = "Fundamental Analyst";
+                } else if (block.classList.contains('technical')) {
+                    agentName = "Technical Tactician";
+                } else if (block.classList.contains('sentiment')) {
+                    agentName = "Sentiment Auditor";
+                } else if (block.classList.contains('cio')) {
+                    agentName = "Lead CIO Referee";
+                }
+                
+                fullText += `${agentName} says: ${commentEl.innerText.trim()}. `;
+            });
+
+            if (!fullText.trim()) {
+                if (typeof showToast === 'function') {
+                    showToast("No agent comments compiled.", "warning");
+                }
+                return;
+            }
+
+            if (window.SpeechPlayer) {
+                window.SpeechPlayer.startSpeakingSection(fullText, "Debate Dialectic", true);
+            }
         });
     }
 
     // Stop speaking when search results or active profile changes
     const searchBtn = document.getElementById('search-btn');
     if (searchBtn) {
-        searchBtn.addEventListener('click', () => stopAudioPlayback());
+        searchBtn.addEventListener('click', () => {
+            if (window.SpeechPlayer && window.SpeechPlayer.isActive) {
+                window.SpeechPlayer.stop();
+            }
+        });
     }
 }
 
 // Initialize on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
     setupRuleScanner();
-    setupAudioConsoleBindings();
+    setupDebateSpeakBtn();
     setupTVWorkstationChartControls();
     setupMetricHoverTooltips();
 });
@@ -33949,7 +33716,15 @@ function setupAcademyAICoach() {
             if (loading) loading.remove();
 
             const answer = data.answer || 'Sorry, I could not generate a response.';
-            messagesEl.innerHTML += `<div class="academy-ai-msg assistant"><span>${answer.replace(/\n/g, '<br>')}</span></div>`;
+            const answerId = `academy-coach-answer-${Date.now()}`;
+            messagesEl.innerHTML += `
+                <div class="academy-ai-msg assistant">
+                    <span>
+                        <button class="section-speak-btn" data-target="${answerId}" data-title="AI Coach Reply" style="background: none; border: none; cursor: pointer; padding: 2px; margin-right: 4px; display: inline-flex; align-items: center; justify-content: center; outline: none; vertical-align: middle;">🔊</button>
+                        <span id="${answerId}">${answer.replace(/\n/g, '<br>')}</span>
+                    </span>
+                </div>
+            `;
         } catch (err) {
             const loading = document.getElementById('academy-ai-loading');
             if (loading) loading.remove();
