@@ -3084,6 +3084,7 @@ window.SpeechPlayer = {
     init() {
         this.isAndroid = window.AndroidTts && typeof window.AndroidTts.speak === 'function';
         this.bindEvents();
+        this.initVoiceList();
     },
 
     bindEvents() {
@@ -3114,6 +3115,15 @@ window.SpeechPlayer = {
             });
         }
 
+        const voiceSelect = document.getElementById('speech-control-voice');
+        if (voiceSelect) {
+            voiceSelect.addEventListener('change', () => {
+                if (this.isPlaying && this.isActive) {
+                    this.speakCurrent();
+                }
+            });
+        }
+
         // Delegate click for speak buttons dynamically
         document.body.addEventListener('click', (e) => {
             const btn = e.target.closest('.section-speak-btn');
@@ -3125,6 +3135,113 @@ window.SpeechPlayer = {
                 this.startSpeakingSection(targetId, title, false);
             }
         });
+    },
+
+    initVoiceList() {
+        const voiceSelect = document.getElementById('speech-control-voice');
+        if (!voiceSelect) return;
+
+        if (this.isAndroid) {
+            try {
+                const nativeVoicesStr = window.AndroidTts.getNativeEnglishIndiaVoices();
+                const nativeVoices = JSON.parse(nativeVoicesStr || "[]");
+                
+                voiceSelect.innerHTML = '<option value="default">Default Indian</option>';
+                
+                let maleCount = 0;
+                let femaleCount = 0;
+                
+                nativeVoices.forEach((v) => {
+                    const option = document.createElement('option');
+                    option.value = v.name;
+                    
+                    if (v.gender === 'male') {
+                        maleCount++;
+                        option.textContent = `🇮🇳 Male Voice ${maleCount}`;
+                    } else {
+                        femaleCount++;
+                        option.textContent = `🇮🇳 Female Voice ${femaleCount}`;
+                    }
+                    voiceSelect.appendChild(option);
+                });
+            } catch (err) {
+                console.error("Error populating native Android voices:", err);
+            }
+        } else if (window.speechSynthesis) {
+            const populate = () => {
+                const voices = window.speechSynthesis.getVoices();
+                voiceSelect.innerHTML = '<option value="default">Default Indian</option>';
+                
+                const indianEnglishVoices = [];
+                const fallbackEnglishVoices = [];
+
+                voices.forEach((voice) => {
+                    const langLower = voice.lang.toLowerCase();
+                    const nameLower = voice.name.toLowerCase();
+                    
+                    const isIndianEnglish = voice.lang === 'en-IN' || 
+                                           (langLower.startsWith('en') && nameLower.includes('india'));
+                                           
+                    const maleIndicators = ["male", "rishi", "david", "ravi", "prabhat", "harman", "george", "mark", "daniel", "richard", "james", "oliver", "peter", "harry", "john", "steven", "stefan"];
+                    
+                    if (isIndianEnglish) {
+                        let gender = "female"; // Default fallback
+                        if (maleIndicators.some(indicator => nameLower.includes(indicator))) {
+                            gender = "male";
+                        }
+                        indianEnglishVoices.push({ voice, gender });
+                    } else if (langLower.startsWith('en')) {
+                        let gender = "female";
+                        if (maleIndicators.some(indicator => nameLower.includes(indicator))) {
+                            gender = "male";
+                        }
+                        fallbackEnglishVoices.push({ voice, gender });
+                    }
+                });
+
+                let maleCount = 0;
+                let femaleCount = 0;
+
+                if (indianEnglishVoices.length > 0) {
+                    indianEnglishVoices.forEach((item) => {
+                        const option = document.createElement('option');
+                        option.value = item.voice.name;
+                        
+                        if (item.gender === 'male') {
+                            maleCount++;
+                            option.textContent = `🇮🇳 Male (Voice ${maleCount})`;
+                        } else {
+                            femaleCount++;
+                            option.textContent = `🇮🇳 Female (Voice ${femaleCount})`;
+                        }
+                        voiceSelect.appendChild(option);
+                    });
+                } else {
+                    fallbackEnglishVoices.forEach((item) => {
+                        const option = document.createElement('option');
+                        option.value = item.voice.name;
+                        
+                        const prefix = item.voice.lang.includes('US') ? '🇺🇸' : '🇬🇧';
+                        
+                        if (item.gender === 'male') {
+                            maleCount++;
+                            option.textContent = `${prefix} Male (Voice ${maleCount})`;
+                        } else {
+                            femaleCount++;
+                            option.textContent = `${prefix} Female (Voice ${femaleCount})`;
+                        }
+                        voiceSelect.appendChild(option);
+                    });
+                }
+            };
+
+            populate();
+            if (typeof window.speechSynthesis.addEventListener === 'function') {
+                window.speechSynthesis.addEventListener('voiceschanged', populate);
+            } else {
+                window.speechSynthesis.onvoiceschanged = populate;
+            }
+        }
     },
 
     startSpeakingSection(targetIdOrText, title, isDirectText = false) {
@@ -3205,15 +3322,26 @@ window.SpeechPlayer = {
 
         const sentenceText = this.sentences[this.currentIndex];
 
+        const voiceSelect = document.getElementById('speech-control-voice');
         if (this.isAndroid) {
             window.AndroidSpeechSpeaking = true;
             window.AndroidTts.setSpeechRate(this.rate);
+            if (voiceSelect && voiceSelect.value !== 'default') {
+                window.AndroidTts.setNativeVoice(voiceSelect.value);
+            }
             window.AndroidTts.speak(sentenceText, "sentence_" + this.currentIndex);
         } else {
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(sentenceText);
             this.activeUtterance = utterance;
             utterance.rate = this.rate;
+            if (voiceSelect && voiceSelect.value !== 'default') {
+                const voices = window.speechSynthesis.getVoices();
+                const matched = voices.find(v => v.name === voiceSelect.value);
+                if (matched) {
+                    utterance.voice = matched;
+                }
+            }
             utterance.onend = () => {
                 if (utterance === this.activeUtterance && this.isPlaying && this.isActive) {
                     this.nextSentenceAuto();

@@ -6288,16 +6288,27 @@
                 <button id="speech-control-stop" class="speech-btn speech-btn-stop" title="Stop">⏹️</button>
             </div>
             
-            <!-- Speed (Rate) Selector -->
-            <div style="display: flex; align-items: center; gap: 5px;">
-                <span style="font-size: 9px; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em;">SPEED:</span>
-                <select id="speech-control-rate">
-                    <option value="0.75">0.75x</option>
-                    <option value="1.0" selected>1.0x</option>
-                    <option value="1.25">1.25x</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2.0">2.0x</option>
-                </select>
+            <!-- Options Group (Speed & Voice) -->
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <!-- Voice Accent / Gender Selector -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 8.5px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em;">VOICE:</span>
+                    <select id="speech-control-voice" style="font-size: 9.5px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 4px; outline: none; cursor: pointer; max-width: 105px; font-family: var(--font-body);">
+                        <option value="default">Default</option>
+                    </select>
+                </div>
+                
+                <!-- Speed (Rate) Selector -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 8.5px; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em;">SPEED:</span>
+                    <select id="speech-control-rate" style="font-size: 9.5px; background: rgba(0,0,0,0.25); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 4px; outline: none; cursor: pointer; font-family: var(--font-body);">
+                        <option value="0.75">0.75x</option>
+                        <option value="1.0" selected>1.0x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2.0">2.0x</option>
+                    </select>
+                </div>
             </div>
         </div>
         

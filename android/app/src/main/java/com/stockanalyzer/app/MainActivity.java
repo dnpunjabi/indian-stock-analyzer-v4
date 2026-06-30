@@ -20,6 +20,10 @@ import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import java.util.ArrayList;
 import java.util.Locale;
+import java.util.Set;
+import android.speech.tts.Voice;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class MainActivity extends BridgeActivity {
     private WebAppInterface printInterface;
@@ -290,6 +294,63 @@ class TtsInterface implements TextToSpeech.OnInitListener {
             public void run() {
                 if (mInitialized) {
                     mTts.setSpeechRate(rate);
+                }
+            }
+        });
+    }
+
+    @JavascriptInterface
+    public String getNativeEnglishIndiaVoices() {
+        if (mTts == null) return "[]";
+        JSONArray arr = new JSONArray();
+        try {
+            Set<Voice> voices = mTts.getVoices();
+            if (voices != null) {
+                for (Voice voice : voices) {
+                    if (voice.getLocale() != null && 
+                        "en".equalsIgnoreCase(voice.getLocale().getLanguage()) && 
+                        "IN".equalsIgnoreCase(voice.getLocale().getCountry())) {
+                        JSONObject obj = new JSONObject();
+                        obj.put("name", voice.getName());
+                        
+                        // Heuristic determination of gender based on voice name suffix/components
+                        String nameLower = voice.getName().toLowerCase();
+                        String gender = "female"; // Default fallback
+                        
+                        if (nameLower.contains("gnd") || nameLower.contains("cxx") || nameLower.contains("tct") || nameLower.contains("male") || nameLower.contains("ene") || nameLower.contains("gde")) {
+                            gender = "male";
+                        }
+                        obj.put("gender", gender);
+                        arr.put(obj);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("StockAnalyzerTTS", "Error fetching native voices: " + e.getMessage());
+        }
+        return arr.toString();
+    }
+
+    @JavascriptInterface
+    public void setNativeVoice(final String voiceName) {
+        mActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (mInitialized && mTts != null) {
+                    try {
+                        Set<Voice> voices = mTts.getVoices();
+                        if (voices != null) {
+                            for (Voice voice : voices) {
+                                if (voice.getName().equals(voiceName)) {
+                                    mTts.setVoice(voice);
+                                    android.util.Log.i("StockAnalyzerTTS", "Set native voice to: " + voiceName);
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("StockAnalyzerTTS", "Error setting native voice: " + e.getMessage());
+                    }
                 }
             }
         });
