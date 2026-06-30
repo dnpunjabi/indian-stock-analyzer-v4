@@ -33,6 +33,7 @@
         let micBtnId = 'chat-mic-btn';
         if (activeTarget === 'analyzer') micBtnId = 'analyzer-voice-search-btn';
         else if (activeTarget === 'rotation') micBtnId = 'sector-ai-voice-btn';
+        else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🔴';
@@ -45,6 +46,7 @@
         let micBtnId = 'chat-mic-btn';
         if (activeTarget === 'analyzer') micBtnId = 'analyzer-voice-search-btn';
         else if (activeTarget === 'rotation') micBtnId = 'sector-ai-voice-btn';
+        else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -57,6 +59,7 @@
         let micBtnId = 'chat-mic-btn';
         if (activeTarget === 'analyzer') micBtnId = 'analyzer-voice-search-btn';
         else if (activeTarget === 'rotation') micBtnId = 'sector-ai-voice-btn';
+        else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -79,6 +82,11 @@
             }
         } else if (activeTarget === 'rotation') {
             const input = document.getElementById('sector-ai-chat-input');
+            if (input) {
+                input.value = (input.value ? input.value + ' ' : '') + transcript;
+            }
+        } else if (activeTarget === 'academy') {
+            const input = document.getElementById('academy-ai-input');
             if (input) {
                 input.value = (input.value ? input.value + ' ' : '') + transcript;
             }
@@ -28188,8 +28196,8 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                     tr.innerHTML = `
                         <td style="padding: 12px; font-weight: 700; color: var(--neon-blue);">${stock.symbol.replace('.NS', '')}</td>
                         <td style="padding: 12px; color: var(--text-primary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${stock.company_name}</td>
-                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 600;" id="movers-price-${stock.symbol.replace('.NS', '')}">₹${stock.price.toFixed(2)}</td>
-                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--neon-green);" id="movers-change-abs-${stock.symbol.replace('.NS', '')}">+₹${(stock.change || 0).toFixed(2)}</td>
+                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 600;" id="movers-price-${stock.symbol.replace('.NS', '')}">${stock.price.toFixed(2)}</td>
+                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--neon-green);" id="movers-change-abs-${stock.symbol.replace('.NS', '')}">${(stock.change || 0).toFixed(2)}</td>
                         <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--neon-green);" id="movers-change-pct-${stock.symbol.replace('.NS', '')}">+${stock.change_pct.toFixed(2)}%</td>
                     `;
                     bindMoversRowEvents(tr, stock);
@@ -28210,8 +28218,8 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                     tr.innerHTML = `
                         <td style="padding: 12px; font-weight: 700; color: var(--neon-blue);">${stock.symbol.replace('.NS', '')}</td>
                         <td style="padding: 12px; color: var(--text-primary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${stock.company_name}</td>
-                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 600;" id="movers-price-${stock.symbol.replace('.NS', '')}">₹${stock.price.toFixed(2)}</td>
-                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: #ef4444;" id="movers-change-abs-${stock.symbol.replace('.NS', '')}">-₹${Math.abs(stock.change || 0).toFixed(2)}</td>
+                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 600;" id="movers-price-${stock.symbol.replace('.NS', '')}">${stock.price.toFixed(2)}</td>
+                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: #ef4444;" id="movers-change-abs-${stock.symbol.replace('.NS', '')}">${Math.abs(stock.change || 0).toFixed(2)}</td>
                         <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: #ef4444;" id="movers-change-pct-${stock.symbol.replace('.NS', '')}">${stock.change_pct.toFixed(2)}%</td>
                     `;
                     bindMoversRowEvents(tr, stock);
@@ -28292,8 +28300,8 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
             const changeAbsEl = document.getElementById(`movers-change-abs-${cleanSym}`);
             const changePctEl = document.getElementById(`movers-change-pct-${cleanSym}`);
             if (priceEl) {
-                const oldPrice = parseFloat(priceEl.innerText.replace('₹', '').replace(/,/g, ''));
-                priceEl.innerText = `₹${price.toFixed(2)}`;
+                const oldPrice = parseFloat(priceEl.innerText.replace(/,/g, ''));
+                priceEl.innerText = `${price.toFixed(2)}`;
                 
                 // Trigger radial blink animations
                 const parentRow = priceEl.closest('tr');
@@ -28312,9 +28320,8 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
 
             if (changeAbsEl) {
                 const displayChange = changeVal !== undefined && changeVal !== null ? changeVal : (price - (price / (1 + changePct / 100)));
-                const sign = changePct >= 0 ? '+' : '-';
                 const absChange = Math.abs(displayChange).toFixed(2);
-                changeAbsEl.innerText = `${sign}₹${absChange}`;
+                changeAbsEl.innerText = `${absChange}`;
                 changeAbsEl.style.color = colorStyle;
             }
 
@@ -33768,6 +33775,82 @@ function setupAcademyAICoach() {
 
     sendBtn.addEventListener('click', sendMessage);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+    // Voice recognition setup
+    const micBtn = document.getElementById('academy-ai-mic-btn');
+    let academyRecognition = null;
+    let isAcademyListening = false;
+
+    if (micBtn) {
+        const isAndroidSpeech = window.AndroidSpeech && typeof window.AndroidSpeech.startListening === 'function';
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (isAndroidSpeech) {
+            micBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (window.AndroidSpeechListening && window.activeSpeechRecognizerTarget === 'academy') {
+                    window.AndroidSpeech.stopListening();
+                } else {
+                    window.activeSpeechRecognizerTarget = 'academy';
+                    window.AndroidSpeech.startListening();
+                }
+            });
+        } else if (!SpeechRecognition) {
+            micBtn.style.display = 'none';
+        } else {
+            academyRecognition = new SpeechRecognition();
+            academyRecognition.continuous = false;
+            academyRecognition.interimResults = false;
+            academyRecognition.lang = 'en-US';
+
+            academyRecognition.onstart = () => {
+                isAcademyListening = true;
+                micBtn.innerHTML = '🔴';
+                micBtn.classList.add('mic-listening');
+            };
+
+            academyRecognition.onend = () => {
+                isAcademyListening = false;
+                micBtn.innerHTML = '🎙️';
+                micBtn.classList.remove('mic-listening');
+            };
+
+            academyRecognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                input.value = (input.value ? input.value + ' ' : '') + transcript;
+            };
+
+            academyRecognition.onerror = (event) => {
+                console.error("Academy Speech recognition error:", event.error);
+                if (event.error === 'no-speech') return;
+                if (event.error === 'network') {
+                    if (typeof showToast === 'function') {
+                        showToast("Speech recognition network error. Please check your internet connection.", "warning");
+                    }
+                    return;
+                }
+                if (event.error === 'not-allowed') {
+                    if (typeof showToast === 'function') {
+                        showToast("Microphone access denied. Please enable mic permissions in browser settings.", "warning");
+                    }
+                    return;
+                }
+            };
+
+            micBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (isAcademyListening) {
+                    academyRecognition.stop();
+                } else {
+                    try {
+                        academyRecognition.start();
+                    } catch (err) {
+                        console.error("Failed to start speech recognition:", err);
+                    }
+                }
+            });
+        }
+    }
 }
 
 let academyActiveSandboxValues = {};
