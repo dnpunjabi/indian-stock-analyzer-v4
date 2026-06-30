@@ -11374,6 +11374,20 @@ tr.active-peer-row td:first-child {
     border-color: rgba(0, 0, 0, 0.15);
 }
 
+.index-card.non-clickable {
+    cursor: default !important;
+}
+.index-card.non-clickable:hover {
+    transform: none !important;
+    background: rgba(30, 41, 59, 0.25) !important;
+    border-color: var(--border-glass) !important;
+    box-shadow: none !important;
+}
+[data-theme="light"] .index-card.non-clickable:hover {
+    background: rgba(243, 244, 246, 0.6) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
 .index-name {
     font-size: 11px;
     font-weight: 600;

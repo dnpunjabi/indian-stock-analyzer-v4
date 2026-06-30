@@ -811,6 +811,7 @@ async def run_background_market_movers_updater():
             )
             
             parsed_indices = []
+            yf_raw = {}
             if not df_indices.empty:
                 is_multi_idx = isinstance(df_indices.columns, pd.MultiIndex)
                 yf_raw = {}
@@ -855,33 +856,67 @@ async def run_background_market_movers_updater():
                                 })
                     except Exception as idx_err:
                         print(f"Error parsing index {ticker} in movers task: {idx_err}")
+            
+            # Calculate Gold and Silver Futures prices in INR (including 15% cumulative import duty: 10% BCD + 5% AIDC)
+            if "GC=F" in yf_raw and "INR=X" in yf_raw:
+                gc = yf_raw["GC=F"]
+                inr = yf_raw["INR=X"]
+                gold_fut_price = (gc["price"] * inr["price"]) / 31.1034768 * 10 * 1.15
+                gold_fut_change = (gc["change"] * inr["price"]) / 31.1034768 * 10 * 1.15
+                parsed_indices.append({
+                    "symbol": "MCXGOLD",
+                    "name": "Gold Futures 10g (INR)",
+                    "price": round(gold_fut_price, 2),
+                    "change": round(gold_fut_change, 2),
+                    "change_pct": round(gc["change_pct"], 2)
+                })
 
-                # Perform Gold and Silver INR calculations
-                if "GC=F" in yf_raw and "INR=X" in yf_raw:
-                    gc = yf_raw["GC=F"]
-                    inr = yf_raw["INR=X"]
-                    gold_price_inr = (gc["price"] * inr["price"]) / 31.1034768 * 10
-                    gold_change_inr = (gc["change"] * inr["price"]) / 31.1034768 * 10
-                    parsed_indices.append({
-                        "symbol": "MCXGOLD",
-                        "name": "Gold 10g (INR)",
-                        "price": round(gold_price_inr, 2),
-                        "change": round(gold_change_inr, 2),
-                        "change_pct": round(gc["change_pct"], 2)
-                    })
+            if "SI=F" in yf_raw and "INR=X" in yf_raw:
+                si = yf_raw["SI=F"]
+                inr = yf_raw["INR=X"]
+                sil_fut_price = (si["price"] * inr["price"]) / 31.1034768 * 1000 * 1.15
+                sil_fut_change = (si["change"] * inr["price"]) / 31.1034768 * 1000 * 1.15
+                parsed_indices.append({
+                    "symbol": "MCXSILVER",
+                    "name": "Silver Futures 1kg (INR)",
+                    "price": round(sil_fut_price, 2),
+                    "change": round(sil_fut_change, 2),
+                    "change_pct": round(si["change_pct"], 2)
+                })
 
-                if "SI=F" in yf_raw and "INR=X" in yf_raw:
-                    si = yf_raw["SI=F"]
-                    inr = yf_raw["INR=X"]
-                    silver_price_inr = (si["price"] * inr["price"]) / 31.1034768 * 1000
-                    silver_change_inr = (si["change"] * inr["price"]) / 31.1034768 * 1000
+            # Append GoodReturns spot rates for Gold, Silver and Platinum
+            from backend.commodity_scraper import CommodityScraper
+            try:
+                spots = await CommodityScraper.get_prices()
+                if "gold_24k" in spots:
+                    g24 = spots["gold_24k"]
                     parsed_indices.append({
-                        "symbol": "MCXSILVER",
-                        "name": "Silver 1kg (INR)",
-                        "price": round(silver_price_inr, 2),
-                        "change": round(silver_change_inr, 2),
-                        "change_pct": round(si["change_pct"], 2)
+                        "symbol": "SPOTGOLD",
+                        "name": "Gold 24K 10g (Spot)",
+                        "price": g24["price"],
+                        "change": g24["change"],
+                        "change_pct": round(g24["change_pct"], 2)
                     })
+                if "silver_1kg" in spots:
+                    sil = spots["silver_1kg"]
+                    parsed_indices.append({
+                        "symbol": "SPOTSILVER",
+                        "name": "Silver 1kg (Spot)",
+                        "price": sil["price"],
+                        "change": sil["change"],
+                        "change_pct": round(sil["change_pct"], 2)
+                    })
+                if "platinum_10g" in spots:
+                    plat = spots["platinum_10g"]
+                    parsed_indices.append({
+                        "symbol": "PLATINUM",
+                        "name": "Platinum 10g (Spot)",
+                        "price": plat["price"],
+                        "change": plat["change"],
+                        "change_pct": round(plat["change_pct"], 2)
+                    })
+            except Exception as scrap_err:
+                print(f"Error appending GoodReturns spots to movers: {scrap_err}")
             
             with get_db() as conn:
                 cursor = conn.cursor()

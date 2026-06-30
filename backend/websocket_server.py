@@ -729,7 +729,9 @@ async def _broadcast_loop():
                 if not is_angel_active:
                     all_subs = connection_manager.get_all_subscribed_symbols()
                     for s in all_subs:
-                        if '.' not in s and not s.startswith('^') and s not in ["MCXGOLD", "MCXSILVER"]:
+                        if s in ["MCXGOLD", "MCXSILVER", "SPOTGOLD", "SPOTSILVER", "PLATINUM"]:
+                            continue
+                        if '.' not in s and not s.startswith('^'):
                             symbols_to_fetch.add(f"{s}.NS")
                         else:
                             symbols_to_fetch.add(s)
@@ -742,38 +744,76 @@ async def _broadcast_loop():
                         base_sym = yf_sym.replace(".NS", "").replace(".BO", "")
                         tick_store.update(base_sym, tick)
 
-                    # Calculate Gold and Silver in INR if the tickers are available
+                    # Calculate Gold and Silver Futures in INR (including 15% cumulative import duty: 10% BCD + 5% AIDC)
                     if "GC=F" in yf_ticks and "INR=X" in yf_ticks:
                         gc = yf_ticks["GC=F"]
                         inr = yf_ticks["INR=X"]
-                        gold_price_inr = (gc["price"] * inr["price"]) / 31.1034768 * 10
-                        gold_change_inr = (gc["change"] * inr["price"]) / 31.1034768 * 10
-                        gold_tick = {
-                            "price": round(gold_price_inr, 2),
-                            "change": round(gold_change_inr, 2),
+                        gold_fut_price = (gc["price"] * inr["price"]) / 31.1034768 * 10 * 1.15
+                        gold_fut_change = (gc["change"] * inr["price"]) / 31.1034768 * 10 * 1.15
+                        tick_store.update("MCXGOLD", {
+                            "price": round(gold_fut_price, 2),
+                            "change": round(gold_fut_change, 2),
                             "change_pct": gc["change_pct"],
-                            "high": round((gc["high"] * inr["price"]) / 31.1034768 * 10, 2),
-                            "low": round((gc["low"] * inr["price"]) / 31.1034768 * 10, 2),
+                            "high": round((gc["high"] * inr["price"]) / 31.1034768 * 10 * 1.15, 2),
+                            "low": round((gc["low"] * inr["price"]) / 31.1034768 * 10 * 1.15, 2),
                             "volume": gc["volume"],
-                            "timestamp": time.time(),
-                        }
-                        tick_store.update("MCXGOLD", gold_tick)
+                            "timestamp": time.time()
+                        })
 
                     if "SI=F" in yf_ticks and "INR=X" in yf_ticks:
                         si = yf_ticks["SI=F"]
                         inr = yf_ticks["INR=X"]
-                        silver_price_inr = (si["price"] * inr["price"]) / 31.1034768 * 1000
-                        silver_change_inr = (si["change"] * inr["price"]) / 31.1034768 * 1000
-                        silver_tick = {
-                            "price": round(silver_price_inr, 2),
-                            "change": round(silver_change_inr, 2),
+                        silver_fut_price = (si["price"] * inr["price"]) / 31.1034768 * 1000 * 1.15
+                        silver_fut_change = (si["change"] * inr["price"]) / 31.1034768 * 1000 * 1.15
+                        tick_store.update("MCXSILVER", {
+                            "price": round(silver_fut_price, 2),
+                            "change": round(silver_fut_change, 2),
                             "change_pct": si["change_pct"],
-                            "high": round((si["high"] * inr["price"]) / 31.1034768 * 1000, 2),
-                            "low": round((si["low"] * inr["price"]) / 31.1034768 * 1000, 2),
+                            "high": round((si["high"] * inr["price"]) / 31.1034768 * 1000 * 1.15, 2),
+                            "low": round((si["low"] * inr["price"]) / 31.1034768 * 1000 * 1.15, 2),
                             "volume": si["volume"],
-                            "timestamp": time.time(),
-                        }
-                        tick_store.update("MCXSILVER", silver_tick)
+                            "timestamp": time.time()
+                        })
+
+                # Get latest scraped Gold, Silver and Platinum spot prices
+                from backend.commodity_scraper import CommodityScraper
+                try:
+                    spots = await CommodityScraper.get_prices()
+                    if "gold_24k" in spots:
+                        g24 = spots["gold_24k"]
+                        tick_store.update("SPOTGOLD", {
+                            "price": g24["price"],
+                            "change": g24["change"],
+                            "change_pct": g24["change_pct"],
+                            "high": g24["price"],
+                            "low": g24["price"],
+                            "volume": 0,
+                            "timestamp": time.time()
+                        })
+                    if "silver_1kg" in spots:
+                        sil = spots["silver_1kg"]
+                        tick_store.update("SPOTSILVER", {
+                            "price": sil["price"],
+                            "change": sil["change"],
+                            "change_pct": sil["change_pct"],
+                            "high": sil["price"],
+                            "low": sil["price"],
+                            "volume": 0,
+                            "timestamp": time.time()
+                        })
+                    if "platinum_10g" in spots:
+                        plat = spots["platinum_10g"]
+                        tick_store.update("PLATINUM", {
+                            "price": plat["price"],
+                            "change": plat["change"],
+                            "change_pct": plat["change_pct"],
+                            "high": plat["price"],
+                            "low": plat["price"],
+                            "volume": 0,
+                            "timestamp": time.time()
+                        })
+                except Exception as scrap_err:
+                    logger.error(f"Error updating commodity ticks: {scrap_err}")
 
             if connection_manager.client_count == 0:
                 continue

@@ -256,8 +256,7 @@ function connectLiveTicksWS() {
         liveTicksConnected = true;
         updateConnectionIndicator('live');
         
-        // Ensure index symbols are subscribed
-        const indices = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO", "MCXGOLD", "MCXSILVER"];
+        const indices = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO", "MCXGOLD", "SPOTGOLD", "MCXSILVER", "SPOTSILVER", "PLATINUM"];
         indices.forEach(s => _wsSubscribedSymbols.add(s));
 
         // Re-subscribe to previously subscribed symbols
@@ -328,7 +327,9 @@ function handleLiveTickMessage(ticksData) {
         '^NSEBANK': { textElId: 'ticker-banknifty', label: 'BANK NIFTY' },
         '^CNXIT': { textElId: 'ticker-niftyit', label: 'NIFTY IT' },
         '^CNXINFRA': { textElId: 'ticker-niftyinfra', label: 'NIFTY INFRA' },
-        '^CNXAUTO': { textElId: 'ticker-niftyauto', label: 'NIFTY AUTO' }
+        '^CNXAUTO': { textElId: 'ticker-niftyauto', label: 'NIFTY AUTO' },
+        'SPOTGOLD': { textElId: 'ticker-spotgold', label: 'SPOT GOLD' },
+        'SPOTSILVER': { textElId: 'ticker-spotsilver', label: 'SPOT SILVER' }
     };
 
     for (const [sym, cfg] of Object.entries(indexMappings)) {
@@ -341,7 +342,8 @@ function handleLiveTickMessage(ticksData) {
                 const changeClass = isPositive ? 'change green-text' : 'change red-text';
                 const changeArrow = isPositive ? '▲' : '▼';
                 const formattedPrice = q.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                el.innerHTML = `${cfg.label}: <strong class="val">${formattedPrice}</strong> <span class="${changeClass}">${changeArrow} ${sign}${q.change_pct.toFixed(2)}%</span>`;
+                const absChange = q.change !== undefined && q.change !== null ? Math.abs(q.change).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
+                el.innerHTML = `${cfg.label}: <strong class="val">${formattedPrice}</strong> <span class="${changeClass}">${changeArrow} ${sign}${absChange} (${sign}${q.change_pct.toFixed(2)}%)</span>`;
             });
         }
     }
@@ -533,7 +535,7 @@ function handleLiveTickMessage(ticksData) {
     if (window.handleMoversLiveTick) {
         for (const [sym, q] of Object.entries(ticksData)) {
             if (q && q.price > 0) {
-                window.handleMoversLiveTick(sym, q.price, q.change_pct);
+                window.handleMoversLiveTick(sym, q.price, q.change_pct, q.change);
             }
         }
     }
@@ -28138,16 +28140,18 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                 const isPos = idx.change_pct >= 0;
                 const changeClass = isPos ? 'index-change positive' : 'index-change negative';
                 const prefix = isPos ? '+' : '';
+                const changeVal = idx.change !== undefined && idx.change !== null ? idx.change : 0;
+                const absChange = Math.abs(changeVal).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
                 card.innerHTML = `
                     <span class="index-name">${idx.name}</span>
                     <div class="index-val-row">
                         <span class="index-price" id="index-price-${idx.symbol.replace('^', '').replace('.NS','')/*.NS fallback*/}">₹${idx.price.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
-                        <span class="${changeClass}" id="index-change-${idx.symbol.replace('^', '').replace('.NS','')}">${prefix}${idx.change_pct.toFixed(2)}%</span>
+                        <span class="${changeClass}" id="index-change-${idx.symbol.replace('^', '').replace('.NS','')}">${prefix}${absChange} (${prefix}${idx.change_pct.toFixed(2)}%)</span>
                     </div>
                 `;
-                
-                if (idx.symbol !== 'MCXGOLD' && idx.symbol !== 'MCXSILVER') {
+                const isCommodity = ['MCXGOLD', 'MCXSILVER', 'SPOTGOLD', 'SPOTSILVER', 'PLATINUM'].includes(idx.symbol);
+                if (!isCommodity) {
                     card.style.cursor = 'pointer';
                     card.addEventListener('click', () => {
                         if (window.switchTab) window.switchTab('analyzer');
@@ -28175,7 +28179,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
         if (gainersTbody) {
             gainersTbody.innerHTML = '';
             if (gainersList.length === 0) {
-                gainersTbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted" style="padding: 20px;">No gainers matching filters</td></tr>`;
+                gainersTbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted" style="padding: 20px;">No gainers matching filters</td></tr>`;
             } else {
                 gainersList.forEach(stock => {
                     const tr = document.createElement('tr');
@@ -28185,7 +28189,8 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                         <td style="padding: 12px; font-weight: 700; color: var(--neon-blue);">${stock.symbol.replace('.NS', '')}</td>
                         <td style="padding: 12px; color: var(--text-primary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${stock.company_name}</td>
                         <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 600;" id="movers-price-${stock.symbol.replace('.NS', '')}">₹${stock.price.toFixed(2)}</td>
-                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--neon-green);" id="movers-change-${stock.symbol.replace('.NS', '')}">+${stock.change_pct.toFixed(2)}%</td>
+                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--neon-green);" id="movers-change-abs-${stock.symbol.replace('.NS', '')}">+₹${(stock.change || 0).toFixed(2)}</td>
+                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--neon-green);" id="movers-change-pct-${stock.symbol.replace('.NS', '')}">+${stock.change_pct.toFixed(2)}%</td>
                     `;
                     bindMoversRowEvents(tr, stock);
                     gainersTbody.appendChild(tr);
@@ -28196,7 +28201,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
         if (losersTbody) {
             losersTbody.innerHTML = '';
             if (losersList.length === 0) {
-                losersTbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted" style="padding: 20px;">No losers matching filters</td></tr>`;
+                losersTbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted" style="padding: 20px;">No losers matching filters</td></tr>`;
             } else {
                 losersList.forEach(stock => {
                     const tr = document.createElement('tr');
@@ -28206,7 +28211,8 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                         <td style="padding: 12px; font-weight: 700; color: var(--neon-blue);">${stock.symbol.replace('.NS', '')}</td>
                         <td style="padding: 12px; color: var(--text-primary); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${stock.company_name}</td>
                         <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 600;" id="movers-price-${stock.symbol.replace('.NS', '')}">₹${stock.price.toFixed(2)}</td>
-                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: #ef4444;" id="movers-change-${stock.symbol.replace('.NS', '')}">${stock.change_pct.toFixed(2)}%</td>
+                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: #ef4444;" id="movers-change-abs-${stock.symbol.replace('.NS', '')}">-₹${Math.abs(stock.change || 0).toFixed(2)}</td>
+                        <td style="padding: 12px; text-align: right; font-family: 'Outfit', sans-serif; font-weight: 700; color: #ef4444;" id="movers-change-pct-${stock.symbol.replace('.NS', '')}">${stock.change_pct.toFixed(2)}%</td>
                     `;
                     bindMoversRowEvents(tr, stock);
                     losersTbody.appendChild(tr);
@@ -28273,22 +28279,21 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
         }
         const gainersTbody = document.getElementById('top-gainers-tbody');
         const losersTbody = document.getElementById('top-losers-tbody');
-        if (gainersTbody) gainersTbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted" style="padding: 20px;">Fetching initial database sweep (approx 20s)...</td></tr>`;
-        if (losersTbody) losersTbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted" style="padding: 20px;">Fetching initial database sweep (approx 20s)...</td></tr>`;
+        if (gainersTbody) gainersTbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted" style="padding: 20px;">Fetching initial database sweep (approx 20s)...</td></tr>`;
+        if (losersTbody) losersTbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted" style="padding: 20px;">Fetching initial database sweep (approx 20s)...</td></tr>`;
     }
 
     function setupMoversWebSocketUpdates() {
-        window.handleMoversLiveTick = function(symbol, price, changePct) {
+        window.handleMoversLiveTick = function(symbol, price, changePct, changeVal) {
             const cleanSym = symbol.replace('.NS', '').replace('.BO', '').replace('^', '');
             
             // 1. Update Movers tables rows if visible
             const priceEl = document.getElementById(`movers-price-${cleanSym}`);
-            const changeEl = document.getElementById(`movers-change-${cleanSym}`);
-            if (priceEl && changeEl) {
-                const oldPrice = parseFloat(priceEl.innerText.replace('₹', ''));
+            const changeAbsEl = document.getElementById(`movers-change-abs-${cleanSym}`);
+            const changePctEl = document.getElementById(`movers-change-pct-${cleanSym}`);
+            if (priceEl) {
+                const oldPrice = parseFloat(priceEl.innerText.replace('₹', '').replace(/,/g, ''));
                 priceEl.innerText = `₹${price.toFixed(2)}`;
-                changeEl.innerText = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
-                changeEl.className = changePct >= 0 ? 'change-pct positive' : 'change-pct negative';
                 
                 // Trigger radial blink animations
                 const parentRow = priceEl.closest('tr');
@@ -28303,13 +28308,33 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                 }
             }
 
+            const colorStyle = changePct >= 0 ? 'var(--neon-green)' : '#ef4444';
+
+            if (changeAbsEl) {
+                const displayChange = changeVal !== undefined && changeVal !== null ? changeVal : (price - (price / (1 + changePct / 100)));
+                const sign = changePct >= 0 ? '+' : '-';
+                const absChange = Math.abs(displayChange).toFixed(2);
+                changeAbsEl.innerText = `${sign}₹${absChange}`;
+                changeAbsEl.style.color = colorStyle;
+            }
+
+            if (changePctEl) {
+                const sign = changePct >= 0 ? '+' : '';
+                changePctEl.innerText = `${sign}${changePct.toFixed(2)}%`;
+                changePctEl.style.color = colorStyle;
+            }
+
             // 2. Update Index cards if visible
             const idxPriceEl = document.getElementById(`index-price-${cleanSym}`);
             const idxChangeEl = document.getElementById(`index-change-${cleanSym}`);
             if (idxPriceEl && idxChangeEl) {
                 const oldPrice = parseFloat(idxPriceEl.innerText.replace('₹', '').replace(/,/g, ''));
                 idxPriceEl.innerText = `₹${price.toLocaleString('en-IN', {minimumFractionDigits:2})}`;
-                idxChangeEl.innerText = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
+                
+                const displayChange = changeVal !== undefined && changeVal !== null ? changeVal : 0;
+                const sign = changePct >= 0 ? '+' : '-';
+                const absChange = Math.abs(displayChange).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+                idxChangeEl.innerText = `${sign}${absChange} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`;
                 idxChangeEl.className = changePct >= 0 ? 'index-change positive' : 'index-change negative';
 
                 const cardEl = idxPriceEl.closest('.index-card');
