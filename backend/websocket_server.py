@@ -715,7 +715,7 @@ async def _broadcast_loop():
                 
                 symbols_to_fetch = set()
                 # Always fetch index tickers
-                indices = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO"]
+                indices = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO", "GC=F", "SI=F", "INR=X"]
                 symbols_to_fetch.update(indices)
                 
                 # If Angel One is not authenticated or not active, fetch active subscriptions as fallback
@@ -729,7 +729,7 @@ async def _broadcast_loop():
                 if not is_angel_active:
                     all_subs = connection_manager.get_all_subscribed_symbols()
                     for s in all_subs:
-                        if '.' not in s and not s.startswith('^'):
+                        if '.' not in s and not s.startswith('^') and s not in ["MCXGOLD", "MCXSILVER"]:
                             symbols_to_fetch.add(f"{s}.NS")
                         else:
                             symbols_to_fetch.add(s)
@@ -741,6 +741,39 @@ async def _broadcast_loop():
                         # Also map base symbol (e.g. TCS) for clients subscribing to plain ticker
                         base_sym = yf_sym.replace(".NS", "").replace(".BO", "")
                         tick_store.update(base_sym, tick)
+
+                    # Calculate Gold and Silver in INR if the tickers are available
+                    if "GC=F" in yf_ticks and "INR=X" in yf_ticks:
+                        gc = yf_ticks["GC=F"]
+                        inr = yf_ticks["INR=X"]
+                        gold_price_inr = (gc["price"] * inr["price"]) / 31.1034768 * 10
+                        gold_change_inr = (gc["change"] * inr["price"]) / 31.1034768 * 10
+                        gold_tick = {
+                            "price": round(gold_price_inr, 2),
+                            "change": round(gold_change_inr, 2),
+                            "change_pct": gc["change_pct"],
+                            "high": round((gc["high"] * inr["price"]) / 31.1034768 * 10, 2),
+                            "low": round((gc["low"] * inr["price"]) / 31.1034768 * 10, 2),
+                            "volume": gc["volume"],
+                            "timestamp": time.time(),
+                        }
+                        tick_store.update("MCXGOLD", gold_tick)
+
+                    if "SI=F" in yf_ticks and "INR=X" in yf_ticks:
+                        si = yf_ticks["SI=F"]
+                        inr = yf_ticks["INR=X"]
+                        silver_price_inr = (si["price"] * inr["price"]) / 31.1034768 * 1000
+                        silver_change_inr = (si["change"] * inr["price"]) / 31.1034768 * 1000
+                        silver_tick = {
+                            "price": round(silver_price_inr, 2),
+                            "change": round(silver_change_inr, 2),
+                            "change_pct": si["change_pct"],
+                            "high": round((si["high"] * inr["price"]) / 31.1034768 * 1000, 2),
+                            "low": round((si["low"] * inr["price"]) / 31.1034768 * 1000, 2),
+                            "volume": si["volume"],
+                            "timestamp": time.time(),
+                        }
+                        tick_store.update("MCXSILVER", silver_tick)
 
             if connection_manager.client_count == 0:
                 continue

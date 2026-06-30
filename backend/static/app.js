@@ -257,7 +257,7 @@ function connectLiveTicksWS() {
         updateConnectionIndicator('live');
         
         // Ensure index symbols are subscribed
-        const indices = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO"];
+        const indices = ["^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO", "MCXGOLD", "MCXSILVER"];
         indices.forEach(s => _wsSubscribedSymbols.add(s));
 
         // Re-subscribe to previously subscribed symbols
@@ -28147,10 +28147,15 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                     </div>
                 `;
                 
-                card.addEventListener('click', () => {
-                    if (window.switchTab) window.switchTab('analyzer');
-                    if (window.loadStockAnalyzer) window.loadStockAnalyzer(idx.symbol);
-                });
+                if (idx.symbol !== 'MCXGOLD' && idx.symbol !== 'MCXSILVER') {
+                    card.style.cursor = 'pointer';
+                    card.addEventListener('click', () => {
+                        if (window.switchTab) window.switchTab('analyzer');
+                        if (window.loadStockAnalyzer) window.loadStockAnalyzer(idx.symbol);
+                    });
+                } else {
+                    card.classList.add('non-clickable');
+                }
 
                 indexGrid.appendChild(card);
             });

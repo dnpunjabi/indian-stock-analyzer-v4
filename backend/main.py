@@ -784,7 +784,7 @@ async def run_background_market_movers_updater():
                 "^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXPHARMA", 
                 "^CNXFMCG", "^CNXMETAL", "^CNXAUTO", "^CNXREALTY", 
                 "^CNXINFRA", "^CNXENERGY", "^CNXFIN", "^CNXPSUBANK", 
-                "^CNXMEDIA", "^CNXCONSUM"
+                "^CNXMEDIA", "^CNXCONSUM", "GC=F", "SI=F", "INR=X"
             ]
             index_names = {
                 "^NSEI": "Nifty 50",
@@ -813,26 +813,75 @@ async def run_background_market_movers_updater():
             parsed_indices = []
             if not df_indices.empty:
                 is_multi_idx = isinstance(df_indices.columns, pd.MultiIndex)
+                yf_raw = {}
                 for ticker in indices_tickers:
                     try:
                         if is_multi_idx:
                             close_series = df_indices['Close'][ticker].dropna()
+                            high_series = df_indices['High'][ticker].dropna() if 'High' in df_indices.columns.get_level_values(0) else pd.Series()
+                            low_series = df_indices['Low'][ticker].dropna() if 'Low' in df_indices.columns.get_level_values(0) else pd.Series()
+                            volume_series = df_indices['Volume'][ticker].dropna() if 'Volume' in df_indices.columns.get_level_values(0) else pd.Series()
                         else:
                             close_series = df_indices['Close'].dropna()
+                            high_series = df_indices['High'].dropna() if 'High' in df_indices.columns else pd.Series()
+                            low_series = df_indices['Low'].dropna() if 'Low' in df_indices.columns else pd.Series()
+                            volume_series = df_indices['Volume'].dropna() if 'Volume' in df_indices.columns else pd.Series()
+
                         if not close_series.empty:
                             price = float(close_series.iloc[-1])
                             prev_close = float(close_series.iloc[-2]) if len(close_series) >= 2 else price
                             change = price - prev_close
                             change_pct = (change / prev_close * 100.0) if prev_close > 0 else 0.0
-                            parsed_indices.append({
-                                "symbol": ticker,
-                                "name": index_names[ticker],
-                                "price": round(price, 2),
-                                "change": round(change, 2),
-                                "change_pct": round(change_pct, 2)
-                            })
+                            high = float(high_series.iloc[-1]) if not high_series.empty else price
+                            low = float(low_series.iloc[-1]) if not low_series.empty else price
+                            volume = int(volume_series.iloc[-1]) if not volume_series.empty else 0
+
+                            yf_raw[ticker] = {
+                                "price": price,
+                                "change": change,
+                                "change_pct": change_pct,
+                                "high": high,
+                                "low": low,
+                                "volume": volume
+                            }
+
+                            if ticker in index_names:
+                                parsed_indices.append({
+                                    "symbol": ticker,
+                                    "name": index_names[ticker],
+                                    "price": round(price, 2),
+                                    "change": round(change, 2),
+                                    "change_pct": round(change_pct, 2)
+                                })
                     except Exception as idx_err:
                         print(f"Error parsing index {ticker} in movers task: {idx_err}")
+
+                # Perform Gold and Silver INR calculations
+                if "GC=F" in yf_raw and "INR=X" in yf_raw:
+                    gc = yf_raw["GC=F"]
+                    inr = yf_raw["INR=X"]
+                    gold_price_inr = (gc["price"] * inr["price"]) / 31.1034768 * 10
+                    gold_change_inr = (gc["change"] * inr["price"]) / 31.1034768 * 10
+                    parsed_indices.append({
+                        "symbol": "MCXGOLD",
+                        "name": "Gold 10g (INR)",
+                        "price": round(gold_price_inr, 2),
+                        "change": round(gold_change_inr, 2),
+                        "change_pct": round(gc["change_pct"], 2)
+                    })
+
+                if "SI=F" in yf_raw and "INR=X" in yf_raw:
+                    si = yf_raw["SI=F"]
+                    inr = yf_raw["INR=X"]
+                    silver_price_inr = (si["price"] * inr["price"]) / 31.1034768 * 1000
+                    silver_change_inr = (si["change"] * inr["price"]) / 31.1034768 * 1000
+                    parsed_indices.append({
+                        "symbol": "MCXSILVER",
+                        "name": "Silver 1kg (INR)",
+                        "price": round(silver_price_inr, 2),
+                        "change": round(silver_change_inr, 2),
+                        "change_pct": round(si["change_pct"], 2)
+                    })
             
             with get_db() as conn:
                 cursor = conn.cursor()

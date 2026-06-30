@@ -14401,4 +14401,22 @@ details[open] .academy-hud-arrow {
     border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
+.index-card.non-clickable {
+    cursor: default !important;
+}
+
+.index-card.non-clickable:hover {
+    transform: none !important;
+    background: rgba(30, 41, 59, 0.25) !important;
+    border-color: var(--border-glass) !important;
+    box-shadow: none !important;
+}
+
+[data-theme="light"] .index-card.non-clickable:hover,
+[data-mode="light"] .index-card.non-clickable:hover {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-color: rgba(0, 0, 0, 0.12) !important;
+    box-shadow: none !important;
+}
+
 
