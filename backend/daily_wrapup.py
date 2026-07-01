@@ -324,9 +324,10 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
     # 2. Gather market indices
     indices_str = ""
     breadth_str = ""
-    global _MARKET_MOVERS_CACHE
-    if _MARKET_MOVERS_CACHE and _MARKET_MOVERS_CACHE.get("status") == "success":
-        indices = _MARKET_MOVERS_CACHE.get("indices", [])
+    import backend.main as bmain
+    cache = bmain._MARKET_MOVERS_CACHE
+    if cache and cache.get("status") == "success":
+        indices = cache.get("indices", [])
         for idx in indices[:4]:
             indices_str += f"• {idx['name']}:   `{idx['price']:.2f} ({idx['change_pct']:+.2f}%)`\n"
         
@@ -344,21 +345,49 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
         if comm_items:
             indices_str += "✨ *Commodities Spot Rates:*\n" + "\n".join(comm_items) + "\n"
 
-        adv = _MARKET_MOVERS_CACHE.get("advances", 0)
-        dec = _MARKET_MOVERS_CACHE.get("declines", 0)
+        adv = cache.get("advances", 0)
+        dec = cache.get("declines", 0)
         breadth_str = f"📈 _Breadth: {adv} Advances | {dec} Declines_"
     else:
-        # yfinance fallback for Nifty 50
+        # Robust fallback fetching multiple indices & spot commodities
         try:
-            nifty = yf.Ticker("^NSEI")
-            hist = nifty.history(period="2d")
-            if len(hist) >= 2:
-                curr = hist["Close"].iloc[-1]
-                prev = hist["Close"].iloc[-2]
-                pct = (curr - prev) / prev * 100.0
-                indices_str += f"• Nifty 50:   `{curr:.2f} ({pct:+.2f}%)`\n"
-        except Exception:
+            # 1. Fetch Nifty 50 and Sensex from yfinance in batch
+            ticks = yf.download(["^NSEI", "^BSESN"], period="2d", interval="1d", progress=False)
+            if not ticks.empty:
+                for sym, name in [("^NSEI", "Nifty 50"), ("^BSESN", "BSE Sensex")]:
+                    try:
+                        # Handle multi-index or single index DataFrame
+                        if isinstance(ticks.columns, pd.MultiIndex):
+                            curr = ticks["Close"][sym].iloc[-1]
+                            prev = ticks["Close"][sym].iloc[-2]
+                        else:
+                            curr = ticks["Close"].iloc[-1]
+                            prev = ticks["Close"].iloc[-2]
+                        pct = (curr - prev) / prev * 100.0
+                        indices_str += f"• {name}:   `{curr:.2f} ({pct:+.2f}%)`\n"
+                    except Exception:
+                        pass
+            if not indices_str:
+                indices_str = "• Nifty 50: N/A\n"
+        except Exception as e:
+            print(f"Daily Wrap-up: Fallback index download error: {e}")
             indices_str = "• Nifty 50: N/A\n"
+            
+        # 2. Fetch Spot Gold & Silver from GoodReturns scraper
+        try:
+            from backend.commodity_scraper import CommodityScraper
+            spots = await CommodityScraper.get_prices()
+            comm_items = []
+            if "gold_24k" in spots:
+                g = spots["gold_24k"]
+                comm_items.append(f"  - Gold 24K 10g (Spot): `{float(g['price']):,.2f} ({g['change_pct']:+.2f}%)`")
+            if "silver_1kg" in spots:
+                s = spots["silver_1kg"]
+                comm_items.append(f"  - Silver 1kg (Spot): `{float(s['price']):,.2f} ({s['change_pct']:+.2f}%)`")
+            if comm_items:
+                indices_str += "✨ *Commodities Spot Rates:*\n" + "\n".join(comm_items) + "\n"
+        except Exception as e:
+            print(f"Daily Wrap-up: Fallback commodity scrape error: {e}")
 
     # 3. Gather Portfolio stats
     port = fetch_portfolio_summary()
