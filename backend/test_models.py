@@ -1829,5 +1829,86 @@ class TestRuleScannerAPI(unittest.TestCase):
         self.assertIn("3Y", perf_res)
 
 
+class TestWhatsAppDailyWrapup(unittest.TestCase):
+    
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(app)
+        main.init_db()
+
+    def setUp(self):
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM alert_settings WHERE key LIKE 'daily_wrapup_%'")
+            cursor.execute("DELETE FROM portfolio_items")
+            cursor.execute("DELETE FROM watchlist_items")
+            conn.commit()
+
+    def test_settings_flow(self):
+        """Verifies retrieving and saving daily wrap-up schedule settings."""
+        # 1. Check default seeded state
+        res = self.client.get("/api/alerts/daily-wrapup/settings")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("enabled", data)
+        self.assertIn("time", data)
+        self.assertIn("persona", data)
+
+        # 2. Save new settings
+        payload = {"enabled": False, "time": "17:30", "persona": "momentum"}
+        post_res = self.client.post("/api/alerts/daily-wrapup/settings", json=payload)
+        self.assertEqual(post_res.status_code, 200)
+        self.assertEqual(post_res.json()["status"], "success")
+
+        # 3. Retrieve and verify updated settings
+        get_res = self.client.get("/api/alerts/daily-wrapup/settings")
+        self.assertEqual(get_res.status_code, 200)
+        updated = get_res.json()
+        self.assertFalse(updated["enabled"])
+        self.assertEqual(updated["time"], "17:30")
+        self.assertEqual(updated["persona"], "momentum")
+
+    @patch("backend.daily_wrapup.yf.download")
+    @patch("backend.daily_wrapup.call_llm")
+    def test_trigger_wrapup(self, mock_llm, mock_yf_download):
+        """Verifies compilation flow of the wrap-up summary."""
+        # Setup mocks
+        mock_llm.return_value = "AI commentary: Markets consolidated inside positive momentum channels."
+        
+        import pandas as pd
+        closes = [100.0, 105.0]
+        dates = pd.date_range(end="2026-06-15", periods=2)
+        mock_df = pd.DataFrame({"Close": closes}, index=dates)
+        
+        mock_yf_download.return_value = mock_df
+
+        # Seed a portfolio item
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO watchlists (id, name) VALUES (?, ?)",
+                (1, "Default Watchlist")
+            )
+            cursor.execute(
+                "INSERT INTO portfolio_items (symbol, name, sector, quantity, purchase_price, transaction_type) VALUES (?, ?, ?, ?, ?, ?)",
+                ("INFY.NS", "Infosys Ltd", "Technology", 10, 100.0, "buy")
+            )
+            cursor.execute(
+                "INSERT INTO watchlist_items (watchlist_id, symbol, name, sector) VALUES (?, ?, ?, ?)",
+                (1, "TCS.NS", "Tata Consultancy Services", "Technology")
+            )
+            conn.commit()
+
+        # Trigger wrap-up
+        res = self.client.post("/api/alerts/daily-wrapup/trigger")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("message_body", data)
+        self.assertIn("APEX EQUITIES WORKSTATION", data["message_body"])
+        self.assertIn("PORTFOLIO DAILY STATUS", data["message_body"])
+        self.assertIn("AI COPILOT BRIEFING", data["message_body"])
+
+
 if __name__ == "__main__":
     unittest.main()

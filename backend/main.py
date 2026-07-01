@@ -382,6 +382,14 @@ def init_db():
         except Exception:
             pass
             
+        # Seed default WhatsApp daily wrap up configurations
+        try:
+            cursor.execute("INSERT OR IGNORE INTO alert_settings (key, value) VALUES ('daily_wrapup_enabled', 'true')")
+            cursor.execute("INSERT OR IGNORE INTO alert_settings (key, value) VALUES ('daily_wrapup_time', '16:00')")
+            cursor.execute("INSERT OR IGNORE INTO alert_settings (key, value) VALUES ('daily_wrapup_persona', 'institutional')")
+        except Exception as e:
+            print(f"Error seeding daily wrap up configurations: {e}")
+            
         conn.commit()
  
 init_db()
@@ -769,6 +777,73 @@ def is_indian_market_hours() -> bool:
     if 555 <= total_minutes <= 930:
         return True
     return False
+
+async def run_background_daily_wrapup_scheduler():
+    """
+    Asynchronous loop that sweeps every 5 minutes.
+    Checks if daily wrap-up is enabled and if the current time is past
+    the configured trigger time (default 16:00 IST) on a weekday, and
+    sends the summary if it hasn't been sent today.
+    """
+    await asyncio.sleep(15)  # Let startup warming finish
+    print("Background WhatsApp daily wrap-up scheduler started.")
+    
+    while True:
+        try:
+            enabled = "true"
+            trigger_time_str = "16:00"
+            last_sent = ""
+            
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT key, value FROM alert_settings WHERE key IN ('daily_wrapup_enabled', 'daily_wrapup_time', 'daily_wrapup_last_sent')")
+                for row in cursor.fetchall():
+                    if row["key"] == "daily_wrapup_enabled":
+                        enabled = row["value"]
+                    elif row["key"] == "daily_wrapup_time":
+                        trigger_time_str = row["value"]
+                    elif row["key"] == "daily_wrapup_last_sent":
+                        last_sent = row["value"]
+            
+            if enabled.lower() == "true":
+                from datetime import datetime, timedelta
+                now_utc = datetime.utcnow()
+                now_ist = now_utc + timedelta(hours=5, minutes=30)
+                
+                # Check if weekday (Mon-Fri)
+                if now_ist.weekday() < 5:
+                    today_str = now_ist.strftime("%Y-%m-%d")
+                    if last_sent != today_str:
+                        try:
+                            t_parts = trigger_time_str.split(":")
+                            target_hour = int(t_parts[0])
+                            target_minute = int(t_parts[1])
+                            
+                            current_minutes = now_ist.hour * 60 + now_ist.minute
+                            target_minutes = target_hour * 60 + target_minute
+                            
+                            # Trigger if past target, but not too late (within 2 hours) to avoid stale boots
+                            if target_minutes <= current_minutes <= (target_minutes + 120):
+                                print(f"Daily Wrap-up: Scheduled trigger time reached ({trigger_time_str} IST). Starting dispatch...")
+                                from backend.daily_wrapup import generate_daily_wrapup_text, send_whatsapp_wrapup
+                                
+                                msg = await generate_daily_wrapup_text()
+                                res = await send_whatsapp_wrapup(msg)
+                                if res.get("status") == "success":
+                                    print(f"Daily Wrap-up: Successfully sent on schedule to WhatsApp. Msg ID: {res.get('message_id')}")
+                                    with get_db() as conn:
+                                        cursor = conn.cursor()
+                                        cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_last_sent', ?)", (today_str,))
+                                        conn.commit()
+                                else:
+                                    print(f"Daily Wrap-up: Scheduled dispatch failed: {res.get('message')}. Retrying in next sweep.")
+                        except Exception as parse_err:
+                            print(f"Daily Wrap-up: Error parsing trigger time or checking date: {parse_err}")
+                            
+        except Exception as loop_err:
+            print(f"Daily Wrap-up: Background scheduler loop error: {loop_err}")
+            
+        await asyncio.sleep(300)  # Sweep every 5 minutes
 
 async def run_background_market_movers_updater():
     """
@@ -1510,6 +1585,8 @@ async def startup_warm_caching():
     asyncio.create_task(asyncio.to_thread(update_nse_bulk_block_deals))
     asyncio.create_task(asyncio.to_thread(update_sector_regime_stats))
     asyncio.create_task(run_background_market_movers_updater())
+    # 4.5 Fire background WhatsApp daily wrap-up scheduler
+    asyncio.create_task(run_background_daily_wrapup_scheduler())
 
     # 5. Initialize Angel One real-time WebSocket feed (optional)
     angel_api_key = os.environ.get("ANGEL_API_KEY", "")
@@ -4228,6 +4305,91 @@ async def test_whatsapp():
             raise HTTPException(status_code=resp.status_code, detail=f"WhatsApp API error: {error_msg}")
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Network error sending WhatsApp test: {str(e)}")
+
+@app.get("/api/alerts/daily-wrapup/settings")
+async def get_daily_wrapup_settings():
+    """Returns WhatsApp Daily Wrap-Up schedule and activation settings."""
+    enabled = "true"
+    trigger_time = "16:00"
+    persona = "institutional"
+    last_sent = ""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT key, value FROM alert_settings WHERE key IN ('daily_wrapup_enabled', 'daily_wrapup_time', 'daily_wrapup_persona', 'daily_wrapup_last_sent')")
+        for row in cursor.fetchall():
+            if row["key"] == "daily_wrapup_enabled":
+                enabled = row["value"]
+            elif row["key"] == "daily_wrapup_time":
+                trigger_time = row["value"]
+            elif row["key"] == "daily_wrapup_persona":
+                persona = row["value"]
+            elif row["key"] == "daily_wrapup_last_sent":
+                last_sent = row["value"]
+    
+    return {
+        "enabled": enabled.lower() == "true",
+        "time": trigger_time,
+        "persona": persona,
+        "last_sent": last_sent
+    }
+
+@app.post("/api/alerts/daily-wrapup/settings")
+async def save_daily_wrapup_settings(payload: dict):
+    """Updates daily wrap-up schedule and activation state in SQLite."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if "enabled" in payload:
+            val = "true" if payload["enabled"] else "false"
+            cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_enabled', ?)", (val,))
+        if "time" in payload:
+            cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_time', ?)", (payload["time"],))
+        if "persona" in payload:
+            cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_persona', ?)", (payload["persona"],))
+        conn.commit()
+    return {"status": "success"}
+
+@app.post("/api/alerts/daily-wrapup/trigger")
+async def trigger_daily_wrapup(payload: Optional[dict] = None):
+    """Manually compiles the daily wrap-up summary and dispatches to WhatsApp."""
+    from backend.daily_wrapup import generate_daily_wrapup_text, send_whatsapp_wrapup
+    try:
+        persona_override = None
+        if payload and "persona" in payload:
+            persona_override = payload["persona"]
+        msg = await generate_daily_wrapup_text(persona_override=persona_override)
+        wa_token = os.environ.get("WHATSAPP_TOKEN", "")
+        wa_phone_id = os.environ.get("WHATSAPP_PHONE_ID", "")
+        wa_recipient = os.environ.get("WHATSAPP_RECIPIENT", "")
+        
+        dispatch_status = "skipped"
+        dispatch_error = None
+        message_id = None
+        
+        if wa_token and wa_phone_id and wa_recipient:
+            res = await send_whatsapp_wrapup(msg)
+            dispatch_status = res.get("status", "error")
+            if dispatch_status == "success":
+                message_id = res.get("message_id")
+                # Record dispatch in database
+                today_str = datetime.now().strftime("%Y-%m-%d")
+                with get_db() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_last_sent', ?)", (today_str,))
+                    conn.commit()
+            else:
+                dispatch_error = res.get("message", "Unknown dispatch failure")
+        else:
+            dispatch_error = "WhatsApp credentials not configured in environment variables."
+            
+        return {
+            "status": "success",
+            "message_body": msg,
+            "dispatch_status": dispatch_status,
+            "message_id": message_id,
+            "error": dispatch_error
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Daily Wrap-up Generation failed: {str(e)}")
 
 @app.delete("/api/alerts/{alert_id}")
 async def delete_alert(alert_id: str):

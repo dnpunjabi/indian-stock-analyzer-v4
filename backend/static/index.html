@@ -3697,6 +3697,98 @@
                                 </span>
                             </div>
                         </div>
+                        
+                        <!-- WhatsApp Daily Wrap-Up Card -->
+                        <div class="card" id="whatsapp-wrapup-card" style="margin-top: 15px; border: 1px solid rgba(37, 211, 102, 0.15); background: rgba(37, 211, 102, 0.01);">
+                            <style>
+                                #whatsapp-wrapup-card .switch-toggle input:checked + .slider-toggle-round {
+                                    background-color: #25d366 !important;
+                                    border-color: #25d366 !important;
+                                }
+                                #whatsapp-wrapup-card .slider-toggle-round::before {
+                                    content: "";
+                                    position: absolute;
+                                    height: 12px;
+                                    width: 12px;
+                                    left: 2px;
+                                    bottom: 2px;
+                                    background-color: white;
+                                    transition: .3s;
+                                    border-radius: 50%;
+                                }
+                                #whatsapp-wrapup-card .switch-toggle input:checked + .slider-toggle-round::before {
+                                    transform: translateX(16px);
+                                }
+                                [data-theme="light"] #save-wrapup-settings-btn {
+                                    background: #2563eb !important;
+                                    color: white !important;
+                                    border: none !important;
+                                }
+                                [data-theme="light"] #trigger-wrapup-now-btn {
+                                    background: #10b981 !important;
+                                    color: white !important;
+                                    border: none !important;
+                                }
+                                [data-theme="light"] #wrapup-preview-text {
+                                    background: #1e293b !important;
+                                    color: #a9dfbf !important;
+                                    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+                                }
+                            </style>
+                            <h3 style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                                <span>📈 DAILY CLOSING WRAP-UP</span>
+                            </h3>
+                            <p class="helper-text" style="margin-bottom: 12px; margin-top: 5px;">Configure automated WhatsApp summaries at market close.</p>
+                            
+                            <!-- Toggle switch -->
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 6px 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px;">
+                                <span style="font-size: 11px; font-weight: 600; color: var(--text-primary);">Enable Daily Dispatch</span>
+                                <label class="switch-toggle" style="position: relative; display: inline-block; width: 34px; height: 18px; margin-bottom: 0;">
+                                    <input type="checkbox" id="wrapup-enabled" style="opacity: 0; width: 0; height: 0;">
+                                    <span class="slider-toggle-round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 18px; border: 1px solid var(--border-glass);"></span>
+                                </label>
+                            </div>
+                            
+                            <!-- Time picker -->
+                            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                                <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Dispatch Time (IST)</span>
+                                    <input type="time" id="wrapup-time" style="font-size: 11px; padding: 4px 8px; background: var(--bg-glass-input); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-primary); outline: none; height: 28px; box-sizing: border-box; font-family: inherit;">
+                                </div>
+                                <div style="flex: 1.2; display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">AI Commentary Persona</span>
+                                    <select id="wrapup-persona" style="font-size: 11px; padding: 4px 8px; background: var(--bg-glass-input); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-primary); cursor: pointer; outline: none; height: 28px; box-sizing: border-box; font-family: inherit;">
+                                        <option value="institutional">Institutional Analyst</option>
+                                        <option value="momentum">Momentum Swing Trader</option>
+                                        <option value="macro">Macro & Commodities</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Save settings button -->
+                            <button type="button" class="btn-primary" id="save-wrapup-settings-btn" style="width: 100%; height: 28px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 8px; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.3); background: rgba(59, 130, 246, 0.2); cursor: pointer;">
+                                Save Schedule Settings
+                            </button>
+                            
+                            <!-- On-demand trigger button -->
+                            <button type="button" class="btn-secondary" id="trigger-wrapup-now-btn" style="width: 100%; height: 28px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 10px; border-radius: 4px; border: 1px solid rgba(37, 211, 102, 0.2); background: rgba(37, 211, 102, 0.08); color: #25d366; cursor: pointer;">
+                                🚀 Send & Preview On-Demand Wrap-Up
+                            </button>
+                            
+                            <!-- Last Sent status -->
+                            <div style="font-size: 9px; color: var(--text-secondary); text-align: center; margin-bottom: 8px;" id="wrapup-last-sent-lbl">
+                                Last dispatched: Never
+                            </div>
+                            
+                            <!-- Live Preview Box -->
+                            <div id="wrapup-preview-container" style="display: none; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 10px; margin-top: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <span style="font-size: 9px; font-weight: 700; color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.05em;">WhatsApp Payload Preview</span>
+                                    <button type="button" id="close-wrapup-preview-btn" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 10px; font-weight: bold; outline: none; padding: 2px;">×</button>
+                                </div>
+                                <pre id="wrapup-preview-text" style="font-size: 10px; font-family: monospace; background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 6px; padding: 10px; color: #a9dfbf; white-space: pre-wrap; word-break: break-all; margin: 0; max-height: 200px; overflow-y: auto; text-align: left;"></pre>
+                            </div>
+                        </div>
                     </div>
                 </div> <!-- Closes alerts-grid -->
 

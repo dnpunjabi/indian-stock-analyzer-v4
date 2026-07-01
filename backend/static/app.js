@@ -9633,6 +9633,8 @@ function setupAlertCenter() {
 
     setupAlertsTableSorting();
     fetchWhatsAppSettings();
+    fetchDailyWrapupSettings();
+    setupDailyWrapupListeners();
     fetchAlertsList();
     startRealTimeAlertScanner();
 
@@ -10315,6 +10317,118 @@ async function fetchWhatsAppSettings() {
         const statusText = document.getElementById('whatsapp-status-text');
         if (statusBadge) statusBadge.className = 'whatsapp-status-badge disconnected';
         if (statusText) statusText.textContent = 'Error';
+    }
+}
+
+async function fetchDailyWrapupSettings() {
+    try {
+        const response = await fetch('/api/alerts/daily-wrapup/settings');
+        if (!response.ok) return;
+        const data = await response.json();
+
+        const enabledChkbx = document.getElementById('wrapup-enabled');
+        const timeInput = document.getElementById('wrapup-time');
+        const personaSelect = document.getElementById('wrapup-persona');
+        const lastSentLbl = document.getElementById('wrapup-last-sent-lbl');
+
+        if (enabledChkbx) enabledChkbx.checked = data.enabled;
+        if (timeInput) timeInput.value = data.time;
+        if (personaSelect) personaSelect.value = data.persona;
+        if (lastSentLbl) {
+            lastSentLbl.textContent = data.last_sent ? `Last dispatched: ${data.last_sent}` : "Last dispatched: Never";
+        }
+    } catch (err) {
+        console.error("Failed to fetch daily wrap-up settings:", err);
+    }
+}
+
+function setupDailyWrapupListeners() {
+    const saveBtn = document.getElementById('save-wrapup-settings-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            const enabled = document.getElementById('wrapup-enabled')?.checked;
+            const time = document.getElementById('wrapup-time')?.value;
+            const persona = document.getElementById('wrapup-persona')?.value;
+
+            if (!time) {
+                showToast("Please enter a valid dispatch time.", "error");
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/alerts/daily-wrapup/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled, time, persona })
+                });
+
+                if (response.ok) {
+                    showToast("Daily Wrap-Up settings updated successfully.", "success");
+                    await fetchDailyWrapupSettings();
+                } else {
+                    showToast("Failed to save wrap-up settings.", "error");
+                }
+            } catch (err) {
+                console.error("Error saving wrap-up settings:", err);
+                showToast("Error updating wrap-up settings.", "error");
+            }
+        });
+    }
+
+    const triggerBtn = document.getElementById('trigger-wrapup-now-btn');
+    if (triggerBtn) {
+        triggerBtn.addEventListener('click', async () => {
+            triggerBtn.disabled = true;
+            const originalText = triggerBtn.textContent;
+            triggerBtn.textContent = "⌛ Compiling & Dispatching...";
+
+            try {
+                showToast("Triggering on-demand wrap-up summary...", "info");
+                const persona = document.getElementById('wrapup-persona')?.value;
+                const response = await fetch('/api/alerts/daily-wrapup/trigger', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ persona })
+                });
+                if (!response.ok) {
+                    const errData = await response.json();
+                    showToast(errData.detail || "Trigger failed.", "error");
+                    return;
+                }
+
+                const data = await response.json();
+                
+                // Show preview box
+                const previewContainer = document.getElementById('wrapup-preview-container');
+                const previewText = document.getElementById('wrapup-preview-text');
+                if (previewContainer && previewText) {
+                    previewText.textContent = data.message_body;
+                    previewContainer.style.display = 'block';
+                }
+
+                if (data.dispatch_status === "success") {
+                    showToast("Wrap-up dispatched successfully to WhatsApp!", "success");
+                } else {
+                    showToast(`Wrap-up compiled but not sent: ${data.error}`, "warning");
+                }
+
+                await fetchDailyWrapupSettings();
+            } catch (err) {
+                console.error("Error triggering daily wrap-up:", err);
+                showToast("Failed to compile or dispatch wrap-up.", "error");
+            } finally {
+                triggerBtn.disabled = false;
+                triggerBtn.textContent = originalText;
+            }
+        });
+    }
+
+    const closePreviewBtn = document.getElementById('close-wrapup-preview-btn');
+    if (closePreviewBtn) {
+        closePreviewBtn.addEventListener('click', () => {
+            const previewContainer = document.getElementById('wrapup-preview-container');
+            if (previewContainer) previewContainer.style.display = 'none';
+        });
     }
 }
 
