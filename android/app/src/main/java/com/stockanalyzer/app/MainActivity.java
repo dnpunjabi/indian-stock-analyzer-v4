@@ -308,16 +308,18 @@ class TtsInterface implements TextToSpeech.OnInitListener {
             if (voices != null) {
                 for (Voice voice : voices) {
                     if (voice.getLocale() != null && 
-                        "en".equalsIgnoreCase(voice.getLocale().getLanguage()) && 
-                        "IN".equalsIgnoreCase(voice.getLocale().getCountry())) {
+                        "en".equalsIgnoreCase(voice.getLocale().getLanguage())) {
                         JSONObject obj = new JSONObject();
                         obj.put("name", voice.getName());
+                        
+                        String country = voice.getLocale().getCountry();
+                        obj.put("country", country != null ? country : "");
                         
                         // Heuristic determination of gender based on voice name suffix/components
                         String nameLower = voice.getName().toLowerCase();
                         String gender = "female"; // Default fallback
                         
-                        if (nameLower.contains("gnd") || nameLower.contains("cxx") || nameLower.contains("tct") || nameLower.contains("male") || nameLower.contains("ene") || nameLower.contains("gde")) {
+                        if (nameLower.contains("gnd") || nameLower.contains("cxx") || nameLower.contains("tct") || nameLower.contains("male") || nameLower.contains("ene") || nameLower.contains("gde") || nameLower.contains("david") || nameLower.contains("ravi") || nameLower.contains("rishi") || nameLower.contains("prabhat") || nameLower.contains("harman") || nameLower.contains("george") || nameLower.contains("mark") || nameLower.contains("daniel") || nameLower.contains("richard") || nameLower.contains("james") || nameLower.contains("oliver") || nameLower.contains("peter") || nameLower.contains("harry") || nameLower.contains("john") || nameLower.contains("steven") || nameLower.contains("stefan")) {
                             gender = "male";
                         }
                         obj.put("gender", gender);

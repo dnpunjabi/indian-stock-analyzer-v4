@@ -3148,20 +3148,57 @@ window.SpeechPlayer = {
                 
                 voiceSelect.innerHTML = '<option value="default">Default Indian</option>';
                 
-                let maleCount = 0;
-                let femaleCount = 0;
+                let inMaleCount = 0, inFemaleCount = 0;
+                let usMaleCount = 0, usFemaleCount = 0;
+                let gbMaleCount = 0, gbFemaleCount = 0;
+                let generalMaleCount = 0, generalFemaleCount = 0;
                 
                 nativeVoices.forEach((v) => {
                     const option = document.createElement('option');
                     option.value = v.name;
                     
-                    if (v.gender === 'male') {
-                        maleCount++;
-                        option.textContent = `🇮🇳 Male Voice ${maleCount}`;
+                    const country = (v.country || "").toUpperCase();
+                    let prefix = "🌐";
+                    let label = "";
+                    
+                    if (country === 'IN') {
+                        prefix = "🇮🇳";
+                        if (v.gender === 'male') {
+                            inMaleCount++;
+                            label = `${prefix} Male (Voice ${inMaleCount})`;
+                        } else {
+                            inFemaleCount++;
+                            label = `${prefix} Female (Voice ${inFemaleCount})`;
+                        }
+                    } else if (country === 'US') {
+                        prefix = "🇺🇸";
+                        if (v.gender === 'male') {
+                            usMaleCount++;
+                            label = `${prefix} Male (Voice ${usMaleCount})`;
+                        } else {
+                            usFemaleCount++;
+                            label = `${prefix} Female (Voice ${usFemaleCount})`;
+                        }
+                    } else if (country === 'GB' || country === 'UK') {
+                        prefix = "🇬🇧";
+                        if (v.gender === 'male') {
+                            gbMaleCount++;
+                            label = `${prefix} Male (Voice ${gbMaleCount})`;
+                        } else {
+                            gbFemaleCount++;
+                            label = `${prefix} Female (Voice ${gbFemaleCount})`;
+                        }
                     } else {
-                        femaleCount++;
-                        option.textContent = `🇮🇳 Female Voice ${femaleCount}`;
+                        if (v.gender === 'male') {
+                            generalMaleCount++;
+                            label = `${prefix} Male (Voice ${generalMaleCount})`;
+                        } else {
+                            generalFemaleCount++;
+                            label = `${prefix} Female (Voice ${generalFemaleCount})`;
+                        }
                     }
+                    
+                    option.textContent = label;
                     voiceSelect.appendChild(option);
                 });
             } catch (err) {
@@ -3199,40 +3236,64 @@ window.SpeechPlayer = {
                     }
                 });
 
-                let maleCount = 0;
-                let femaleCount = 0;
+                let inMaleCount = 0, inFemaleCount = 0;
+                indianEnglishVoices.forEach((item) => {
+                    const option = document.createElement('option');
+                    option.value = item.voice.name;
+                    
+                    if (item.gender === 'male') {
+                        inMaleCount++;
+                        option.textContent = `🇮🇳 Male (Voice ${inMaleCount})`;
+                    } else {
+                        inFemaleCount++;
+                        option.textContent = `🇮🇳 Female (Voice ${inFemaleCount})`;
+                    }
+                    voiceSelect.appendChild(option);
+                });
 
-                if (indianEnglishVoices.length > 0) {
-                    indianEnglishVoices.forEach((item) => {
-                        const option = document.createElement('option');
-                        option.value = item.voice.name;
-                        
+                let usMaleCount = 0, usFemaleCount = 0;
+                let gbMaleCount = 0, gbFemaleCount = 0;
+                let generalMaleCount = 0, generalFemaleCount = 0;
+                
+                fallbackEnglishVoices.forEach((item) => {
+                    const option = document.createElement('option');
+                    option.value = item.voice.name;
+                    
+                    const langUpper = item.voice.lang.toUpperCase();
+                    let prefix = "🌐";
+                    let label = "";
+                    
+                    if (langUpper.includes('US')) {
+                        prefix = "🇺🇸";
                         if (item.gender === 'male') {
-                            maleCount++;
-                            option.textContent = `🇮🇳 Male (Voice ${maleCount})`;
+                            usMaleCount++;
+                            label = `${prefix} Male (Voice ${usMaleCount})`;
                         } else {
-                            femaleCount++;
-                            option.textContent = `🇮🇳 Female (Voice ${femaleCount})`;
+                            usFemaleCount++;
+                            label = `${prefix} Female (Voice ${usFemaleCount})`;
                         }
-                        voiceSelect.appendChild(option);
-                    });
-                } else {
-                    fallbackEnglishVoices.forEach((item) => {
-                        const option = document.createElement('option');
-                        option.value = item.voice.name;
-                        
-                        const prefix = item.voice.lang.includes('US') ? '🇺🇸' : '🇬🇧';
-                        
+                    } else if (langUpper.includes('GB') || langUpper.includes('UK')) {
+                        prefix = "🇬🇧";
                         if (item.gender === 'male') {
-                            maleCount++;
-                            option.textContent = `${prefix} Male (Voice ${maleCount})`;
+                            gbMaleCount++;
+                            label = `${prefix} Male (Voice ${gbMaleCount})`;
                         } else {
-                            femaleCount++;
-                            option.textContent = `${prefix} Female (Voice ${femaleCount})`;
+                            gbFemaleCount++;
+                            label = `${prefix} Female (Voice ${gbFemaleCount})`;
                         }
-                        voiceSelect.appendChild(option);
-                    });
-                }
+                    } else {
+                        if (item.gender === 'male') {
+                            generalMaleCount++;
+                            label = `${prefix} Male (Voice ${generalMaleCount})`;
+                        } else {
+                            generalFemaleCount++;
+                            label = `${prefix} Female (Voice ${generalFemaleCount})`;
+                        }
+                    }
+                    
+                    option.textContent = label;
+                    voiceSelect.appendChild(option);
+                });
             };
 
             populate();

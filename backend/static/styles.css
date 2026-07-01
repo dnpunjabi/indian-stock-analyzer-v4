@@ -14433,4 +14433,38 @@ details[open] .academy-hud-arrow {
     box-shadow: none !important;
 }
 
+.speech-controls-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.speech-options-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+@media (max-width: 600px) {
+    .speech-panel-adaptive {
+        width: calc(100% - 24px) !important;
+        right: 12px !important;
+        left: 12px !important;
+        bottom: 12px !important;
+        padding: 10px 12px !important;
+    }
+    .speech-controls-row {
+        justify-content: center !important;
+        gap: 12px !important;
+    }
+    .speech-options-group {
+        justify-content: center !important;
+        width: 100% !important;
+    }
+}
+
 
