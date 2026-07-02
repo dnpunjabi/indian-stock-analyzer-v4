@@ -4370,12 +4370,6 @@ async def trigger_daily_wrapup(payload: Optional[dict] = None):
             dispatch_status = res.get("status", "error")
             if dispatch_status == "success":
                 message_id = res.get("message_id")
-                # Record dispatch in database
-                today_str = datetime.now().strftime("%Y-%m-%d")
-                with get_db() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_last_sent', ?)", (today_str,))
-                    conn.commit()
             else:
                 dispatch_error = res.get("message", "Unknown dispatch failure")
         else:
