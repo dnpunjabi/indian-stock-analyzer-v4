@@ -58,6 +58,48 @@ def parse_screener_table(table_el) -> dict:
         "rows": rows
     }
 
+def parse_screener_peers_table(table_el) -> dict:
+    if not table_el:
+        return {"headers": [], "rows": []}
+        
+    headers_cells = table_el.find_all("th")
+    headers = [th.text.strip() for th in headers_cells]
+    
+    # Clean headers: remove S.No or blank first column
+    if len(headers) > 1 and (headers[0] == "" or "s.no" in headers[0].lower()):
+        headers = headers[1:]
+        
+    rows = []
+    tbody = table_el.find("tbody")
+    tr_elements = tbody.find_all("tr") if tbody else table_el.find_all("tr")[1:]
+    
+    for tr in tr_elements:
+        cells = tr.find_all(["td", "th"])
+        if len(cells) < 2:
+            continue
+            
+        # If cells[0] is just a digit (serial number), then cells[1] is the company name
+        c0_text = cells[0].text.strip().rstrip(".")
+        if len(cells) > 2 and c0_text.isdigit():
+            label = clean_label(cells[1].text)
+            values = [clean_value(c.text) for c in cells[2:]]
+        else:
+            label = clean_label(cells[0].text)
+            values = [clean_value(c.text) for c in cells[1:]]
+            
+        if not label:
+            continue
+            
+        rows.append({
+            "label": label,
+            "values": values
+        })
+        
+    return {
+        "headers": headers,
+        "rows": rows
+    }
+
 def scrape_financial_statements(symbol: str, view: str = "consolidated") -> dict:
     """
     Scrapes the Quarterly Results, annual Profit & Loss, and Balance Sheet statements
@@ -148,7 +190,7 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated") -> dict
             p_el = quarters_sec.find("p")
             if p_el:
                 p_text = p_el.text.strip()
-        actual_is_consolidated = "consolidated" in p_text.lower()
+        actual_is_consolidated = "consolidated figures" in p_text.lower()
         
         return {
             "symbol": symbol,
@@ -156,7 +198,8 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated") -> dict
             "is_consolidated": actual_is_consolidated,
             "quarters": parse_screener_table(soup.find("section", id="quarters").find("table") if soup.find("section", id="quarters") else None),
             "profit_loss": parse_screener_table(soup.find("section", id="profit-loss").find("table") if soup.find("section", id="profit-loss") else None),
-            "balance_sheet": parse_screener_table(soup.find("section", id="balance-sheet").find("table") if soup.find("section", id="balance-sheet") else None)
+            "balance_sheet": parse_screener_table(soup.find("section", id="balance-sheet").find("table") if soup.find("section", id="balance-sheet") else None),
+            "peers": parse_screener_peers_table(soup.find("section", id="peers").find("table") if soup.find("section", id="peers") else None)
         }
     except Exception as err:
         return {"error": f"Exception occurred while scraping financials: {str(err)}"}

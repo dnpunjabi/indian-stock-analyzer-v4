@@ -36111,17 +36111,22 @@ function renderActiveStatementTable() {
     
     const headers = statement.headers;
     const rows = statement.rows;
+    const isPeers = (activeFsStatement === 'peers');
     
     let html = '';
     
     // 1. Build Header Row
     html += '<thead><tr>';
     // Sticky Metric column header
-    html += `<th style="position: sticky; left: 0; z-index: 6; background: var(--bg-card); border-right: 1px solid var(--border-glass); border-bottom: 2px solid var(--border-glass); text-align: left; min-width: 160px; font-family: 'Outfit', sans-serif;">Metric</th>`;
-    // Trend column header
-    html += `<th style="text-align: center; border-bottom: 2px solid var(--border-glass); font-family: 'Outfit', sans-serif; font-size: 10px; color: var(--text-secondary); width: 85px;">Trend</th>`;
+    const firstColTitle = isPeers ? 'Company Name' : 'Metric';
+    html += `<th style="position: sticky; left: 0; z-index: 6; background: var(--bg-card); border-right: 1px solid var(--border-glass); border-bottom: 2px solid var(--border-glass); text-align: left; min-width: 160px; font-family: 'Outfit', sans-serif;">${firstColTitle}</th>`;
     
-    // Remaining Date/Year columns
+    if (!isPeers) {
+        // Trend column header
+        html += `<th style="text-align: center; border-bottom: 2px solid var(--border-glass); font-family: 'Outfit', sans-serif; font-size: 10px; color: var(--text-secondary); width: 85px;">Trend</th>`;
+    }
+    
+    // Remaining Date/Year or ratio columns
     for (let i = 1; i < headers.length; i++) {
         html += `<th style="border-bottom: 2px solid var(--border-glass); font-family: 'Outfit', sans-serif; padding: 8px 12px; white-space: nowrap; text-align: right;">${headers[i]}</th>`;
     }
@@ -36141,7 +36146,7 @@ function renderActiveStatementTable() {
         const values = r.values;
         const cleanLabelLower = label.toLowerCase();
         
-        const isBold = boldLabels.some(b => cleanLabelLower.includes(b));
+        const isBold = !isPeers && boldLabels.some(b => cleanLabelLower.includes(b));
         const isPercent = cleanLabelLower.includes('%');
         
         let rowStyle = '';
@@ -36150,11 +36155,17 @@ function renderActiveStatementTable() {
             rowStyle = 'font-weight: 700; background: rgba(255,255,255,0.015);';
         }
         
+        // Highlight analyzed stock row in peers table
+        if (isPeers && activeStockProfile && (cleanLabelLower.includes(activeStockProfile.ticker.toLowerCase().replace('.ns', '')) || cleanLabelLower.includes((activeStockProfile.name || '').toLowerCase()))) {
+            rowStyle = 'font-weight: 700; background: rgba(59, 130, 246, 0.08);';
+            cellBg = 'rgba(30, 41, 59, 0.95)';
+        }
+        
         // Render Row
         html += `<tr style="${rowStyle}">`;
         
-        // Metric name cell (sticky left)
-        const sparkline = generateSparklineSvg(values);
+        // Metric/Company Name cell (sticky left)
+        const sparkline = isPeers ? '' : generateSparklineSvg(values);
         html += `
             <td style="position: sticky; left: 0; z-index: 5; background: ${cellBg}; border-right: 1px solid var(--border-glass); text-align: left; white-space: nowrap; padding: 8px 12px; font-family: 'Outfit', sans-serif; box-shadow: 2px 0 5px rgba(0,0,0,0.04);">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
@@ -36164,47 +36175,49 @@ function renderActiveStatementTable() {
             </td>
         `;
         
-        // Calculate trend change comparing the last period to comparison period
-        let trendBadge = '--';
-        if (values.length >= 2) {
-            const lastVal = values[values.length - 1];
-            
-            // For quarterly results, try to compare YoY same quarter (4 quarters ago, i.e. index length - 5)
-            // For balance sheet or annual PL, compare to previous period (index length - 2)
-            let prevIndex = values.length - 2; // default to previous period
-            if (activeFsStatement === 'quarters' && values.length >= 5) {
-                prevIndex = values.length - 5; // YoY same quarter (4 quarters ago)
-            }
-            
-            const prevVal = values[prevIndex];
-            
-            if (typeof lastVal === 'number' && typeof prevVal === 'number' && prevVal !== 0) {
-                const diffPct = ((lastVal - prevVal) / Math.abs(prevVal)) * 100;
+        if (!isPeers) {
+            // Calculate trend change comparing the last period to comparison period
+            let trendBadge = '--';
+            if (values.length >= 2) {
+                const lastVal = values[values.length - 1];
                 
-                // Color formatting
-                let colorClass = 'var(--text-muted)';
-                let prefix = '';
-                
-                if (diffPct > 0.05) {
-                    colorClass = 'var(--color-emerald)';
-                    prefix = '▲ +';
-                } else if (diffPct < -0.05) {
-                    colorClass = 'var(--color-crimson)';
-                    prefix = '▼ ';
-                } else {
-                    prefix = '• ';
+                // For quarterly results, try to compare YoY same quarter (4 quarters ago, i.e. index length - 5)
+                // For balance sheet or annual PL, compare to previous period (index length - 2)
+                let prevIndex = values.length - 2; // default to previous period
+                if (activeFsStatement === 'quarters' && values.length >= 5) {
+                    prevIndex = values.length - 5; // YoY same quarter (4 quarters ago)
                 }
                 
-                const showTrendText = diffPct.toFixed(1) + '%';
-                trendBadge = `<span style="font-size: 8.5px; font-weight: bold; color: ${colorClass}; background: ${colorClass}12; padding: 2px 6px; border-radius: 4px; border: 1px solid ${colorClass}25; white-space: nowrap;">${prefix}${showTrendText}</span>`;
+                const prevVal = values[prevIndex];
+                
+                if (typeof lastVal === 'number' && typeof prevVal === 'number' && prevVal !== 0) {
+                    const diffPct = ((lastVal - prevVal) / Math.abs(prevVal)) * 100;
+                    
+                    // Color formatting
+                    let colorClass = 'var(--text-muted)';
+                    let prefix = '';
+                    
+                    if (diffPct > 0.05) {
+                        colorClass = 'var(--color-emerald)';
+                        prefix = '▲ +';
+                    } else if (diffPct < -0.05) {
+                        colorClass = 'var(--color-crimson)';
+                        prefix = '▼ ';
+                    } else {
+                        prefix = '• ';
+                    }
+                    
+                    const showTrendText = diffPct.toFixed(1) + '%';
+                    trendBadge = `<span style="font-size: 8.5px; font-weight: bold; color: ${colorClass}; background: ${colorClass}12; padding: 2px 6px; border-radius: 4px; border: 1px solid ${colorClass}25; white-space: nowrap;">${prefix}${showTrendText}</span>`;
+                }
             }
+            html += `<td style="text-align: center; vertical-align: middle; padding: 8px;">${trendBadge}</td>`;
         }
-        
-        html += `<td style="text-align: center; vertical-align: middle; padding: 8px;">${trendBadge}</td>`;
         
         // Values cells
         for (let i = 0; i < values.length; i++) {
-            const formatted = formatFsValue(values[i], isPercent);
+            const isColPercent = isPeers ? (headers[i + 1] && headers[i + 1].toLowerCase().includes('%')) : isPercent;
+            const formatted = formatFsValue(values[i], isColPercent);
             html += `<td style="padding: 8px 12px; white-space: nowrap; font-family: 'Inter', sans-serif; text-align: right;">${formatted}</td>`;
         }
         

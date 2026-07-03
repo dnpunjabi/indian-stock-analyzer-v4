@@ -83,6 +83,32 @@ class TestFinancialStatements(unittest.TestCase):
                         </tbody>
                     </table>
                 </section>
+                <section id="peers">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>S.No.</th>
+                                <th>Name</th>
+                                <th>P/E</th>
+                                <th>ROCE %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1.</td>
+                                <td>TCS Ltd</td>
+                                <td>28.5</td>
+                                <td>45.2</td>
+                            </tr>
+                            <tr>
+                                <td>2.</td>
+                                <td>Infosys</td>
+                                <td>24.3</td>
+                                <td>38.1</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </section>
             </body>
         </html>
         """
@@ -101,6 +127,11 @@ class TestFinancialStatements(unittest.TestCase):
         self.assertEqual(data["quarters"]["headers"], ["", "Jun 2023", "Sep 2023"])
         self.assertEqual(data["quarters"]["rows"][0]["label"], "Sales")
         self.assertEqual(data["quarters"]["rows"][0]["values"], [50000, 52000])
+        
+        self.assertIn("peers", data)
+        self.assertEqual(data["peers"]["headers"], ["Name", "P/E", "ROCE %"])
+        self.assertEqual(data["peers"]["rows"][0]["label"], "TCS Ltd")
+        self.assertEqual(data["peers"]["rows"][0]["values"], [28.5, 45.2])
 
     @patch("backend.financial_statements_scraper.scrape_financial_statements")
     def test_api_financial_statements_cached(self, mock_scrape):

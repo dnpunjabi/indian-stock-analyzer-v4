@@ -4714,23 +4714,37 @@ async def audit_financial_statements(data: AuditFinancialsRequest):
     statement_name_map = {
         "quarters": "Quarterly Results",
         "profit_loss": "Profit & Loss (Annual)",
-        "balance_sheet": "Balance Sheet"
+        "balance_sheet": "Balance Sheet",
+        "peers": "Peer Comparison"
     }
     st_title = statement_name_map.get(data.statement_type, data.statement_type)
     
-    system_prompt = (
-        "You are an expert Chartered Accountant and SEBI-registered CFA financial research analyst. "
-        "Analyze the provided financial statements table data and compile a structured, high-impact diagnostic audit memo. "
-        "Adhere to the following structural output layout:\n\n"
-        "### Key Revenue/Profitability Trends\n"
-        "* Analyze sequential (QoQ) or annual (YoY) growth rate, margin stability, and expansions/contractions.\n"
-        "### Working Capital & Balance Sheet Risks\n"
-        "* Evaluate financial leverage, debt-to-equity changes, equity capital dilution, or asset build-up flags.\n"
-        "### Anomalies & Flags\n"
-        "* Note any accounting flags or financial metrics anomalies (e.g. growing sales but dropping margins, reserves drop, etc.).\n"
-        "### Diagnostic Verdict\n"
-        "* Conclude with a final rating (Safe / Watch / Distress) and a brief summary of the main driver."
-    )
+    if data.statement_type == "peers":
+        system_prompt = (
+            "You are an expert Chartered Accountant and SEBI-registered CFA financial research analyst. "
+            "Analyze the provided peer comparison table and compile a structured, high-impact diagnostic audit memo. "
+            "Adhere to the following structural output layout:\n\n"
+            "### Valuation vs. Peers\n"
+            "* Compare P/E, Market Cap, and dividend yield against peers to assess relative valuation.\n"
+            "### Efficiency & Profitability Ratios\n"
+            "* Compare ROCE %, margins, and growth variance (Sales & Profit) against peers.\n"
+            "### Leaderboard & Verdict\n"
+            "* Conclude with a final verdict on the relative attractiveness of the main company vs. its peers, rating it as (Overvalued / Fair Value / Undervalued)."
+        )
+    else:
+        system_prompt = (
+            "You are an expert Chartered Accountant and SEBI-registered CFA financial research analyst. "
+            "Analyze the provided financial statements table data and compile a structured, high-impact diagnostic audit memo. "
+            "Adhere to the following structural output layout:\n\n"
+            "### Key Revenue/Profitability Trends\n"
+            "* Analyze sequential (QoQ) or annual (YoY) growth rate, margin stability, and expansions/contractions.\n"
+            "### Working Capital & Balance Sheet Risks\n"
+            "* Evaluate financial leverage, debt-to-equity changes, equity capital dilution, or asset build-up flags.\n"
+            "### Anomalies & Flags\n"
+            "* Note any accounting flags or financial metrics anomalies (e.g. growing sales but dropping margins, reserves drop, etc.).\n"
+            "### Diagnostic Verdict\n"
+            "* Conclude with a final rating (Safe / Watch / Distress) and a brief summary of the main driver."
+        )
     
     # Format the table data for the prompt
     headers = data.table_data.get("headers", [])
