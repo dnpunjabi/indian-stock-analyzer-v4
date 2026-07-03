@@ -4441,7 +4441,7 @@ async def save_screener_cookie_settings(payload: dict):
         conn.commit()
     return {"status": "success"}
 
-@app.get("/api/screener/screens")
+@app.get("/api/screener-external/screens")
 async def get_screener_screens():
     """Fetches the saved custom screens from Screener.in."""
     from backend.screens_scraper import scrape_saved_screens
@@ -4455,7 +4455,7 @@ async def get_screener_screens():
     screens = scrape_saved_screens(cookie)
     return {"screens": screens}
 
-@app.get("/api/screener/screens/{screen_id}/preview")
+@app.get("/api/screener-external/screens/{screen_id}/preview")
 async def get_screener_screen_preview(screen_id: str, page: int = 1):
     """Fetches the preview list of equities for the specified screen ID."""
     from backend.screens_scraper import scrape_screen_results
@@ -4469,7 +4469,7 @@ async def get_screener_screen_preview(screen_id: str, page: int = 1):
     data = scrape_screen_results(screen_id, cookie, page=page)
     return data
 
-@app.post("/api/screener/import")
+@app.post("/api/screener-external/import")
 async def import_screener_screen_stocks(payload: dict):
     """Imports selected symbols into a new or existing watchlist."""
     symbols = payload.get("symbols", [])

@@ -116,7 +116,7 @@ class TestScreensTrackerAPI(unittest.TestCase):
             mock_conn.cursor.return_value = mock_cursor
             mock_cursor.fetchone.return_value = {"value": "dummy_cookie"}
             
-            response = self.client.get("/api/screener/screens")
+            response = self.client.get("/api/screener-external/screens")
             self.assertEqual(response.status_code, 200)
             data = response.json()
             self.assertIn("screens", data)
@@ -125,7 +125,7 @@ class TestScreensTrackerAPI(unittest.TestCase):
 
     @patch("requests.get")
     def test_api_screener_screens_preview_endpoint(self, mock_get):
-        """Test the GET /api/screener/screens/{id}/preview endpoint."""
+        """Test the GET /api/screener-external/screens/{id}/preview endpoint."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = """
@@ -151,7 +151,7 @@ class TestScreensTrackerAPI(unittest.TestCase):
             mock_conn.cursor.return_value = mock_cursor
             mock_cursor.fetchone.return_value = {"value": "dummy_cookie"}
             
-            response = self.client.get("/api/screener/screens/10123/preview")
+            response = self.client.get("/api/screener-external/screens/10123/preview")
             self.assertEqual(response.status_code, 200)
             data = response.json()
             self.assertIn("companies", data)

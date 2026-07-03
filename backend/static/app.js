@@ -35561,7 +35561,7 @@ function setupScreenerImportHandlers() {
         if (screenSelect) {
             screenSelect.innerHTML = '<option value="" disabled selected>Loading your saved screens...</option>';
             try {
-                const res = await fetch('/api/screener/screens');
+                const res = await fetch('/api/screener-external/screens');
                 const data = await res.json();
                 if (data.error) {
                     errorBanner.textContent = data.error;
@@ -35620,7 +35620,7 @@ function setupScreenerImportHandlers() {
             loadBtn.innerHTML = "Fetching results... <span class='spinner'></span>";
             
             try {
-                const res = await fetch(`/api/screener/screens/${screenId}/preview`);
+                const res = await fetch(`/api/screener-external/screens/${screenId}/preview`);
                 const data = await res.json();
                 loadBtn.disabled = false;
                 loadBtn.innerHTML = originalText;
@@ -35764,7 +35764,7 @@ function setupScreenerImportHandlers() {
             }
             
             try {
-                const res = await fetch('/api/screener/import', {
+                const res = await fetch('/api/screener-external/import', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
