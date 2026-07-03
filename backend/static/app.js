@@ -36157,8 +36157,9 @@ function renderActiveStatementTable() {
         
         // Highlight analyzed stock row in peers table
         if (isPeers && activeStockProfile && (cleanLabelLower.includes(activeStockProfile.ticker.toLowerCase().replace('.ns', '')) || cleanLabelLower.includes((activeStockProfile.name || '').toLowerCase()))) {
-            rowStyle = 'font-weight: 700; background: rgba(59, 130, 246, 0.08);';
-            cellBg = 'rgba(30, 41, 59, 0.95)';
+            const isLightMode = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-mode') === 'light';
+            rowStyle = 'font-weight: 700; background: rgba(59, 130, 246, 0.15);';
+            cellBg = isLightMode ? '#e0f2fe' : 'rgba(30, 41, 59, 0.95)';
         }
         
         // Render Row

@@ -4687,7 +4687,15 @@ async def get_stock_financial_statements(symbol: str, view: str = "consolidated"
                 pass
                 
     # Cache miss or expired -> Scrape page
-    data = scrape_financial_statements(base_symbol, view)
+    session_cookie = None
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+        cookie_row = cursor.fetchone()
+        if cookie_row:
+            session_cookie = cookie_row["value"]
+            
+    data = scrape_financial_statements(base_symbol, view, session_cookie)
     if not data or "error" in data:
         raise HTTPException(status_code=500, detail=data.get("error", "Failed to retrieve financial statements."))
         

@@ -63,7 +63,7 @@ def parse_screener_peers_table(table_el) -> dict:
         return {"headers": [], "rows": []}
         
     headers_cells = table_el.find_all("th")
-    headers = [th.text.strip() for th in headers_cells]
+    headers = [clean_label(th.text) for th in headers_cells]
     
     # Clean headers: remove S.No or blank first column
     if len(headers) > 1 and (headers[0] == "" or "s.no" in headers[0].lower()):
@@ -76,6 +76,10 @@ def parse_screener_peers_table(table_el) -> dict:
     for tr in tr_elements:
         cells = tr.find_all(["td", "th"])
         if len(cells) < 2:
+            continue
+            
+        # Skip header rows nested inside tbody (e.g. rows containing "Name")
+        if len(cells) > 1 and "name" in cells[1].text.lower():
             continue
             
         # If cells[0] is just a digit (serial number), then cells[1] is the company name
@@ -100,15 +104,21 @@ def parse_screener_peers_table(table_el) -> dict:
         "rows": rows
     }
 
-def scrape_financial_statements(symbol: str, view: str = "consolidated") -> dict:
+def scrape_financial_statements(symbol: str, view: str = "consolidated", session_cookie: str = None) -> dict:
     """
     Scrapes the Quarterly Results, annual Profit & Loss, and Balance Sheet statements
-    from Screener.in without requiring any cookies.
+    from Screener.in with optional session cookie support for customized peer metrics.
     
     If 'view' is 'consolidated', it will target the /consolidated/ path on Screener.
     If it's 'standalone', it will target the default path.
     If the requested view is not available, it fallbacks automatically.
     """
+    cookies = {}
+    if session_cookie:
+        cookie_val = session_cookie
+        if "sessionid=" in cookie_val:
+            cookie_val = cookie_val.split("sessionid=")[-1].split(";")[0].strip()
+        cookies = {"sessionid": cookie_val}
     # 1. Resolve ticker symbol and name using our offline database first
     base_symbol = symbol.split(".")[0].strip().upper()
     company_name = None
@@ -137,7 +147,7 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated") -> dict
     for q in search_queries:
         search_url = f"https://www.screener.in/api/company/search/?q={requests.utils.quote(q)}"
         try:
-            search_res = requests.get(search_url, headers=headers, timeout=5)
+            search_res = requests.get(search_url, headers=headers, cookies=cookies, timeout=5)
             if search_res.status_code == 200:
                 results = search_res.json()
                 if results and len(results) > 0:
@@ -171,12 +181,12 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated") -> dict
         url = f"https://www.screener.in{base_path}/"
 
     try:
-        response = requests.get(url, headers=headers, timeout=12)
+        response = requests.get(url, headers=headers, cookies=cookies, timeout=12)
         
         # Fallback if consolidated returns 404 or redirects back to the main standalone profile page
         if view == "consolidated" and (response.status_code != 200 or len(response.history) > 0):
             fallback_url = f"https://www.screener.in{base_path}/"
-            response = requests.get(fallback_url, headers=headers, timeout=12)
+            response = requests.get(fallback_url, headers=headers, cookies=cookies, timeout=12)
             
         if response.status_code != 200:
             return {"error": f"Failed to retrieve Screener financials. Status: {response.status_code}"}
@@ -192,15 +202,17 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated") -> dict
                 p_text = p_el.text.strip()
         actual_is_consolidated = "consolidated figures" in p_text.lower()
         
-        # Parse the company_id from main page to call peers API
-        company_id_match = re.search(r'data-company-id=["\'](\d+)["\']', response.text)
-        company_id = company_id_match.group(1) if company_id_match else None
+        # Parse the warehouse_id (or company_id as fallback) from main page to call peers API
+        warehouse_id_match = re.search(r'data-warehouse-id=["\'](\d+)["\']', response.text)
+        if not warehouse_id_match:
+            warehouse_id_match = re.search(r'data-company-id=["\'](\d+)["\']', response.text)
+        warehouse_id = warehouse_id_match.group(1) if warehouse_id_match else None
         
         peers_table_el = None
-        if company_id:
+        if warehouse_id:
             try:
-                peers_url = f"https://www.screener.in/api/company/{company_id}/peers/"
-                peers_res = requests.get(peers_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+                peers_url = f"https://www.screener.in/api/company/{warehouse_id}/peers/"
+                peers_res = requests.get(peers_url, headers=headers, cookies=cookies, timeout=10)
                 if peers_res.status_code == 200:
                     peers_soup = BeautifulSoup(peers_res.text, "html.parser")
                     peers_table_el = peers_soup.find("table")
