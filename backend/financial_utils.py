@@ -386,15 +386,41 @@ def clean_and_deduplicate_peers(peers, base_symbol, company_name, pe_ratio=None,
 
 def fetch_screener_data(symbol: str) -> dict:
     """
-    Politely scrapes Screener.in company page (e.g. https://www.screener.in/company/RELIANCE/)
+    Politely scrapes Screener.in company page
     to extract top ratios, peer groups, and shareholding structures.
     Uses Consolidated view if available to prevent Standalone vs Consolidated mismatches.
     """
-    url = f"https://www.screener.in/company/{symbol}/"
+    base_symbol = symbol.split(".")[0].strip().upper()
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
+    # Resolve correct Screener URL path using search suggestion API to handle custom slugs (e.g. TMCV for Tata Motors)
+    resolved_path = None
+    search_url = f"https://www.screener.in/api/company/search/?q={requests.utils.quote(base_symbol)}"
+    try:
+        search_res = requests.get(search_url, headers=headers, timeout=5)
+        if search_res.status_code == 200:
+            results = search_res.json()
+            if results and len(results) > 0:
+                # Find a close match
+                for item in results:
+                    url_val = item.get("url", "").lower()
+                    name_val = item.get("name", "").lower()
+                    b_sym_lower = base_symbol.lower()
+                    if b_sym_lower in url_val or b_sym_lower in name_val:
+                        resolved_path = item.get("url")
+                        break
+                if not resolved_path:
+                    resolved_path = results[0].get("url")
+    except Exception as search_err:
+        print(f"Screener search suggest query failed in fetch_screener_data for '{base_symbol}': {search_err}")
+        
+    if resolved_path:
+        url = f"https://www.screener.in{resolved_path}"
+    else:
+        url = f"https://www.screener.in/company/{base_symbol}/"
+        
     result = {
         "ratios": {},
         "peers": [],
@@ -409,10 +435,12 @@ def fetch_screener_data(symbol: str) -> dict:
             
         soup = BeautifulSoup(response.text, "html.parser")
         
-        # Check if Consolidated financials are available
-        consolidated_link = soup.find("a", href=re.compile(rf"/company/{re.escape(symbol)}/consolidated/?", re.IGNORECASE))
+        # Check if Consolidated financials are available dynamically using the URL's company slug
+        slug_match = re.search(r'/company/([^/]+)/?', url)
+        slug = slug_match.group(1) if slug_match else base_symbol
+        consolidated_link = soup.find("a", href=re.compile(rf"/company/{re.escape(slug)}/consolidated/?", re.IGNORECASE))
         if consolidated_link:
-            url = f"https://www.screener.in/company/{symbol}/consolidated/"
+            url = f"https://www.screener.in/company/{slug}/consolidated/"
             response = requests.get(url, headers=headers, timeout=8)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, "html.parser")

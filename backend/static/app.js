@@ -25978,20 +25978,48 @@ function setupMetricHoverTooltips() {
             subtitle = "4-Year Leverage & Solvency Path";
             label = "Debt-to-Equity";
         } else if (metricType === 'fii') {
-            const fiiVal = activeStockProfile.shareholding ? (activeStockProfile.shareholding.FIIs || activeStockProfile.shareholding["FII"] || 15.0) : 15.0;
-            const fiiHistory = generateQuarterlyShareholdingTrend(activeStockProfile.ticker, fiiVal, 20);
-            chartLabels = ["Q-3", "Q-2", "Q-1", "Current"];
+            let fiiHistory = [];
+            let labels = [];
+            const history = window.activeShareholdingHistory;
+            if (history && history.symbol && activeStockProfile.ticker && 
+                history.symbol.split('.')[0].toUpperCase() === activeStockProfile.ticker.split('.')[0].toUpperCase()) {
+                const rawHistory = history.categories["FIIs"] || history.categories["FII"] || [];
+                if (rawHistory.length > 0) {
+                    fiiHistory = [...rawHistory];
+                    labels = [...history.quarters];
+                }
+            }
+            if (fiiHistory.length === 0) {
+                const fiiVal = activeStockProfile.shareholding ? (activeStockProfile.shareholding.FIIs || activeStockProfile.shareholding["FII"] || 15.0) : 15.0;
+                fiiHistory = generateQuarterlyShareholdingTrend(activeStockProfile.ticker, fiiVal, 20);
+                labels = ["Q-3", "Q-2", "Q-1", "Current"];
+            }
+            chartLabels = labels;
             chartData = fiiHistory;
             title = `${activeStockProfile.ticker.split('.')[0]} FII Holding Trend`;
-            subtitle = "4-Quarter Foreign Institutional Velocity";
+            subtitle = "Foreign Institutional Velocity";
             label = "FII Holding %";
         } else if (metricType === 'dii') {
-            const diiVal = activeStockProfile.shareholding ? (activeStockProfile.shareholding.DIIs || activeStockProfile.shareholding["DII"] || 15.0) : 15.0;
-            const diiHistory = generateQuarterlyShareholdingTrend(activeStockProfile.ticker, diiVal, 30);
-            chartLabels = ["Q-3", "Q-2", "Q-1", "Current"];
+            let diiHistory = [];
+            let labels = [];
+            const history = window.activeShareholdingHistory;
+            if (history && history.symbol && activeStockProfile.ticker && 
+                history.symbol.split('.')[0].toUpperCase() === activeStockProfile.ticker.split('.')[0].toUpperCase()) {
+                const rawHistory = history.categories["DIIs"] || history.categories["DII"] || [];
+                if (rawHistory.length > 0) {
+                    diiHistory = [...rawHistory];
+                    labels = [...history.quarters];
+                }
+            }
+            if (diiHistory.length === 0) {
+                const diiVal = activeStockProfile.shareholding ? (activeStockProfile.shareholding.DIIs || activeStockProfile.shareholding["DII"] || 15.0) : 15.0;
+                diiHistory = generateQuarterlyShareholdingTrend(activeStockProfile.ticker, diiVal, 30);
+                labels = ["Q-3", "Q-2", "Q-1", "Current"];
+            }
+            chartLabels = labels;
             chartData = diiHistory;
             title = `${activeStockProfile.ticker.split('.')[0]} DII Holding Trend`;
-            subtitle = "4-Quarter Domestic Institutional Velocity";
+            subtitle = "Domestic Institutional Velocity";
             label = "DII Holding %";
         }
         return { chartData, chartLabels, title, subtitle, label };
@@ -34916,6 +34944,7 @@ async function loadShareholdingData(symbol) {
             return;
         }
         
+        window.activeShareholdingHistory = data;
         const quarters = data.quarters;
         const categories = data.categories;
         const detailed = data.detailed || {};
@@ -35080,6 +35109,12 @@ async function loadShareholdingData(symbol) {
         // Initial render of latest quarter
         const latestQ = quarters[quarters.length - 1];
         updateUIForQuarter(latestQ);
+        
+        // Draw real sparklines based on fetched categories
+        if (categories["Promoters"]) drawSparkline('spark-promoter', categories["Promoters"], trendColor(categories["Promoters"]));
+        if (categories["FIIs"]) drawSparkline('spark-fii', categories["FIIs"], trendColor(categories["FIIs"]));
+        if (categories["DIIs"]) drawSparkline('spark-dii', categories["DIIs"], trendColor(categories["DIIs"]));
+        if (categories["Public"]) drawSparkline('spark-public', categories["Public"], trendColor(categories["Public"]));
         
         // Handle dropdown selection changes
         qSelect.onchange = (e) => {

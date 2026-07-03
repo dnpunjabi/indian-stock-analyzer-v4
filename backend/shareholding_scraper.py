@@ -20,6 +20,17 @@ def scrape_shareholding_pattern(symbol: str, session_cookie: str = None, company
     base_symbol = clean_symbol(symbol)
     if not base_symbol:
         return {}
+
+    # Attempt local offline resolution to find standard tickers/names
+    try:
+        from backend.financial_utils import resolve_company_ticker
+        resolution = resolve_company_ticker(symbol)
+        if resolution:
+            base_symbol = resolution.get("base_symbol") or base_symbol
+            if not company_name:
+                company_name = resolution.get("name")
+    except Exception as e:
+        print(f"Failed local resolution in shareholding_scraper: {e}")
         
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -35,6 +46,7 @@ def scrape_shareholding_pattern(symbol: str, session_cookie: str = None, company
         
     # 1. Resolve URL from Screener Search API to support custom slugs (e.g. TMCV for Tata Motors)
     resolved_path = None
+    resolved_id = None
     search_queries = []
     if base_symbol:
         search_queries.append(base_symbol)
@@ -51,7 +63,20 @@ def scrape_shareholding_pattern(symbol: str, session_cookie: str = None, company
             if search_res.status_code == 200:
                 results = search_res.json()
                 if results and len(results) > 0:
-                    resolved_path = results[0].get("url")
+                    # Find a close match in the list of search suggestions
+                    match_found = False
+                    for item in results:
+                        url_val = item.get("url", "").lower()
+                        name_val = item.get("name", "").lower()
+                        q_lower = q.lower()
+                        if q_lower in url_val or q_lower in name_val:
+                            resolved_path = item.get("url")
+                            resolved_id = item.get("id")
+                            match_found = True
+                            break
+                    if not match_found:
+                        resolved_path = results[0].get("url")
+                        resolved_id = results[0].get("id")
                     if resolved_path:
                         break
         except Exception as search_err:
@@ -102,10 +127,14 @@ def scrape_shareholding_pattern(symbol: str, session_cookie: str = None, company
         # 3. If logged in, fetch detailed holdings
         detailed = {}
         if cookies.get("sessionid"):
-            # Find company ID from page HTML using regex data-company-id attribute
-            company_id_match = re.search(r'data-company-id=["\'](\d+)["\']', res.text)
-            if company_id_match:
-                company_id = company_id_match.group(1)
+            # Use resolved_id from search API directly, or fallback to regex match
+            company_id = resolved_id
+            if not company_id:
+                company_id_match = re.search(r'data-company-id=["\'](\d+)["\']', res.text)
+                if company_id_match:
+                    company_id = company_id_match.group(1)
+            
+            if company_id:
                 
                 # Fetch detailed lists for promoters, fii, dii, public
                 headers["Referer"] = url
