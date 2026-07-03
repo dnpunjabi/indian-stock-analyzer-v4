@@ -4528,8 +4528,6 @@ async def import_screener_screen_stocks(payload: dict):
             cursor2.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
             r = cursor2.fetchone()
             cookie = r["value"] if r else None
-        if not cookie:
-            return
             
         from backend.shareholding_scraper import scrape_shareholding_pattern
         from backend.trades_scraper import scrape_trades
@@ -4556,29 +4554,31 @@ async def import_screener_screen_stocks(payload: dict):
                         )
                         conn3.commit()
 
-                sh_data = scrape_shareholding_pattern(clean_s, cookie)
-                if sh_data and "error" not in sh_data:
-                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    with get_db() as conn2:
-                        cursor2 = conn2.cursor()
-                        cursor2.execute(
-                            "INSERT OR REPLACE INTO cached_shareholdings (symbol, data_json, last_updated) VALUES (?, ?, ?)",
-                            (clean_s, json.dumps(sh_data), now_str)
-                        )
-                        conn2.commit()
-                        
-                tr_data = scrape_trades(clean_s, cookie)
-                if tr_data and "error" not in tr_data:
-                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    with get_db() as conn2:
-                        cursor2 = conn2.cursor()
-                        cursor2.execute(
-                            "INSERT OR REPLACE INTO cached_trades (symbol, data_json, last_updated) VALUES (?, ?, ?)",
-                            (clean_s, json.dumps(tr_data), now_str)
-                        )
-                        conn2.commit()
-            except Exception:
-                pass
+                # Shareholding and trades scraping require a screener session cookie
+                if cookie:
+                    sh_data = scrape_shareholding_pattern(clean_s, cookie)
+                    if sh_data and "error" not in sh_data:
+                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        with get_db() as conn2:
+                            cursor2 = conn2.cursor()
+                            cursor2.execute(
+                                "INSERT OR REPLACE INTO cached_shareholdings (symbol, data_json, last_updated) VALUES (?, ?, ?)",
+                                (clean_s, json.dumps(sh_data), now_str)
+                            )
+                            conn2.commit()
+                            
+                    tr_data = scrape_trades(clean_s, cookie)
+                    if tr_data and "error" not in tr_data:
+                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        with get_db() as conn2:
+                            cursor2 = conn2.cursor()
+                            cursor2.execute(
+                                "INSERT OR REPLACE INTO cached_trades (symbol, data_json, last_updated) VALUES (?, ?, ?)",
+                                (clean_s, json.dumps(tr_data), now_str)
+                            )
+                            conn2.commit()
+            except Exception as e:
+                print(f"Error pre-caching stats for {clean_s}: {e}")
                 
     threading.Thread(target=pre_cache_scrapes, daemon=True).start()
     

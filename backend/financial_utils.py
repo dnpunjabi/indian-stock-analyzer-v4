@@ -613,6 +613,27 @@ def fetch_screener_data(symbol: str) -> dict:
                         elif "opm" in row_title or "operating profit margin" in row_title:
                             result["quarterly_results"]["opm"] = values
         
+        # Extract sector, industry, and company name from Screener.in page if present
+        screener_sector = None
+        screener_industry = None
+        screener_company_name = None
+        
+        sector_el = soup.find("a", title="Sector")
+        if sector_el:
+            screener_sector = sector_el.text.strip()
+            
+        industry_el = soup.find("a", title="Industry") or soup.find("a", title="Broad Industry")
+        if industry_el:
+            screener_industry = industry_el.text.strip()
+            
+        company_name_el = soup.find("h1")
+        if company_name_el:
+            screener_company_name = company_name_el.text.strip()
+            
+        result["scraped_sector"] = screener_sector
+        result["scraped_industry"] = screener_industry
+        result["scraped_company_name"] = screener_company_name
+        
     except Exception as e:
         print(f"Error scraping Screener.in: {e}")
         
@@ -2780,9 +2801,9 @@ def _build_financial_profile(ticker_query: str) -> dict:
     unified_profile = {
         "ticker": yf_ticker,
         "base_symbol": base_symbol,
-        "company_name": resolution["name"] or info.get("longName") or base_symbol,
-        "sector": info.get("sector") or "N/A",
-        "industry": info.get("industry") or "N/A",
+        "company_name": resolution.get("name") or screener_data.get("scraped_company_name") or info.get("longName") or base_symbol,
+        "sector": screener_data.get("scraped_sector") or info.get("sector") or "N/A",
+        "industry": screener_data.get("scraped_industry") or info.get("industry") or "N/A",
         "business_summary": info.get("longBusinessSummary") or f"Indian company {resolution['name']} listed on the National Stock Exchange.",
         "cap_type": cap_type,
         "website": info.get("website") or "N/A",
