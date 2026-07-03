@@ -2638,7 +2638,7 @@
                             <div>
                                 <h3 style="margin: 0 0 12px 0; font-size: 12px; letter-spacing: 0.04em;">SHAREHOLDING & GOVERNANCE AUDIT</h3>
                                 <div class="pe-stat-list has-margin-bottom">
-                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); position: relative;">
+                                    <div class="pe-stat-item hover-chart-trigger" data-hover-chart="promoter" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); position: relative; cursor: help;">
                                         <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">Promoter Holding</span>
                                         <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 2px;">
                                             <strong id="sh-promoter" style="font-size: 14px; color: var(--text-primary);">72.4%</strong>
@@ -2659,7 +2659,7 @@
                                             <svg id="spark-dii" style="width: 50px; height: 16px; margin-left: 8px; overflow: visible;"></svg>
                                         </div>
                                     </div>
-                                    <div class="pe-stat-item" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); position: relative;">
+                                    <div class="pe-stat-item hover-chart-trigger" data-hover-chart="public" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.08); position: relative; cursor: help;">
                                         <span style="font-size: 8.5px; color: var(--text-secondary); text-transform: uppercase; font-weight: 500; letter-spacing: 0.02em;">Retail & Public</span>
                                         <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 2px;">
                                             <strong id="sh-public" style="font-size: 14px; color: var(--text-primary);">4.9%</strong>
@@ -2696,7 +2696,16 @@
 
                                 <!-- Detailed Scheme Holdings Container -->
                                 <div id="sh-detailed-container" style="display: none; margin-top: 12px; margin-bottom: 12px; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.15); border: 1px solid var(--border-glass); max-width: 100%; box-sizing: border-box;">
-                                    <div style="font-size: 9.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; font-family: 'Outfit', sans-serif;">Top Institutional & Fund Holders</div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                                        <div style="font-size: 9.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">Top Institutional & Fund Holders</div>
+                                        <select id="sh-detailed-filter" style="padding: 2px 6px; border-radius: 4px; font-size: 9.5px; background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); cursor: pointer; outline: none;">
+                                            <option value="all">Show All</option>
+                                            <option value="promoters">Promoters</option>
+                                            <option value="fii">FIIs (Foreign)</option>
+                                            <option value="dii">DIIs (Domestic)</option>
+                                            <option value="public">Public</option>
+                                        </select>
+                                    </div>
                                     <div id="sh-detailed-list" style="max-height: 150px; overflow-y: auto; font-size: 11px; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
                                         <!-- Populated dynamically -->
                                     </div>

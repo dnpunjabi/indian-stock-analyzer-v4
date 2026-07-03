@@ -26021,6 +26021,50 @@ function setupMetricHoverTooltips() {
             title = `${activeStockProfile.ticker.split('.')[0]} DII Holding Trend`;
             subtitle = "Domestic Institutional Velocity";
             label = "DII Holding %";
+        } else if (metricType === 'promoter') {
+            let promoterHistory = [];
+            let labels = [];
+            const history = window.activeShareholdingHistory;
+            if (history && history.symbol && activeStockProfile.ticker && 
+                history.symbol.split('.')[0].toUpperCase() === activeStockProfile.ticker.split('.')[0].toUpperCase()) {
+                const rawHistory = history.categories["Promoters"] || history.categories["Promoter"] || [];
+                if (rawHistory.length > 0) {
+                    promoterHistory = [...rawHistory];
+                    labels = [...history.quarters];
+                }
+            }
+            if (promoterHistory.length === 0) {
+                const promoterVal = activeStockProfile.shareholding ? (activeStockProfile.shareholding.Promoter || activeStockProfile.shareholding["Promoters"] || 50.0) : 50.0;
+                promoterHistory = generateQuarterlyShareholdingTrend(activeStockProfile.ticker, promoterVal, 10);
+                labels = ["Q-3", "Q-2", "Q-1", "Current"];
+            }
+            chartLabels = labels;
+            chartData = promoterHistory;
+            title = `${activeStockProfile.ticker.split('.')[0]} Promoter Holding Trend`;
+            subtitle = "Promoter Ownership Velocity";
+            label = "Promoter Holding %";
+        } else if (metricType === 'public') {
+            let publicHistory = [];
+            let labels = [];
+            const history = window.activeShareholdingHistory;
+            if (history && history.symbol && activeStockProfile.ticker && 
+                history.symbol.split('.')[0].toUpperCase() === activeStockProfile.ticker.split('.')[0].toUpperCase()) {
+                const rawHistory = history.categories["Public"] || [];
+                if (rawHistory.length > 0) {
+                    publicHistory = [...rawHistory];
+                    labels = [...history.quarters];
+                }
+            }
+            if (publicHistory.length === 0) {
+                const publicVal = activeStockProfile.shareholding ? (activeStockProfile.shareholding.Public || activeStockProfile.shareholding["Public"] || 20.0) : 20.0;
+                publicHistory = generateQuarterlyShareholdingTrend(activeStockProfile.ticker, publicVal, 40);
+                labels = ["Q-3", "Q-2", "Q-1", "Current"];
+            }
+            chartLabels = labels;
+            chartData = publicHistory;
+            title = `${activeStockProfile.ticker.split('.')[0]} Retail & Public Holding Trend`;
+            subtitle = "Retail & Public Ownership Velocity";
+            label = "Public Holding %";
         }
         return { chartData, chartLabels, title, subtitle, label };
     }
@@ -26034,7 +26078,7 @@ function setupMetricHoverTooltips() {
         if (metricType === 'debteq') {
             const isDebtReduced = chartData[chartData.length - 1] <= chartData[0];
             lineColor = isDebtReduced ? '#10b981' : '#ef4444';
-        } else if (metricType === 'fii' || metricType === 'dii') {
+        } else if (metricType === 'fii' || metricType === 'dii' || metricType === 'promoter' || metricType === 'public') {
             const isUp = chartData[chartData.length - 1] >= chartData[0];
             lineColor = isUp ? '#10b981' : '#ef4444';
         } else if (metricType === 'pe') {
@@ -34928,7 +34972,9 @@ async function loadShareholdingData(symbol) {
     const detailedContainer = document.getElementById('sh-detailed-container');
     const detailedList = document.getElementById('sh-detailed-list');
     const detailedStatus = document.getElementById('sh-detailed-status');
+    const filterSelect = document.getElementById('sh-detailed-filter');
     
+    if (filterSelect) filterSelect.value = 'all';
     if (!qSelect) return;
     
     try {
@@ -35069,19 +35115,43 @@ async function loadShareholdingData(symbol) {
                 // Sort by value desc
                 holdersList.sort((a, b) => b.value - a.value);
                 
-                if (holdersList.length > 0) {
-                    detailedList.innerHTML = '';
-                    holdersList.forEach(h => {
-                        const item = document.createElement('div');
-                        item.className = 'sh-holder-item';
-                        item.innerHTML = `
-                            <span class="sh-holder-name">${h.name} <span style="font-size:8.5px; opacity:0.6; text-transform:uppercase;">(${h.category})</span></span>
-                            <span class="sh-holder-val">${h.value.toFixed(2)}%</span>
+                const filterSelect = document.getElementById('sh-detailed-filter');
+                const renderFilteredList = () => {
+                    const filterVal = filterSelect ? filterSelect.value : 'all';
+                    const filtered = filterVal === 'all' 
+                        ? holdersList 
+                        : holdersList.filter(h => h.category === filterVal);
+                        
+                    if (filtered.length > 0) {
+                        detailedList.innerHTML = '';
+                        filtered.forEach(h => {
+                            const item = document.createElement('div');
+                            item.className = 'sh-holder-item';
+                            item.innerHTML = `
+                                <span class="sh-holder-name">${h.name} <span style="font-size:8.5px; opacity:0.6; text-transform:uppercase;">(${h.category})</span></span>
+                                <span class="sh-holder-val">${h.value.toFixed(2)}%</span>
+                            `;
+                            detailedList.appendChild(item);
+                        });
+                        detailedContainer.style.display = 'block';
+                        if (detailedStatus) detailedStatus.textContent = "Data sourced from Screener.in integration.";
+                    } else {
+                        detailedList.innerHTML = `
+                            <div style="font-size: 10px; color: var(--text-muted); text-align: center; padding: 12px 8px;">
+                                No individual holdings >1% found for the selected category.
+                            </div>
                         `;
-                        detailedList.appendChild(item);
-                    });
-                    detailedContainer.style.display = 'block';
-                    if (detailedStatus) detailedStatus.textContent = "Data sourced from Screener.in integration.";
+                        detailedContainer.style.display = 'block';
+                        if (detailedStatus) detailedStatus.textContent = "";
+                    }
+                };
+                
+                if (filterSelect) {
+                    filterSelect.onchange = renderFilteredList;
+                }
+                
+                if (holdersList.length > 0) {
+                    renderFilteredList();
                 } else {
                     detailedList.innerHTML = '';
                     // Check if we have a cookie configured
