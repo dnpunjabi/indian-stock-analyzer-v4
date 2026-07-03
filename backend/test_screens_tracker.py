@@ -17,18 +17,20 @@ class TestScreensTrackerAPI(unittest.TestCase):
 
     @patch("requests.get")
     def test_scrape_saved_screens_mock(self, mock_get):
-        """Verify parsing of custom saved screens list from Screener.in."""
+        """Verify parsing of custom saved screens list from Screener.in explore dashboard."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = """
         <html>
             <body>
-                <div class="user-screens">
-                    <a href="/screen/user/10123/">High Growth Tech</a>
-                    <a href="/screen/user/20456/">Consistent Roce</a>
-                    <a href="/screen/raw/30789/">Value Under 15 PE</a>
-                    <!-- Standard links to ignore -->
-                    <a href="/screens/">Explore Screens</a>
+                <div class="card">
+                    <h2>Your screens</h2>
+                    <a class="screen-item" href="/screens/10123/high-growth-tech/">
+                        <div class="font-weight-500">High Growth Tech</div>
+                    </a>
+                    <a class="screen-item" href="/screens/20456/consistent-roce/">
+                        <div class="font-weight-500">Consistent Roce</div>
+                    </a>
                 </div>
             </body>
         </html>
@@ -36,11 +38,11 @@ class TestScreensTrackerAPI(unittest.TestCase):
         mock_get.return_value = mock_response
 
         screens = scrape_saved_screens("dummy_cookie")
-        self.assertEqual(len(screens), 3)
-        self.assertEqual(screens[0]["id"], "10123")
+        self.assertEqual(len(screens), 2)
+        self.assertEqual(screens[0]["id"], "/screens/10123/high-growth-tech/")
         self.assertEqual(screens[0]["name"], "High Growth Tech")
-        self.assertEqual(screens[1]["id"], "20456")
-        self.assertEqual(screens[2]["id"], "30789")
+        self.assertEqual(screens[1]["id"], "/screens/20456/consistent-roce/")
+        self.assertEqual(screens[1]["name"], "Consistent Roce")
 
     @patch("requests.get")
     def test_scrape_screen_results_mock(self, mock_get):
@@ -85,7 +87,7 @@ class TestScreensTrackerAPI(unittest.TestCase):
         """
         mock_get.return_value = mock_response
 
-        data = scrape_screen_results("10123", "dummy_cookie")
+        data = scrape_screen_results("/screens/10123/high-growth-tech/", "dummy_cookie")
         self.assertIn("companies", data)
         companies = data["companies"]
         self.assertEqual(len(companies), 2)
@@ -103,10 +105,19 @@ class TestScreensTrackerAPI(unittest.TestCase):
 
     @patch("requests.get")
     def test_api_screener_screens_endpoint(self, mock_get):
-        """Test the GET /api/screener/screens endpoint behavior when cookie is mock loaded."""
+        """Test the GET /api/screener-external/screens endpoint behavior when cookie is mock loaded."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.text = '<html><body><a href="/screen/user/10123/">High Growth Tech</a></body></html>'
+        mock_response.text = """
+        <html>
+            <body>
+                <div class="card">
+                    <h2>Your screens</h2>
+                    <a href="/screens/10123/high-growth-tech/"><div class="font-weight-500">High Growth Tech</div></a>
+                </div>
+            </body>
+        </html>
+        """
         mock_get.return_value = mock_response
 
         with patch("backend.main.get_db") as mock_get_db:
@@ -121,7 +132,7 @@ class TestScreensTrackerAPI(unittest.TestCase):
             data = response.json()
             self.assertIn("screens", data)
             self.assertTrue(len(data["screens"]) > 0)
-            self.assertEqual(data["screens"][0]["id"], "10123")
+            self.assertEqual(data["screens"][0]["id"], "/screens/10123/high-growth-tech/")
 
     @patch("requests.get")
     def test_api_screener_screens_preview_endpoint(self, mock_get):
@@ -151,7 +162,8 @@ class TestScreensTrackerAPI(unittest.TestCase):
             mock_conn.cursor.return_value = mock_cursor
             mock_cursor.fetchone.return_value = {"value": "dummy_cookie"}
             
-            response = self.client.get("/api/screener-external/screens/10123/preview")
+            # Using path param containing slashes
+            response = self.client.get("/api/screener-external/screens/screens/10123/high-growth-tech/preview")
             self.assertEqual(response.status_code, 200)
             data = response.json()
             self.assertIn("companies", data)

@@ -4455,7 +4455,7 @@ async def get_screener_screens():
     screens = scrape_saved_screens(cookie)
     return {"screens": screens}
 
-@app.get("/api/screener-external/screens/{screen_id}/preview")
+@app.get("/api/screener-external/screens/{screen_id:path}/preview")
 async def get_screener_screen_preview(screen_id: str, page: int = 1):
     """Fetches the preview list of equities for the specified screen ID."""
     from backend.screens_scraper import scrape_screen_results

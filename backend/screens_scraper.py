@@ -21,14 +21,15 @@ def get_session_cookies(session_cookie: str) -> dict:
 
 def scrape_saved_screens(session_cookie: str = None) -> list:
     """
-    Scrapes the authenticated user's custom saved screens from Screener.in.
+    Scrapes the authenticated user's custom saved screens from Screener.in's explore dashboard.
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     cookies = get_session_cookies(session_cookie)
     
-    url = "https://www.screener.in/screens/"
+    # We fetch /explore/ because it lists custom user screens under 'Your screens'
+    url = "https://www.screener.in/explore/"
     try:
         res = requests.get(url, headers=headers, cookies=cookies, timeout=15)
         if res.status_code != 200:
@@ -37,20 +38,40 @@ def scrape_saved_screens(session_cookie: str = None) -> list:
         soup = BeautifulSoup(res.text, "html.parser")
         screens = []
         
-        # Screener lists user screens under links matching /screen/user/{digits}/ or /screen/raw/{digits}/
-        # Let's search for these patterns
-        for link in soup.find_all('a', href=re.compile(r'/screen/(user|raw)/\d+/')):
-            href = link.get('href', '')
-            match = re.search(r'/screen/(user|raw)/(\d+)/', href)
-            if match:
-                screen_id = match.group(2)
-                name = link.get_text(strip=True)
-                # Eliminate standard links like popular screens
-                if screen_id and name and not any(s['id'] == screen_id for s in screens):
+        # 1. Look for the "Your screens" or "Custom screens" section header
+        header = soup.find(lambda tag: tag.name in ['h1', 'h2', 'h3', 'h4'] and 'your screens' in tag.get_text().lower())
+        if not header:
+            header = soup.find(lambda tag: tag.name in ['h1', 'h2', 'h3', 'h4'] and 'custom screens' in tag.get_text().lower())
+            
+        container = None
+        if header:
+            container = header.find_parent('div', class_='card')
+            if not container:
+                container = header.find_parent()
+                
+        if container:
+            for link in container.find_all('a', href=re.compile(r'/screens/\d+/')):
+                href = link.get('href', '')
+                div_tag = link.find('div', class_='font-weight-500')
+                name = div_tag.get_text(strip=True) if div_tag else link.get_text(strip=True)
+                if href and name:
                     screens.append({
-                        "id": screen_id,
+                        "id": href,
                         "name": name
                     })
+                    
+        # 2. Fallback to any /screens/\d+/ link on page if no custom section was located
+        if not screens:
+            for link in soup.find_all('a', href=re.compile(r'/screens/\d+/')):
+                href = link.get('href', '')
+                div_tag = link.find('div', class_='font-weight-500')
+                name = div_tag.get_text(strip=True) if div_tag else link.get_text(strip=True)
+                if href and name and not any(s['id'] == href for s in screens):
+                    screens.append({
+                        "id": href,
+                        "name": name
+                    })
+                    
         return screens
     except Exception as e:
         print(f"Failed to scrape saved screens: {e}")
@@ -59,26 +80,27 @@ def scrape_saved_screens(session_cookie: str = None) -> list:
 def scrape_screen_results(screen_id: str, session_cookie: str = None, page: int = 1) -> dict:
     """
     Executes and scrapes matching companies of a specific screen.
-    Returns:
-        {
-            "companies": [
-                {"symbol": "INFY", "name": "Infosys Ltd", "price": 1500.0, "pe": 25.0, "market_cap": 600000.0, "roce": 28.5}
-            ],
-            "total_pages": 1,
-            "current_page": 1
-        }
+    `screen_id` can be a raw numeric ID or a full path (e.g. /screens/156741/myfirst-query/)
     """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     cookies = get_session_cookies(session_cookie)
     
-    url = f"https://www.screener.in/screen/raw/{screen_id}/?page={page}"
+    # Clean screen_id and determine the exact request URL
+    clean_id = screen_id.strip()
+    if "screens/" in clean_id:
+        path = clean_id.lstrip("/")
+        url = f"https://www.screener.in/{path}?page={page}"
+    else:
+        # Fallback to internal raw screen results if it's a numeric ID
+        url = f"https://www.screener.in/screen/raw/{clean_id}/?page={page}"
+        
     try:
         res = requests.get(url, headers=headers, cookies=cookies, timeout=15)
         if res.status_code != 200:
             if res.status_code == 404:
-                return {"error": "Screen not found.", "companies": [], "total_pages": 1}
+                return {"error": f"Screen not found (URL: {url}).", "companies": [], "total_pages": 1}
             return {"error": f"Failed to retrieve screen. Status: {res.status_code}", "companies": [], "total_pages": 1}
             
         soup = BeautifulSoup(res.text, "html.parser")
