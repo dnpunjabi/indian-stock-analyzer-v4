@@ -280,6 +280,24 @@ def init_db():
         )
         """)
 
+        # Cache table for Shareholding Patterns
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cached_shareholdings (
+            symbol TEXT PRIMARY KEY,
+            data_json TEXT NOT NULL,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        # Cache table for Insider & Large Trades (Bulk, Block, SAST)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cached_trades (
+            symbol TEXT PRIMARY KEY,
+            data_json TEXT NOT NULL,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
 
         
         # Mock loader for history, block deals, and corporate actions if empty
@@ -4400,6 +4418,270 @@ async def delete_alert(alert_id: str):
             _ae.unregister_alert(alert_id)
         except Exception as e:
             print(f"Error unregistering alert: {e}")
+
+@app.get("/api/settings/screener-cookie")
+async def get_screener_cookie_settings():
+    """Retrieves the configured Screener session cookie."""
+    cookie = ""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+        row = cursor.fetchone()
+        if row:
+            cookie = row["value"]
+    return {"cookie": cookie}
+
+@app.post("/api/settings/screener-cookie")
+async def save_screener_cookie_settings(payload: dict):
+    """Saves or updates the Screener session cookie."""
+    cookie = payload.get("cookie", "").strip()
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('screener_session_cookie', ?)", (cookie,))
+        conn.commit()
+    return {"status": "success"}
+
+@app.get("/api/stocks/{symbol}/shareholding")
+async def get_stock_shareholding(symbol: str):
+    """Retrieves the shareholding pattern from 30-day SQLite cache or scrapes it on-demand."""
+    from backend.shareholding_scraper import scrape_shareholding_pattern, clean_symbol
+    from datetime import datetime, timedelta
+    import json
+    
+    base_symbol = clean_symbol(symbol)
+    if not base_symbol:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+        
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT data_json, last_updated FROM cached_shareholdings WHERE symbol = ?", (base_symbol,))
+        row = cursor.fetchone()
+        
+        if row:
+            try:
+                last_updated = datetime.strptime(row["last_updated"], "%Y-%m-%d %H:%M:%S")
+                # If cache is valid (under 30 days old), return it instantly
+                if datetime.now() - last_updated < timedelta(days=30):
+                    return json.loads(row["data_json"])
+            except Exception:
+                pass
+                
+        # Fetch Screener session cookie
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+        cookie_row = cursor.fetchone()
+        cookie = cookie_row["value"] if cookie_row else None
+        
+        # Fetch company name if available to resolve custom URL slugs (e.g., TMCV for Tata Motors)
+        cursor.execute(
+            "SELECT company_name FROM screener_universe WHERE symbol = ? OR symbol = ? OR symbol LIKE ?",
+            (base_symbol, base_symbol + ".NS", base_symbol + "%")
+        )
+        profile_row = cursor.fetchone()
+        company_name = profile_row["company_name"] if profile_row else None
+        
+    # Cache miss or expired -> Scrape page
+    data = scrape_shareholding_pattern(base_symbol, cookie, company_name=company_name)
+    if not data or "error" in data:
+        raise HTTPException(status_code=500, detail=data.get("error", "Failed to retrieve shareholding pattern."))
+        
+    # Save back to SQLite cache
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR REPLACE INTO cached_shareholdings (symbol, data_json, last_updated) VALUES (?, ?, ?)",
+            (base_symbol, json.dumps(data), now_str)
+        )
+        conn.commit()
+        
+    return data
+
+@app.get("/api/stocks/{symbol}/trades")
+async def get_stock_trades(symbol: str):
+    """Retrieves insider, bulk, and block deals for a single stock, cached for 24 hours."""
+    from backend.trades_scraper import scrape_trades, clean_symbol
+    from datetime import datetime, timedelta
+    import json
+    
+    base_symbol = clean_symbol(symbol)
+    if not base_symbol:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+        
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT data_json, last_updated FROM cached_trades WHERE symbol = ?", (base_symbol,))
+        row = cursor.fetchone()
+        
+        if row:
+            try:
+                last_updated = datetime.strptime(row["last_updated"], "%Y-%m-%d %H:%M:%S")
+                # Cache validity: 24 hours (deals are updated daily)
+                if datetime.now() - last_updated < timedelta(hours=24):
+                    return json.loads(row["data_json"])
+            except Exception:
+                pass
+                
+        # Fetch Screener session cookie
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+        cookie_row = cursor.fetchone()
+        cookie = cookie_row["value"] if cookie_row else None
+        
+        # Fetch company name if available to resolve custom URL slugs
+        cursor.execute(
+            "SELECT company_name FROM screener_universe WHERE symbol = ? OR symbol = ? OR symbol LIKE ?",
+            (base_symbol, base_symbol + ".NS", base_symbol + "%")
+        )
+        profile_row = cursor.fetchone()
+        company_name = profile_row["company_name"] if profile_row else None
+        
+    # Cache miss or expired -> Scrape page
+    data = scrape_trades(base_symbol, cookie, company_name=company_name)
+    if not data or "error" in data:
+        if data and "error" in data:
+            return {"symbol": base_symbol, "insider_trades": [], "bulk_deals": [], "block_deals": [], "error": data["error"]}
+        raise HTTPException(status_code=500, detail="Failed to retrieve trades.")
+        
+    # Save back to SQLite cache
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR REPLACE INTO cached_trades (symbol, data_json, last_updated) VALUES (?, ?, ?)",
+            (base_symbol, json.dumps(data), now_str)
+        )
+        conn.commit()
+        
+    return data
+
+@app.get("/api/trades/global-scanner")
+async def get_global_trades(
+    min_value: int = 0,
+    trade_type: str = "All",
+    action_type: str = "All",
+    search: str = "",
+    duration_days: int = 90
+):
+    """Aggregates all cached trades and filters them for market discovery."""
+    import json
+    from datetime import datetime
+    all_deals = []
+    
+    # Pre-populate cache if it's completely empty to ensure user gets immediate results
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as cnt FROM cached_trades")
+        count = cursor.fetchone()["cnt"]
+        
+    if count == 0:
+        seeds = ["INFY", "TATAMOTORS", "RELIANCE", "BOSCHLTD", "TCS", "HDFCBANK"]
+        # Fetch Screener session cookie
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+            cookie_row = cursor.fetchone()
+            cookie = cookie_row["value"] if cookie_row else None
+            
+        from backend.trades_scraper import scrape_trades
+        for s in seeds:
+            # Get company name
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT company_name FROM screener_universe WHERE symbol LIKE ?", (s + "%",))
+                p_row = cursor.fetchone()
+                c_name = p_row["company_name"] if p_row else None
+            try:
+                data = scrape_trades(s, cookie, company_name=c_name)
+                if data and "error" not in data:
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    with get_db() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "INSERT OR REPLACE INTO cached_trades (symbol, data_json, last_updated) VALUES (?, ?, ?)",
+                            (s, json.dumps(data), now_str)
+                        )
+                        conn.commit()
+            except Exception:
+                pass
+                
+    # Query all cached trades
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT symbol, data_json FROM cached_trades")
+        rows = cursor.fetchall()
+        
+    for row in rows:
+        symbol = row["symbol"]
+        try:
+            data = json.loads(row["data_json"])
+        except Exception:
+            continue
+            
+        # Merge insider, bulk, block trades
+        for item in data.get("insider_trades", []):
+            item["category"] = "Insider"
+            item["symbol"] = symbol
+            all_deals.append(item)
+            
+        for item in data.get("bulk_deals", []):
+            item["category"] = "Bulk"
+            item["symbol"] = symbol
+            item["relation"] = ""
+            all_deals.append(item)
+            
+        for item in data.get("block_deals", []):
+            item["category"] = "Block"
+            item["symbol"] = symbol
+            item["relation"] = ""
+            all_deals.append(item)
+            
+        for item in data.get("sast_deals", []):
+            item["category"] = "SAST"
+            item["symbol"] = symbol
+            all_deals.append(item)
+            
+    # Sort helper defined beforehand so we can use it for duration cutoff
+    def parse_deal_date(date_str):
+        if not date_str:
+            return datetime.min
+        for fmt in ('%d %b %Y', '%b %Y'):
+            try:
+                return datetime.strptime(date_str, fmt)
+            except ValueError:
+                pass
+        return datetime.min
+
+    now = datetime.now()
+    cutoff = None
+    if duration_days > 0:
+        from datetime import timedelta
+        cutoff = now - timedelta(days=duration_days)
+
+    # Apply filters
+    filtered_deals = []
+    search_lower = search.strip().lower()
+    
+    for d in all_deals:
+        if search_lower and search_lower not in d["symbol"].lower():
+            continue
+            
+        if min_value > 0 and d["value"] < min_value:
+            continue
+            
+        if trade_type != "All" and d["category"] != trade_type:
+            continue
+            
+        if action_type != "All" and d["type"] != action_type:
+            continue
+            
+        if cutoff:
+            deal_dt = parse_deal_date(d.get("date"))
+            if deal_dt != datetime.min and deal_dt < cutoff:
+                continue
+                
+        filtered_deals.append(d)
+        
+    filtered_deals.sort(key=lambda x: parse_deal_date(x.get("date")), reverse=True)
+    return filtered_deals
 
 async def evaluate_single_condition_bool(cond_type: str, op: str, val_str: str, t: dict, df) -> tuple:
     triggered = False

@@ -1909,6 +1909,59 @@ class TestWhatsAppDailyWrapup(unittest.TestCase):
         self.assertIn("PORTFOLIO DAILY STATUS", data["message_body"])
         self.assertIn("AI COPILOT BRIEFING", data["message_body"])
 
+    def test_screener_cookie_endpoints(self):
+        """Verifies cookie setting CRUD API."""
+        # 1. Post a new cookie
+        res = self.client.post("/api/settings/screener-cookie", json={"cookie": "test_cookie_12345"})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), {"status": "success"})
+
+        # 2. Get the cookie
+        res_get = self.client.get("/api/settings/screener-cookie")
+        self.assertEqual(res_get.status_code, 200)
+        self.assertEqual(res_get.json(), {"cookie": "test_cookie_12345"})
+
+    @patch("backend.shareholding_scraper.scrape_shareholding_pattern")
+    def test_shareholding_endpoint(self, mock_scrape):
+        """Verifies shareholding endpoint loads from cache/scraper."""
+        mock_scrape.return_value = {
+            "quarters": ["Jun 2026", "Sep 2026"],
+            "categories": {
+                "Promoters": [50.0, 50.0],
+                "FIIs": [15.0, 16.0],
+                "DIIs": [15.0, 14.0],
+                "Public": [20.0, 20.0]
+            },
+            "detailed": {
+                "promoters": {},
+                "fii": {},
+                "dii": {
+                    "SBI Bluechip Fund": {"Jun 2026": 2.5, "Sep 2026": 2.6}
+                },
+                "public": {}
+            }
+        }
+
+        # Clear cache first to ensure cache-miss scrapes
+        with get_db() as conn:
+            conn.execute("DELETE FROM cached_shareholdings")
+            conn.commit()
+
+        # Query shareholding for INFY
+        res = self.client.get("/api/stocks/INFY/shareholding")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertIn("quarters", data)
+        self.assertEqual(data["quarters"], ["Jun 2026", "Sep 2026"])
+        self.assertEqual(data["categories"]["Promoters"], [50.0, 50.0])
+        
+        # Verify it cached the result
+        with get_db() as conn:
+            row = conn.execute("SELECT data_json FROM cached_shareholdings WHERE symbol = 'INFY'").fetchone()
+            self.assertIsNotNone(row)
+            cached_data = json.loads(row[0])
+            self.assertEqual(cached_data["quarters"], ["Jun 2026", "Sep 2026"])
+
 
 if __name__ == "__main__":
     unittest.main()

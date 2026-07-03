@@ -931,6 +931,8 @@ async function fetchLLMConfig() {
 
 document.addEventListener('DOMContentLoaded', () => {
     fetchLLMConfig();
+    fetchScreenerCookieSettings();
+    setupScreenerCookieListeners();
     // Check if Angel One is configured before connecting WS
     fetch('/api/angel/status').then(r => r.json()).then(status => {
         if (status.connected || status.authenticated) {
@@ -1173,6 +1175,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Connect to Backend WebSocket
     connectLiveTicksWS();
+
+    // Initialize Insider & Large Trades tracker UI
+    setupTradesHandlers();
+    loadGlobalTrades();
 });
 
 // Collapsible Sidebar Workstation Manager
@@ -5005,6 +5011,10 @@ async function loadStockAnalyzer(query, force_llm = false) {
             progressConsole.appendChild(line);
             progressConsole.scrollTop = progressConsole.scrollHeight;
         }
+
+        // Load advanced shareholding and institutional holdings data
+        loadShareholdingData(profile.ticker);
+        loadStockTrades(profile.ticker);
 
         setTimeout(() => {
             hideLoader();
@@ -9635,6 +9645,8 @@ function setupAlertCenter() {
     fetchWhatsAppSettings();
     fetchDailyWrapupSettings();
     setupDailyWrapupListeners();
+    fetchScreenerCookieSettings();
+    setupScreenerCookieListeners();
     fetchAlertsList();
     startRealTimeAlertScanner();
 
@@ -10428,6 +10440,43 @@ function setupDailyWrapupListeners() {
         closePreviewBtn.addEventListener('click', () => {
             const previewContainer = document.getElementById('wrapup-preview-container');
             if (previewContainer) previewContainer.style.display = 'none';
+        });
+    }
+}
+
+async function fetchScreenerCookieSettings() {
+    try {
+        const response = await fetch('/api/settings/screener-cookie');
+        if (!response.ok) return;
+        const data = await response.json();
+        const cookieInput = document.getElementById('screener-session-cookie');
+        if (cookieInput) cookieInput.value = data.cookie || "";
+    } catch (err) {
+        console.error("Failed to fetch Screener session cookie settings:", err);
+    }
+}
+
+function setupScreenerCookieListeners() {
+    const saveBtn = document.getElementById('save-screener-cookie-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', async () => {
+            const cookie = document.getElementById('screener-session-cookie')?.value;
+            try {
+                const response = await fetch('/api/settings/screener-cookie', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cookie })
+                });
+                if (response.ok) {
+                    showToast("Screener.in session cookie updated successfully.", "success");
+                    await fetchScreenerCookieSettings();
+                } else {
+                    showToast("Failed to save Screener session cookie.", "error");
+                }
+            } catch (err) {
+                console.error("Error saving Screener cookie:", err);
+                showToast("Error updating Screener session cookie.", "error");
+            }
         });
     }
 }
@@ -18064,6 +18113,14 @@ function setupAnalyzerSubtabs() {
             if (activeSubtab === 'volume') {
                 if (activeStockProfile && activeStockProfile.ticker) {
                     loadPriceVolumeDynamics(activeStockProfile.ticker);
+                } else {
+                    showToast("Please load a stock analyzer profile first.", "warning");
+                }
+            }
+
+            if (activeSubtab === 'trades') {
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    loadStockTrades(activeStockProfile.ticker);
                 } else {
                     showToast("Please load a stock analyzer profile first.", "warning");
                 }
@@ -34826,4 +34883,609 @@ window.selectAcademyPrompt = function(promptText) {
         }, 800);
     }
 };
+
+async function loadShareholdingData(symbol) {
+    const qSelect = document.getElementById('sh-quarter-select');
+    const detailedContainer = document.getElementById('sh-detailed-container');
+    const detailedList = document.getElementById('sh-detailed-list');
+    const detailedStatus = document.getElementById('sh-detailed-status');
+    
+    if (!qSelect) return;
+    
+    try {
+        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/shareholding`);
+        if (!response.ok) {
+            console.warn("Shareholding API fetch failed");
+            return;
+        }
+        
+        const data = await response.json();
+        if (data.error || !data.quarters || data.quarters.length === 0) {
+            console.warn("Invalid shareholding data returned:", data.error || "no quarters");
+            return;
+        }
+        
+        const quarters = data.quarters;
+        const categories = data.categories;
+        const detailed = data.detailed || {};
+        
+        // Populate dropdown selector
+        qSelect.innerHTML = '';
+        quarters.forEach((q, idx) => {
+            const opt = document.createElement('option');
+            opt.value = q;
+            opt.textContent = q;
+            if (idx === quarters.length - 1) {
+                opt.selected = true;
+            }
+            qSelect.appendChild(opt);
+        });
+        
+        const updateUIForQuarter = (selectedQ) => {
+            const idx = quarters.indexOf(selectedQ);
+            if (idx === -1) return;
+            
+            const promoters = categories["Promoters"] ? categories["Promoters"][idx] || 0.0 : 0.0;
+            const fiis = categories["FIIs"] ? categories["FIIs"][idx] || 0.0 : 0.0;
+            const diis = categories["DIIs"] ? categories["DIIs"][idx] || 0.0 : 0.0;
+            const gov = categories["Government"] ? categories["Government"][idx] || 0.0 : 0.0;
+            const publicVal = categories["Public"] ? categories["Public"][idx] || 0.0 : 0.0;
+            
+            // 1. Update Segment widths
+            const barPromoter = document.getElementById('sh-bar-promoter');
+            const barFii = document.getElementById('sh-bar-fii');
+            const barDii = document.getElementById('sh-bar-dii');
+            const barGov = document.getElementById('sh-bar-government');
+            const barPublic = document.getElementById('sh-bar-public');
+            
+            if (barPromoter) barPromoter.style.width = `${promoters}%`;
+            if (barFii) barFii.style.width = `${fiis}%`;
+            if (barDii) barDii.style.width = `${diis}%`;
+            if (barGov) barGov.style.width = `${gov}%`;
+            if (barPublic) barPublic.style.width = `${publicVal}%`;
+            
+            // 2. Set tooltips
+            if (barPromoter) barPromoter.title = `Promoters: ${promoters.toFixed(2)}%`;
+            if (barFii) barFii.title = `FIIs: ${fiis.toFixed(2)}%`;
+            if (barDii) barDii.title = `DIIs: ${diis.toFixed(2)}%`;
+            if (barGov) barGov.title = `Government: ${gov.toFixed(2)}%`;
+            if (barPublic) barPublic.title = `Public: ${publicVal.toFixed(2)}%`;
+
+            // 2.5 Update Summary Tab Segment widths & labels
+            const sumBarPromoter = document.getElementById('summary-sh-bar-promoter');
+            const sumBarFii = document.getElementById('summary-sh-bar-fii');
+            const sumBarDii = document.getElementById('summary-sh-bar-dii');
+            const sumBarGov = document.getElementById('summary-sh-bar-government');
+            const sumBarPublic = document.getElementById('summary-sh-bar-public');
+            
+            if (sumBarPromoter) sumBarPromoter.style.width = `${promoters}%`;
+            if (sumBarFii) sumBarFii.style.width = `${fiis}%`;
+            if (sumBarDii) sumBarDii.style.width = `${diis}%`;
+            if (sumBarGov) sumBarGov.style.width = `${gov}%`;
+            if (sumBarPublic) sumBarPublic.style.width = `${publicVal}%`;
+            
+            if (sumBarPromoter) sumBarPromoter.title = `Promoters: ${promoters.toFixed(2)}%`;
+            if (sumBarFii) sumBarFii.title = `FIIs: ${fiis.toFixed(2)}%`;
+            if (sumBarDii) sumBarDii.title = `DIIs: ${diis.toFixed(2)}%`;
+            if (sumBarGov) sumBarGov.title = `Government: ${gov.toFixed(2)}%`;
+            if (sumBarPublic) sumBarPublic.title = `Public: ${publicVal.toFixed(2)}%`;
+
+            const sumQ = document.getElementById('summary-sh-quarter-label');
+            if (sumQ) sumQ.textContent = selectedQ;
+
+            const sumPromoterVal = document.getElementById('summary-sh-promoter-val');
+            const sumFiiVal = document.getElementById('summary-sh-fii-val');
+            const sumDiiVal = document.getElementById('summary-sh-dii-val');
+            const sumGovVal = document.getElementById('summary-sh-government-val');
+            const sumPublicVal = document.getElementById('summary-sh-public-val');
+
+            if (sumPromoterVal) sumPromoterVal.textContent = `${promoters.toFixed(1)}%`;
+            if (sumFiiVal) sumFiiVal.textContent = `${fiis.toFixed(1)}%`;
+            if (sumDiiVal) sumDiiVal.textContent = `${diis.toFixed(1)}%`;
+            if (sumGovVal) sumGovVal.textContent = `${gov.toFixed(1)}%`;
+            if (sumPublicVal) sumPublicVal.textContent = `${publicVal.toFixed(1)}%`;
+            
+            // 3. Update pill text and change indicators
+            const updatePill = (id, curVal, catKey) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                
+                let changeHtml = '';
+                if (idx > 0 && categories[catKey]) {
+                    const prevVal = categories[catKey][idx - 1] || 0.0;
+                    const diff = curVal - prevVal;
+                    if (diff > 0.01) {
+                        changeHtml = ` <span style="font-size:8px; color:var(--color-emerald); font-weight:bold;">▲ +${diff.toFixed(2)}%</span>`;
+                    } else if (diff < -0.01) {
+                        changeHtml = ` <span style="font-size:8px; color:var(--color-crimson); font-weight:bold;">▼ ${diff.toFixed(2)}%</span>`;
+                    }
+                }
+                
+                el.innerHTML = `${curVal.toFixed(1)}%${changeHtml}`;
+            };
+            
+            updatePill('sh-promoter', promoters, "Promoters");
+            updatePill('sh-fii', fiis, "FIIs");
+            updatePill('sh-dii', diis, "DIIs");
+            updatePill('sh-public', publicVal, "Public");
+            
+            // 4. Update Detailed Holdings if present
+            if (detailedContainer && detailedList) {
+                const holdersList = [];
+                for (const cat of ["promoters", "fii", "dii", "public"]) {
+                    if (detailed[cat]) {
+                        for (const [name, qVals] of Object.entries(detailed[cat])) {
+                            if (qVals[selectedQ] !== undefined) {
+                                holdersList.push({
+                                    name: name,
+                                    value: qVals[selectedQ],
+                                    category: cat
+                                });
+                            }
+                        }
+                    }
+                }
+                
+                // Sort by value desc
+                holdersList.sort((a, b) => b.value - a.value);
+                
+                if (holdersList.length > 0) {
+                    detailedList.innerHTML = '';
+                    holdersList.forEach(h => {
+                        const item = document.createElement('div');
+                        item.className = 'sh-holder-item';
+                        item.innerHTML = `
+                            <span class="sh-holder-name">${h.name} <span style="font-size:8.5px; opacity:0.6; text-transform:uppercase;">(${h.category})</span></span>
+                            <span class="sh-holder-val">${h.value.toFixed(2)}%</span>
+                        `;
+                        detailedList.appendChild(item);
+                    });
+                    detailedContainer.style.display = 'block';
+                    if (detailedStatus) detailedStatus.textContent = "Data sourced from Screener.in integration.";
+                } else {
+                    detailedList.innerHTML = '';
+                    // Check if we have a cookie configured
+                    fetch('/api/settings/screener-cookie')
+                        .then(r => r.json())
+                        .then(cookieData => {
+                            if (!cookieData.cookie) {
+                                detailedContainer.style.display = 'block';
+                                detailedList.innerHTML = `
+                                    <div style="font-size: 10px; color: var(--text-muted); text-align: center; padding: 12px 8px; border: 1px dashed var(--border-glass); border-radius: 6px; line-height: 1.45; background: rgba(0,0,0,0.1);">
+                                        🔒 Detailed Holdings Locked<br>
+                                        <span style="font-size: 9px; opacity: 0.8;">Configure your <strong>Screener.in Session Cookie</strong> in Settings to automatically unlock names of mutual funds and institutions.</span>
+                                    </div>
+                                `;
+                                if (detailedStatus) detailedStatus.textContent = "";
+                            } else {
+                                detailedContainer.style.display = 'block';
+                                if (detailedStatus) detailedStatus.textContent = "No individual holdings >1% found for this quarter.";
+                            }
+                        });
+                }
+            }
+        };
+        
+        // Initial render of latest quarter
+        const latestQ = quarters[quarters.length - 1];
+        updateUIForQuarter(latestQ);
+        
+        // Handle dropdown selection changes
+        qSelect.onchange = (e) => {
+            updateUIForQuarter(e.target.value);
+        };
+        
+    } catch (err) {
+        console.error("Error loading shareholding data:", err);
+    }
+}
+
+// ==========================================
+// 🤝 INSIDER ACTIVITY & LARGE DEALS TRACKER
+// ==========================================
+
+let currentStockTrades = null;
+let currentStockTradesFilter = "all";
+
+async function loadStockTrades(symbol) {
+    const timelineContainer = document.getElementById('trades-timeline-container');
+    const badge = document.getElementById('trades-ticker-badge');
+    const warningBadge = document.getElementById('trades-cookie-warning-badge');
+    
+    if (badge) badge.textContent = symbol;
+    
+    if (timelineContainer) {
+        timelineContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 30px; font-size: 11.5px;">Loading transaction feed...</div>';
+    }
+    
+    try {
+        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/trades`);
+        if (!response.ok) throw new Error("API call failed");
+        
+        const data = await response.json();
+        currentStockTrades = data;
+        
+        if (warningBadge) {
+            if (data.error) {
+                warningBadge.innerHTML = `<span style="color: var(--color-amber); background: rgba(245,158,11,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(245,158,11,0.25);">🔒 Cookie Expired/Not Set</span>`;
+            } else {
+                warningBadge.innerHTML = `<span style="color: var(--color-emerald); background: rgba(16,185,129,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.25);">✓ Authenticated</span>`;
+            }
+        }
+        
+        renderTradesTimeline();
+        
+    } catch (err) {
+        console.error("Error loading trades:", err);
+        if (timelineContainer) {
+            timelineContainer.innerHTML = `<div style="text-align: center; color: var(--color-crimson); padding: 30px; font-size: 11.5px;">Error: ${err.message}</div>`;
+        }
+    }
+}
+
+function calculateTradesSummaries(filteredDeals, durationDays) {
+    const buyValEl = document.getElementById('summary-trades-buy-val');
+    const buyCountEl = document.getElementById('summary-trades-buy-count');
+    const sellValEl = document.getElementById('summary-trades-sell-val');
+    const sellCountEl = document.getElementById('summary-trades-sell-count');
+    const biasValEl = document.getElementById('summary-trades-bias-val');
+    const biasLabelEl = document.getElementById('summary-trades-bias-label');
+    
+    // Update labels dynamically based on timeframe
+    if (buyValEl) {
+        const buyLabelTitle = buyValEl.previousElementSibling;
+        if (buyLabelTitle) {
+            let labelSuffix = "(12M)";
+            if (durationDays === 30) labelSuffix = "(30D)";
+            else if (durationDays === 90) labelSuffix = "(90D)";
+            else if (durationDays === 180) labelSuffix = "(6M)";
+            else if (durationDays === 365) labelSuffix = "(12M)";
+            else if (durationDays === 0) labelSuffix = "(All Time)";
+            buyLabelTitle.textContent = `Promoter Buying ${labelSuffix}`;
+        }
+    }
+    if (sellValEl) {
+        const sellLabelTitle = sellValEl.previousElementSibling;
+        if (sellLabelTitle) {
+            let labelSuffix = "(12M)";
+            if (durationDays === 30) labelSuffix = "(30D)";
+            else if (durationDays === 90) labelSuffix = "(90D)";
+            else if (durationDays === 180) labelSuffix = "(6M)";
+            else if (durationDays === 365) labelSuffix = "(12M)";
+            else if (durationDays === 0) labelSuffix = "(All Time)";
+            sellLabelTitle.textContent = `Promoter Selling ${labelSuffix}`;
+        }
+    }
+    
+    let totalBuy = 0;
+    let buyCount = 0;
+    let totalSell = 0;
+    let sellCount = 0;
+    
+    filteredDeals.forEach(t => {
+        if (t.category === "Insider") {
+            if (t.type === "Buy") {
+                totalBuy += t.value;
+                buyCount++;
+            } else {
+                totalSell += t.value;
+                sellCount++;
+            }
+        }
+    });
+    
+    if (buyValEl) buyValEl.textContent = formatIndianRupees(totalBuy);
+    if (buyCountEl) buyCountEl.textContent = `${buyCount} buy transactions`;
+    if (sellValEl) sellValEl.textContent = formatIndianRupees(totalSell);
+    if (sellCountEl) sellCountEl.textContent = `${sellCount} sell transactions`;
+    
+    if (biasValEl && biasLabelEl) {
+        if (totalBuy === 0 && totalSell === 0) {
+            biasValEl.textContent = "NEUTRAL";
+            biasValEl.style.color = "var(--text-primary)";
+            biasLabelEl.textContent = "No insider trades found";
+        } else {
+            const netVal = totalBuy - totalSell;
+            if (netVal > 0) {
+                biasValEl.textContent = "BULLISH";
+                biasValEl.style.color = "var(--color-emerald)";
+                biasLabelEl.textContent = `Net Promoter Inflow of ${formatIndianRupees(netVal)}`;
+            } else if (netVal < 0) {
+                biasValEl.textContent = "BEARISH";
+                biasValEl.style.color = "var(--color-crimson)";
+                biasLabelEl.textContent = `Net Promoter Outflow of ${formatIndianRupees(Math.abs(netVal))}`;
+            } else {
+                biasValEl.textContent = "NEUTRAL";
+                biasValEl.style.color = "var(--text-primary)";
+                biasLabelEl.textContent = "Balanced buying and selling";
+            }
+        }
+    }
+}
+
+function formatIndianRupees(num) {
+    if (num === 0) return "₹0.00";
+    if (num >= 10000000) {
+        return "₹" + (num / 10000000).toFixed(2) + " Cr";
+    } else if (num >= 100000) {
+        return "₹" + (num / 100000).toFixed(2) + " L";
+    }
+    return "₹" + num.toLocaleString("en-IN");
+}
+
+function renderTradesTimeline() {
+    const timelineContainer = document.getElementById('trades-timeline-container');
+    if (!timelineContainer || !currentStockTrades) return;
+    
+    let allDeals = [];
+    
+    if (currentStockTradesFilter === "all" || currentStockTradesFilter === "insider") {
+        (currentStockTrades.insider_trades || []).forEach(d => {
+            allDeals.push({
+                date: d.date,
+                person: d.person,
+                relation: d.relation,
+                type: d.type,
+                quantity: d.quantity,
+                price: d.price,
+                value: d.value,
+                category: "Insider"
+            });
+        });
+    }
+    
+    if (currentStockTradesFilter === "all" || currentStockTradesFilter === "bulk") {
+        (currentStockTrades.bulk_deals || []).forEach(d => {
+            allDeals.push({
+                date: d.date,
+                person: d.person,
+                relation: "",
+                type: d.type,
+                quantity: d.quantity,
+                price: d.price,
+                value: d.value,
+                category: "Bulk"
+            });
+        });
+    }
+    
+    if (currentStockTradesFilter === "all" || currentStockTradesFilter === "block") {
+        (currentStockTrades.block_deals || []).forEach(d => {
+            allDeals.push({
+                date: d.date,
+                person: d.person,
+                relation: "",
+                type: d.type,
+                quantity: d.quantity,
+                price: d.price,
+                value: d.value,
+                category: "Block"
+            });
+        });
+    }
+    
+    if (currentStockTradesFilter === "all" || currentStockTradesFilter === "sast") {
+        (currentStockTrades.sast_deals || []).forEach(d => {
+            allDeals.push({
+                date: d.date,
+                person: d.person,
+                relation: d.relation,
+                type: d.type,
+                quantity: d.quantity,
+                price: d.price,
+                value: d.value,
+                category: "SAST"
+            });
+        });
+    }
+    
+    const parseDealDate = (dateStr) => {
+        if (!dateStr) return new Date(0);
+        const parts = dateStr.split(' ');
+        if (parts.length === 3) {
+            return new Date(dateStr);
+        } else if (parts.length === 2) {
+            return new Date(`1 ${dateStr}`);
+        }
+        return new Date(0);
+    };
+
+    const durationFilter = document.getElementById('trades-duration-filter');
+    const durationDays = durationFilter ? parseInt(durationFilter.value, 10) : 90;
+    if (durationDays > 0) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - durationDays);
+        allDeals = allDeals.filter(d => {
+            const dDate = parseDealDate(d.date);
+            return dDate.getTime() >= cutoffDate.getTime();
+        });
+    }
+    
+    // Dynamically calculate and update scorecard metrics based on filtered deals
+    calculateTradesSummaries(allDeals, durationDays);
+    
+    allDeals.sort((a, b) => parseDealDate(b.date) - parseDealDate(a.date));
+    
+    if (allDeals.length === 0) {
+        timelineContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 35px; font-size: 11.5px;">No transactions found under this category filter.</div>`;
+        return;
+    }
+    
+    timelineContainer.innerHTML = '';
+    allDeals.forEach(deal => {
+        const item = document.createElement('div');
+        item.className = 'timeline-item-row';
+        item.style.display = 'flex';
+        item.style.flexDirection = 'column';
+        item.style.gap = '6px';
+        item.style.border = '1px solid var(--border-glass)';
+        item.style.borderRadius = '8px';
+        item.style.padding = '12px 15px';
+        item.style.background = 'var(--bg-card-hover)';
+        item.style.boxSizing = 'border-box';
+        
+        const typeBadge = deal.type === "Buy" ? 
+            `<span style="background: rgba(16,185,129,0.1); color: var(--color-emerald); font-weight:700; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid rgba(16,185,129,0.2);">BUY</span>` : 
+            `<span style="background: rgba(239,68,68,0.1); color: var(--color-crimson); font-weight:700; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid rgba(239,68,68,0.2);">SELL</span>`;
+            
+        const categoryBadge = `<span style="background: rgba(255,255,255,0.06); color: var(--text-secondary); font-weight:600; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid var(--border-glass); text-transform: uppercase;">${deal.category}</span>`;
+        
+        const relationLabel = deal.relation ? `<span style="font-size: 10px; color: var(--text-muted); font-style: italic;">(${deal.relation})</span>` : '';
+        
+        item.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 700; font-size: 12.5px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    ${deal.person} ${relationLabel}
+                </span>
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">${deal.date}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 4px; border-top: 1px dashed var(--border-glass); padding-top: 8px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    ${typeBadge}
+                    ${categoryBadge}
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary);">
+                    <strong>${deal.quantity.toLocaleString("en-IN")}</strong> shares 
+                    ${deal.price > 0 ? `@ ₹${deal.price.toLocaleString("en-IN")} ` : ''}
+                    ${deal.value > 0 ? `&rarr; <strong style="color: var(--text-primary); font-family: 'Outfit'; font-size: 13px;">${formatIndianRupees(deal.value)}</strong>` : ''}
+                </div>
+            </div>
+        `;
+        timelineContainer.appendChild(item);
+    });
+}
+
+async function loadGlobalTrades() {
+    const container = document.getElementById('global-trades-container');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 30px; font-size: 11.5px;">Loading large deals sweep...</div>';
+    
+    const typeSelect = document.getElementById('global-trades-type-select');
+    const actionSelect = document.getElementById('global-trades-action-select');
+    const minValSelect = document.getElementById('global-trades-min-value');
+    const durationSelect = document.getElementById('global-trades-duration');
+    const searchInput = document.getElementById('global-trades-search-input');
+    
+    const type = typeSelect ? typeSelect.value : 'All';
+    const action = actionSelect ? actionSelect.value : 'All';
+    const minVal = minValSelect ? minValSelect.value : 0;
+    const duration = durationSelect ? durationSelect.value : 90;
+    const search = searchInput ? searchInput.value.trim() : '';
+    
+    try {
+        const url = `/api/trades/global-scanner?trade_type=${encodeURIComponent(type)}&action_type=${encodeURIComponent(action)}&min_value=${minVal}&search=${encodeURIComponent(search)}&duration_days=${duration}`;
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("API call failed");
+        
+        const deals = await response.json();
+        
+        if (deals.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 35px; font-size: 11.5px;">No transactions matching the filters were found. Try clicking "Refresh Feed" or clearing search filters.</div>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        deals.forEach(deal => {
+            const item = document.createElement('div');
+            item.className = 'timeline-item-row';
+            item.style.display = 'flex';
+            item.style.flexDirection = 'column';
+            item.style.gap = '6px';
+            item.style.border = '1px solid var(--border-glass)';
+            item.style.borderRadius = '8px';
+            item.style.padding = '12px 15px';
+            item.style.background = 'var(--bg-card-hover)';
+            item.style.boxSizing = 'border-box';
+            
+            const typeBadge = deal.type === "Buy" ? 
+                `<span style="background: rgba(16,185,129,0.1); color: var(--color-emerald); font-weight:700; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid rgba(16,185,129,0.2);">BUY</span>` : 
+                `<span style="background: rgba(239,68,68,0.1); color: var(--color-crimson); font-weight:700; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid rgba(239,68,68,0.2);">SELL</span>`;
+                
+            const categoryBadge = `<span style="background: rgba(255,255,255,0.06); color: var(--text-secondary); font-weight:600; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid var(--border-glass); text-transform: uppercase;">${deal.category}</span>`;
+            
+            const relationLabel = deal.relation ? `<span style="font-size: 10px; color: var(--text-muted); font-style: italic;">(${deal.relation})</span>` : '';
+            
+            item.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700; font-size: 12.5px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                        <span onclick="window.loadStockFromTrades('${deal.symbol}')" style="color: var(--color-primary); cursor: pointer; text-decoration: underline;" title="Click to open this stock's profile">${deal.symbol}</span>
+                        <span>&bull;</span>
+                        ${deal.person} ${relationLabel}
+                    </span>
+                    <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">${deal.date}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 4px; border-top: 1px dashed var(--border-glass); padding-top: 8px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        ${typeBadge}
+                        ${categoryBadge}
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">
+                        <strong>${deal.quantity.toLocaleString("en-IN")}</strong> shares 
+                        ${deal.price > 0 ? `@ ₹${deal.price.toLocaleString("en-IN")} ` : ''}
+                        &rarr; <strong style="color: var(--text-primary); font-family: 'Outfit'; font-size: 13px;">${formatIndianRupees(deal.value)}</strong>
+                    </div>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+        
+    } catch (err) {
+        console.error("Error loading global trades scanner:", err);
+        if (container) {
+            container.innerHTML = `<div style="text-align: center; color: var(--text-crimson); padding: 30px; font-size: 11.5px;">Error: ${err.message}</div>`;
+        }
+    }
+}
+
+// Global function to link scanner with active stock research
+window.loadStockFromTrades = (symbol) => {
+    switchTab('analyzer');
+    loadStockAnalyzer(symbol);
+};
+
+function setupTradesHandlers() {
+    const filterContainer = document.getElementById('trades-filter-control');
+    if (filterContainer) {
+        const btns = filterContainer.querySelectorAll('.segmented-btn');
+        btns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                btns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentStockTradesFilter = btn.getAttribute('data-filter');
+                renderTradesTimeline();
+            });
+        });
+    }
+    
+    const typeSelect = document.getElementById('global-trades-type-select');
+    const actionSelect = document.getElementById('global-trades-action-select');
+    const minValSelect = document.getElementById('global-trades-min-value');
+    const durationSelect = document.getElementById('global-trades-duration');
+    const searchInput = document.getElementById('global-trades-search-input');
+    const syncBtn = document.getElementById('global-trades-sync-btn');
+    
+    if (typeSelect) typeSelect.onchange = loadGlobalTrades;
+    if (actionSelect) actionSelect.onchange = loadGlobalTrades;
+    if (minValSelect) minValSelect.onchange = loadGlobalTrades;
+    if (durationSelect) durationSelect.onchange = loadGlobalTrades;
+    if (searchInput) {
+        let debounceTimer;
+        searchInput.oninput = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(loadGlobalTrades, 400);
+        };
+    }
+    
+    if (syncBtn) {
+        syncBtn.addEventListener('click', loadGlobalTrades);
+    }
+    
+    const stockDurationFilter = document.getElementById('trades-duration-filter');
+    if (stockDurationFilter) {
+        stockDurationFilter.onchange = () => {
+            renderTradesTimeline();
+        };
+    }
+}
 
