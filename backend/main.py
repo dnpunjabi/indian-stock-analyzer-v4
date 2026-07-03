@@ -4502,15 +4502,19 @@ async def import_screener_screen_stocks(payload: dict):
             if not clean_sym:
                 continue
             cursor.execute(
-                "SELECT symbol FROM screener_universe WHERE symbol = ? OR base_symbol = ? OR symbol LIKE ?",
+                "SELECT symbol, company_name, sector FROM screener_universe WHERE symbol = ? OR base_symbol = ? OR symbol LIKE ?",
                 (clean_sym, clean_sym, clean_sym + "%")
             )
             uni_row = cursor.fetchone()
             db_symbol = uni_row["symbol"] if uni_row else clean_sym + ".NS"
             
+            # Extract names & sectors if present
+            company_name = uni_row["company_name"] if (uni_row and "company_name" in dict(uni_row) and uni_row["company_name"]) else clean_sym
+            sector = uni_row["sector"] if (uni_row and "sector" in dict(uni_row) and uni_row["sector"]) else "General Equities"
+            
             cursor.execute(
-                "INSERT OR IGNORE INTO watchlist_items (watchlist_id, symbol) VALUES (?, ?)",
-                (watchlist_id, db_symbol)
+                "INSERT OR IGNORE INTO watchlist_items (watchlist_id, symbol, name, sector, quantity, purchase_price, in_portfolio) VALUES (?, ?, ?, ?, 0.0, 0.0, 0)",
+                (watchlist_id, db_symbol, company_name, sector)
             )
             added_count += 1
             
@@ -4529,6 +4533,7 @@ async def import_screener_screen_stocks(payload: dict):
             
         from backend.shareholding_scraper import scrape_shareholding_pattern
         from backend.trades_scraper import scrape_trades
+        from backend.financial_utils import get_complete_financial_profile
         from datetime import datetime
         import json
         
@@ -4538,6 +4543,19 @@ async def import_screener_screen_stocks(payload: dict):
             if not clean_s:
                 continue
             try:
+                # 1. Fetch complete financial profile to fill company name/sector
+                prof = get_complete_financial_profile(clean_s)
+                if prof:
+                    r_name = prof.get("company_name") or clean_s
+                    r_sector = prof.get("sector") or "General Equities"
+                    with get_db() as conn3:
+                        c3 = conn3.cursor()
+                        c3.execute(
+                            "UPDATE watchlist_items SET name = ?, sector = ? WHERE watchlist_id = ? AND (symbol = ? OR symbol = ?)",
+                            (r_name, r_sector, watchlist_id, clean_s, clean_s + ".NS")
+                        )
+                        conn3.commit()
+
                 sh_data = scrape_shareholding_pattern(clean_s, cookie)
                 if sh_data and "error" not in sh_data:
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

@@ -35782,9 +35782,8 @@ function setupScreenerImportHandlers() {
                 
                 showToastNotification(`Successfully imported ${data.added_count} stocks to watchlist! Background cache scan triggered.`);
                 closeModal();
-                if (typeof loadWatchlists === 'function') {
-                    loadWatchlists(data.watchlist_id);
-                }
+                activeWatchlistId = data.watchlist_id;
+                await fetchWatchlists();
             } catch (err) {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalText;
