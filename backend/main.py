@@ -1845,6 +1845,7 @@ class AuditFinancialsRequest(BaseModel):
     view: str
     statement_type: str
     table_data: dict
+    custom_prompt: Optional[str] = None
 
 @app.get("/api/search")
 async def search_ticker(q: str):
@@ -4770,8 +4771,17 @@ async def audit_financial_statements(data: AuditFinancialsRequest):
         f"Reporting Basis: {'Consolidated' if data.view == 'consolidated' else 'Standalone'}\n"
         f"Statement Type: {st_title}\n\n"
         f"Financial Table:\n{table_str}\n\n"
-        f"Please provide your financial audit memo. Output strictly in markdown."
     )
+    
+    if data.custom_prompt:
+        user_prompt += (
+            f"Specific User Request / Question:\n"
+            f"\"{data.custom_prompt}\"\n\n"
+            f"Please address the specific user request/question directly using the provided financial table data above. "
+            f"Output strictly in markdown."
+        )
+    else:
+        user_prompt += f"Please provide your financial audit memo. Output strictly in markdown."
     
     try:
         # Call Groq/LLM asynchronously

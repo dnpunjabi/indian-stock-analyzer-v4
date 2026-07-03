@@ -36056,6 +36056,21 @@ async function loadFinancialStatements(symbol) {
         }
         
         renderActiveStatementTable();
+        
+        // Clear chat history and load template quick-prompts
+        const history = document.getElementById('fs-chat-history');
+        if (history) {
+            history.innerHTML = '<div style="font-size: 11px; color: var(--text-secondary); font-style: italic; text-align: center; margin: auto;">Select a statement category and choose an audit template or type your customized question below.</div>';
+        }
+        if (typeof renderFsChatTemplates === 'function') {
+            renderFsChatTemplates();
+        }
+        
+        // Stop audio if any is active
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        if (window.SpeechPlayer && typeof window.SpeechPlayer.stop === 'function') window.SpeechPlayer.stop();
+        const stopTtsBtn = document.getElementById('fs-ai-stop-tts-btn');
+        if (stopTtsBtn) stopTtsBtn.style.display = 'none';
     } catch (err) {
         console.error("Error loading financials:", err);
         tableEl.innerHTML = `<tr><td style="text-align: center; padding: 40px; color: var(--color-crimson); font-weight: bold;">Error: ${err.message}</td></tr>`;
@@ -36288,26 +36303,243 @@ function setupFinancialStatementsEvents() {
             
             activeFsStatement = statement;
             
-            // Clear AI text as the context changed
-            const auditText = document.getElementById('fs-ai-audit-text');
-            if (auditText) {
-                auditText.innerHTML = "Select a statement category and click the button to generate a structured AI financial research memo.";
+            activeFsStatement = statement;
+            
+            // Clear chat history and load templates on tab switch
+            const history = document.getElementById('fs-chat-history');
+            if (history) {
+                history.innerHTML = '<div style="font-size: 11px; color: var(--text-secondary); font-style: italic; text-align: center; margin: auto;">Select a statement category and choose an audit template or type your customized question below.</div>';
             }
-            const speakBtn = document.getElementById('fs-ai-speak-btn');
-            if (speakBtn) speakBtn.style.display = 'none';
+            renderFsChatTemplates();
+            
+            // Cancel voice if any active
+            if (window.speechSynthesis) window.speechSynthesis.cancel();
+            if (window.SpeechPlayer && typeof window.SpeechPlayer.stop === 'function') window.SpeechPlayer.stop();
+            const stopTtsBtn = document.getElementById('fs-ai-stop-tts-btn');
+            if (stopTtsBtn) stopTtsBtn.style.display = 'none';
             
             renderActiveStatementTable();
         });
     });
     
-    // 3. Run AI Financial Audit
+    // 3. AI Financial Analyst Chatbot bindings
+    const sendBtn = document.getElementById('fs-chat-send-btn');
+    if (sendBtn) {
+        sendBtn.addEventListener('click', triggerFsChatQuery);
+    }
     const runAuditBtn = document.getElementById('fs-run-audit-btn');
     if (runAuditBtn) {
-        runAuditBtn.addEventListener('click', runAiFinancialAudit);
+        runAuditBtn.addEventListener('click', triggerFsFullAudit);
+    }
+    const inputEl = document.getElementById('fs-chat-input');
+    if (inputEl) {
+        inputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                triggerFsChatQuery();
+            }
+        });
+    }
+    const stopTtsBtn = document.getElementById('fs-ai-stop-tts-btn');
+    if (stopTtsBtn) {
+        stopTtsBtn.addEventListener('click', () => {
+            if (window.speechSynthesis) window.speechSynthesis.cancel();
+            if (window.SpeechPlayer && typeof window.SpeechPlayer.stop === 'function') window.SpeechPlayer.stop();
+            stopTtsBtn.style.display = 'none';
+            document.querySelectorAll('.fs-chat-speak-btn').forEach(btn => {
+                btn.innerHTML = '🔊 Speak';
+                btn.classList.remove('speaking');
+            });
+        });
+    }
+    
+    // 4. Voice Search (Speech to Text) Mic button
+    const micBtn = document.getElementById('fs-chat-mic-btn');
+    if (micBtn) {
+        const isAndroidSpeech = window.AndroidSpeech && typeof window.AndroidSpeech.startListening === 'function';
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (isAndroidSpeech) {
+            micBtn.addEventListener('click', () => {
+                if (window.AndroidSpeechListening && window.activeSpeechRecognizerTarget === 'fs_chat') {
+                    window.AndroidSpeech.stopListening();
+                } else {
+                    window.activeSpeechRecognizerTarget = 'fs_chat';
+                    window.AndroidSpeech.startListening();
+                }
+            });
+        } else if (!SpeechRecognition) {
+            micBtn.style.display = 'none';
+        } else {
+            let fsRecognition = new SpeechRecognition();
+            fsRecognition.continuous = false;
+            fsRecognition.interimResults = false;
+            fsRecognition.lang = 'en-US';
+            let isFsListening = false;
+            
+            fsRecognition.onstart = () => {
+                isFsListening = true;
+                micBtn.innerHTML = '🔴';
+                micBtn.classList.add('mic-listening');
+            };
+            
+            fsRecognition.onend = () => {
+                isFsListening = false;
+                micBtn.innerHTML = '🎙️';
+                micBtn.classList.remove('mic-listening');
+            };
+            
+            fsRecognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                if (inputEl) {
+                    inputEl.value = (inputEl.value ? inputEl.value + ' ' : '') + transcript;
+                }
+            };
+            
+            fsRecognition.onerror = (event) => {
+                console.error("FS Speech recognition error:", event.error);
+            };
+            
+            micBtn.addEventListener('click', () => {
+                if (isFsListening) {
+                    fsRecognition.stop();
+                } else {
+                    fsRecognition.start();
+                }
+            });
+        }
     }
 }
 
-async function runAiFinancialAudit() {
+const fsChatTemplatesMap = {
+    quarters: [
+        { label: '📊 Trend Analysis', text: 'Analyze the sequential (QoQ) and yearly (YoY) revenue and net profit trends. Is there a seasonal pattern?' },
+        { label: '📈 Margin Expansion', text: 'Check if operating profit margin (OPM) is expanding QoQ/YoY. What are the key expenses drivers?' },
+        { label: '⚡ Earnings Momentum', text: 'Assess the earnings momentum of this quarter. Are the sales matching the bottom-line growth?' },
+        { label: '💰 Other Income Impact', text: 'Investigate the other income. Is it high, and is it masking operational weakness or boosting net profit artificially?' },
+        { label: '🏦 Financing Cost Burden', text: 'Analyze the interest expense relative to operating profit. Is the interest burden increasing over the quarters?' },
+        { label: '🛑 Profitability Health', text: 'Identify any quarters where the company had profit margin drops. What drove those sudden margin declines?' }
+    ],
+    profit_loss: [
+        { label: '📈 Compounded Growth', text: 'Analyze the compounded sales and profit growth. Are they accelerating over the years?' },
+        { label: '⚙️ Operating Leverage', text: 'Examine the operating leverage. Did operating profit grow faster than sales over the years?' },
+        { label: '💸 Dividend Allocation', text: 'Analyze the dividend payout percentage and retention ratio trends. Is capital allocation efficient?' },
+        { label: '📊 Tax Rate Consistency', text: 'Look at the tax rate percentage year-over-year. Are there major fluctuations or anomalies in taxes?' },
+        { label: '🛍️ Cost Structure Audit', text: 'Analyze key cost items (Material Cost, Manufacturing, Employee cost) as a % of sales over the decade. Any trends?' },
+        { label: '📉 Depreciation & Interest', text: 'Check the depreciation and interest trends over the years. Are they growing faster than revenues?' }
+    ],
+    balance_sheet: [
+        { label: '🏦 Reserves vs. Debt', text: 'Analyze the growth of reserves relative to borrowings. Is the debt-to-equity ratio safe?' },
+        { label: '🏗️ Capital Expenditure', text: 'Examine fixed assets, CWIP, and investments. Where is the company investing its capital?' },
+        { label: '💧 Solvency & Liquidity', text: 'Assess the solvency and liquidity position based on reserves, borrowings, and assets composition?' },
+        { label: '📑 Working Capital Cycle', text: 'Examine trade receivables, inventory, and trade payables. Is working capital efficiency improving?' },
+        { label: '💎 Share Capital Dilution', text: 'Has the share capital changed over the last 10 years? Check for equity dilutions or share buybacks.' },
+        { label: '📈 Investment Portfolio', text: 'Analyze the scale of other investments relative to fixed assets. Is the company investing heavily in non-core assets?' }
+    ],
+    peers: [
+        { label: '💵 Valuation Premium', text: 'Compare the valuation multiple (P/E) of this company against peers. Is it trading at a premium or discount, and is it justified?' },
+        { label: '⚡ Return on Capital (ROCE)', text: 'Compare the return on capital employed (ROCE %) and profitability metrics against peers. Who is the efficiency leader?' },
+        { label: '📈 Competitor Growth', text: 'Compare quarterly profit growth, sales growth, and market capitalization size against other competitors.' },
+        { label: '📉 Dividend Yield Leader', text: 'Compare the dividend yield % across all the peer companies. Which company offers the best yield?' },
+        { label: '👑 Competitive Edge', text: 'Evaluate the peers to identify which competitor possesses the strongest competitive edge or moat based on ROCE, valuation multiples, and profit growth metrics.' },
+        { label: '🔥 Peer Multiples Ranking', text: 'Rank all the peer companies based on P/E (lowest to highest) and ROCE (highest to lowest). Who has the best combo?' }
+    ]
+};
+
+function renderFsChatTemplates() {
+    const container = document.getElementById('fs-chat-templates');
+    if (!container) return;
+    
+    const list = fsChatTemplatesMap[activeFsStatement] || [];
+    container.innerHTML = '';
+    
+    list.forEach(tpl => {
+        const btn = document.createElement('button');
+        btn.className = 'fs-template-pill';
+        btn.style.cssText = `
+            background: var(--color-primary-glow);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            color: var(--text-primary);
+            font-size: 10.5px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+            font-weight: 500;
+            font-family: 'Outfit', sans-serif;
+            transition: all 0.2s ease;
+        `;
+        btn.innerText = tpl.label;
+        btn.addEventListener('click', () => {
+            const input = document.getElementById('fs-chat-input');
+            if (input) {
+                input.value = tpl.text;
+                triggerFsChatQuery();
+            }
+        });
+        container.appendChild(btn);
+    });
+}
+
+async function triggerFsChatQuery() {
+    const input = document.getElementById('fs-chat-input');
+    if (!input) return;
+    const promptText = input.value.trim();
+    if (!promptText) return;
+    
+    const sendBtn = document.getElementById('fs-chat-send-btn');
+    const spinner = document.getElementById('fs-chat-send-spinner');
+    const history = document.getElementById('fs-chat-history');
+    if (!history || !activeFsData) return;
+    
+    const activeTable = activeFsData[activeFsStatement];
+    if (!activeTable || !activeTable.headers || activeTable.headers.length === 0) {
+        showToast("No active statement table data to analyze.", "error");
+        return;
+    }
+    
+    // Append user message to chat history
+    appendFsChatMessage('user', promptText);
+    input.value = ''; // clear input
+    
+    // Show loading indicator in send button and append bot placeholder
+    if (sendBtn) sendBtn.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+    
+    const botMsgId = 'fs-bot-' + Date.now();
+    appendFsChatLoading(botMsgId);
+    
+    try {
+        const payload = {
+            symbol: activeStockProfile ? activeStockProfile.ticker : 'STOCK',
+            view: activeFsView,
+            statement_type: activeFsStatement,
+            table_data: activeTable,
+            custom_prompt: promptText
+        };
+        
+        const res = await fetch('/api/ai/audit-financials', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) throw new Error("Failed to compile AI analysis");
+        const data = await res.json();
+        
+        // Remove loading message and append actual response
+        removeFsChatLoading(botMsgId);
+        appendFsChatMessage('bot', data.analysis || "No response received.");
+    } catch (err) {
+        console.error("AI Chat error:", err);
+        removeFsChatLoading(botMsgId);
+        appendFsChatMessage('bot', "❌ Error: Failed to generate response from AI model.");
+    } finally {
+        if (sendBtn) sendBtn.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+    }
+}
+
+async function triggerFsFullAudit() {
     if (!activeStockProfile || !activeStockProfile.ticker || !activeFsData) {
         showToast("Please load a stock analyzer profile and statements first.", "warning");
         return;
@@ -36320,14 +36552,12 @@ async function runAiFinancialAudit() {
     }
     
     const runAuditBtn = document.getElementById('fs-run-audit-btn');
-    const loadingEl = document.getElementById('fs-ai-loading');
-    const auditTextEl = document.getElementById('fs-ai-audit-text');
-    const speakBtn = document.getElementById('fs-ai-speak-btn');
-    
     if (runAuditBtn) runAuditBtn.disabled = true;
-    if (loadingEl) loadingEl.style.display = 'block';
-    if (auditTextEl) auditTextEl.style.display = 'none';
-    if (speakBtn) speakBtn.style.display = 'none';
+    
+    appendFsChatMessage('user', `✨ Run Full Structured AI Audit on ${activeFsStatement.toUpperCase()} Statement`);
+    
+    const botMsgId = 'fs-bot-audit-' + Date.now();
+    appendFsChatLoading(botMsgId);
     
     try {
         const response = await fetch('/api/ai/audit-financials', {
@@ -36347,39 +36577,201 @@ async function runAiFinancialAudit() {
         
         const data = await response.json();
         
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (auditTextEl) {
-            auditTextEl.innerHTML = formatMarkdown(data.analysis);
-            auditTextEl.style.display = 'block';
-        }
-        
-        // Show speak button if speech synthesis is available
-        if (speakBtn && 'speechSynthesis' in window) {
-            speakBtn.style.display = 'inline-flex';
-            speakBtn.onclick = () => {
-                const textToSpeak = auditTextEl.innerText;
-                if (window.speechSynthesis.speaking) {
-                    window.speechSynthesis.cancel();
-                    speakBtn.innerHTML = '🔊 Speak Audit';
-                } else {
-                    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-                    utterance.rate = 1.05;
-                    utterance.onend = () => { speakBtn.innerHTML = '🔊 Speak Audit'; };
-                    speakBtn.innerHTML = '⏹ Stop Audio';
-                    window.speechSynthesis.speak(utterance);
-                }
-            };
-        }
+        removeFsChatLoading(botMsgId);
+        appendFsChatMessage('bot', data.analysis || "No audit response received.");
     } catch (err) {
         console.error("AI Audit error:", err);
         showToast("Failed to compile AI audit: " + err.message, "error");
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (auditTextEl) {
-            auditTextEl.textContent = "AI analysis failed. Please try again later.";
-            auditTextEl.style.display = 'block';
-        }
+        removeFsChatLoading(botMsgId);
+        appendFsChatMessage('bot', "❌ Error: Failed to generate structured audit from AI model.");
     } finally {
         if (runAuditBtn) runAuditBtn.disabled = false;
+    }
+}
+
+function appendFsChatMessage(sender, text) {
+    const history = document.getElementById('fs-chat-history');
+    if (!history) return;
+    
+    // Clear placeholder if it's the first message
+    if (history.children.length === 1 && history.children[0].style.fontStyle === 'italic') {
+        history.innerHTML = '';
+    }
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-self: ${sender === 'user' ? 'flex-end' : 'flex-start'};
+        max-width: 85%;
+        margin-bottom: 4px;
+    `;
+    
+    const contentDiv = document.createElement('div');
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+    
+    let bg = sender === 'user' 
+        ? 'var(--color-primary)' 
+        : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)');
+    let color = sender === 'user' 
+        ? '#ffffff' 
+        : 'var(--text-primary)';
+        
+    contentDiv.style.cssText = `
+        background: ${bg};
+        color: ${color};
+        font-size: 11px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        line-height: 1.5;
+        word-break: break-word;
+        font-family: 'Inter', sans-serif;
+        white-space: pre-wrap;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    `;
+    
+    // Parse simple markdown headings/bullets/tables for bot response
+    if (sender === 'bot') {
+        contentDiv.innerHTML = formatMarkdownText(text);
+    } else {
+        contentDiv.innerText = text;
+    }
+    
+    messageDiv.appendChild(contentDiv);
+    
+    // If bot sender, add speaker control icon next to message
+    if (sender === 'bot') {
+        const actionsDiv = document.createElement('div');
+        actionsDiv.style.cssText = `
+            display: flex;
+            gap: 12px;
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            padding: 0 4px;
+            align-self: flex-start;
+        `;
+        
+        const speakBtn = document.createElement('button');
+        speakBtn.className = 'fs-chat-speak-btn';
+        speakBtn.style.cssText = 'background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0; outline: none; font-size: 10px; display: flex; align-items: center; gap: 2px;';
+        speakBtn.innerHTML = '🔊 Speak';
+        speakBtn.addEventListener('click', () => {
+            speakFsBotMessage(text, speakBtn);
+        });
+        
+        actionsDiv.appendChild(speakBtn);
+        messageDiv.appendChild(actionsDiv);
+    }
+    
+    history.appendChild(messageDiv);
+    history.scrollTop = history.scrollHeight;
+}
+
+function formatMarkdownText(text) {
+    // Convert bold tags **bold** to <strong>bold</strong>
+    let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    // Convert headings e.g. ### Title or ## Title or # Title
+    html = html.replace(/^###+ (.*?)$/gm, '<h4 style="margin: 8px 0 3px 0; font-size: 12px; color: var(--color-primary); font-family: \'Outfit\', sans-serif; border-left: 2px solid var(--color-primary); padding-left: 6px;">$1</h4>');
+    html = html.replace(/^## (.*?)$/gm, '<h3 style="margin: 10px 0 4px 0; font-size: 13px; color: var(--color-primary); font-family: \'Outfit\', sans-serif; border-left: 3px solid var(--color-primary); padding-left: 8px;">$1</h3>');
+    // Convert bullet lists
+    html = html.replace(/^\* (.*?)$/gm, '<div style="display: flex; gap: 4px; margin-left: 6px; font-size: 10.5px; margin-bottom: 2px;"><span>•</span><span>$1</span></div>');
+    // Newlines to breaks
+    html = html.replace(/\n/g, '<br>');
+    // Remove duplicates breaks
+    html = html.replace(/(<br>){3,}/g, '<br><br>');
+    return html;
+}
+
+function appendFsChatLoading(msgId) {
+    const history = document.getElementById('fs-chat-history');
+    if (!history) return;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.id = msgId;
+    messageDiv.style.cssText = `
+        align-self: flex-start;
+        max-width: 85%;
+        background: rgba(255,255,255,0.03);
+        padding: 8px 12px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    `;
+    
+    const spinner = document.createElement('div');
+    spinner.className = 'loader-spinner';
+    spinner.style.cssText = `
+        width: 10px;
+        height: 10px;
+        border: 1.5px solid var(--border-glass);
+        border-top-color: var(--color-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    `;
+    
+    const text = document.createElement('span');
+    text.style.cssText = 'font-size: 10.5px; color: var(--text-secondary); font-style: italic;';
+    text.innerText = 'AI compiling statement trends...';
+    
+    messageDiv.appendChild(spinner);
+    messageDiv.appendChild(text);
+    history.appendChild(messageDiv);
+    history.scrollTop = history.scrollHeight;
+}
+
+function removeFsChatLoading(msgId) {
+    const el = document.getElementById(msgId);
+    if (el) el.remove();
+}
+
+function speakFsBotMessage(text, speakBtn) {
+    const cleanText = text
+        .replace(/<\/?[^>]+(>|$)/g, "") // strip html tags
+        .replace(/\*\*|###|##|\*|\|/g, "")  // strip basic markdown symbols
+        .trim();
+        
+    const isPlaying = speakBtn.classList.contains('speaking');
+    const stopTtsBtn = document.getElementById('fs-ai-stop-tts-btn');
+    
+    // Stop any active speech first
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (window.SpeechPlayer && typeof window.SpeechPlayer.stop === 'function') window.SpeechPlayer.stop();
+    
+    // Reset all other speak buttons
+    document.querySelectorAll('.fs-chat-speak-btn').forEach(btn => {
+        btn.innerHTML = '🔊 Speak';
+        btn.classList.remove('speaking');
+    });
+    
+    if (isPlaying) {
+        if (stopTtsBtn) stopTtsBtn.style.display = 'none';
+        return; // just stop
+    }
+    
+    speakBtn.classList.add('speaking');
+    speakBtn.innerHTML = '⏹️ Stop';
+    if (stopTtsBtn) stopTtsBtn.style.display = 'inline-block';
+    
+    // Trigger audio
+    if (window.SpeechPlayer) {
+        window.SpeechPlayer.startSpeakingSection(cleanText, "AI Financial Analyst", true);
+    } else if (window.speechSynthesis) {
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.rate = 1.05;
+        utterance.onend = () => {
+            speakBtn.innerHTML = '🔊 Speak';
+            speakBtn.classList.remove('speaking');
+            if (stopTtsBtn) stopTtsBtn.style.display = 'none';
+        };
+        utterance.onerror = () => {
+            speakBtn.innerHTML = '🔊 Speak';
+            speakBtn.classList.remove('speaking');
+            if (stopTtsBtn) stopTtsBtn.style.display = 'none';
+        };
+        window.speechSynthesis.speak(utterance);
     }
 }
 

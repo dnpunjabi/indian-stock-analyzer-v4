@@ -2758,29 +2758,46 @@
                             </div>
 
                             <!-- AI Financial Analyst Diagnostic Card -->
-                            <div id="fs-ai-audit-box" style="padding: 15px; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-glass); border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 10px; display: flex; flex-direction: column; gap: 12px;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
-                                    <div style="display: flex; align-items: center; gap: 6px;">
+                            <div id="fs-ai-audit-box" style="padding: 15px; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-glass); border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+                                <div class="fs-chat-header">
+                                    <div class="fs-chat-header-title">
                                         <span style="font-size: 14px;">🔬</span>
-                                        <span style="font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">AI Financial Analyst Diagnostic</span>
+                                        <span style="font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">AI Financial Analyst Diagnostic Chat</span>
                                     </div>
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <button class="section-speak-btn" id="fs-ai-speak-btn" data-target="fs-ai-audit-text" data-title="AI Financial Statements Audit" style="display: none; background: none; border: none; cursor: pointer; padding: 0; outline: none; font-size: 11px;">🔊 Speak Audit</button>
-                                        <button id="fs-run-audit-btn" class="btn-primary" style="font-size: 10.5px; padding: 5px 12px; border-radius: 6px; border: none; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s ease;">
+                                    <div class="fs-chat-header-actions">
+                                        <button id="fs-ai-stop-tts-btn" style="display: none; background: none; border: none; cursor: pointer; padding: 2px 8px; outline: none; font-size: 11px; color: var(--color-crimson); font-weight: bold;">🔇 Stop AI Voice</button>
+                                        <button id="fs-run-audit-btn" class="btn-primary" style="font-size: 10px; padding: 4px 10px; border-radius: 6px; border: none; font-weight: 600; display: flex; align-items: center; gap: 4px; cursor: pointer; transition: all 0.2s ease;">
                                             <span>✨</span> Run AI Financial Audit
                                         </button>
                                     </div>
                                 </div>
 
-                                <!-- AI Loading Spinner -->
-                                <div id="fs-ai-loading" style="display: none; padding: 25px 0; text-align: center;">
-                                    <div class="loader-spinner" style="display: inline-block; width: 24px; height: 24px; border: 2.5px solid var(--border-glass); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; letter-spacing: 0.02em;">AI Analyst compiling financial statement trends and anomalies...</div>
+                                <!-- Predefined Chat Templates Group -->
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <span style="font-size: 9.5px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; font-weight: bold; margin-bottom: 2px;">⚡ Audit Quick Templates</span>
+                                    <div id="fs-chat-templates" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch;">
+                                        <!-- Rendered dynamically in app.js based on active statement category -->
+                                    </div>
                                 </div>
 
-                                <!-- AI Audit Result Text -->
-                                <div id="fs-ai-audit-text" style="font-size: 11.5px; color: var(--text-muted); line-height: 1.5; min-height: 20px;">
-                                    Select a statement category and click the button to generate a structured AI financial research memo.
+                                <!-- Chat Area Message Log -->
+                                <div id="fs-chat-history" style="background: rgba(0,0,0,0.12); border-radius: 6px; border: 1px solid var(--border-glass); padding: 10px; max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-height: 120px; box-sizing: border-box;">
+                                    <div style="font-size: 11px; color: var(--text-secondary); font-style: italic; text-align: center; margin: auto;">Select a statement category and choose an audit template or type your customized question below.</div>
+                                </div>
+
+                                <!-- Input Box, Mic button, and Send button -->
+                                <div class="fs-chat-input-row">
+                                    <!-- Mic Speech button -->
+                                    <button id="fs-chat-mic-btn" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; cursor: pointer; transition: all 0.25s ease; font-size: 12px; display: flex; align-items: center; justify-content: center; height: 32px; box-sizing: border-box; outline: none;">🎙️</button>
+                                    
+                                    <!-- Input text -->
+                                    <input id="fs-chat-input" type="text" placeholder="Ask about growth, ratios, anomalies..." style="flex: 1; height: 32px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-primary); font-size: 11.5px; font-family: 'Inter', sans-serif; box-sizing: border-box;" />
+                                    
+                                    <!-- Send button -->
+                                    <button id="fs-chat-send-btn" class="btn-primary" style="height: 32px; padding: 0 14px; font-size: 11.5px; border-radius: 6px; border: none; cursor: pointer; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 4px; box-sizing: border-box;">
+                                        <span id="fs-chat-send-spinner" class="spinner-loader" style="display: none; width: 10px; height: 10px; border: 1.5px solid rgba(255,255,255,0.3); border-top-color: #ffffff; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+                                        <span>Send</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
