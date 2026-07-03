@@ -139,6 +139,13 @@ class TestTradesTrackerAPI(unittest.TestCase):
     @patch("requests.get")
     def test_stock_specific_endpoint(self, mock_get):
         """Test stock-specific trades details endpoint."""
+        # Clear cache for INFY to force scraping/mock path
+        from backend.main import get_db
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute("DELETE FROM cached_trades WHERE symbol = ?", ("INFY",))
+            conn.commit()
+
         # Mock suggest endpoint then trade page
         search_res = MagicMock()
         search_res.status_code = 200

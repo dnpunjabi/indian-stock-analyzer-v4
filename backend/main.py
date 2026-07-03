@@ -298,6 +298,17 @@ def init_db():
         )
         """)
 
+        # Cache table for Financial Statements (Quarterly, P&L, Balance Sheet)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS cached_financial_statements (
+            symbol TEXT,
+            view TEXT,
+            data_json TEXT NOT NULL,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (symbol, view)
+        )
+        """)
+
 
         
         # Mock loader for history, block deals, and corporate actions if empty
@@ -1828,6 +1839,12 @@ class LearningAskRequest(BaseModel):
     category: Optional[str] = None
     sandbox_values: Optional[dict] = None
     sub_pattern: Optional[str] = None
+
+class AuditFinancialsRequest(BaseModel):
+    symbol: str
+    view: str
+    statement_type: str
+    table_data: dict
 
 @app.get("/api/search")
 async def search_ticker(q: str):
@@ -4638,6 +4655,110 @@ async def get_stock_shareholding(symbol: str):
         conn.commit()
         
     return data
+
+@app.get("/api/stocks/{symbol}/financial-statements")
+async def get_stock_financial_statements(symbol: str, view: str = "consolidated"):
+    """Retrieves Quarterly, P&L and Balance Sheet tables from 30-day SQLite cache or scrapes on-demand."""
+    from backend.financial_statements_scraper import scrape_financial_statements
+    from backend.shareholding_scraper import clean_symbol
+    from datetime import datetime, timedelta
+    import json
+    
+    base_symbol = clean_symbol(symbol)
+    if not base_symbol:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+        
+    view = view.strip().lower()
+    if view not in ["standalone", "consolidated"]:
+        view = "consolidated"
+        
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT data_json, last_updated FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, view))
+        row = cursor.fetchone()
+        
+        if row:
+            try:
+                last_updated = datetime.strptime(row["last_updated"], "%Y-%m-%d %H:%M:%S")
+                # If cache is valid (under 30 days old), return it instantly
+                if datetime.now() - last_updated < timedelta(days=30):
+                    return json.loads(row["data_json"])
+            except Exception:
+                pass
+                
+    # Cache miss or expired -> Scrape page
+    data = scrape_financial_statements(base_symbol, view)
+    if not data or "error" in data:
+        raise HTTPException(status_code=500, detail=data.get("error", "Failed to retrieve financial statements."))
+        
+    # Save back to SQLite cache
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT OR REPLACE INTO cached_financial_statements (symbol, view, data_json, last_updated) VALUES (?, ?, ?, ?)",
+            (base_symbol, view, json.dumps(data), now_str)
+        )
+        conn.commit()
+        
+    return data
+
+@app.post("/api/ai/audit-financials")
+async def audit_financial_statements(data: AuditFinancialsRequest):
+    """Generates an on-demand AI financial audit for the provided statements table using call_llm."""
+    import asyncio
+    import json
+    from backend.llm_config import call_llm, TASK_FAST
+    
+    # 1. Compile prompt context
+    statement_name_map = {
+        "quarters": "Quarterly Results",
+        "profit_loss": "Profit & Loss (Annual)",
+        "balance_sheet": "Balance Sheet"
+    }
+    st_title = statement_name_map.get(data.statement_type, data.statement_type)
+    
+    system_prompt = (
+        "You are an expert Chartered Accountant and SEBI-registered CFA financial research analyst. "
+        "Analyze the provided financial statements table data and compile a structured, high-impact diagnostic audit memo. "
+        "Adhere to the following structural output layout:\n\n"
+        "### Key Revenue/Profitability Trends\n"
+        "* Analyze sequential (QoQ) or annual (YoY) growth rate, margin stability, and expansions/contractions.\n"
+        "### Working Capital & Balance Sheet Risks\n"
+        "* Evaluate financial leverage, debt-to-equity changes, equity capital dilution, or asset build-up flags.\n"
+        "### Anomalies & Flags\n"
+        "* Note any accounting flags or financial metrics anomalies (e.g. growing sales but dropping margins, reserves drop, etc.).\n"
+        "### Diagnostic Verdict\n"
+        "* Conclude with a final rating (Safe / Watch / Distress) and a brief summary of the main driver."
+    )
+    
+    # Format the table data for the prompt
+    headers = data.table_data.get("headers", [])
+    rows = data.table_data.get("rows", [])
+    
+    table_str = " | ".join(headers) + "\n"
+    table_str += "---|" * len(headers) + "\n"
+    for r in rows:
+        label = r.get("label", "")
+        vals = [str(v) if v is not None else "--" for v in r.get("values", [])]
+        table_str += f"{label} | " + " | ".join(vals) + "\n"
+        
+    user_prompt = (
+        f"Company Ticker: {data.symbol}\n"
+        f"Reporting Basis: {'Consolidated' if data.view == 'consolidated' else 'Standalone'}\n"
+        f"Statement Type: {st_title}\n\n"
+        f"Financial Table:\n{table_str}\n\n"
+        f"Please provide your financial audit memo. Output strictly in markdown."
+    )
+    
+    try:
+        # Call Groq/LLM asynchronously
+        analysis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt, max_tokens=1500)
+        if not analysis:
+            raise HTTPException(status_code=500, detail="LLM failed to return a response.")
+        return {"analysis": analysis}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI financial audit compilation failed: {str(e)}")
 
 @app.get("/api/stocks/{symbol}/trades")
 async def get_stock_trades(symbol: str):

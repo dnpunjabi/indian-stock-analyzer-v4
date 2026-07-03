@@ -1367,6 +1367,7 @@
                             <button class="subtab-btn" data-subtab="tv-advanced">📊 TradingView Pro</button>
                             <button class="subtab-btn" data-subtab="fundamental">🩺 Ratios & Earnings</button>
                             <button class="subtab-btn" data-subtab="peers">👥 Peers & Ownership</button>
+                            <button class="subtab-btn" data-subtab="financials">📋 Financial Statements</button>
                             <button class="subtab-btn" data-subtab="audit">🔬 Agent Strategy Audit</button>
                             <button class="subtab-btn" data-subtab="volume">📋 Price Volume Dynamics</button>
                             <button class="subtab-btn" data-subtab="trades">🤝 Insider & Block Deals</button>
@@ -2717,6 +2718,69 @@
                             <div id="shareholding-layman-block" style="padding: 10px 12px; background: rgba(59, 130, 246, 0.03); border-left: 2.5px solid var(--color-primary); border-radius: 0 6px 6px 0; border-top: 1px dashed rgba(255,255,255,0.05); border-right: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); width: 100%; box-sizing: border-box; transition: all 0.3s ease;">
                                 <span style="font-size: 9px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em; margin-bottom: 4px;">💡 Shareholding Layman Translation</span>
                                 <p id="shareholding-layman-text" style="font-size: 11px; color: var(--text-muted); line-height: 1.45; margin: 0;">Analyzing institutional holding profiles...</p>
+                            </div>
+                        </div>
+
+                        <!-- SECTION: FINANCIAL STATEMENTS GRID -->
+                        <div class="card col-span-4 card-hidden" id="financial-statements-card" data-subtab="financials" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; margin-bottom: 5px;">
+                                <div>
+                                    <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                                        <span>📊</span> FINANCIAL STATEMENTS
+                                    </h3>
+                                    <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; display: block; margin-top: 2px;">Quarterly Results, annual Profit & Loss, and Balance Sheet statements</span>
+                                </div>
+                                <!-- Toggle Standalone vs Consolidated -->
+                                <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.015); padding: 3px; border-radius: 6px; border: 1px solid var(--border-glass);">
+                                    <button id="fs-view-consolidated-btn" class="btn-primary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; transition: all 0.25s ease;">Consolidated</button>
+                                    <button id="fs-view-standalone-btn" class="btn-secondary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; background: none; color: var(--text-secondary); transition: all 0.25s ease;">Standalone</button>
+                                </div>
+                            </div>
+
+                            <!-- Statements selector sub-tabs -->
+                            <div style="display: flex; gap: 12px; border-bottom: 1px solid var(--border-glass); padding-bottom: 4px; margin-bottom: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;">
+                                <button class="fs-statement-tab active" data-statement="quarters" style="background: none; border: none; color: var(--text-primary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 12px; border-bottom: 2px solid var(--color-primary); transition: all 0.2s; white-space: nowrap;">Quarterly Results</button>
+                                <button class="fs-statement-tab" data-statement="profit_loss" style="background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 12px; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap;">Profit & Loss</button>
+                                <button class="fs-statement-tab" data-statement="balance_sheet" style="background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 12px; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap;">Balance Sheet</button>
+                            </div>
+
+                            <!-- Table container with horizontal scrolling -->
+                            <div class="table-scroll" style="overflow-x: auto; width: 100%; border-radius: 8px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.15); max-width: 100%; box-sizing: border-box; position: relative;">
+                                <table id="financial-statements-table" class="data-table" style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: right; min-width: 800px;">
+                                    <!-- Populated dynamically -->
+                                </table>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: var(--text-secondary); font-style: italic; flex-wrap: wrap; gap: 8px; margin-top: -5px;">
+                                <span id="fs-reporting-basis" style="font-weight: 600; text-transform: uppercase;">Reporting Basis: --</span>
+                                <span>Data sourced from Screener.in integration (no cookie required).</span>
+                            </div>
+
+                            <!-- AI Financial Analyst Diagnostic Card -->
+                            <div id="fs-ai-audit-box" style="padding: 15px; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-glass); border-radius: 8px; width: 100%; box-sizing: border-box; margin-top: 10px; display: flex; flex-direction: column; gap: 12px;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 14px;">🔬</span>
+                                        <span style="font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">AI Financial Analyst Diagnostic</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <button class="section-speak-btn" id="fs-ai-speak-btn" data-target="fs-ai-audit-text" data-title="AI Financial Statements Audit" style="display: none; background: none; border: none; cursor: pointer; padding: 0; outline: none; font-size: 11px;">🔊 Speak Audit</button>
+                                        <button id="fs-run-audit-btn" class="btn-primary" style="font-size: 10.5px; padding: 5px 12px; border-radius: 6px; border: none; font-weight: 600; display: flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s ease;">
+                                            <span>✨</span> Run AI Financial Audit
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- AI Loading Spinner -->
+                                <div id="fs-ai-loading" style="display: none; padding: 25px 0; text-align: center;">
+                                    <div class="loader-spinner" style="display: inline-block; width: 24px; height: 24px; border: 2.5px solid var(--border-glass); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                    <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; letter-spacing: 0.02em;">AI Analyst compiling financial statement trends and anomalies...</div>
+                                </div>
+
+                                <!-- AI Audit Result Text -->
+                                <div id="fs-ai-audit-text" style="font-size: 11.5px; color: var(--text-muted); line-height: 1.5; min-height: 20px;">
+                                    Select a statement category and click the button to generate a structured AI financial research memo.
+                                </div>
                             </div>
                         </div>
 

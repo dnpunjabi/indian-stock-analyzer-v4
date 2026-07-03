@@ -18127,6 +18127,14 @@ function setupAnalyzerSubtabs() {
                 }
             }
 
+            if (activeSubtab === 'financials') {
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    loadFinancialStatements(activeStockProfile.ticker);
+                } else {
+                    showToast("Please load a stock analyzer profile first.", "warning");
+                }
+            }
+
             if (activeSubtab === 'tv-chart') {
                 if (activeStockProfile && activeStockProfile.ticker) {
                     renderTVWorkstationChart(activeStockProfile.ticker);
@@ -18163,8 +18171,16 @@ function setupAnalyzerSubtabs() {
         });
     });
 
+    // Initialize financial statement click events
+    if (typeof setupFinancialStatementsEvents === 'function') {
+        setupFinancialStatementsEvents();
+    }
+
     // Run tab filter whenever a new stock is successfully loaded in workspace
     window.resetAnalyzerSubtabs = () => {
+        if (typeof resetFinancialStatementsUI === 'function') {
+            resetFinancialStatementsUI();
+        }
         const firstBtn = document.querySelector('.subtab-btn[data-subtab="summary"]');
         if (firstBtn) {
             firstBtn.click();
@@ -35943,5 +35959,413 @@ function showToastNotification(message) {
         toast.style.transition = 'opacity 0.5s ease-out';
         setTimeout(() => { toast.remove(); }, 500);
     }, 4500);
+}
+
+// Financial Statements UI Controller & Scraper Client
+let activeFsView = 'consolidated';
+let activeFsStatement = 'quarters';
+let activeFsData = null;
+
+function resetFinancialStatementsUI() {
+    activeFsView = 'consolidated';
+    activeFsStatement = 'quarters';
+    activeFsData = null;
+    
+    // Reset toggle buttons
+    const consBtn = document.getElementById('fs-view-consolidated-btn');
+    const standBtn = document.getElementById('fs-view-standalone-btn');
+    if (consBtn) {
+        consBtn.className = 'btn-primary';
+        consBtn.style.background = '';
+        consBtn.style.color = '';
+    }
+    if (standBtn) {
+        standBtn.className = 'btn-secondary';
+        standBtn.style.background = 'none';
+        standBtn.style.color = 'var(--text-secondary)';
+    }
+    
+    // Reset statement tab buttons
+    const tabs = document.querySelectorAll('.fs-statement-tab');
+    tabs.forEach(t => {
+        if (t.getAttribute('data-statement') === 'quarters') {
+            t.classList.add('active');
+            t.style.borderBottomColor = 'var(--color-primary)';
+            t.style.color = 'var(--text-primary)';
+        } else {
+            t.classList.remove('active');
+            t.style.borderBottomColor = 'transparent';
+            t.style.color = 'var(--text-secondary)';
+        }
+    });
+    
+    // Clear AI Audit
+    const auditText = document.getElementById('fs-ai-audit-text');
+    if (auditText) {
+        auditText.innerHTML = "Select a statement category and click the button to generate a structured AI financial research memo.";
+    }
+    const speakBtn = document.getElementById('fs-ai-speak-btn');
+    if (speakBtn) speakBtn.style.display = 'none';
+    
+    const tableEl = document.getElementById('financial-statements-table');
+    if (tableEl) tableEl.innerHTML = '';
+}
+
+async function loadFinancialStatements(symbol) {
+    const tableEl = document.getElementById('financial-statements-table');
+    const basisEl = document.getElementById('fs-reporting-basis');
+    if (!tableEl) return;
+    
+    tableEl.innerHTML = `<tr><td style="text-align: center; padding: 40px; color: var(--text-secondary);">Loading financial statements from Screener...</td></tr>`;
+    if (basisEl) basisEl.textContent = "Reporting Basis: --";
+    
+    try {
+        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/financial-statements?view=${activeFsView}`);
+        if (!response.ok) throw new Error("Failed to fetch financial statements");
+        
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        
+        activeFsData = data;
+        
+        // Update reporting basis text
+        if (basisEl) {
+            const basisText = data.is_consolidated ? "Consolidated Figures" : "Standalone Figures";
+            basisEl.textContent = `Reporting Basis: ${basisText}`;
+            
+            // Sync the toggle button active states if the scraped actual state differs
+            const consBtn = document.getElementById('fs-view-consolidated-btn');
+            const standBtn = document.getElementById('fs-view-standalone-btn');
+            if (consBtn && standBtn) {
+                if (data.is_consolidated) {
+                    consBtn.className = 'btn-primary';
+                    consBtn.style.background = '';
+                    consBtn.style.color = '';
+                    standBtn.className = 'btn-secondary';
+                    standBtn.style.background = 'none';
+                    standBtn.style.color = 'var(--text-secondary)';
+                } else {
+                    consBtn.className = 'btn-secondary';
+                    consBtn.style.background = 'none';
+                    consBtn.style.color = 'var(--text-secondary)';
+                    standBtn.className = 'btn-primary';
+                    standBtn.style.background = '';
+                    standBtn.style.color = '';
+                }
+            }
+        }
+        
+        renderActiveStatementTable();
+    } catch (err) {
+        console.error("Error loading financials:", err);
+        tableEl.innerHTML = `<tr><td style="text-align: center; padding: 40px; color: var(--color-crimson); font-weight: bold;">Error: ${err.message}</td></tr>`;
+    }
+}
+
+function generateSparklineSvg(values) {
+    const cleanVals = values.filter(v => typeof v === 'number');
+    if (cleanVals.length < 2) return '';
+    
+    const min = Math.min(...cleanVals);
+    const max = Math.max(...cleanVals);
+    const range = max - min === 0 ? 1 : max - min;
+    
+    const width = 60;
+    const height = 16;
+    const padding = 2;
+    
+    const points = cleanVals.map((val, index) => {
+        const x = (index / (cleanVals.length - 1)) * (width - padding * 2) + padding;
+        const y = height - ((val - min) / range) * (height - padding * 2) - padding;
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    
+    // Detect general trend (up vs down) for line color
+    const firstVal = cleanVals[0];
+    const lastVal = cleanVals[cleanVals.length - 1];
+    const isUp = lastVal >= firstVal;
+    const strokeColor = isUp ? 'var(--color-emerald)' : 'var(--color-crimson)';
+    
+    return `
+        <svg width="${width}" height="${height}" style="vertical-align: middle; margin-left: 8px;" opacity="0.85">
+            <path d="M ${points.join(' L ')}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+    `;
+}
+
+function formatFsValue(val, isPercent) {
+    if (val === null || val === undefined) return '--';
+    if (isPercent) return val + '%';
+    return val.toLocaleString('en-IN');
+}
+
+function renderActiveStatementTable() {
+    const tableEl = document.getElementById('financial-statements-table');
+    if (!tableEl || !activeFsData) return;
+    
+    const statement = activeFsData[activeFsStatement];
+    if (!statement || !statement.headers || statement.headers.length === 0) {
+        tableEl.innerHTML = `<tr><td style="text-align: center; padding: 40px; color: var(--text-secondary);">No data available for this statement.</td></tr>`;
+        return;
+    }
+    
+    const headers = statement.headers;
+    const rows = statement.rows;
+    
+    let html = '';
+    
+    // 1. Build Header Row
+    html += '<thead><tr>';
+    // Sticky Metric column header
+    html += `<th style="position: sticky; left: 0; z-index: 6; background: var(--bg-card); border-right: 1px solid var(--border-glass); border-bottom: 2px solid var(--border-glass); text-align: left; min-width: 160px; font-family: 'Outfit', sans-serif;">Metric</th>`;
+    // Trend column header
+    html += `<th style="text-align: center; border-bottom: 2px solid var(--border-glass); font-family: 'Outfit', sans-serif; font-size: 10px; color: var(--text-secondary); width: 85px;">Trend</th>`;
+    
+    // Remaining Date/Year columns
+    for (let i = 1; i < headers.length; i++) {
+        html += `<th style="border-bottom: 2px solid var(--border-glass); font-family: 'Outfit', sans-serif; padding: 8px 12px; white-space: nowrap; text-align: right;">${headers[i]}</th>`;
+    }
+    html += '</tr></thead>';
+    
+    // 2. Build Body Rows
+    html += '<tbody>';
+    
+    const boldLabels = [
+        "sales", "expenses", "operating profit", "net profit", "equity capital", 
+        "reserves", "borrowings", "total liabilities", "fixed assets", "total assets", 
+        "operating cash flow", "profit before tax", "other income"
+    ];
+    
+    rows.forEach(r => {
+        const label = r.label;
+        const values = r.values;
+        const cleanLabelLower = label.toLowerCase();
+        
+        const isBold = boldLabels.some(b => cleanLabelLower.includes(b));
+        const isPercent = cleanLabelLower.includes('%');
+        
+        let rowStyle = '';
+        let cellBg = 'var(--bg-card)';
+        if (isBold) {
+            rowStyle = 'font-weight: 700; background: rgba(255,255,255,0.015);';
+        }
+        
+        // Render Row
+        html += `<tr style="${rowStyle}">`;
+        
+        // Metric name cell (sticky left)
+        const sparkline = generateSparklineSvg(values);
+        html += `
+            <td style="position: sticky; left: 0; z-index: 5; background: ${cellBg}; border-right: 1px solid var(--border-glass); text-align: left; white-space: nowrap; padding: 8px 12px; font-family: 'Outfit', sans-serif; box-shadow: 2px 0 5px rgba(0,0,0,0.04);">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span>${label}</span>
+                    ${sparkline}
+                </div>
+            </td>
+        `;
+        
+        // Calculate trend change comparing the last period to comparison period
+        let trendBadge = '--';
+        if (values.length >= 2) {
+            const lastVal = values[values.length - 1];
+            
+            // For quarterly results, try to compare YoY same quarter (4 quarters ago, i.e. index length - 5)
+            // For balance sheet or annual PL, compare to previous period (index length - 2)
+            let prevIndex = values.length - 2; // default to previous period
+            if (activeFsStatement === 'quarters' && values.length >= 5) {
+                prevIndex = values.length - 5; // YoY same quarter (4 quarters ago)
+            }
+            
+            const prevVal = values[prevIndex];
+            
+            if (typeof lastVal === 'number' && typeof prevVal === 'number' && prevVal !== 0) {
+                const diffPct = ((lastVal - prevVal) / Math.abs(prevVal)) * 100;
+                
+                // Color formatting
+                let colorClass = 'var(--text-muted)';
+                let prefix = '';
+                
+                if (diffPct > 0.05) {
+                    colorClass = 'var(--color-emerald)';
+                    prefix = '▲ +';
+                } else if (diffPct < -0.05) {
+                    colorClass = 'var(--color-crimson)';
+                    prefix = '▼ ';
+                } else {
+                    prefix = '• ';
+                }
+                
+                const showTrendText = diffPct.toFixed(1) + '%';
+                trendBadge = `<span style="font-size: 8.5px; font-weight: bold; color: ${colorClass}; background: ${colorClass}12; padding: 2px 6px; border-radius: 4px; border: 1px solid ${colorClass}25; white-space: nowrap;">${prefix}${showTrendText}</span>`;
+            }
+        }
+        
+        html += `<td style="text-align: center; vertical-align: middle; padding: 8px;">${trendBadge}</td>`;
+        
+        // Values cells
+        for (let i = 0; i < values.length; i++) {
+            const formatted = formatFsValue(values[i], isPercent);
+            html += `<td style="padding: 8px 12px; white-space: nowrap; font-family: 'Inter', sans-serif; text-align: right;">${formatted}</td>`;
+        }
+        
+        html += '</tr>';
+    });
+    
+    html += '</tbody>';
+    tableEl.innerHTML = html;
+}
+
+function setupFinancialStatementsEvents() {
+    // 1. Consolidated vs Standalone toggle buttons
+    const consBtn = document.getElementById('fs-view-consolidated-btn');
+    const standBtn = document.getElementById('fs-view-standalone-btn');
+    
+    if (consBtn) {
+        consBtn.addEventListener('click', () => {
+            if (activeFsView === 'consolidated') return;
+            activeFsView = 'consolidated';
+            consBtn.className = 'btn-primary';
+            consBtn.style.background = '';
+            consBtn.style.color = '';
+            if (standBtn) {
+                standBtn.className = 'btn-secondary';
+                standBtn.style.background = 'none';
+                standBtn.style.color = 'var(--text-secondary)';
+            }
+            if (activeStockProfile && activeStockProfile.ticker) {
+                loadFinancialStatements(activeStockProfile.ticker);
+            }
+        });
+    }
+    
+    if (standBtn) {
+        standBtn.addEventListener('click', () => {
+            if (activeFsView === 'standalone') return;
+            activeFsView = 'standalone';
+            standBtn.className = 'btn-primary';
+            standBtn.style.background = '';
+            standBtn.style.color = '';
+            if (consBtn) {
+                consBtn.className = 'btn-secondary';
+                consBtn.style.background = 'none';
+                consBtn.style.color = 'var(--text-secondary)';
+            }
+            if (activeStockProfile && activeStockProfile.ticker) {
+                loadFinancialStatements(activeStockProfile.ticker);
+            }
+        });
+    }
+    
+    // 2. Statements sub-tabs (segmented controls)
+    const tabs = document.querySelectorAll('.fs-statement-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const statement = tab.getAttribute('data-statement');
+            if (activeFsStatement === statement) return;
+            
+            tabs.forEach(t => {
+                t.classList.remove('active');
+                t.style.borderBottomColor = 'transparent';
+                t.style.color = 'var(--text-secondary)';
+            });
+            tab.classList.add('active');
+            tab.style.borderBottomColor = 'var(--color-primary)';
+            tab.style.color = 'var(--text-primary)';
+            
+            activeFsStatement = statement;
+            
+            // Clear AI text as the context changed
+            const auditText = document.getElementById('fs-ai-audit-text');
+            if (auditText) {
+                auditText.innerHTML = "Select a statement category and click the button to generate a structured AI financial research memo.";
+            }
+            const speakBtn = document.getElementById('fs-ai-speak-btn');
+            if (speakBtn) speakBtn.style.display = 'none';
+            
+            renderActiveStatementTable();
+        });
+    });
+    
+    // 3. Run AI Financial Audit
+    const runAuditBtn = document.getElementById('fs-run-audit-btn');
+    if (runAuditBtn) {
+        runAuditBtn.addEventListener('click', runAiFinancialAudit);
+    }
+}
+
+async function runAiFinancialAudit() {
+    if (!activeStockProfile || !activeStockProfile.ticker || !activeFsData) {
+        showToast("Please load a stock analyzer profile and statements first.", "warning");
+        return;
+    }
+    
+    const statementData = activeFsData[activeFsStatement];
+    if (!statementData || !statementData.headers || statementData.headers.length === 0) {
+        showToast("No table data available for analysis.", "warning");
+        return;
+    }
+    
+    const runAuditBtn = document.getElementById('fs-run-audit-btn');
+    const loadingEl = document.getElementById('fs-ai-loading');
+    const auditTextEl = document.getElementById('fs-ai-audit-text');
+    const speakBtn = document.getElementById('fs-ai-speak-btn');
+    
+    if (runAuditBtn) runAuditBtn.disabled = true;
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (auditTextEl) auditTextEl.style.display = 'none';
+    if (speakBtn) speakBtn.style.display = 'none';
+    
+    try {
+        const response = await fetch('/api/ai/audit-financials', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                symbol: activeStockProfile.ticker,
+                view: activeFsView,
+                statement_type: activeFsStatement,
+                table_data: statementData
+            })
+        });
+        
+        if (!response.ok) throw new Error("AI analysis endpoint returned an error");
+        
+        const data = await response.json();
+        
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (auditTextEl) {
+            auditTextEl.innerHTML = formatMarkdown(data.analysis);
+            auditTextEl.style.display = 'block';
+        }
+        
+        // Show speak button if speech synthesis is available
+        if (speakBtn && 'speechSynthesis' in window) {
+            speakBtn.style.display = 'inline-flex';
+            speakBtn.onclick = () => {
+                const textToSpeak = auditTextEl.innerText;
+                if (window.speechSynthesis.speaking) {
+                    window.speechSynthesis.cancel();
+                    speakBtn.innerHTML = '🔊 Speak Audit';
+                } else {
+                    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+                    utterance.rate = 1.05;
+                    utterance.onend = () => { speakBtn.innerHTML = '🔊 Speak Audit'; };
+                    speakBtn.innerHTML = '⏹ Stop Audio';
+                    window.speechSynthesis.speak(utterance);
+                }
+            };
+        }
+    } catch (err) {
+        console.error("AI Audit error:", err);
+        showToast("Failed to compile AI audit: " + err.message, "error");
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (auditTextEl) {
+            auditTextEl.textContent = "AI analysis failed. Please try again later.";
+            auditTextEl.style.display = 'block';
+        }
+    } finally {
+        if (runAuditBtn) runAuditBtn.disabled = false;
+    }
 }
 
