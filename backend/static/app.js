@@ -35366,7 +35366,7 @@ function renderTradesTimeline() {
     });
 }
 
-async function loadGlobalTrades() {
+async function loadGlobalTrades(forceRefresh = false) {
     const container = document.getElementById('global-trades-container');
     if (!container) return;
     
@@ -35385,11 +35385,21 @@ async function loadGlobalTrades() {
     const search = searchInput ? searchInput.value.trim() : '';
     
     try {
-        const url = `/api/trades/global-scanner?trade_type=${encodeURIComponent(type)}&action_type=${encodeURIComponent(action)}&min_value=${minVal}&search=${encodeURIComponent(search)}&duration_days=${duration}`;
+        const url = `/api/trades/global-scanner?trade_type=${encodeURIComponent(type)}&action_type=${encodeURIComponent(action)}&min_value=${minVal}&search=${encodeURIComponent(search)}&duration_days=${duration}${forceRefresh === true ? '&refresh=true' : ''}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error("API call failed");
         
         const deals = await response.json();
+        
+        if (!Array.isArray(deals)) {
+            console.error("Expected array from global-scanner, got:", deals);
+            let errMsg = "Failed to load deals feed.";
+            if (deals && deals.error) {
+                errMsg = `🔒 Screener Session Cookie is missing or expired. Please configure it in System Settings (⚙️ dropdown) to load promoter and institutional deals.`;
+            }
+            container.innerHTML = `<div style="text-align: center; color: var(--color-amber); padding: 35px; font-size: 11.5px; font-weight: 500; background: rgba(245,158,11,0.05); border: 1px dashed rgba(245,158,11,0.2); border-radius: 8px; margin: 15px;">${errMsg}</div>`;
+            return;
+        }
         
         if (deals.length === 0) {
             container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 35px; font-size: 11.5px;">No transactions matching the filters were found. Try clicking "Refresh Feed" or clearing search filters.</div>';
@@ -35489,7 +35499,7 @@ function setupTradesHandlers() {
     }
     
     if (syncBtn) {
-        syncBtn.addEventListener('click', loadGlobalTrades);
+        syncBtn.addEventListener('click', () => loadGlobalTrades(true));
     }
     
     const stockDurationFilter = document.getElementById('trades-duration-filter');

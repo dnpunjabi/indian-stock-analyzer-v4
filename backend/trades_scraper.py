@@ -15,6 +15,9 @@ def scrape_trades(symbol: str, session_cookie: str = None, company_name: str = N
     
     Requires session_cookie (format: 'sessionid=xxx' or just 'xxx').
     """
+    if not session_cookie:
+        return {"error": "Screener.in session cookie is not configured."}
+        
     base_symbol = clean_symbol(symbol)
     if not base_symbol:
         return {}
@@ -75,6 +78,17 @@ def scrape_trades(symbol: str, session_cookie: str = None, company_name: str = N
             if res.status_code == 404:
                 return {"error": f"Trades page not found for symbol {base_symbol}"}
             return {"error": f"Failed to fetch Screener trades page. Status: {res.status_code}"}
+            
+        is_redirect = False
+        if isinstance(res.history, list) and len(res.history) > 0:
+            is_redirect = True
+        elif isinstance(res.url, str) and "/login/" in res.url:
+            is_redirect = True
+        elif isinstance(res.text, str) and ("Login to Screener" in res.text or 'name="username"' in res.text):
+            is_redirect = True
+            
+        if is_redirect:
+            return {"error": "Screener.in session cookie is invalid or expired."}
             
         soup = BeautifulSoup(res.text, "html.parser")
         result = {

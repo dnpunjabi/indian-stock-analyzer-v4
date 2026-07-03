@@ -4702,13 +4702,27 @@ async def get_global_trades(
     trade_type: str = "All",
     action_type: str = "All",
     search: str = "",
-    duration_days: int = 90
+    duration_days: int = 90,
+    refresh: bool = False
 ):
     """Aggregates all cached trades and filters them for market discovery."""
     import json
     from datetime import datetime
     all_deals = []
     
+    # Fetch Screener session cookie
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+        cookie_row = cursor.fetchone()
+        cookie = cookie_row["value"] if cookie_row else None
+        
+    if refresh:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM cached_trades")
+            conn.commit()
+            
     # Pre-populate cache if it's completely empty to ensure user gets immediate results
     with get_db() as conn:
         cursor = conn.cursor()
@@ -4716,15 +4730,15 @@ async def get_global_trades(
         count = cursor.fetchone()["cnt"]
         
     if count == 0:
-        seeds = ["INFY", "TATAMOTORS", "RELIANCE", "BOSCHLTD", "TCS", "HDFCBANK"]
-        # Fetch Screener session cookie
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
-            cookie_row = cursor.fetchone()
-            cookie = cookie_row["value"] if cookie_row else None
+        if not cookie:
+            return {"error": "Screener.in session cookie is not configured. Please configure it in System Settings."}
             
+        seeds = ["INFY", "TATAMOTORS", "RELIANCE", "BOSCHLTD", "TCS", "HDFCBANK"]
         from backend.trades_scraper import scrape_trades
+        
+        scraped_any = False
+        cookie_error = False
+        
         for s in seeds:
             # Get company name
             with get_db() as conn:
@@ -4734,7 +4748,13 @@ async def get_global_trades(
                 c_name = p_row["company_name"] if p_row else None
             try:
                 data = scrape_trades(s, cookie, company_name=c_name)
-                if data and "error" not in data:
+                if data:
+                    if "error" in data:
+                        err_msg = data["error"].lower()
+                        if "cookie" in err_msg or "expired" in err_msg or "session" in err_msg:
+                            cookie_error = True
+                        continue
+                    
                     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     with get_db() as conn:
                         cursor = conn.cursor()
@@ -4743,8 +4763,15 @@ async def get_global_trades(
                             (s, json.dumps(data), now_str)
                         )
                         conn.commit()
+                        scraped_any = True
             except Exception:
                 pass
+                
+        if not scraped_any:
+            if cookie_error:
+                return {"error": "Screener.in session cookie is invalid or expired. Please update it in System Settings."}
+            else:
+                return {"error": "Failed to retrieve any deals feed records from Screener.in."}
                 
     # Query all cached trades
     with get_db() as conn:
