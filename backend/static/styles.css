@@ -14521,4 +14521,41 @@ details[open] .academy-hud-arrow {
     color: #059669;
 }
 
+/* Screener Import Modal Theme & Mobile Adaptability */
+[data-theme="light"] #screener-import-modal .card {
+    background: var(--bg-card) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12) !important;
+}
+
+[data-theme="light"] #screener-import-modal h3 {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="light"] #screener-import-modal tr:hover {
+    background: rgba(0, 0, 0, 0.02) !important;
+}
+
+@media (max-width: 600px) {
+    #screener-import-modal .card {
+        max-height: 95vh !important;
+        margin: 10px !important;
+    }
+    #screener-import-modal div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+    #screener-import-modal table th:nth-child(5),
+    #screener-import-modal table td:nth-child(5),
+    #screener-import-modal table th:nth-child(6),
+    #screener-import-modal table td:nth-child(6) {
+        display: none !important; /* Hide PE and Mar Cap on mobile to fit screen */
+    }
+    #screener-import-modal th, 
+    #screener-import-modal td {
+        padding: 8px 10px !important;
+    }
+}
+
+
 

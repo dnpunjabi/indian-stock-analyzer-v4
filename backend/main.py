@@ -4441,6 +4441,131 @@ async def save_screener_cookie_settings(payload: dict):
         conn.commit()
     return {"status": "success"}
 
+@app.get("/api/screener/screens")
+async def get_screener_screens():
+    """Fetches the saved custom screens from Screener.in."""
+    from backend.screens_scraper import scrape_saved_screens
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+        row = cursor.fetchone()
+        cookie = row["value"] if row else None
+    if not cookie or not cookie.strip():
+        return {"error": "Screener.in cookie is not configured. Please open Settings (⚙️) to save it."}
+    screens = scrape_saved_screens(cookie)
+    return {"screens": screens}
+
+@app.get("/api/screener/screens/{screen_id}/preview")
+async def get_screener_screen_preview(screen_id: str, page: int = 1):
+    """Fetches the preview list of equities for the specified screen ID."""
+    from backend.screens_scraper import scrape_screen_results
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+        row = cursor.fetchone()
+        cookie = row["value"] if row else None
+    if not cookie or not cookie.strip():
+        return {"error": "Screener.in cookie is not configured.", "companies": [], "total_pages": 1}
+    data = scrape_screen_results(screen_id, cookie, page=page)
+    return data
+
+@app.post("/api/screener/import")
+async def import_screener_screen_stocks(payload: dict):
+    """Imports selected symbols into a new or existing watchlist."""
+    symbols = payload.get("symbols", [])
+    watchlist_name = payload.get("watchlist_name", "").strip()
+    watchlist_id = payload.get("watchlist_id")
+    
+    if not symbols:
+        raise HTTPException(status_code=400, detail="No symbols selected for import.")
+        
+    if not watchlist_name and not watchlist_id:
+        raise HTTPException(status_code=400, detail="Watchlist name or ID must be specified.")
+        
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Get or create watchlist ID
+        if not watchlist_id:
+            cursor.execute("INSERT OR IGNORE INTO watchlists (name) VALUES (?)", (watchlist_name,))
+            cursor.execute("SELECT id FROM watchlists WHERE name = ?", (watchlist_name,))
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=500, detail="Failed to create watchlist.")
+            watchlist_id = row["id"]
+            
+        # Insert items
+        added_count = 0
+        for s in symbols:
+            from backend.screens_scraper import clean_symbol
+            clean_sym = clean_symbol(s)
+            if not clean_sym:
+                continue
+            cursor.execute(
+                "SELECT symbol FROM screener_universe WHERE symbol = ? OR base_symbol = ? OR symbol LIKE ?",
+                (clean_sym, clean_sym, clean_sym + "%")
+            )
+            uni_row = cursor.fetchone()
+            db_symbol = uni_row["symbol"] if uni_row else clean_sym + ".NS"
+            
+            cursor.execute(
+                "INSERT OR IGNORE INTO watchlist_items (watchlist_id, symbol) VALUES (?, ?)",
+                (watchlist_id, db_symbol)
+            )
+            added_count += 1
+            
+        conn.commit()
+        
+    # Trigger background caching tasks
+    import threading
+    def pre_cache_scrapes():
+        with get_db() as conn2:
+            cursor2 = conn2.cursor()
+            cursor2.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+            r = cursor2.fetchone()
+            cookie = r["value"] if r else None
+        if not cookie:
+            return
+            
+        from backend.shareholding_scraper import scrape_shareholding_pattern
+        from backend.trades_scraper import scrape_trades
+        from datetime import datetime
+        import json
+        
+        for s in symbols:
+            from backend.screens_scraper import clean_symbol
+            clean_s = clean_symbol(s)
+            if not clean_s:
+                continue
+            try:
+                sh_data = scrape_shareholding_pattern(clean_s, cookie)
+                if sh_data and "error" not in sh_data:
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    with get_db() as conn2:
+                        cursor2 = conn2.cursor()
+                        cursor2.execute(
+                            "INSERT OR REPLACE INTO cached_shareholdings (symbol, data_json, last_updated) VALUES (?, ?, ?)",
+                            (clean_s, json.dumps(sh_data), now_str)
+                        )
+                        conn2.commit()
+                        
+                tr_data = scrape_trades(clean_s, cookie)
+                if tr_data and "error" not in tr_data:
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    with get_db() as conn2:
+                        cursor2 = conn2.cursor()
+                        cursor2.execute(
+                            "INSERT OR REPLACE INTO cached_trades (symbol, data_json, last_updated) VALUES (?, ?, ?)",
+                            (clean_s, json.dumps(tr_data), now_str)
+                        )
+                        conn2.commit()
+            except Exception:
+                pass
+                
+    threading.Thread(target=pre_cache_scrapes, daemon=True).start()
+    
+    return {"status": "success", "added_count": added_count, "watchlist_id": watchlist_id}
+
 @app.get("/api/stocks/{symbol}/shareholding")
 async def get_stock_shareholding(symbol: str):
     """Retrieves the shareholding pattern from 30-day SQLite cache or scrapes it on-demand."""

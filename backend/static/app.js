@@ -1179,6 +1179,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Insider & Large Trades tracker UI
     setupTradesHandlers();
     loadGlobalTrades();
+    setupScreenerImportHandlers();
 });
 
 // Collapsible Sidebar Workstation Manager
@@ -35487,5 +35488,336 @@ function setupTradesHandlers() {
             renderTradesTimeline();
         };
     }
+}
+
+function setupScreenerImportHandlers() {
+    const triggerBtn = document.getElementById('screener-import-modal-trigger-btn');
+    const modal = document.getElementById('screener-import-modal');
+    const closeBtn = document.getElementById('screener-import-close-btn');
+    const cancelBtn = document.getElementById('screener-import-cancel-btn');
+    const backBtn = document.getElementById('screener-import-back-btn');
+    const loadBtn = document.getElementById('screener-import-load-btn');
+    const submitBtn = document.getElementById('screener-import-submit-btn');
+    const toggleAllBtn = document.getElementById('screener-import-toggle-all-btn');
+    
+    const screenSelect = document.getElementById('screener-import-screen-select');
+    const watchlistSelect = document.getElementById('screener-import-watchlist-select');
+    const newWatchlistName = document.getElementById('screener-import-new-watchlist-name');
+    const errorBanner = document.getElementById('screener-import-error-banner');
+    
+    const step1 = document.getElementById('screener-import-step-1');
+    const step2 = document.getElementById('screener-import-step-2');
+    const previewTableBody = document.getElementById('screener-import-table-body');
+    const screenTitle = document.getElementById('screener-import-screen-title');
+    const selectedCountLabel = document.getElementById('screener-import-selected-count');
+    
+    if (!triggerBtn || !modal) return;
+    
+    let activeScreenCompanies = [];
+    
+    // Toggle watchlists selection
+    if (watchlistSelect) {
+        watchlistSelect.onchange = () => {
+            if (watchlistSelect.value === 'new') {
+                newWatchlistName.style.display = 'block';
+            } else {
+                newWatchlistName.style.display = 'none';
+            }
+        };
+    }
+    
+    // Trigger open modal
+    triggerBtn.onclick = async () => {
+        errorBanner.style.display = 'none';
+        step1.style.display = 'flex';
+        step2.style.display = 'none';
+        backBtn.style.display = 'none';
+        submitBtn.style.display = 'none';
+        modal.style.display = 'flex';
+        
+        // Populate watchlist choices
+        if (watchlistSelect) {
+            watchlistSelect.innerHTML = '<option value="new" selected>+ Create New Watchlist</option>';
+            newWatchlistName.style.display = 'block';
+            newWatchlistName.value = '';
+            
+            try {
+                const res = await fetch('/api/watchlists');
+                const data = await res.json();
+                if (data && data.watchlists) {
+                    data.watchlists.forEach(w => {
+                        const opt = document.createElement('option');
+                        opt.value = w.id;
+                        opt.textContent = w.name;
+                        watchlistSelect.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error("Error loading watchlists:", err);
+            }
+        }
+        
+        // Fetch screens list from Screener
+        if (screenSelect) {
+            screenSelect.innerHTML = '<option value="" disabled selected>Loading your saved screens...</option>';
+            try {
+                const res = await fetch('/api/screener/screens');
+                const data = await res.json();
+                if (data.error) {
+                    errorBanner.textContent = data.error;
+                    errorBanner.style.display = 'block';
+                    screenSelect.innerHTML = '<option value="" disabled selected>Authentication failed</option>';
+                    return;
+                }
+                
+                screenSelect.innerHTML = '';
+                if (data.screens && data.screens.length > 0) {
+                    data.screens.forEach(s => {
+                        const opt = document.createElement('option');
+                        opt.value = s.id;
+                        opt.textContent = s.name;
+                        screenSelect.appendChild(opt);
+                    });
+                } else {
+                    screenSelect.innerHTML = '<option value="" disabled selected>No saved screens found on Screener.in</option>';
+                }
+            } catch (err) {
+                errorBanner.textContent = "Error: Could not retrieve saved screens. Please check backend connection.";
+                errorBanner.style.display = 'block';
+                screenSelect.innerHTML = '<option value="" disabled selected>Connection error</option>';
+            }
+        }
+    };
+    
+    // Close modal triggers
+    const closeModal = () => {
+        modal.style.display = 'none';
+    };
+    if (closeBtn) closeBtn.onclick = closeModal;
+    if (cancelBtn) cancelBtn.onclick = closeModal;
+    
+    // Step 1 -> Step 2 transition
+    if (loadBtn) {
+        loadBtn.onclick = async () => {
+            errorBanner.style.display = 'none';
+            const screenId = screenSelect.value;
+            if (!screenId) {
+                errorBanner.textContent = "Please select a screen first.";
+                errorBanner.style.display = 'block';
+                return;
+            }
+            
+            const isNew = watchlistSelect.value === 'new';
+            const name = newWatchlistName.value.trim();
+            if (isNew && !name) {
+                errorBanner.textContent = "Please specify a name for the new watchlist.";
+                errorBanner.style.display = 'block';
+                return;
+            }
+            
+            loadBtn.disabled = true;
+            const originalText = loadBtn.innerHTML;
+            loadBtn.innerHTML = "Fetching results... <span class='spinner'></span>";
+            
+            try {
+                const res = await fetch(`/api/screener/screens/${screenId}/preview`);
+                const data = await res.json();
+                loadBtn.disabled = false;
+                loadBtn.innerHTML = originalText;
+                
+                if (data.error) {
+                    errorBanner.textContent = data.error;
+                    errorBanner.style.display = 'block';
+                    return;
+                }
+                
+                activeScreenCompanies = data.companies || [];
+                if (activeScreenCompanies.length === 0) {
+                    errorBanner.textContent = "No matching stocks found for this screen query on Screener.in.";
+                    errorBanner.style.display = 'block';
+                    return;
+                }
+                
+                step1.style.display = 'none';
+                step2.style.display = 'flex';
+                backBtn.style.display = 'inline-flex';
+                submitBtn.style.display = 'inline-flex';
+                
+                const selectedScreenText = screenSelect.options[screenSelect.selectedIndex].textContent;
+                if (screenTitle) screenTitle.textContent = `Screen: ${selectedScreenText}`;
+                
+                renderScreenPreviewTable();
+                updateSelectionCount();
+            } catch (err) {
+                loadBtn.disabled = false;
+                loadBtn.innerHTML = originalText;
+                errorBanner.textContent = "Failed to load results. Connection error.";
+                errorBanner.style.display = 'block';
+            }
+        };
+    }
+    
+    // Back Button
+    if (backBtn) {
+        backBtn.onclick = () => {
+            errorBanner.style.display = 'none';
+            step2.style.display = 'none';
+            step1.style.display = 'flex';
+            backBtn.style.display = 'none';
+            submitBtn.style.display = 'none';
+        };
+    }
+    
+    // Toggle Select All / Deselect All
+    if (toggleAllBtn) {
+        toggleAllBtn.onclick = () => {
+            const checkboxes = previewTableBody.querySelectorAll('.screener-stock-checkbox');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            
+            checkboxes.forEach(cb => {
+                cb.checked = !allChecked;
+            });
+            
+            toggleAllBtn.textContent = allChecked ? "Select All" : "Deselect All";
+            updateSelectionCount();
+        };
+    }
+    
+    // Render Step 2 Preview table
+    function renderScreenPreviewTable() {
+        if (!previewTableBody) return;
+        previewTableBody.innerHTML = '';
+        
+        activeScreenCompanies.forEach(c => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid var(--border-glass)';
+            tr.style.transition = 'background 0.2s';
+            tr.onmouseover = () => { tr.style.background = 'rgba(255,255,255,0.02)'; };
+            tr.onmouseout = () => { tr.style.background = 'transparent'; };
+            
+            const checkboxTd = document.createElement('td');
+            checkboxTd.style.padding = '8px 15px';
+            checkboxTd.style.textAlign = 'center';
+            checkboxTd.innerHTML = `<input type="checkbox" class="screener-stock-checkbox" data-symbol="${c.symbol}" checked style="cursor: pointer;">`;
+            
+            const cb = checkboxTd.querySelector('.screener-stock-checkbox');
+            cb.onchange = updateSelectionCount;
+            
+            tr.appendChild(checkboxTd);
+            
+            const cmpVal = c.price > 0 ? `₹${c.price.toLocaleString("en-IN")}` : '--';
+            const peVal = c.pe > 0 ? c.pe.toFixed(1) : '--';
+            const mcVal = c.market_cap > 0 ? c.market_cap.toLocaleString("en-IN") : '--';
+            const roceVal = c.roce > 0 ? `${c.roce.toFixed(1)}%` : '--';
+            
+            tr.innerHTML += `
+                <td style="padding: 8px 15px; font-weight: 700; color: var(--color-primary-light);">${c.symbol}</td>
+                <td style="padding: 8px 15px; color: var(--text-primary); font-weight: 500;">${c.name}</td>
+                <td style="padding: 8px 15px; text-align: right; color: var(--text-secondary);">${cmpVal}</td>
+                <td style="padding: 8px 15px; text-align: right; color: var(--text-secondary);">${peVal}</td>
+                <td style="padding: 8px 15px; text-align: right; color: var(--text-secondary);">${mcVal}</td>
+                <td style="padding: 8px 15px; text-align: right; color: var(--text-secondary); font-weight: 600;">${roceVal}</td>
+            `;
+            tr.insertBefore(checkboxTd, tr.firstChild);
+            previewTableBody.appendChild(tr);
+        });
+    }
+    
+    function updateSelectionCount() {
+        if (!selectedCountLabel) return;
+        const checkboxes = previewTableBody.querySelectorAll('.screener-stock-checkbox');
+        const selected = Array.from(checkboxes).filter(cb => cb.checked).length;
+        selectedCountLabel.textContent = `Selected: ${selected}/${checkboxes.length}`;
+        
+        if (toggleAllBtn) {
+            const allChecked = selected === checkboxes.length;
+            toggleAllBtn.textContent = allChecked ? "Deselect All" : "Select All";
+        }
+    }
+    
+    // Sync & Import handler
+    if (submitBtn) {
+        submitBtn.onclick = async () => {
+            errorBanner.style.display = 'none';
+            const checkboxes = previewTableBody.querySelectorAll('.screener-stock-checkbox');
+            const selectedSymbols = Array.from(checkboxes)
+                .filter(cb => cb.checked)
+                .map(cb => cb.getAttribute('data-symbol'));
+                
+            if (selectedSymbols.length === 0) {
+                errorBanner.textContent = "Please select at least one stock to import.";
+                errorBanner.style.display = 'block';
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = "Importing... <span class='spinner'></span>";
+            
+            const watchlistId = watchlistSelect.value;
+            const payload = {
+                symbols: selectedSymbols,
+                watchlist_name: watchlistId === 'new' ? newWatchlistName.value.trim() : ""
+            };
+            if (watchlistId !== 'new') {
+                payload.watchlist_id = parseInt(watchlistId);
+            }
+            
+            try {
+                const res = await fetch('/api/screener/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await res.json();
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                
+                if (data.detail) {
+                    errorBanner.textContent = data.detail;
+                    errorBanner.style.display = 'block';
+                    return;
+                }
+                
+                showToastNotification(`Successfully imported ${data.added_count} stocks to watchlist! Background cache scan triggered.`);
+                closeModal();
+                if (typeof loadWatchlists === 'function') {
+                    loadWatchlists(data.watchlist_id);
+                }
+            } catch (err) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+                errorBanner.textContent = "Failed to sync import. Connection error.";
+                errorBanner.style.display = 'block';
+            }
+        };
+    }
+}
+
+function showToastNotification(message) {
+    const toast = document.createElement('div');
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.right = '20px';
+    toast.style.background = 'rgba(16, 185, 129, 0.95)';
+    toast.style.color = '#fff';
+    toast.style.padding = '12px 20px';
+    toast.style.borderRadius = '8px';
+    toast.style.fontSize = '12px';
+    toast.style.fontWeight = '700';
+    toast.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)';
+    toast.style.zIndex = '999999';
+    toast.style.fontFamily = 'Outfit, sans-serif';
+    toast.style.border = '1px solid rgba(255,255,255,0.15)';
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.5s ease-out';
+        setTimeout(() => { toast.remove(); }, 500);
+    }, 4500);
 }
 
