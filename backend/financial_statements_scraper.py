@@ -192,6 +192,21 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated") -> dict
                 p_text = p_el.text.strip()
         actual_is_consolidated = "consolidated figures" in p_text.lower()
         
+        # Parse the company_id from main page to call peers API
+        company_id_match = re.search(r'data-company-id=["\'](\d+)["\']', response.text)
+        company_id = company_id_match.group(1) if company_id_match else None
+        
+        peers_table_el = None
+        if company_id:
+            try:
+                peers_url = f"https://www.screener.in/api/company/{company_id}/peers/"
+                peers_res = requests.get(peers_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+                if peers_res.status_code == 200:
+                    peers_soup = BeautifulSoup(peers_res.text, "html.parser")
+                    peers_table_el = peers_soup.find("table")
+            except Exception as e:
+                print(f"Error fetching peers API: {e}")
+                
         return {
             "symbol": symbol,
             "resolved_symbol": base_symbol,
@@ -199,7 +214,7 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated") -> dict
             "quarters": parse_screener_table(soup.find("section", id="quarters").find("table") if soup.find("section", id="quarters") else None),
             "profit_loss": parse_screener_table(soup.find("section", id="profit-loss").find("table") if soup.find("section", id="profit-loss") else None),
             "balance_sheet": parse_screener_table(soup.find("section", id="balance-sheet").find("table") if soup.find("section", id="balance-sheet") else None),
-            "peers": parse_screener_peers_table(soup.find("section", id="peers").find("table") if soup.find("section", id="peers") else None)
+            "peers": parse_screener_peers_table(peers_table_el)
         }
     except Exception as err:
         return {"error": f"Exception occurred while scraping financials: {str(err)}"}

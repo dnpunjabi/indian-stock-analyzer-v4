@@ -83,40 +83,49 @@ class TestFinancialStatements(unittest.TestCase):
                         </tbody>
                     </table>
                 </section>
+                <div data-company-id="123"></div>
                 <section id="peers">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>S.No.</th>
-                                <th>Name</th>
-                                <th>P/E</th>
-                                <th>ROCE %</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>1.</td>
-                                <td>TCS Ltd</td>
-                                <td>28.5</td>
-                                <td>45.2</td>
-                            </tr>
-                            <tr>
-                                <td>2.</td>
-                                <td>Infosys</td>
-                                <td>24.3</td>
-                                <td>38.1</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <!-- peers section is loaded dynamically, so it's empty in main HTML -->
                 </section>
             </body>
         </html>
         """
         
+        # Mock peers API response
+        mock_peers_res = MagicMock()
+        mock_peers_res.status_code = 200
+        mock_peers_res.text = """
+        <table>
+            <thead>
+                <tr>
+                    <th>S.No.</th>
+                    <th>Name</th>
+                    <th>P/E</th>
+                    <th>ROCE %</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1.</td>
+                    <td>TCS Ltd</td>
+                    <td>28.5</td>
+                    <td>45.2</td>
+                </tr>
+                <tr>
+                    <td>2.</td>
+                    <td>Infosys</td>
+                    <td>24.3</td>
+                    <td>38.1</td>
+                </tr>
+            </tbody>
+        </table>
+        """
+        
         # Configure requests.get calls
         # 1. Search api suggest query
         # 2. Main details page fetch
-        mock_get.side_effect = [mock_search_res, mock_page_res]
+        # 3. Peers API page fetch
+        mock_get.side_effect = [mock_search_res, mock_page_res, mock_peers_res]
         
         from backend.financial_statements_scraper import scrape_financial_statements
         data = scrape_financial_statements("TCS", "consolidated")
