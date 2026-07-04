@@ -14706,3 +14706,496 @@ details[open] .academy-hud-arrow {
         justify-content: center !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   STOCK EVENTS CALENDAR — STYLES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── Event Type Color Tokens ─────────────────────────────────── */
+:root {
+    --event-results: rgba(59, 130, 246, 0.85);
+    --event-results-bg: rgba(59, 130, 246, 0.12);
+    --event-dividend: rgba(16, 185, 129, 0.85);
+    --event-dividend-bg: rgba(16, 185, 129, 0.12);
+    --event-bonus: rgba(245, 158, 11, 0.85);
+    --event-bonus-bg: rgba(245, 158, 11, 0.12);
+    --event-split: rgba(168, 85, 247, 0.85);
+    --event-split-bg: rgba(168, 85, 247, 0.12);
+    --event-meeting: rgba(107, 114, 128, 0.85);
+    --event-meeting-bg: rgba(107, 114, 128, 0.12);
+}
+
+/* ─── Per-Stock Events Grid ───────────────────────────────────── */
+.events-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.event-stock-card {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: eventSlideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+    position: relative;
+    overflow: hidden;
+}
+
+.event-stock-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: 10px 0 0 10px;
+}
+
+.event-stock-card[data-type="quarterly_results"]::before { background: var(--event-results); }
+.event-stock-card[data-type="dividend"]::before { background: var(--event-dividend); }
+.event-stock-card[data-type="bonus"]::before { background: var(--event-bonus); }
+.event-stock-card[data-type="split"]::before { background: var(--event-split); }
+.event-stock-card[data-type="board_meeting"]::before { background: var(--event-meeting); }
+
+.event-stock-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    border-color: var(--color-primary);
+}
+
+.event-stock-card .event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.event-stock-card .event-type-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.event-type-badge[data-type="quarterly_results"] { background: var(--event-results-bg); color: var(--event-results); }
+.event-type-badge[data-type="dividend"] { background: var(--event-dividend-bg); color: var(--event-dividend); }
+.event-type-badge[data-type="bonus"] { background: var(--event-bonus-bg); color: var(--event-bonus); }
+.event-type-badge[data-type="split"] { background: var(--event-split-bg); color: var(--event-split); }
+.event-type-badge[data-type="board_meeting"] { background: var(--event-meeting-bg); color: var(--event-meeting); }
+
+.event-stock-card .event-date {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.event-stock-card .event-desc {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.event-stock-card .event-countdown {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: fit-content;
+}
+
+.event-countdown.upcoming {
+    background: rgba(59, 130, 246, 0.1);
+    color: rgba(59, 130, 246, 0.9);
+}
+
+.event-countdown.imminent {
+    background: rgba(245, 158, 11, 0.15);
+    color: rgba(245, 158, 11, 0.95);
+    animation: countdownPulse 2s ease-in-out infinite;
+}
+
+.event-countdown.passed {
+    background: rgba(107, 114, 128, 0.1);
+    color: rgba(107, 114, 128, 0.7);
+}
+
+.event-countdown.passed-check {
+    background: rgba(16, 185, 129, 0.1);
+    color: rgba(16, 185, 129, 0.8);
+}
+
+/* ─── Skeleton Loaders ────────────────────────────────────────── */
+.event-card-skeleton {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: 10px;
+    height: 100px;
+    position: relative;
+    overflow: hidden;
+}
+
+.event-card-skeleton.shimmer::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.04),
+        transparent
+    );
+    animation: shimmerSlide 1.8s ease-in-out infinite;
+}
+
+/* ─── Filter Pills ────────────────────────────────────────────── */
+.events-pill {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+.events-pill:hover {
+    border-color: var(--color-primary);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.events-pill.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(var(--color-primary-rgb, 99, 102, 241), 0.3);
+}
+
+/* ─── Summary Stats Bar ───────────────────────────────────────── */
+.events-summary-bar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.events-summary-bar .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.events-summary-bar .stat-count {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* ─── Market Events Table ─────────────────────────────────────── */
+.events-table {
+    font-size: 11.5px;
+}
+
+.events-table thead th {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-glass);
+    position: sticky;
+    top: 0;
+    background: var(--bg-card, var(--bg-glass));
+    z-index: 2;
+    user-select: none;
+}
+
+.events-table thead th:hover {
+    color: var(--color-primary);
+}
+
+.events-table tbody tr {
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.events-table tbody tr:hover {
+    background: var(--bg-glass);
+}
+
+.events-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    color: var(--text-secondary);
+    vertical-align: middle;
+}
+
+.events-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.events-table .event-date-cell {
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    font-size: 11px;
+}
+
+.events-table .event-company-cell {
+    font-weight: 500;
+    color: var(--text-primary);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.events-table .event-company-cell .event-symbol {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* ─── Mobile Event Cards ──────────────────────────────────────── */
+.events-mobile-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.event-mobile-card {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s ease;
+    animation: eventSlideUp 0.3s ease both;
+}
+
+.event-mobile-card:hover {
+    border-color: var(--color-primary);
+}
+
+.event-mobile-card .event-mobile-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.event-mobile-card .event-mobile-company {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.event-mobile-card .event-mobile-desc {
+    font-size: 10.5px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.event-mobile-card .event-mobile-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.event-mobile-card .event-mobile-date {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+/* ─── Empty & Error States ────────────────────────────────────── */
+.events-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-muted);
+}
+
+.events-empty-state .empty-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+    animation: eventFloat 3s ease-in-out infinite;
+}
+
+.events-empty-state .empty-text {
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.events-empty-state .empty-subtext {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+/* ─── Animations ──────────────────────────────────────────────── */
+@keyframes eventSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes countdownPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+@keyframes shimmerSlide {
+    0% { left: -100%; }
+    100% { left: 200%; }
+}
+
+@keyframes eventFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+@keyframes spinRefresh {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* ─── Responsive: Mobile ──────────────────────────────────────── */
+@media (max-width: 768px) {
+    .events-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .events-table { display: none !important; }
+    #events-market-cards { display: flex !important; }
+
+    #events-search-input {
+        width: 100% !important;
+    }
+
+    .events-filter-pills {
+        flex-wrap: wrap !important;
+        gap: 8px 6px;
+        padding: 10px 14px !important;
+    }
+
+    #events-market-container {
+        max-height: 400px !important;
+    }
+
+    .events-summary-bar {
+        font-size: 10px;
+        gap: 8px;
+        padding: 8px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .event-stock-card {
+        padding: 12px 14px;
+    }
+
+    #events-stock-section,
+    #events-market-section {
+        padding: 12px 14px !important;
+    }
+}
+
+@media (min-width: 769px) {
+    #events-market-cards { display: none !important; }
+    .events-table { display: table !important; }
+}
+
+/* ─── Light Theme Table Borders & Imminent Event Glow ────────────────────── */
+@keyframes imminentPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+        border-color: rgba(239, 68, 68, 0.6);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+        border-color: rgba(239, 68, 68, 0.85);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+        border-color: rgba(239, 68, 68, 0.6);
+    }
+}
+.event-imminent {
+    animation: imminentPulse 2s infinite !important;
+    background: rgba(239, 68, 68, 0.05) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+}
+
+[data-theme="light"] .data-table th {
+    border-bottom: 2px solid rgba(0, 0, 0, 0.15) !important;
+}
+[data-theme="light"] .data-table td {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ─── Events Calendar Table Grid Borders ────────────────────── */
+.events-table th,
+.events-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-glass, rgba(255, 255, 255, 0.08));
+    color: var(--text-primary);
+}
+.events-table th {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border-glass, rgba(255, 255, 255, 0.12));
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+[data-theme="light"] .events-table th {
+    border-bottom: 2px solid rgba(0, 0, 0, 0.15) !important;
+    background: rgba(0, 0, 0, 0.02) !important;
+    color: #374151 !important;
+}
+[data-theme="light"] .events-table td {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+    color: #0b0f19 !important;
+}

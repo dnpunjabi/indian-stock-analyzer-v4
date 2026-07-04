@@ -309,6 +309,24 @@ def init_db():
         )
         """)
 
+        # Stock Events Calendar table (dividends, results, bonus, splits, board meetings)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS stock_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            symbol TEXT NOT NULL,
+            company_name TEXT,
+            event_type TEXT NOT NULL,
+            event_date TEXT NOT NULL,
+            description TEXT,
+            details_json TEXT,
+            source TEXT DEFAULT 'nse',
+            fetched_at TEXT NOT NULL,
+            UNIQUE(symbol, event_type, event_date)
+        )
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_date ON stock_events(event_date)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_symbol ON stock_events(symbol)")
+
 
         
         # Mock loader for history, block deals, and corporate actions if empty
@@ -759,6 +777,17 @@ async def run_background_cache_warmer():
                         )
                         conn.commit()
                     print(f"Background cache warmer: successfully cached {sym}")
+
+                    # Warm events cache in background
+                    try:
+                        from backend.events_scraper import cache_stock_events, is_stock_events_stale
+                        full_sym = f"{sym.replace('.NS', '').replace('.BO', '')}.NS"
+                        if is_stock_events_stale(full_sym, max_age_hours=24):
+                            await asyncio.to_thread(cache_stock_events, full_sym)
+                            print(f"Background cache warmer: warmed events for {sym}")
+                    except Exception as e:
+                        print(f"Background cache warmer: failed to warm events for {sym}: {e}")
+
                     await asyncio.sleep(2)  # Reduced sleep between updates
                 except Exception as e:
                     print(f"Background warming error for {sym}: {e}")
@@ -1616,6 +1645,10 @@ async def startup_warm_caching():
     asyncio.create_task(run_background_market_movers_updater())
     # 4.5 Fire background WhatsApp daily wrap-up scheduler
     asyncio.create_task(run_background_daily_wrapup_scheduler())
+
+    # 5.5 Fire background stock events calendar refresh (2x/day)
+    from backend.events_scraper import run_background_events_scheduler
+    asyncio.create_task(run_background_events_scheduler())
 
     # 5. Initialize Angel One real-time WebSocket feed (optional)
     angel_api_key = os.environ.get("ANGEL_API_KEY", "")
@@ -4711,6 +4744,87 @@ async def get_stock_financial_statements(symbol: str, view: str = "consolidated"
         conn.commit()
         
     return data
+
+# ─── Stock Events Calendar API Endpoints ──────────────────────────────────────
+
+@app.get("/api/events/calendar")
+async def get_events_calendar(days: int = Query(30, ge=1, le=365), type: Optional[str] = None):
+    """
+    Returns upcoming market-wide stock events (results, dividends, bonuses, splits).
+    Served entirely from SQLite cache — never hits external APIs in real-time.
+    """
+    from backend.events_scraper import get_market_events
+    event_type = type if type and type != "all" else None
+    events = get_market_events(days=days, event_type=event_type)
+    
+    # Compute summary stats
+    type_counts = {}
+    for ev in events:
+        et = ev.get("event_type", "other")
+        type_counts[et] = type_counts.get(et, 0) + 1
+    
+    return {
+        "events": events,
+        "total": len(events),
+        "type_counts": type_counts,
+        "days_range": days,
+        "filter_type": type or "all",
+    }
+
+
+@app.get("/api/events/stock/{symbol}")
+async def get_stock_events(symbol: str):
+    """
+    Returns upcoming events for a specific stock.
+    If cache is stale (>12 hours), triggers background refresh via yfinance.
+    """
+    import asyncio
+    from backend.events_scraper import get_stock_events_cached, is_stock_events_stale, cache_stock_events
+    from backend.shareholding_scraper import clean_symbol
+    
+    base_symbol = clean_symbol(symbol)
+    if not base_symbol:
+        raise HTTPException(status_code=400, detail="Invalid ticker symbol.")
+    
+    full_symbol = f"{base_symbol}.NS"
+    
+    # Check staleness and trigger background refresh if needed
+    if is_stock_events_stale(full_symbol, max_age_hours=12):
+        try:
+            # Refresh in background thread (non-blocking)
+            asyncio.create_task(asyncio.to_thread(cache_stock_events, full_symbol))
+        except Exception:
+            pass
+    
+    # Always serve from cache (even if stale — better stale than empty)
+    events = get_stock_events_cached(full_symbol)
+    
+    # If cache is completely empty, do a synchronous fetch
+    if not events:
+        try:
+            events = await asyncio.to_thread(cache_stock_events, full_symbol)
+        except Exception as e:
+            print(f"[Events API] Sync fetch failed for {full_symbol}: {e}")
+            events = []
+    
+    return {
+        "symbol": base_symbol,
+        "events": events,
+        "total": len(events),
+    }
+
+
+@app.post("/api/events/refresh")
+async def refresh_events():
+    """Admin endpoint: manually trigger a background events refresh."""
+    import asyncio
+    from backend.events_scraper import aggregate_and_cache_market_events
+    
+    try:
+        count = await asyncio.to_thread(aggregate_and_cache_market_events)
+        return {"status": "ok", "events_updated": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/ai/audit-financials")
 async def audit_financial_statements(data: AuditFinancialsRequest):

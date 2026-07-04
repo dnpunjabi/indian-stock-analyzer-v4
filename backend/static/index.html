@@ -83,6 +83,9 @@
                 <button class="nav-btn" id="tab-market-news-btn" data-title="Global Market News Feed">
                     <span class="btn-icon">📡</span> <span class="btn-text">Global News Feed</span>
                 </button>
+                <button class="nav-btn" id="tab-events-btn" data-title="Market Events Calendar">
+                    <span class="btn-icon">📅</span> <span class="btn-text">Events Calendar</span>
+                </button>
 
                 <div class="nav-category-header">⚡ Tactical Trading</div>
                 <button class="nav-btn" id="tab-swing-scan-btn" data-title="Swing Setup Scanner">
@@ -982,8 +985,30 @@
                     </div>
 
                     <!-- Global Trades Result Grid -->
-                    <div id="global-trades-container" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 5px;">
+                    <div id="global-trades-container" style="max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 5px; margin-bottom: 15px;">
                         <div style="text-align: center; color: var(--text-muted); padding: 30px; font-size: 11.5px;">Click Refresh Feed to load recent market-wide transactions.</div>
+                    </div>
+
+                    <!-- Smart Pagination Controls for Global Trades Sweep -->
+                    <div id="global-trades-pagination" class="no-print" style="display: none; justify-content: space-between; align-items: center; padding: 12px 15px; border-top: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.01); border-radius: 6px;">
+                        <button class="btn-secondary" id="global-trades-prev-btn" onclick="navigateGlobalTradesPage(-1)" style="font-size: 10.5px; padding: 6px 12px; background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; min-width: 60px;">◀ Prev</button>
+                        
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span id="global-trades-page-info" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Page 1 of 1</span>
+                            
+                            <div style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-glass); padding-left: 15px;">
+                                <span style="font-size: 10px; color: var(--text-secondary);">Records per page:</span>
+                                <select id="global-trades-pagesize-select" onchange="changeGlobalTradesPageSize(this.value)" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer; outline: none; height: 24px;">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="btn-secondary" id="global-trades-next-btn" onclick="navigateGlobalTradesPage(1)" style="font-size: 10.5px; padding: 6px 12px; background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; min-width: 60px;">Next ▶</button>
                     </div>
                 </div>
             </section>
@@ -1088,6 +1113,100 @@
                 <!-- Feed Chronological timeline cards container -->
                 <div class="news-timeline-wrapper" id="market-news-feed-container">
                     <!-- Loaded dynamically -->
+                </div>
+            </section>
+
+
+            <!-- SECTION: MARKET-WIDE EVENTS CALENDAR -->
+            <section class="workspace-tab" id="tab-events" style="display: none; font-family: 'Inter', sans-serif; padding: 20px;">
+                <div class="section-header" style="margin-bottom: 20px;">
+                    <h2 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px;">Market-Wide Events Calendar</h2>
+                    <p style="margin: 0; font-size: 11.5px; color: var(--text-muted);">Track upcoming earnings, results, dividends, splits, bonuses, and board meetings across all NSE and indexed companies.</p>
+                </div>
+
+                <div class="card no-print" id="events-calendar-card" style="display: flex; flex-direction: column; gap: 0;">
+                    <!-- Header -->
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 18px 20px; border-bottom: 1px solid var(--border-glass);">
+                        <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">
+                            <span>📊</span> MARKET-WIDE EVENTS CALENDAR
+                        </h3>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <span id="events-market-count" class="events-count-badge" style="background: var(--color-emerald, #10b981); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; min-width: 18px; text-align: center;">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Controls Row: Search + Date Range -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border-glass);">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <input type="text" id="events-search-input" placeholder="🔍 Search company or symbol..." style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); font-size: 11.5px; width: 220px; outline: none; transition: border 0.2s;" onfocus="this.style.borderColor='var(--color-primary)'" onblur="this.style.borderColor='var(--border-glass)'">
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <select id="events-range-select" onchange="loadMarketEvents()" style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; padding: 5px 8px; color: var(--text-primary); font-size: 11px; cursor: pointer;">
+                                <option value="7">Next 7 days</option>
+                                <option value="30" selected>Next 30 days</option>
+                                <option value="90">Next 90 days</option>
+                                <option value="365">Next 1 year</option>
+                            </select>
+                            <button onclick="loadMarketEvents()" title="Refresh market events" style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; padding: 4px 10px; cursor: pointer; color: var(--text-secondary); font-size: 11px; transition: all 0.2s;">🔄 Refresh</button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Pills -->
+                    <div id="events-filter-pills" class="events-filter-pills" style="display: flex; gap: 6px; flex-wrap: wrap; padding: 12px 20px; border-bottom: 1px solid var(--border-glass); align-items: center;">
+                        <button class="events-pill active" data-filter="all" onclick="filterEvents('all', this)">All</button>
+                        <button class="events-pill" data-filter="quarterly_results" onclick="filterEvents('quarterly_results', this)">📊 Results</button>
+                        <button class="events-pill" data-filter="dividend" onclick="filterEvents('dividend', this)">💰 Dividends</button>
+                        <button class="events-pill" data-filter="bonus" onclick="filterEvents('bonus', this)">🎁 Bonus</button>
+                        <button class="events-pill" data-filter="split" onclick="filterEvents('split', this)">✂️ Splits</button>
+                        <button class="events-pill" data-filter="board_meeting" onclick="filterEvents('board_meeting', this)">📋 Board Meetings</button>
+                        <button class="events-pill" id="events-watchlist-btn" onclick="toggleWatchlistEventsFilter(this)" style="margin-left: auto;">⭐ Watchlist Only</button>
+                    </div>
+
+                    <!-- Summary Stats Bar -->
+                    <div id="events-summary-bar" class="events-summary-bar" style="display: none; padding: 10px 20px; border-bottom: 1px solid var(--border-glass);"></div>
+
+                    <!-- Events Table / Cards Container -->
+                    <div id="events-market-container" style="max-height: 600px; overflow-y: auto; padding: 0;">
+                        <!-- Desktop Table -->
+                        <table id="events-market-table" class="events-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                            <thead>
+                                <tr>
+                                    <th onclick="sortEventsTable('event_date')" style="cursor: pointer;">Date ↕</th>
+                                    <th onclick="sortEventsTable('company_name')" style="cursor: pointer;">Company ↕</th>
+                                    <th onclick="sortEventsTable('event_type')" style="cursor: pointer;">Type ↕</th>
+                                    <th>Details</th>
+                                    <th>Countdown</th>
+                                </tr>
+                            </thead>
+                            <tbody id="events-market-tbody">
+                                <tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 11.5px;">Click the "📅 Events Calendar" tab to load market events</td></tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Mobile Cards (hidden on desktop, shown on mobile via CSS) -->
+                        <div id="events-market-cards" class="events-mobile-cards" style="display: none;"></div>
+                    </div>
+
+                    <!-- Smart Pagination Controls for Market-Wide Events -->
+                    <div id="events-market-pagination" class="no-print" style="display: none; justify-content: space-between; align-items: center; padding: 12px 20px; border-top: 1px solid var(--border-glass); background: rgba(0, 0, 0, 0.01);">
+                        <button class="btn-secondary" id="events-prev-btn" onclick="navigateEventsPage(-1)" style="font-size: 10.5px; padding: 6px 12px; background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; min-width: 60px;">◀ Prev</button>
+                        
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span id="events-page-info" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Page 1 of 1</span>
+                            
+                            <div style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-glass); padding-left: 15px;">
+                                <span style="font-size: 10px; color: var(--text-secondary);">Records per page:</span>
+                                <select id="events-pagesize-select" onchange="changeEventsPageSize(this.value)" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer; outline: none; height: 24px;">
+                                    <option value="10">10</option>
+                                    <option value="25" selected>25</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="btn-secondary" id="events-next-btn" onclick="navigateEventsPage(1)" style="font-size: 10.5px; padding: 6px 12px; background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; min-width: 60px;">Next ▶</button>
+                    </div>
                 </div>
             </section>
 
@@ -1371,6 +1490,7 @@
                             <button class="subtab-btn" data-subtab="audit">🔬 Agent Strategy Audit</button>
                             <button class="subtab-btn" data-subtab="volume">📋 Price Volume Dynamics</button>
                             <button class="subtab-btn" data-subtab="trades">🤝 Insider & Block Deals</button>
+                            <button class="subtab-btn" data-subtab="events">📅 Upcoming Events</button>
                         </div>
                         <button class="subtabs-nav-btn next-btn hidden" aria-label="Scroll right">▶</button>
                     </div>
@@ -3253,6 +3373,35 @@
                                 <div style="text-align: center; color: var(--text-muted); padding: 30px; font-size: 11.5px;">No transactions loaded. Select a stock to view insider and large market deals.</div>
                             </div>
                         </div>
+
+                        <!-- ===== Stock Events Calendar Card ===== -->
+                        <!-- ═══ Per-Stock Upcoming Events Card (Stock Profile — Events Tab) ═══ -->
+                        <div class="card col-span-4 no-print" id="stock-events-profile-card" data-subtab="events" style="display: flex; flex-direction: column; gap: 0; margin-top: 15px;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 18px 20px; border-bottom: 1px solid var(--border-glass);">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">
+                                        <span>📅</span> <span id="events-stock-title">UPCOMING EVENTS</span>
+                                    </h3>
+                                    <span id="events-stock-count" class="events-count-badge" style="background: var(--color-primary); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; min-width: 18px; text-align: center;">0</span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                    <span id="events-last-updated" style="font-size: 10px; color: var(--text-muted);"></span>
+                                    <button id="events-refresh-btn" onclick="loadStockEvents()" title="Refresh events" style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; padding: 4px 10px; cursor: pointer; color: var(--text-secondary); font-size: 11px; transition: all 0.2s;">🔄 Refresh</button>
+                                </div>
+                            </div>
+                            <div id="events-stock-section" style="padding: 16px 20px;">
+                                <div id="events-stock-grid" class="events-grid">
+                                    <!-- Skeleton loaders (replaced by JS) -->
+                                    <div class="event-card-skeleton shimmer"></div>
+                                    <div class="event-card-skeleton shimmer"></div>
+                                    <div class="event-card-skeleton shimmer"></div>
+                                    <div class="event-card-skeleton shimmer"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Events Calendar card removed from subtabs -->
+
 
                         <!-- Interactive TradingView Chart Subtab (Generic advanced indicators host) -->
                         <div class="card col-span-4 card-hidden" id="tv-chart-card" data-subtab="tv-chart" style="min-height: 580px;">

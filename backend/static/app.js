@@ -1106,6 +1106,7 @@ const tabs = {
     'sector-radar': document.getElementById('tab-sector-radar'),
     movers: document.getElementById('tab-movers'),
     'market-news': document.getElementById('tab-market-news'),
+    events: document.getElementById('tab-events'),
     learning: document.getElementById('tab-learning')
 };
 
@@ -1123,6 +1124,7 @@ const tabBtns = {
     'sector-radar': document.getElementById('tab-sector-radar-btn'),
     movers: document.getElementById('tab-movers-btn'),
     'market-news': document.getElementById('tab-market-news-btn'),
+    events: document.getElementById('tab-events-btn'),
     learning: document.getElementById('tab-learning-btn')
 };
 
@@ -1888,6 +1890,10 @@ function switchTab(tabKey) {
 
     if (tabKey === 'market-news') {
         if (window.loadGlobalMarketNews) window.loadGlobalMarketNews();
+    }
+
+    if (tabKey === 'events') {
+        if (typeof loadMarketEvents === 'function') loadMarketEvents();
     }
 
     if (tabKey === 'movers') {
@@ -4976,6 +4982,11 @@ async function loadStockAnalyzer(query, force_llm = false) {
         setupPeersSorting();
         triggerLiveCompoundingCalculation();
         if (window.resetAnalyzerSubtabs) window.resetAnalyzerSubtabs();
+
+        // Load per-stock events for the summary tab
+        if (typeof loadStockEvents === 'function') {
+            loadStockEvents(profile.ticker);
+        }
 
         // Handle Institutional Pitchbook Button
         const pitchbookBtn = document.getElementById('export-pitchbook-btn');
@@ -18130,6 +18141,14 @@ function setupAnalyzerSubtabs() {
             if (activeSubtab === 'financials') {
                 if (activeStockProfile && activeStockProfile.ticker) {
                     loadFinancialStatements(activeStockProfile.ticker);
+                } else {
+                    showToast("Please load a stock analyzer profile first.", "warning");
+                }
+            }
+
+            if (activeSubtab === 'events') {
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    loadStockEvents(activeStockProfile.ticker);
                 } else {
                     showToast("Please load a stock analyzer profile first.", "warning");
                 }
@@ -35487,6 +35506,11 @@ function renderTradesTimeline() {
     });
 }
 
+// ─── State for Global Insider & Large Market Deals Scanner ──────────────────
+let _globalTradesData = [];         // Store currently loaded deals list
+let _globalTradesPage = 0;          // Cursor page
+let _globalTradesPageSize = 10;     // Current page size
+
 async function loadGlobalTrades(forceRefresh = false) {
     const container = document.getElementById('global-trades-container');
     if (!container) return;
@@ -35504,6 +35528,9 @@ async function loadGlobalTrades(forceRefresh = false) {
     const minVal = minValSelect ? minValSelect.value : 0;
     const duration = durationSelect ? durationSelect.value : 90;
     const search = searchInput ? searchInput.value.trim() : '';
+
+    const paginationDiv = document.getElementById('global-trades-pagination');
+    if (paginationDiv) paginationDiv.style.display = 'none';
     
     try {
         const url = `/api/trades/global-scanner?trade_type=${encodeURIComponent(type)}&action_type=${encodeURIComponent(action)}&min_value=${minVal}&search=${encodeURIComponent(search)}&duration_days=${duration}${forceRefresh === true ? '&refresh=true' : ''}`;
@@ -35522,68 +35549,167 @@ async function loadGlobalTrades(forceRefresh = false) {
             return;
         }
         
-        if (deals.length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 35px; font-size: 11.5px;">No transactions matching the filters were found. Try clicking "Refresh Feed" or clearing search filters.</div>';
-            return;
-        }
-        
-        container.innerHTML = '';
-        deals.forEach(deal => {
-            const item = document.createElement('div');
-            item.className = 'timeline-item-row';
-            item.style.display = 'flex';
-            item.style.flexDirection = 'column';
-            item.style.gap = '6px';
-            item.style.border = '1px solid var(--border-glass)';
-            item.style.borderRadius = '8px';
-            item.style.padding = '12px 15px';
-            item.style.background = 'var(--bg-card-hover)';
-            item.style.boxSizing = 'border-box';
-            
-            const typeBadge = deal.type === "Buy" ? 
-                `<span style="background: rgba(16,185,129,0.1); color: var(--color-emerald); font-weight:700; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid rgba(16,185,129,0.2);">BUY</span>` : 
-                `<span style="background: rgba(239,68,68,0.1); color: var(--color-crimson); font-weight:700; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid rgba(239,68,68,0.2);">SELL</span>`;
-                
-            const categoryBadge = `<span style="background: rgba(255,255,255,0.06); color: var(--text-secondary); font-weight:600; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid var(--border-glass); text-transform: uppercase;">${deal.category}</span>`;
-            
-            const relationLabel = deal.relation ? `<span style="font-size: 10px; color: var(--text-muted); font-style: italic;">(${deal.relation})</span>` : '';
-            
-            item.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 700; font-size: 12.5px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-                        <span onclick="window.loadStockFromTrades('${deal.symbol}')" style="color: var(--color-primary); cursor: pointer; text-decoration: underline;" title="Click to open this stock's profile">${deal.symbol}</span>
-                        <span>&bull;</span>
-                        ${deal.person} ${relationLabel}
-                    </span>
-                    <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">${deal.date}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 4px; border-top: 1px dashed var(--border-glass); padding-top: 8px;">
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        ${typeBadge}
-                        ${categoryBadge}
-                    </div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">
-                        <strong>${deal.quantity.toLocaleString("en-IN")}</strong> shares 
-                        ${deal.price > 0 ? `@ ₹${deal.price.toLocaleString("en-IN")} ` : ''}
-                        &rarr; <strong style="color: var(--text-primary); font-family: 'Outfit'; font-size: 13px;">${formatIndianRupees(deal.value)}</strong>
-                    </div>
-                </div>
-            `;
-            container.appendChild(item);
-        });
+        _globalTradesData = deals;
+        _globalTradesPage = 0;
+        _renderGlobalTradesPage();
         
     } catch (err) {
         console.error("Error loading global trades scanner:", err);
         if (container) {
             container.innerHTML = `<div style="text-align: center; color: var(--text-crimson); padding: 30px; font-size: 11.5px;">Error: ${err.message}</div>`;
         }
+        if (paginationDiv) paginationDiv.style.display = 'none';
     }
+}
+
+/**
+ * Render a page of global deals into the scanner card
+ */
+function _renderGlobalTradesPage() {
+    const container = document.getElementById('global-trades-container');
+    const paginationDiv = document.getElementById('global-trades-pagination');
+    const prevBtn = document.getElementById('global-trades-prev-btn');
+    const nextBtn = document.getElementById('global-trades-next-btn');
+    const pageInfo = document.getElementById('global-trades-page-info');
+
+    if (!container) return;
+
+    const start = _globalTradesPage * _globalTradesPageSize;
+    const end = Math.min(start + _globalTradesPageSize, _globalTradesData.length);
+    const pageDeals = _globalTradesData.slice(start, end);
+
+    container.innerHTML = '';
+
+    if (_globalTradesData.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 35px; font-size: 11.5px;">No transactions matching the filters were found. Try clicking "Refresh Feed" or clearing search filters.</div>';
+        if (paginationDiv) paginationDiv.style.display = 'none';
+        return;
+    }
+
+    pageDeals.forEach(deal => {
+        const item = document.createElement('div');
+        item.className = 'timeline-item-row';
+        item.style.display = 'flex';
+        item.style.flexDirection = 'column';
+        item.style.gap = '6px';
+        item.style.border = '1px solid var(--border-glass)';
+        item.style.borderRadius = '8px';
+        item.style.padding = '12px 15px';
+        item.style.background = 'var(--bg-card-hover)';
+        item.style.boxSizing = 'border-box';
+        
+        const typeBadge = deal.type === "Buy" ? 
+            `<span style="background: rgba(16,185,129,0.1); color: var(--color-emerald); font-weight:700; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid rgba(16,185,129,0.2);">BUY</span>` : 
+            `<span style="background: rgba(239,68,68,0.1); color: var(--color-crimson); font-weight:700; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid rgba(239,68,68,0.2);">SELL</span>`;
+            
+        const categoryBadge = `<span style="background: rgba(255,255,255,0.06); color: var(--text-secondary); font-weight:600; font-size:9.5px; padding:2px 6px; border-radius:4px; border: 1px solid var(--border-glass); text-transform: uppercase;">${deal.category}</span>`;
+        
+        const relationLabel = deal.relation ? `<span style="font-size: 10px; color: var(--text-muted); font-style: italic;">(${deal.relation})</span>` : '';
+        
+        item.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 700; font-size: 12.5px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <span onclick="window.loadStockFromTrades('${deal.symbol}')" style="color: var(--color-primary); cursor: pointer; text-decoration: underline;" title="Click to open this stock's profile">${deal.symbol}</span>
+                    <span>&bull;</span>
+                    ${deal.person} ${relationLabel}
+                </span>
+                <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">${deal.date}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 4px; border-top: 1px dashed var(--border-glass); padding-top: 8px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    ${typeBadge}
+                    ${categoryBadge}
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary);">
+                    <strong>${deal.quantity.toLocaleString("en-IN")}</strong> shares 
+                    ${deal.price > 0 ? `@ ₹${deal.price.toLocaleString("en-IN")} ` : ''}
+                    &rarr; <strong style="color: var(--text-primary); font-family: 'Outfit'; font-size: 13px;">${formatIndianRupees(deal.value)}</strong>
+                </div>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+
+    if (paginationDiv) {
+        const totalPages = Math.ceil(_globalTradesData.length / _globalTradesPageSize) || 1;
+        paginationDiv.style.display = 'flex';
+        
+        if (pageInfo) {
+            pageInfo.textContent = 'Page ' + (_globalTradesPage + 1) + ' of ' + totalPages;
+        }
+
+        if (prevBtn) {
+            if (_globalTradesPage === 0) {
+                prevBtn.disabled = true;
+                prevBtn.style.opacity = '0.4';
+                prevBtn.style.cursor = 'not-allowed';
+            } else {
+                prevBtn.disabled = false;
+                prevBtn.style.opacity = '1';
+                prevBtn.style.cursor = 'pointer';
+            }
+        }
+
+        if (nextBtn) {
+            if (_globalTradesPage >= totalPages - 1) {
+                nextBtn.disabled = true;
+                nextBtn.style.opacity = '0.4';
+                nextBtn.style.cursor = 'not-allowed';
+            } else {
+                nextBtn.disabled = false;
+                nextBtn.style.opacity = '1';
+                nextBtn.style.cursor = 'pointer';
+            }
+        }
+    }
+}
+
+/**
+ * Navigate to another page of global trades scanner
+ * @param {number} direction — -1 for prev, 1 for next
+ */
+function navigateGlobalTradesPage(direction) {
+    const totalPages = Math.ceil(_globalTradesData.length / _globalTradesPageSize) || 1;
+    const newPage = _globalTradesPage + direction;
+    if (newPage >= 0 && newPage < totalPages) {
+        _globalTradesPage = newPage;
+        _renderGlobalTradesPage();
+        const container = document.getElementById('global-trades-container');
+        if (container) container.scrollTop = 0;
+    }
+}
+
+/**
+ * Change the page size for global trades scanner
+ * @param {string|number} size — New page size (5, 10, 20, 50, 100)
+ */
+function changeGlobalTradesPageSize(size) {
+    _globalTradesPageSize = parseInt(size) || 10;
+    _globalTradesPage = 0;
+    _renderGlobalTradesPage();
 }
 
 // Global function to link scanner with active stock research
 window.loadStockFromTrades = (symbol) => {
     switchTab('analyzer');
     loadStockAnalyzer(symbol);
+};
+
+// Global function to navigate to stock details events subtab
+window.navigateToStockEvents = (symbol) => {
+    if (!symbol) return;
+    const cleanSym = symbol.replace('.NS', '').replace('.BO', '').toUpperCase();
+    switchTab('analyzer');
+    if (typeof loadStockAnalyzer === 'function') {
+        loadStockAnalyzer(cleanSym + '.NS');
+    }
+    // Switch to Events subtab after profile loads
+    setTimeout(() => {
+        const eventsBtn = document.querySelector('.subtab-btn[data-subtab="events"]');
+        if (eventsBtn) {
+            eventsBtn.click();
+        }
+    }, 600);
 };
 
 function setupTradesHandlers() {
@@ -36774,4 +36900,691 @@ function speakFsBotMessage(text, speakBtn) {
         window.speechSynthesis.speak(utterance);
     }
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STOCK EVENTS CALENDAR — JavaScript Module
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let _eventsMarketData = [];          // Full market events from API
+let _eventsMarketFiltered = [];      // After type + search filter
+let _eventsMarketPage = 0;           // Pagination cursor
+let _eventsMarketPageSize = 25;
+let _eventsMarketSortKey = 'event_date';
+let _eventsMarketSortAsc = true;
+let _eventsActiveFilter = 'all';
+let _eventsSearchTimer = null;
+let _eventsWatchlistOnly = false;    // Watchlist Only filter state
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Friendly event type labels and icons */
+function _eventTypeLabel(type) {
+    const map = {
+        quarterly_results: { icon: '📊', label: 'Results' },
+        dividend:          { icon: '💰', label: 'Dividend' },
+        bonus:             { icon: '🎁', label: 'Bonus' },
+        split:             { icon: '✂️', label: 'Split' },
+        board_meeting:     { icon: '📋', label: 'Board Meeting' },
+        agm:               { icon: '🏛️', label: 'AGM' },
+        rights:            { icon: '📜', label: 'Rights Issue' },
+    };
+    return map[type] || { icon: '📅', label: type || 'Event' };
+}
+
+/** Format ISO date string to human-readable */
+function _eventDateFmt(dateStr) {
+    if (!dateStr) return '—';
+    try {
+        const d = new Date(dateStr + 'T00:00:00');
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const day = d.getDate();
+        const month = months[d.getMonth()];
+        const year = d.getFullYear();
+        const weekdays = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        return `${weekdays[d.getDay()]}, ${day} ${month} ${year}`;
+    } catch(e) {
+        return dateStr;
+    }
+}
+
+/** Calculate countdown days from today */
+function _eventCountdown(dateStr) {
+    if (!dateStr) return { days: null, label: '—', cls: 'passed' };
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const eventDate = new Date(dateStr + 'T00:00:00');
+        eventDate.setHours(0, 0, 0, 0);
+        const diff = Math.round((eventDate - today) / (1000 * 60 * 60 * 24));
+
+        if (diff < 0) {
+            return { days: diff, label: `${Math.abs(diff)}d ago`, cls: 'passed' };
+        } else if (diff === 0) {
+            return { days: 0, label: '🔴 Today!', cls: 'imminent' };
+        } else if (diff === 1) {
+            return { days: 1, label: '⚡ Tomorrow', cls: 'imminent' };
+        } else if (diff <= 3) {
+            return { days: diff, label: `🔥 ${diff} days`, cls: 'imminent' };
+        } else if (diff <= 7) {
+            return { days: diff, label: `${diff} days`, cls: 'upcoming' };
+        } else {
+            return { days: diff, label: `${diff} days`, cls: 'upcoming' };
+        }
+    } catch(e) {
+        return { days: null, label: '—', cls: 'passed' };
+    }
+}
+
+/** Safe HTML escape */
+function _evEscapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+}
+
+// ─── Per-Stock Events (Top Section) ──────────────────────────────────────────
+
+/**
+ * Load events for the currently active stock.
+ * @param {string|null} ticker — e.g. "RELIANCE" or null for no-stock state
+ */
+async function loadStockEvents(ticker) {
+    const grid = document.getElementById('events-stock-grid');
+    const title = document.getElementById('events-stock-title');
+    const countBadge = document.getElementById('events-stock-count');
+    const lastUpdated = document.getElementById('events-last-updated');
+
+    if (!grid) return;
+
+    // Use provided ticker or active stock profile
+    const symbol = ticker || (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) || null;
+
+    if (!symbol) {
+        if (title) title.textContent = 'Stock Events';
+        if (countBadge) countBadge.textContent = '0';
+        grid.innerHTML = '<div class="events-empty-state" style="grid-column: 1 / -1;">' +
+            '<div class="empty-icon">📅</div>' +
+            '<div class="empty-text">No stock selected</div>' +
+            '<div class="empty-subtext">Search and load a stock to view its upcoming events</div>' +
+            '</div>';
+        return;
+    }
+
+    // Show skeleton loading
+    grid.innerHTML = '<div class="event-card-skeleton shimmer"></div>' +
+        '<div class="event-card-skeleton shimmer"></div>' +
+        '<div class="event-card-skeleton shimmer"></div>' +
+        '<div class="event-card-skeleton shimmer"></div>';
+
+    const cleanSym = symbol.replace('.NS', '').replace('.BO', '');
+    if (title) title.textContent = cleanSym + ' Events';
+
+    try {
+        const resp = await fetch('/api/events/stock/' + encodeURIComponent(cleanSym));
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+
+        const events = data.events || [];
+        if (countBadge) countBadge.textContent = events.length;
+        if (lastUpdated) lastUpdated.textContent = 'Updated: ' + new Date().toLocaleTimeString();
+
+        if (events.length === 0) {
+            grid.innerHTML = '<div class="events-empty-state" style="grid-column: 1 / -1;">' +
+                '<div class="empty-icon">🔍</div>' +
+                '<div class="empty-text">No upcoming events found for ' + _evEscapeHtml(cleanSym) + '</div>' +
+                '<div class="empty-subtext">Events will appear when dividends, results, or corporate actions are announced</div>' +
+                '</div>';
+            return;
+        }
+
+        // Sort: upcoming first (by date asc), then passed
+        events.sort(function(a, b) {
+            var da = new Date(a.event_date);
+            var db = new Date(b.event_date);
+            var today = new Date();
+            today.setHours(0, 0, 0, 0);
+            var aFuture = da >= today;
+            var bFuture = db >= today;
+            if (aFuture && !bFuture) return -1;
+            if (!aFuture && bFuture) return 1;
+            return da - db;
+        });
+
+        var html = '';
+        for (var i = 0; i < events.length; i++) {
+            var ev = events[i];
+            var typeInfo = _eventTypeLabel(ev.event_type);
+            var countdown = _eventCountdown(ev.event_date);
+            var dateFmt = _eventDateFmt(ev.event_date);
+            
+            // Generate structured detail widgets
+            var detailsHtml = '';
+            var details = ev.details || {};
+            
+            if (ev.event_type === 'dividend') {
+                var divYield = details.dividend_yield;
+                var annualRate = details.trailing_annual_rate || details.dividend_rate;
+                var avgYield = details.five_year_avg_yield;
+                
+                var yieldText = divYield ? (parseFloat(divYield) * 100).toFixed(2) + '%' : '--';
+                var rateText = annualRate ? '₹' + parseFloat(annualRate).toFixed(2) : '--';
+                var avgText = avgYield ? parseFloat(avgYield).toFixed(2) + '%' : '--';
+                
+                detailsHtml = '<div class="event-details-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; font-size: 10.5px; border-top: 1px dashed var(--border-glass); padding-top: 8px; line-height: 1.4;">' +
+                    '<div><span style="color: var(--text-muted);">Yield:</span> <strong style="color: var(--color-emerald);">' + yieldText + '</strong></div>' +
+                    '<div><span style="color: var(--text-muted);">Annual Rate:</span> <strong>' + rateText + '</strong></div>' +
+                    '<div style="grid-column: span 2;"><span style="color: var(--text-muted);">5Y Avg Yield:</span> <strong>' + avgText + '</strong></div>' +
+                    '</div>';
+            } else if (ev.event_type === 'split') {
+                var factor = details.split_factor || 'Split';
+                var isCompleted = new Date(ev.event_date) < new Date();
+                var statusText = isCompleted ? '✅ Completed' : '⏳ Upcoming';
+                
+                detailsHtml = '<div class="event-details-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; font-size: 10.5px; border-top: 1px dashed var(--border-glass); padding-top: 8px; line-height: 1.4;">' +
+                    '<div><span style="color: var(--text-muted);">Ratio:</span> <strong>' + _evEscapeHtml(factor) + '</strong></div>' +
+                    '<div><span style="color: var(--text-muted);">Status:</span> <strong style="color: var(--text-secondary);">' + statusText + '</strong></div>' +
+                    '</div>';
+            } else if (ev.event_type === 'quarterly_results') {
+                var est = details.earnings_estimate;
+                var revenue = details.revenue_average;
+                if (est || revenue) {
+                    var estText = est ? '₹' + parseFloat(est).toFixed(2) : '--';
+                    var revText = revenue ? '₹' + (parseFloat(revenue) / 1e7).toFixed(2) + ' Cr' : '--';
+                    
+                    detailsHtml = '<div class="event-details-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; font-size: 10.5px; border-top: 1px dashed var(--border-glass); padding-top: 8px; line-height: 1.4;">' +
+                        '<div><span style="color: var(--text-muted);">Est. EPS:</span> <strong>' + estText + '</strong></div>' +
+                        '<div><span style="color: var(--text-muted);">Est. Revenue:</span> <strong>' + revText + '</strong></div>' +
+                        '</div>';
+                }
+            }
+            
+            var isImminent = (countdown.days >= 0 && countdown.days <= 3);
+            html += '<div class="event-stock-card ' + (isImminent ? 'event-imminent' : '') + '" data-type="' + ev.event_type + '" style="animation-delay: ' + (i * 0.08) + 's; display: flex; flex-direction: column; justify-content: space-between; min-height: 110px;">' +
+                '<div>' +
+                    '<div class="event-header" style="margin-bottom: 6px;">' +
+                        '<span class="event-date" style="font-weight: 600; font-size: 11px;">' + dateFmt + '</span>' +
+                        '<span class="event-type-badge" data-type="' + ev.event_type + '">' + typeInfo.icon + ' ' + typeInfo.label + '</span>' +
+                    '</div>' +
+                    '<div class="event-desc" style="font-weight: 500; font-size: 11.5px; color: var(--text-primary); margin-bottom: 4px;">' + _evEscapeHtml(ev.description || 'Corporate Event') + '</div>' +
+                    detailsHtml +
+                '</div>' +
+                '<div class="event-countdown ' + countdown.cls + '" style="margin-top: 8px; font-size: 10.5px; font-weight: 600;">' + countdown.label + '</div>' +
+                '</div>';
+        }
+        grid.innerHTML = html;
+
+    } catch (err) {
+        console.error('[Events] Failed to load stock events:', err);
+        grid.innerHTML = '<div class="events-empty-state" style="grid-column: 1 / -1;">' +
+            '<div class="empty-icon">⚠️</div>' +
+            '<div class="empty-text">Could not load events</div>' +
+            '<div class="empty-subtext">' + (err.message || 'Network error') + '</div>' +
+            '</div>';
+    }
+}
+
+
+// ─── Market-Wide Events (Bottom Section) ─────────────────────────────────────
+
+/**
+ * Load market-wide events from /api/events/calendar
+ */
+async function loadMarketEvents() {
+    var tbody = document.getElementById('events-market-tbody');
+    var mobileCards = document.getElementById('events-market-cards');
+    var countBadge = document.getElementById('events-market-count');
+    var summaryBar = document.getElementById('events-summary-bar');
+    var loadMoreBtn = document.getElementById('events-load-more');
+    var rangeSelect = document.getElementById('events-range-select');
+
+    if (!tbody) return;
+
+    var days = rangeSelect ? parseInt(rangeSelect.value) : 30;
+
+    // Show loading state
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 11.5px;">' +
+        '<span style="display: inline-block; animation: spinRefresh 1s linear infinite;">🔄</span> Loading market events...' +
+        '</td></tr>';
+    if (mobileCards) mobileCards.innerHTML = '';
+
+    try {
+        var resp = await fetch('/api/events/calendar?days=' + days);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var data = await resp.json();
+
+        _eventsMarketData = (data.events || []).filter(function(e) {
+            // Only show future events + last 7 days of passed
+            var cd = _eventCountdown(e.event_date);
+            return cd.days === null || cd.days >= -7;
+        });
+
+        // Sort by date ascending by default
+        _eventsMarketData.sort(function(a, b) {
+            return new Date(a.event_date) - new Date(b.event_date);
+        });
+
+        _eventsMarketSortKey = 'event_date';
+        _eventsMarketSortAsc = true;
+        _updateSortHeaders();
+
+        _eventsMarketPage = 0;
+        _eventsActiveFilter = 'all';
+        _eventsWatchlistOnly = false;
+
+        // Reset active pill
+        document.querySelectorAll('#events-filter-pills button[data-filter]').forEach(function(p) { p.classList.remove('active'); });
+        var allPill = document.querySelector('.events-pill[data-filter="all"]');
+        if (allPill) allPill.classList.add('active');
+        var wlBtn = document.getElementById('events-watchlist-btn');
+        if (wlBtn) wlBtn.classList.remove('active');
+
+        // Build summary
+        _renderEventsSummary(data.type_counts || {});
+
+        // Apply filters and render
+        _applyEventsFilter();
+
+    } catch (err) {
+        console.error('[Events] Failed to load market events:', err);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">' +
+            '⚠️ Failed to load market events: ' + (err.message || '') +
+            '</td></tr>';
+        if (countBadge) countBadge.textContent = '0';
+    }
+}
+
+/** Render the summary stats bar */
+function _renderEventsSummary(typeCounts) {
+    var bar = document.getElementById('events-summary-bar');
+    if (!bar) return;
+
+    var total = 0;
+    for (var k in typeCounts) total += typeCounts[k];
+    if (total === 0) {
+        bar.style.display = 'none';
+        return;
+    }
+
+    var items = [
+        { type: 'quarterly_results', icon: '📊', label: 'Results' },
+        { type: 'dividend', icon: '💰', label: 'Dividends' },
+        { type: 'bonus', icon: '🎁', label: 'Bonus' },
+        { type: 'split', icon: '✂️', label: 'Splits' },
+        { type: 'board_meeting', icon: '📋', label: 'Meetings' },
+    ];
+
+    bar.style.display = 'flex';
+    var statsHtml = '<div class="stat-item">📅 <span class="stat-count">' + total + '</span> total</div>';
+    for (var i = 0; i < items.length; i++) {
+        if (typeCounts[items[i].type]) {
+            statsHtml += '<div class="stat-item">' + items[i].icon + ' <span class="stat-count">' + typeCounts[items[i].type] + '</span> ' + items[i].label + '</div>';
+        }
+    }
+    bar.innerHTML = statsHtml;
+}
+
+
+// ─── Filter, Sort & Search ───────────────────────────────────────────────────
+
+/**
+ * Filter market events by type (pill click handler)
+ */
+function filterEvents(type, btnEl) {
+    _eventsActiveFilter = type;
+    _eventsMarketPage = 0;
+
+    // Update pill active state
+    document.querySelectorAll('#events-filter-pills button[data-filter]').forEach(function(p) { p.classList.remove('active'); });
+    if (btnEl) btnEl.classList.add('active');
+
+    _applyEventsFilter();
+}
+
+/**
+ * Apply current filter + search to market data and re-render
+ */
+function _applyEventsFilter() {
+    var searchInput = document.getElementById('events-search-input');
+    var searchTerm = (searchInput ? searchInput.value : '').toLowerCase().trim();
+
+    // First filter by Watchlist and Search query (but NOT by active event type filter)
+    var subset = _eventsMarketData.filter(function(ev) {
+        // Watchlist Only filter
+        if (_eventsWatchlistOnly) {
+            const activeWatch = (typeof watchlistsList !== 'undefined') ? watchlistsList.find(w => w.id == activeWatchlistId) : null;
+            if (!activeWatch || !activeWatch.items) return false;
+            const cleanEvSym = (ev.symbol || '').replace('.NS', '').replace('.BO', '').toUpperCase();
+            const inWatchlist = activeWatch.items.some(item => {
+                const cleanWatchSym = (item.symbol || '').replace('.NS', '').replace('.BO', '').toUpperCase();
+                return cleanWatchSym === cleanEvSym;
+            });
+            if (!inWatchlist) return false;
+        }
+        // Search filter
+        if (searchTerm) {
+            var company = (ev.company_name || '').toLowerCase();
+            var symbol = (ev.symbol || '').toLowerCase();
+            var desc = (ev.description || '').toLowerCase();
+            if (company.indexOf(searchTerm) === -1 && symbol.indexOf(searchTerm) === -1 && desc.indexOf(searchTerm) === -1) {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    // Compute category counts on this filtered subset
+    const counts = {
+        all: subset.length,
+        quarterly_results: 0,
+        dividend: 0,
+        bonus: 0,
+        split: 0,
+        board_meeting: 0
+    };
+    subset.forEach(ev => {
+        if (ev.event_type in counts) {
+            counts[ev.event_type]++;
+        }
+    });
+
+    // Update filter pills count labels dynamically
+    const pillAll = document.querySelector('.events-pill[data-filter="all"]');
+    if (pillAll) pillAll.innerHTML = 'All <span class="pill-count" style="font-size: 9px; opacity: 0.75; background: rgba(255,255,255,0.15); border-radius: 10px; padding: 1px 5px; margin-left: 4px;">' + counts.all + '</span>';
+
+    const pillResults = document.querySelector('.events-pill[data-filter="quarterly_results"]');
+    if (pillResults) pillResults.innerHTML = '📊 Results <span class="pill-count" style="font-size: 9px; opacity: 0.75; background: rgba(255,255,255,0.15); border-radius: 10px; padding: 1px 5px; margin-left: 4px;">' + counts.quarterly_results + '</span>';
+
+    const pillDividends = document.querySelector('.events-pill[data-filter="dividend"]');
+    if (pillDividends) pillDividends.innerHTML = '💰 Dividends <span class="pill-count" style="font-size: 9px; opacity: 0.75; background: rgba(255,255,255,0.15); border-radius: 10px; padding: 1px 5px; margin-left: 4px;">' + counts.dividend + '</span>';
+
+    const pillBonus = document.querySelector('.events-pill[data-filter="bonus"]');
+    if (pillBonus) pillBonus.innerHTML = '🎁 Bonus <span class="pill-count" style="font-size: 9px; opacity: 0.75; background: rgba(255,255,255,0.15); border-radius: 10px; padding: 1px 5px; margin-left: 4px;">' + counts.bonus + '</span>';
+
+    const pillSplits = document.querySelector('.events-pill[data-filter="split"]');
+    if (pillSplits) pillSplits.innerHTML = '✂️ Splits <span class="pill-count" style="font-size: 9px; opacity: 0.75; background: rgba(255,255,255,0.15); border-radius: 10px; padding: 1px 5px; margin-left: 4px;">' + counts.split + '</span>';
+
+    const pillMeetings = document.querySelector('.events-pill[data-filter="board_meeting"]');
+    if (pillMeetings) pillMeetings.innerHTML = '📋 Board Meetings <span class="pill-count" style="font-size: 9px; opacity: 0.75; background: rgba(255,255,255,0.15); border-radius: 10px; padding: 1px 5px; margin-left: 4px;">' + counts.board_meeting + '</span>';
+
+    // Now apply type filter to obtain final list to display
+    _eventsMarketFiltered = subset.filter(function(ev) {
+        if (_eventsActiveFilter !== 'all' && ev.event_type !== _eventsActiveFilter) return false;
+        return true;
+    });
+
+    // Apply sort
+    _applySortToFiltered();
+
+    // Reset page and render
+    _eventsMarketPage = 0;
+    _renderMarketEventsPage(true);
+}
+
+/**
+ * Toggle Watchlist Only filter
+ */
+function toggleWatchlistEventsFilter(btnEl) {
+    _eventsWatchlistOnly = !_eventsWatchlistOnly;
+    if (_eventsWatchlistOnly) {
+        btnEl.classList.add('active');
+    } else {
+        btnEl.classList.remove('active');
+    }
+    _eventsMarketPage = 0;
+    _applyEventsFilter();
+}
+
+/** Apply current sort to filtered data */
+function _applySortToFiltered() {
+    var key = _eventsMarketSortKey;
+    var asc = _eventsMarketSortAsc;
+    _eventsMarketFiltered.sort(function(a, b) {
+        var va = a[key] || '';
+        var vb = b[key] || '';
+        if (key === 'event_date') {
+            va = new Date(va);
+            vb = new Date(vb);
+        } else {
+            va = va.toString().toLowerCase();
+            vb = vb.toString().toLowerCase();
+        }
+        if (va < vb) return asc ? -1 : 1;
+        if (va > vb) return asc ? 1 : -1;
+        return 0;
+    });
+}
+
+/**
+ * Dynamically update table column sort headers with arrow indicators
+ */
+function _updateSortHeaders() {
+    var table = document.getElementById('events-market-table');
+    if (!table) return;
+    var ths = table.querySelectorAll('thead th');
+    if (ths.length < 3) return;
+
+    ths[0].innerHTML = 'Date ' + (_eventsMarketSortKey === 'event_date' ? (_eventsMarketSortAsc ? '▲' : '▼') : '↕');
+    ths[1].innerHTML = 'Company ' + (_eventsMarketSortKey === 'company_name' ? (_eventsMarketSortAsc ? '▲' : '▼') : '↕');
+    ths[2].innerHTML = 'Type ' + (_eventsMarketSortKey === 'event_type' ? (_eventsMarketSortAsc ? '▲' : '▼') : '↕');
+}
+
+/**
+ * Sort handler for table column headers
+ */
+function sortEventsTable(key) {
+    if (_eventsMarketSortKey === key) {
+        _eventsMarketSortAsc = !_eventsMarketSortAsc;
+    } else {
+        _eventsMarketSortKey = key;
+        _eventsMarketSortAsc = true;
+    }
+    _updateSortHeaders();
+    _applySortToFiltered();
+    _eventsMarketPage = 0;
+    _renderMarketEventsPage(true);
+}
+
+/**
+ * Render a page of market events into both table and mobile card views
+ * @param {boolean} reset — if true, clears existing rows before inserting
+ */
+function _renderMarketEventsPage(reset) {
+    var tbody = document.getElementById('events-market-tbody');
+    var mobileCards = document.getElementById('events-market-cards');
+    var countBadge = document.getElementById('events-market-count');
+    var paginationDiv = document.getElementById('events-market-pagination');
+    var prevBtn = document.getElementById('events-prev-btn');
+    var nextBtn = document.getElementById('events-next-btn');
+    var pageInfo = document.getElementById('events-page-info');
+
+    if (!tbody) return;
+
+    // We ALWAYS want to reset/clear rows on page load/change when utilizing pagination buttons
+    reset = true;
+
+    var start = _eventsMarketPage * _eventsMarketPageSize;
+    var end = Math.min(start + _eventsMarketPageSize, _eventsMarketFiltered.length);
+    var pageEvents = _eventsMarketFiltered.slice(start, end);
+
+    if (countBadge) countBadge.textContent = _eventsMarketFiltered.length;
+
+    // Empty state
+    if (_eventsMarketFiltered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px;">' +
+            '<div class="events-empty-state">' +
+            '<div class="empty-icon">📭</div>' +
+            '<div class="empty-text">No events match your filters</div>' +
+            '<div class="empty-subtext">Try a different time range or clear the search</div>' +
+            '</div></td></tr>';
+        if (mobileCards) mobileCards.innerHTML =
+            '<div class="events-empty-state">' +
+            '<div class="empty-icon">📭</div>' +
+            '<div class="empty-text">No events match your filters</div>' +
+            '<div class="empty-subtext">Try a different time range or clear the search</div>' +
+            '</div>';
+        if (paginationDiv) paginationDiv.style.display = 'none';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    if (mobileCards) mobileCards.innerHTML = '';
+
+    // ── Desktop Table Rows ──
+    var rowsHtml = '';
+    for (var i = 0; i < pageEvents.length; i++) {
+        var ev = pageEvents[i];
+        var typeInfo = _eventTypeLabel(ev.event_type);
+        var countdown = _eventCountdown(ev.event_date);
+        var dateFmt = _eventDateFmt(ev.event_date);
+        var cleanSym = (ev.symbol || '').replace('.NS', '').replace('.BO', '');
+        var companyName = ev.company_name || cleanSym;
+        var animDelay = i * 0.04;
+        var isImminent = (countdown.days >= 0 && countdown.days <= 3);
+
+        rowsHtml += '<tr style="animation: eventSlideUp 0.3s ' + animDelay + 's both;" class="' + (isImminent ? 'event-imminent' : '') + '">' +
+            '<td class="event-date-cell">' + dateFmt + '</td>' +
+            '<td class="event-company-cell" style="cursor: pointer;" onclick="window.navigateToStockEvents(\'' + cleanSym + '\')" title="Click to view ' + _evEscapeHtml(companyName) + ' events">' +
+                _evEscapeHtml(companyName) +
+                '<br><span class="event-symbol" style="background: rgba(59,130,246,0.12); color: var(--color-primary); border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 700; display: inline-block; margin-top: 4px;">' + cleanSym + '</span>' +
+            '</td>' +
+            '<td><span class="event-type-badge" data-type="' + ev.event_type + '">' + typeInfo.icon + ' ' + typeInfo.label + '</span></td>' +
+            '<td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="' + _evEscapeHtml(ev.description || '') + '">' + _evEscapeHtml(ev.description || '—') + '</td>' +
+            '<td><span class="event-countdown ' + countdown.cls + '">' + countdown.label + '</span></td>' +
+            '</tr>';
+    }
+    tbody.insertAdjacentHTML('beforeend', rowsHtml);
+
+    // ── Mobile Cards ──
+    if (mobileCards) {
+        var cardsHtml = '';
+        for (var j = 0; j < pageEvents.length; j++) {
+            var mev = pageEvents[j];
+            var mTypeInfo = _eventTypeLabel(mev.event_type);
+            var mCountdown = _eventCountdown(mev.event_date);
+            var mDateFmt = _eventDateFmt(mev.event_date);
+            var mCleanSym = (mev.symbol || '').replace('.NS', '').replace('.BO', '');
+            var mCompanyName = mev.company_name || mCleanSym;
+            var mIsImminent = (mCountdown.days >= 0 && mCountdown.days <= 3);
+
+            cardsHtml += '<div class="event-mobile-card ' + (mIsImminent ? 'event-imminent' : '') + '" style="animation-delay: ' + (j * 0.04) + 's; cursor: pointer;" onclick="window.navigateToStockEvents(\'' + mCleanSym + '\')" title="Click to view events">' +
+                '<div class="event-mobile-left">' +
+                    '<div class="event-mobile-company" style="font-weight: 700; color: var(--color-primary);">' + _evEscapeHtml(mCompanyName) + ' <span style="font-size: 9px; padding: 1px 4px; background: rgba(59,130,246,0.1); border-radius: 3px; font-weight: 700;">' + mCleanSym + '</span></div>' +
+                    '<div class="event-mobile-desc">' +
+                        '<span class="event-type-badge" data-type="' + mev.event_type + '" style="font-size: 9px; padding: 2px 6px;">' + mTypeInfo.icon + ' ' + mTypeInfo.label + '</span> ' +
+                        _evEscapeHtml(mev.description || '') +
+                    '</div>' +
+                '</div>' +
+                '<div class="event-mobile-right">' +
+                    '<div class="event-mobile-date">' + mDateFmt + '</div>' +
+                    '<span class="event-countdown ' + mCountdown.cls + '" style="font-size: 9.5px;">' + mCountdown.label + '</span>' +
+                '</div>' +
+                '</div>';
+        }
+        mobileCards.insertAdjacentHTML('beforeend', cardsHtml);
+    }
+
+    // Update Pagination Controls
+    if (paginationDiv) {
+        var totalPages = Math.ceil(_eventsMarketFiltered.length / _eventsMarketPageSize) || 1;
+        paginationDiv.style.display = 'flex';
+        
+        if (pageInfo) {
+            pageInfo.textContent = 'Page ' + (_eventsMarketPage + 1) + ' of ' + totalPages;
+        }
+        
+        if (prevBtn) {
+            if (_eventsMarketPage === 0) {
+                prevBtn.disabled = true;
+                prevBtn.style.opacity = '0.4';
+                prevBtn.style.cursor = 'not-allowed';
+            } else {
+                prevBtn.disabled = false;
+                prevBtn.style.opacity = '1';
+                prevBtn.style.cursor = 'pointer';
+            }
+        }
+        
+        if (nextBtn) {
+            if (_eventsMarketPage >= totalPages - 1) {
+                nextBtn.disabled = true;
+                nextBtn.style.opacity = '0.4';
+                nextBtn.style.cursor = 'not-allowed';
+            } else {
+                nextBtn.disabled = false;
+                nextBtn.style.opacity = '1';
+                nextBtn.style.cursor = 'pointer';
+            }
+        }
+    }
+}
+
+/**
+ * Navigate to another page of market events
+ * @param {number} direction — -1 for prev, 1 for next
+ */
+function navigateEventsPage(direction) {
+    var totalPages = Math.ceil(_eventsMarketFiltered.length / _eventsMarketPageSize) || 1;
+    var newPage = _eventsMarketPage + direction;
+    if (newPage >= 0 && newPage < totalPages) {
+        _eventsMarketPage = newPage;
+        _renderMarketEventsPage(true);
+        // Scroll the events container back to top
+        var container = document.getElementById('events-market-container');
+        if (container) container.scrollTop = 0;
+    }
+}
+
+/**
+ * Change the page size for market events
+ * @param {string|number} size — New page size (10, 25, 50, 100)
+ */
+function changeEventsPageSize(size) {
+    _eventsMarketPageSize = parseInt(size) || 25;
+    _eventsMarketPage = 0;
+    _renderMarketEventsPage(true);
+}
+
+
+// ─── Search Debounce ─────────────────────────────────────────────────────────
+(function() {
+    var searchInput = document.getElementById('events-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(_eventsSearchTimer);
+            _eventsSearchTimer = setTimeout(function() {
+                _applyEventsFilter();
+            }, 300);
+        });
+    } else {
+        // Retry after DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            var si = document.getElementById('events-search-input');
+            if (si) {
+                si.addEventListener('input', function() {
+                    clearTimeout(_eventsSearchTimer);
+                    _eventsSearchTimer = setTimeout(function() {
+                        _applyEventsFilter();
+                    }, 300);
+                });
+            }
+        });
+    }
+})();
+
+
+// ─── Live Countdown Refresh Timer ───────────────────────────────────────────
+(function() {
+    setInterval(function() {
+        var activeSubtabBtn = document.querySelector('.subtab-btn.active');
+        var activeSubtab = activeSubtabBtn ? activeSubtabBtn.getAttribute('data-subtab') : 'summary';
+        if (activeSubtab === 'events') {
+            _applyEventsFilter();
+        } else if (activeSubtab === 'summary') {
+            loadStockEvents();
+        }
+    }, 60000);
+})();
+
 
