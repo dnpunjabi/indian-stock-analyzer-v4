@@ -27811,6 +27811,8 @@ function setupTVWorkstationChartControls() {
                 if (activeStockProfile && activeStockProfile.ticker) {
                     renderTVWorkstationChart(activeStockProfile.ticker);
                 }
+                renderTvChartTemplates();
+                updateTvChartConsensusRating();
             });
         }
     });
