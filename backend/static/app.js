@@ -1107,6 +1107,7 @@ const tabs = {
     movers: document.getElementById('tab-movers'),
     'market-news': document.getElementById('tab-market-news'),
     events: document.getElementById('tab-events'),
+    trades: document.getElementById('tab-trades'),
     learning: document.getElementById('tab-learning')
 };
 
@@ -1125,6 +1126,7 @@ const tabBtns = {
     movers: document.getElementById('tab-movers-btn'),
     'market-news': document.getElementById('tab-market-news-btn'),
     events: document.getElementById('tab-events-btn'),
+    trades: document.getElementById('tab-trades-btn'),
     learning: document.getElementById('tab-learning-btn')
 };
 
@@ -1894,6 +1896,10 @@ function switchTab(tabKey) {
 
     if (tabKey === 'events') {
         if (typeof loadMarketEvents === 'function') loadMarketEvents();
+    }
+
+    if (tabKey === 'trades') {
+        if (typeof loadGlobalTrades === 'function') loadGlobalTrades();
     }
 
     if (tabKey === 'movers') {
