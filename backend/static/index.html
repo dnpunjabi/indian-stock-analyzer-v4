@@ -3714,6 +3714,60 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Conversational Chart Analyst Chatbot Panel -->
+                                <div id="tv-chart-chatbot-panel" style="width: 100%; margin-top: 10px; background: var(--bg-card-sub); border: 1px solid var(--border-glass); border-radius: 6px; padding: 15px; display: flex; flex-direction: column; gap: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;" id="tv-chart-chatbot-header">
+                                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary);">
+                                            <span>💬</span> Chat with AI Technical Analyst
+                                            <span class="llm-engine-badge" style="font-size: 8px; background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; padding: 2px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1;">Groq Llama 3</span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <button id="tv-chart-clear-chat-btn" title="Clear Chat History" style="background: transparent; border: 1px solid var(--border-glass); color: var(--text-secondary); padding: 2px 6px; font-size: 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s;">
+                                                🗑️ Clear
+                                            </button>
+                                            <button id="tv-chart-export-chat-btn" title="Export Chat History" style="background: transparent; border: 1px solid var(--border-glass); color: var(--text-secondary); padding: 2px 6px; font-size: 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s;">
+                                                📋 Copy
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Dynamic consensus rating gauge -->
+                                    <div id="tv-chart-consensus-gauge" style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 6px;">
+                                        <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Consensus Technical Rating:</div>
+                                        <span id="tv-chart-rating-badge" style="font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">NEUTRAL</span>
+                                        <div id="tv-chart-confluence-warning" style="display: none; align-items: center; gap: 4px; color: #fbbf24; font-size: 10px; margin-left: auto;">
+                                            <span>⚠️</span> <span style="font-weight: 600;">Confluence Cluster Detected!</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Chat history -->
+                                    <div id="tv-chart-chat-history" style="height: 250px; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 10px; font-size: 12px; border: 1px solid var(--border-glass); border-radius: 4px; padding: 10px; background: rgba(0,0,0,0.15);">
+                                        <div class="bot-message" style="align-self: flex-start; background: rgba(255,255,255,0.05); color: var(--text-secondary); padding: 8px 12px; border-radius: 12px 12px 12px 0px; max-width: 85%; line-height: 1.4;">
+                                            Hello! I am your Technical Analyst chatbot. Select indicators on the chart to dynamically update the templates below, or ask any question about key reversal patterns, order blocks, volume spikes, and catalyst confluences.
+                                        </div>
+                                    </div>
+
+                                    <!-- Template pills -->
+                                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                                        <div style="font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Suggested Prompts:</div>
+                                        <div id="tv-chart-templates-container" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; white-space: nowrap; scrollbar-width: thin;">
+                                            <!-- Dynamically generated pills -->
+                                        </div>
+                                    </div>
+
+                                    <!-- Text synthesis input dock -->
+                                    <div style="display: flex; gap: 8px; align-items: center; position: relative;">
+                                        <input type="text" id="tv-chart-chat-input" placeholder="Ask about chart patterns or technical indicators..." style="flex-grow: 1; padding: 8px 36px 8px 12px; font-size: 11.5px; border-radius: 6px; border: 1px solid var(--border-glass); background: var(--bg-card-sub); color: var(--text-primary); outline: none; transition: border-color 0.2s;" />
+                                        <button id="tv-chart-chat-mic-btn" title="Voice Input (Speech-to-Text)" style="position: absolute; right: 88px; background: transparent; border: none; font-size: 14px; cursor: pointer; color: var(--text-secondary); opacity: 0.8; transition: all 0.2s; padding: 4px;">🎙️</button>
+                                        <button id="tv-chart-stop-tts-btn" title="Stop Speech Output" style="display: none; background: rgba(239,68,68,0.2); border: 1px solid rgba(239,68,68,0.4); color: #f87171; padding: 6px 10px; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
+                                            ⏹️ Stop
+                                        </button>
+                                        <button id="tv-chart-chat-send-btn" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; border: none; padding: 8px 16px; font-size: 11.5px; font-weight: 600; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; transition: all 0.2s ease;">
+                                            <span>Send</span> <span id="tv-chart-send-spinner" class="spinner" style="display: none; width: 10px; height: 10px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

@@ -1880,6 +1880,14 @@ class AuditFinancialsRequest(BaseModel):
     table_data: dict
     custom_prompt: Optional[str] = None
 
+class ChartChatRequest(BaseModel):
+    symbol: str
+    indicator: str = "general"
+    length: int = 14
+    mult: float = 1.0
+    custom_prompt: str
+    chat_history: list = []
+
 @app.get("/api/search")
 async def search_ticker(q: str):
     """Resolves conversational company queries into NSE tickers."""
@@ -3168,6 +3176,257 @@ async def get_indicator_synthesis(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Indicator LLM synthesis failure: {str(e)}")
+
+
+@app.post("/api/chart/chat-analyst")
+async def post_chart_chat_analyst(req: ChartChatRequest):
+    ticker = req.symbol
+    if not ticker:
+        raise HTTPException(status_code=400, detail="Ticker parameter is required.")
+        
+    try:
+        fetch_range = "2y"
+        df = await fetch_history_df(ticker, fetch_range, "1d")
+        if df.empty:
+            raise HTTPException(status_code=404, detail="No price data returned from Yahoo Chart endpoint.")
+            
+        curr_price = round(float(df["Close"].iloc[-1]), 2)
+        prev_price = round(float(df["Close"].iloc[-2]), 2) if len(df) > 1 else curr_price
+        price_change = round(curr_price - prev_price, 2)
+        pct_change = round((price_change / prev_price) * 100, 2) if prev_price > 0 else 0.0
+        
+        # Calculate ATR-14
+        highs = df['High'].values
+        lows = df['Low'].values
+        closes = df['Close'].values
+        tr = np.maximum(highs - lows, np.maximum(np.abs(highs - np.roll(closes, 1)), np.abs(lows - np.roll(closes, 1))))
+        tr[0] = highs[0] - lows[0]
+        atr_val = round(float(np.mean(tr[-14:])), 2)
+        
+        from backend.swing_utils import (
+            calculate_trendlines_with_breaks, 
+            calculate_mxwll_suite, 
+            calculate_lux_smc,
+            calculate_linear_regression_trend_channel,
+            calculate_pitchfork_indicators
+        )
+        from backend.llm_config import call_llm, TASK_FAST
+        from backend.events_scraper import get_stock_events_cached
+        
+        # Get cached events
+        events = []
+        try:
+            events = get_stock_events_cached(ticker)
+        except Exception:
+            pass
+        
+        # Get cached trades
+        insider_trades = []
+        bulk_deals = []
+        block_deals = []
+        base_symbol = ticker.replace(".NS", "").replace(".BO", "")
+        try:
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT data_json FROM cached_trades WHERE symbol = ?", (base_symbol,))
+                row = cursor.fetchone()
+                if row:
+                    trades_data = json.loads(row["data_json"])
+                    insider_trades = trades_data.get("insider_trades", [])
+                    bulk_deals = trades_data.get("bulk_deals", [])
+                    block_deals = trades_data.get("block_deals", [])
+        except Exception:
+            pass
+                    
+        system_prompt = (
+            "You are a professional Technical Analyst and Senior Market Strategist specializing in the Indian Stock Markets.\n"
+            "Your objective is to answer user queries or analyze the chart based *only* on the provided custom indicator calculations, historical structural levels, and fundamental catalysts.\n"
+            "Identify any classic chart patterns (Double Tops/Bottoms, Head & Shoulders, Ascending/Descending Triangles, or Pennant/Wedge breakouts) if active, and highlight key supports/resistances.\n"
+            "In addition, look for CONFLUENCE CLUSTERS: instances where multiple indicator boundaries (e.g. Maxwell golden zone, SMC Order Block, and LRTC boundaries) fall within a ±1% price range. Highlight these confluence points as high-probability reversal or acceleration zones.\n"
+            "Format your response in structured Markdown. Start directly with the analysis. Avoid conversational preambles (like 'Here is the analysis...').\n"
+            "Use clear bullet points and bold styling. Do not hallucinate prices; rely only on the structured indicators values provided in the prompt."
+        )
+        
+        indicator_list = [ind.strip().lower() for ind in req.indicator.split(",") if ind.strip()]
+        
+        user_prompt_parts = [
+            f"Perform a technical analysis for the stock ticker: {ticker}",
+            f"Current Price: Rs. {curr_price} ({price_change:+.2f}, {pct_change:+.2f}%)",
+            f"Volatility (ATR-14): {atr_val}",
+            f"Active Indicators: {', '.join(indicator_list).upper()}\n"
+        ]
+        
+        has_active_indicator = False
+        
+        if "lux-algo" in indicator_list:
+            has_active_indicator = True
+            breaks_data = calculate_trendlines_with_breaks(df, length=req.length, atr_mult=req.mult)
+            last_res = next((x for x in reversed(breaks_data["resistance"]) if x is not None), None)
+            last_sup = next((x for x in reversed(breaks_data["support"]) if x is not None), None)
+            recent_bull_break = any(breaks_data["bullish_breaks"][-15:])
+            recent_bear_break = any(breaks_data["bearish_breaks"][-15:])
+            
+            res_str = f"Rs. {last_res}" if last_res else "None identified"
+            sup_str = f"Rs. {last_sup}" if last_sup else "None identified"
+            
+            user_prompt_parts.append(
+                f"--- LuxAlgo Trendlines with Breaks (Lookback: {req.length}, Slope Multiplier: {req.mult}) ---\n"
+                f"- Active Support Trendline Price: {sup_str}\n"
+                f"- Active Resistance Trendline Price: {res_str}\n"
+                f"- Recent Bullish Breakout (last 15 bars): {'YES' if recent_bull_break else 'NO'}\n"
+                f"- Recent Bearish Breakout (last 15 bars): {'YES' if recent_bear_break else 'NO'}\n"
+            )
+            
+        if "lux-smc" in indicator_list or "smc" in indicator_list:
+            has_active_indicator = True
+            smc = calculate_lux_smc(df, int_sens=3, ext_sens=req.length, show_last=10)
+            struct_list = []
+            if smc.get("structures"):
+                for s in smc["structures"][-5:]:
+                    struct_list.append(f"{s['time']}: {s['type']} ({s['direction']}, Level: Rs. {s.get('price', 'N/A')})")
+            struct_str = "\n".join(struct_list) if struct_list else "No recent structures detected"
+            
+            demand_obs = [ob for ob in smc.get("order_blocks", []) if ob["type"] == "demand"]
+            supply_obs = [ob for ob in smc.get("order_blocks", []) if ob["type"] == "supply"]
+            demand_str = ", ".join([f"Rs. {ob['bottom']}-{ob['top']}" for ob in demand_obs[-3:]]) if demand_obs else "None active"
+            supply_str = ", ".join([f"Rs. {ob['bottom']}-{ob['top']}" for ob in supply_obs[-3:]]) if supply_obs else "None active"
+            
+            pd = smc.get("premium_discount", {})
+            pd_str = f"Range: Rs. {pd.get('bottom')}-{pd.get('top')} (Equilibrium: Rs. {pd.get('equilibrium')})" if pd else "Unknown"
+            
+            pd_zone = "Neutral"
+            if pd:
+                eq = pd.get("equilibrium", 0)
+                if curr_price > eq:
+                    pd_zone = f"Premium Zone (above equilibrium of Rs. {eq})"
+                elif curr_price < eq:
+                    pd_zone = f"Discount Zone (below equilibrium of Rs. {eq})"
+                    
+            daily = smc.get("daily_levels", [])
+            last_daily = daily[-1] if daily else None
+            daily_str = f"High: Rs. {last_daily['high']}, Low: Rs. {last_daily['low']}" if last_daily else "N/A"
+            
+            user_prompt_parts.append(
+                f"--- LuxAlgo Smart Money Concepts (Internal Sens: 3, Swing Sens: {req.length}) ---\n"
+                f"- Recent Structural Transitions (BOS/CHoCH):\n{struct_str}\n"
+                f"- Unmitigated Demand Order Blocks (Buy Zone): {demand_str}\n"
+                f"- Unmitigated Supply Order Blocks (Sell Zone): {supply_str}\n"
+                f"- Premium / Discount Zones: {pd_str}\n"
+                f"- Current Price Position: Sits in the {pd_zone}\n"
+                f"- Prev Day High/Low (Daily levels): {daily_str}\n"
+            )
+            
+        if "mxwll" in indicator_list:
+            has_active_indicator = True
+            mxwll = calculate_mxwll_suite(df, int_sens=3, ext_sens=req.length, show_last=10)
+            struct_list = []
+            if mxwll.get("structures"):
+                for s in mxwll["structures"][-5:]:
+                    struct_list.append(f"{s['time']}: {s['type']} ({s['direction']}, Price: Rs. {s.get('price', 'N/A')})")
+            struct_str = "\n".join(struct_list) if struct_list else "No recent structures detected"
+            
+            demand_obs = [ob for ob in mxwll.get("order_blocks", []) if ob["type"] == "demand"]
+            supply_obs = [ob for ob in mxwll.get("order_blocks", []) if ob["type"] == "supply"]
+            demand_str = ", ".join([f"Rs. {ob['bottom']:.2f}-{ob['top']:.2f}" for ob in demand_obs[-3:]]) if demand_obs else "None active"
+            supply_str = ", ".join([f"Rs. {ob['bottom']:.2f}-{ob['top']:.2f}" for ob in supply_obs[-3:]]) if supply_obs else "None active"
+            
+            fvgs = mxwll.get("fvg", [])
+            fvg_str = ", ".join([f"{g['type']} (Rs. {g['bottom']:.2f}-{g['top']:.2f})" for g in fvgs[-3:]]) if fvgs else "None active"
+            
+            fibs = mxwll.get("fib_levels", {})
+            fibs_str = ", ".join([f"{k}: Rs. {v}" for k, v in fibs.items() if k not in ["anchor_start_time", "anchor_end_time"]]) if fibs else "N/A"
+            
+            user_prompt_parts.append(
+                f"--- Mxwll Price Action Suite (Int Sens: 3, Ext Sens: {req.length}) ---\n"
+                f"- Market Structures (BOS/CHoCH):\n{struct_str}\n"
+                f"- Active Demand Zones (OBs): {demand_str}\n"
+                f"- Active Supply Zones (OBs): {supply_str}\n"
+                f"- Unmitigated Fair Value Gaps (FVGs): {fvg_str}\n"
+                f"- Auto-Fibonacci Retracement Levels: {fibs_str}\n"
+            )
+            
+        if "lrtc" in indicator_list:
+            has_active_indicator = True
+            lrtc_data = calculate_linear_regression_trend_channel(df, period=req.length, deviations_mult=req.mult)
+            latest = lrtc_data.get("latest_channel", {})
+            recent_buy = any(lrtc_data["ready_to_buy"][-15:])
+            recent_sell = any(lrtc_data["ready_to_sell"][-15:])
+            
+            slope = latest.get("slope", 0.0) if latest else 0.0
+            trend_slope = -slope
+            channel_direction = "Rising/Bullish" if trend_slope > 0 else "Falling/Bearish"
+            
+            user_prompt_parts.append(
+                f"--- Linear Regression Trend Channel (Period: {req.length}, Deviations: {req.mult}) ---\n"
+                f"- Channel Direction: {channel_direction} (Slope: {trend_slope:.4f})\n"
+                f"- Current Channel End Bounds:\n"
+                f"  * Upper Channel (Sell Limit): Rs. {latest.get('upper_end', 0.0) if latest else 0.0}\n"
+                f"  * Median Line (Fair Value): Rs. {latest.get('median_end', 0.0) if latest else 0.0}\n"
+                f"  * Lower Channel (Buy Limit): Rs. {latest.get('lower_end', 0.0) if latest else 0.0}\n"
+                f"- Current Entry Alerts (last 15 bars):\n"
+                f"  * Buy Alert Triggered: {'YES' if recent_buy else 'NO'}\n"
+                f"  * Sell Alert Triggered: {'YES' if recent_sell else 'NO'}\n"
+            )
+            
+        if "pitchfork" in indicator_list:
+            has_active_indicator = True
+            pf_res = calculate_pitchfork_indicators(df, deviation=5.0, depth=req.length * 2, type_pf='Original')
+            pf = pf_res.get("pitchfork", {})
+            p1_val = pf.get("p1", {}).get("value") if pf.get("p1") else "N/A"
+            p2_val = pf.get("p2", {}).get("value") if pf.get("p2") else "N/A"
+            p3_val = pf.get("p3", {}).get("value") if pf.get("p3") else "N/A"
+            user_prompt_parts.append(
+                f"--- Andrews Pitchfork (Parameters: depth={req.length * 2}) ---\n"
+                f"- Anchor Prices: P1 (Start) = Rs. {p1_val}, P2 (High) = Rs. {p2_val}, P3 (Low) = Rs. {p3_val}\n"
+            )
+            
+        if not has_active_indicator:
+            user_prompt_parts.append(
+                "Active Indicator: Price and Volatility Only\n"
+                "Provide a standard trend and volatility overview based on price action alone."
+            )
+            
+        # Add events
+        if events:
+            user_prompt_parts.append("--- Upcoming Corporate Events & Catalysts ---")
+            for ev in events[:5]:
+                user_prompt_parts.append(
+                    f"- Date: {ev['event_date']} | Type: {ev.get('event_type','Event')} | Purpose: {ev.get('purpose','N/A')} [Countdown: {ev.get('countdown_days','N/A')} days]"
+                )
+                
+        # Add trades
+        if insider_trades:
+            user_prompt_parts.append("--- Recent Insider Trades (SAST Promoter Activity) ---")
+            for trd in insider_trades[:5]:
+                user_prompt_parts.append(
+                    f"- Date: {trd.get('date','N/A')} | Acquirer: {trd.get('acquirer','N/A')} | Action: {trd.get('mode','N/A')} | Shares: {trd.get('shares','N/A')} | Value: {trd.get('value','N/A')}"
+                )
+        if bulk_deals or block_deals:
+            user_prompt_parts.append("--- Recent Bulk & Block Deals ---")
+            for deal in (bulk_deals + block_deals)[:5]:
+                user_prompt_parts.append(
+                    f"- Date: {deal.get('date','N/A')} | Party: {deal.get('client_name','N/A')} | Type: {deal.get('type','N/A')} | Qty: {deal.get('quantity','N/A')} | Avg Price: {deal.get('price','N/A')}"
+                )
+                
+        # Inject Chat History
+        if req.chat_history:
+            user_prompt_parts.append("\n--- Conversation History ---")
+            for msg in req.chat_history:
+                role_label = "User" if msg.get("role") == "user" else "Assistant"
+                user_prompt_parts.append(f"{role_label}: {msg.get('content')}")
+                
+        # Custom Prompt
+        user_prompt_parts.append(f"\nUser Query: {req.custom_prompt}")
+        
+        user_prompt = "\n".join(user_prompt_parts)
+        analysis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
+        
+        if not analysis:
+            raise HTTPException(status_code=500, detail="LLM failed to respond.")
+            
+        return {"analysis": analysis}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chart AI Chatbot execution failed: {str(e)}")
 
 
 @app.get("/api/compare")

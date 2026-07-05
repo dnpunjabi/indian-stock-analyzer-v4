@@ -15415,5 +15415,85 @@ details[open] .academy-hud-arrow {
         transform: translateX(-50%) translateY(0) !important;
         opacity: 1 !important;
     }
+    }
 }
+
+/* ────────────────── Chatbot UI Custom Styles ─────────────────── */
+#tv-chart-chat-history::-webkit-scrollbar {
+    width: 5px;
+}
+#tv-chart-chat-history::-webkit-scrollbar-track {
+    background: transparent;
+}
+#tv-chart-chat-history::-webkit-scrollbar-thumb {
+    background: var(--border-glass);
+    border-radius: 4px;
+}
+#tv-chart-chat-history::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+#tv-chart-templates-container::-webkit-scrollbar {
+    height: 4px;
+}
+#tv-chart-templates-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+#tv-chart-templates-container::-webkit-scrollbar-thumb {
+    background: var(--border-glass);
+    border-radius: 2px;
+}
+
+/* Clickable Price Level Animations */
+.clickable-price-level {
+    position: relative;
+    transition: all 0.2s ease;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+.clickable-price-level:hover {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fcd34d !important;
+}
+
+/* Pulsing voice recording indicator */
+@keyframes micPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+        transform: scale(1);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+        transform: scale(1.1);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+        transform: scale(1);
+    }
+}
+
+.mic-listening {
+    animation: micPulse 1.5s infinite;
+    background: rgba(239, 68, 68, 0.2) !important;
+    border-radius: 50% !important;
+    color: #ef4444 !important;
+}
+
+/* Mobile-first and native app specific layout constraints */
+@media (max-width: 576px) {
+    #tv-chart-chatbot-panel {
+        padding: 10px !important;
+    }
+    #tv-chart-chat-history {
+        height: 180px !important;
+    }
+    #tv-chart-chat-input {
+        font-size: 13px !important; /* Avoid auto-zoom on mobile safari */
+    }
+    .tv-template-pill {
+        font-size: 9px !important;
+        padding: 3px 8px !important;
+    }
+}
+
 

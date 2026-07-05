@@ -27840,6 +27840,8 @@ function setupTVWorkstationChartControls() {
                 if (activeStockProfile && activeStockProfile.ticker) {
                     renderTVWorkstationChart(activeStockProfile.ticker);
                 }
+                renderTvChartTemplates();
+                updateTvChartConsensusRating();
             });
         }
     });
@@ -27867,7 +27869,537 @@ function setupTVWorkstationChartControls() {
             }
         });
     }
+
+    // Conversational Chatbot Bindings
+    const tvChatSendBtn = document.getElementById('tv-chart-chat-send-btn');
+    if (tvChatSendBtn) {
+        tvChatSendBtn.addEventListener('click', triggerTvChatQuery);
+    }
+    const tvChatInput = document.getElementById('tv-chart-chat-input');
+    if (tvChatInput) {
+        tvChatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                triggerTvChatQuery();
+            }
+        });
+    }
+    const tvChatClearBtn = document.getElementById('tv-chart-clear-chat-btn');
+    if (tvChatClearBtn) {
+        tvChatClearBtn.addEventListener('click', () => {
+            const history = document.getElementById('tv-chart-chat-history');
+            if (history) {
+                history.innerHTML = '<div class="bot-message" style="align-self: flex-start; background: rgba(255,255,255,0.05); color: var(--text-secondary); padding: 8px 12px; border-radius: 12px 12px 12px 0px; max-width: 85%; line-height: 1.4;">Hello! I am your Technical Analyst chatbot. Select indicators on the chart to dynamically update the templates below, or ask any question about key reversal patterns, order blocks, volume spikes, and catalyst confluences.</div>';
+            }
+            tvChatHistoryList = [];
+            clearTvTemporaryPriceLines();
+        });
+    }
+    const tvChatExportBtn = document.getElementById('tv-chart-export-chat-btn');
+    if (tvChatExportBtn) {
+        tvChatExportBtn.addEventListener('click', () => {
+            if (tvChatHistoryList.length === 0) {
+                showToast("No chat history to export.", "warning");
+                return;
+            }
+            let text = "Interactive Chart AI Chatbot History:\n\n";
+            tvChatHistoryList.forEach(m => {
+                const role = m.role === 'user' ? 'User' : 'AI Analyst';
+                text += `[${role}]: ${m.content}\n\n`;
+            });
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("Chat history copied to clipboard!", "success");
+            }).catch(err => {
+                console.error("Failed to copy text:", err);
+            });
+        });
+    }
+    const tvChatStopTtsBtn = document.getElementById('tv-chart-stop-tts-btn');
+    if (tvChatStopTtsBtn) {
+        tvChatStopTtsBtn.addEventListener('click', () => {
+            if (window.speechSynthesis) window.speechSynthesis.cancel();
+            tvChatStopTtsBtn.style.display = 'none';
+            document.querySelectorAll('.tv-chat-speak-btn').forEach(btn => {
+                btn.innerHTML = '🔊 Speak';
+                btn.classList.remove('speaking');
+            });
+        });
+    }
+    
+    // Bind templates renderer and voice integrations
+    renderTvChartTemplates();
+    setupTvChatSTT();
+    updateTvChartConsensusRating();
 }
+
+// ----------------------------------------------------
+// Chatbot Logic Helpers
+// ----------------------------------------------------
+let tvChatHistoryList = [];
+let tvTemporaryPriceLines = [];
+
+const tvChatTemplatesMap = {
+    general: [
+        { label: '📊 Trend & Momentum', text: 'Analyze the current trend, momentum, and short-term forecast based on price action.' },
+        { label: '🧱 Support & Resistance', text: 'Identify the key horizontal support floors and resistance ceilings based on historical pivots.' },
+        { label: '📈 Pattern Recognition', text: 'Scan for classic chart pattern formations (Double Tops/Bottoms, Triangles, Head & Shoulders) on the chart.' },
+        { label: '🕯️ Candlestick Audit', text: 'Examine the shape, size, and shadow of the recent daily candles. Are there any engulfing bars, pinbars, or indecision dojis?' },
+        { label: '📉 Volume Spikes', text: 'Interpret the recent volume activity relative to the 20-period average. Is a major move being backed by volume?' },
+        { label: '🏁 Trade Setup Builder', text: 'Formulate a comprehensive trading setup specifying entry zone, stop-loss limit, and target take-profit levels.' }
+    ],
+    "lux-algo": [
+        { label: '🔴 Breakout Probability', text: 'Analyze current proximity to resistance and support lines. What is the probability of a breakout?' },
+        { label: '⚡ Breakout Signals', text: 'Audit the recent bullish/bearish breakout signal markers. What was the post-signal performance?' },
+        { label: '🛡️ False Breakout Filter', text: 'Review the latest breakout trigger. Did volume and momentum support the move, or is it a potential bull/bear trap?' },
+        { label: '📐 Volatility Squeeze', text: 'Evaluate whether the support and resistance lines are contracting (volatility compression) or expanding.' }
+    ],
+    mxwll: [
+        { label: '🟡 Golden Zone Audit', text: 'Verify if the current price is within the Golden Zone (Fib 0.5 - 0.618) and evaluate potential reversal setups.' },
+        { label: '🎯 Fibonacci Retracement', text: 'Analyze the current price position relative to the main swing low (0%) and swing high (100%). What are the key extension targets?' },
+        { label: '🏢 Order Block Reaction', text: 'Evaluate price behavior inside the nearest institutional supply or demand Order Block. Is a reaction occurring?' },
+        { label: '📥 FVG Gap Mitigation', text: 'List the active Fair Value Gaps (FVG) and estimate when they are likely to be filled or mitigated.' },
+        { label: '📉 Swing Range Strength', text: 'Assess the structural strength of the current swing range. Is the trend making higher highs or lower lows?' }
+    ],
+    "lux-smc": [
+        { label: '🦁 Institutional Order Flow', text: 'Identify all unmitigated order blocks and describe the active market flow.' },
+        { label: '⚖️ Premium vs. Discount', text: 'Is the stock trading in the Premium (expensive) zone, Discount (cheap) zone, or at Equilibrium?' },
+        { label: '🔄 CHoCH vs BOS Transition', text: 'Explain the recent structural shifts. Have we transitioned from a Change of Character (reversal) to a Break of Structure (continuation)?' },
+        { label: '📊 MTF Levels Analysis', text: 'Evaluate high-timeframe Daily (PDH/PDL), Weekly (PWH/PWL), and Monthly (PMH/PML) key pivots.' },
+        { label: '🌊 Liquidity Grab (EQH/EQL)', text: 'Scan for Equal Highs or Equal Lows. Is a liquidity run or stop-hunt building up?' }
+    ],
+    lrtc: [
+        { label: '📐 Channel Slope & Speed', text: 'Analyze the slope, speed, and standard deviation width of the regression channel. Is the trend accelerating?' },
+        { label: '🏹 Boundary Play Setup', text: 'Identify low-risk entry opportunities based on current distance to the upper (sell) and lower (buy) bounds.' },
+        { label: '🔄 Mean Reversion Velocity', text: 'How far is the price from the median regression line? Estimate the mean reversion tendency.' },
+        { label: '⚠️ Boundary Break Risk', text: 'Assess the probability of a structural break outside the 2.0 standard deviation regression bounds.' }
+    ],
+    pitchfork: [
+        { label: '🔱 Pitchfork Channel Bias', text: 'Determine trend orientation and momentum based on the pitchfork\'s parallel bands and median line slope.' },
+        { label: '📍 Anchor Coordinates', text: 'Audit the structural pivots (P1, P2, P3) used to build the Pitchfork. Are they strong swing points?' },
+        { label: '📈 Parallel Bounces', text: 'Formulate trading plays based on price bounces or rejections at the 0.25, 0.382, 0.5, 0.618, and 0.75 pitchfork levels.' },
+        { label: '❌ Structural Validity', text: 'Check if the price has broken out of the outer Pitchfork bounds, rendering the channel invalid.' }
+    ]
+};
+
+function renderTvChartTemplates() {
+    const container = document.getElementById('tv-chart-templates-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    let pills = [...tvChatTemplatesMap.general];
+    
+    const indicatorLuxAlgo = document.getElementById('tv-indicator-lux-algo');
+    const indicatorMxwll = document.getElementById('tv-indicator-mxwll');
+    const indicatorLuxSMC = document.getElementById('tv-indicator-lux-smc');
+    const indicatorLRTC = document.getElementById('tv-indicator-lrtc');
+    const indicatorPitchfork = document.getElementById('tv-indicator-pitchfork');
+    
+    if (indicatorLuxAlgo && indicatorLuxAlgo.checked) pills = pills.concat(tvChatTemplatesMap['lux-algo']);
+    if (indicatorMxwll && indicatorMxwll.checked) pills = pills.concat(tvChatTemplatesMap['mxwll']);
+    if (indicatorLuxSMC && indicatorLuxSMC.checked) pills = pills.concat(tvChatTemplatesMap['lux-smc']);
+    if (indicatorLRTC && indicatorLRTC.checked) pills = pills.concat(tvChatTemplatesMap['lrtc']);
+    if (indicatorPitchfork && indicatorPitchfork.checked) pills = pills.concat(tvChatTemplatesMap['pitchfork']);
+    
+    pills.forEach(tpl => {
+        const btn = document.createElement('button');
+        btn.className = 'tv-template-pill';
+        btn.style.cssText = `
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            color: var(--text-primary);
+            font-size: 10px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            font-weight: 500;
+        `;
+        btn.innerText = tpl.label;
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = 'rgba(16, 185, 129, 0.2)';
+            btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.background = 'rgba(16, 185, 129, 0.1)';
+            btn.style.borderColor = 'rgba(16, 185, 129, 0.25)';
+        });
+        btn.addEventListener('click', () => {
+            const input = document.getElementById('tv-chart-chat-input');
+            if (input) {
+                input.value = tpl.text;
+                triggerTvChatQuery();
+            }
+        });
+        container.appendChild(btn);
+    });
+}
+
+async function triggerTvChatQuery() {
+    const input = document.getElementById('tv-chart-chat-input');
+    if (!input) return;
+    const promptText = input.value.trim();
+    if (!promptText) return;
+    
+    const sendBtn = document.getElementById('tv-chart-chat-send-btn');
+    const spinner = document.getElementById('tv-chart-send-spinner');
+    const history = document.getElementById('tv-chart-chat-history');
+    if (!history) return;
+    
+    appendTvChatMessage('user', promptText);
+    input.value = '';
+    
+    if (sendBtn) sendBtn.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+    
+    const botMsgId = 'tv-bot-' + Date.now();
+    appendTvChatLoading(botMsgId);
+    
+    try {
+        const activeInd = document.getElementById('tv-active-indicator')?.value || 'general';
+        const length = parseInt(document.getElementById('tv-length')?.value || '14', 10);
+        const mult = parseFloat(document.getElementById('tv-mult')?.value || '1.0');
+        
+        const payload = {
+            symbol: activeStockProfile ? activeStockProfile.ticker : 'STOCK',
+            indicator: activeInd,
+            length: length,
+            mult: mult,
+            custom_prompt: promptText,
+            chat_history: tvChatHistoryList
+        };
+        
+        const res = await fetch('/api/chart/chat-analyst', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!res.ok) throw new Error("Failed to compile AI chart query");
+        const data = await res.json();
+        
+        removeTvChatLoading(botMsgId);
+        appendTvChatMessage('bot', data.analysis || "No response received.");
+        tvChatHistoryList.push({ role: 'user', content: promptText });
+        tvChatHistoryList.push({ role: 'assistant', content: data.analysis || "" });
+        
+        updateTvChartConsensusRating();
+    } catch (err) {
+        console.error("AI Chart Chat error:", err);
+        removeTvChatLoading(botMsgId);
+        appendTvChatMessage('bot', "❌ Error: Failed to generate response from AI model.");
+    } finally {
+        if (sendBtn) sendBtn.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+    }
+}
+
+function clearTvTemporaryPriceLines() {
+    if (activeTVCandleSeries) {
+        tvTemporaryPriceLines.forEach(line => {
+            try {
+                activeTVCandleSeries.removePriceLine(line);
+            } catch (err) {}
+        });
+    }
+    tvTemporaryPriceLines = [];
+}
+
+function addTvTemporaryPriceLine(price, label) {
+    if (!activeTVCandleSeries) return;
+    clearTvTemporaryPriceLines();
+    
+    try {
+        const line = activeTVCandleSeries.createPriceLine({
+            price: parseFloat(price),
+            color: '#fbbf24',
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            axisLabelVisible: true,
+            title: label || 'Target Level'
+        });
+        tvTemporaryPriceLines.push(line);
+        
+        setTimeout(() => {
+            try {
+                if (activeTVCandleSeries) {
+                    activeTVCandleSeries.removePriceLine(line);
+                }
+            } catch (e) {}
+        }, 8000);
+    } catch (err) {
+        console.error("Error adding temporary price line:", err);
+    }
+}
+window.addTvTemporaryPriceLine = addTvTemporaryPriceLine;
+
+function makePricesClickable(htmlText) {
+    const regex = /(?:Rs\.|₹)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d+(?:\.\d{2})?)/g;
+    return htmlText.replace(regex, (match, val) => {
+        const numericVal = val.replace(/,/g, '');
+        return `<span class="clickable-price-level" data-price="${numericVal}" style="color: #fbbf24; text-decoration: underline; cursor: pointer; font-weight: 600;" onclick="window.addTvTemporaryPriceLine(${numericVal}, 'Target Level: ₹${numericVal}')">${match}</span>`;
+    });
+}
+
+function appendTvChatMessage(role, content) {
+    const history = document.getElementById('tv-chart-chat-history');
+    if (!history) return;
+    
+    const div = document.createElement('div');
+    div.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-width: 85%;
+        padding: 8px 12px;
+        border-radius: 12px;
+        line-height: 1.4;
+    `;
+    
+    if (role === 'user') {
+        div.style.alignSelf = 'flex-end';
+        div.style.background = 'var(--color-primary-glow)';
+        div.style.color = 'var(--text-primary)';
+        div.style.borderRadius = '12px 12px 0px 12px';
+        div.innerText = content;
+    } else {
+        div.style.alignSelf = 'flex-start';
+        div.style.background = 'rgba(255,255,255,0.05)';
+        div.style.color = 'var(--text-secondary)';
+        div.style.borderRadius = '12px 12px 12px 0px';
+        
+        let html = formatMarkdownToHTML(content);
+        html = makePricesClickable(html);
+        
+        const speechContainer = document.createElement('div');
+        speechContainer.style.cssText = 'display: flex; gap: 8px; margin-top: 6px; font-size: 10px;';
+        
+        const speakBtn = document.createElement('button');
+        speakBtn.className = 'tv-chat-speak-btn';
+        speakBtn.style.cssText = 'background: transparent; border: 1px solid var(--border-glass); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; cursor: pointer;';
+        speakBtn.innerHTML = '🔊 Speak';
+        
+        const plainText = content.replace(/[#*`_-]/g, '').trim();
+        speakBtn.addEventListener('click', () => {
+            triggerTvChatTTS(plainText, speakBtn);
+        });
+        
+        speechContainer.appendChild(speakBtn);
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.innerHTML = html;
+        div.appendChild(contentDiv);
+        div.appendChild(speechContainer);
+    }
+    
+    history.appendChild(div);
+    history.scrollTop = history.scrollHeight;
+}
+
+function appendTvChatLoading(id) {
+    const history = document.getElementById('tv-chart-chat-history');
+    if (!history) return;
+    
+    const div = document.createElement('div');
+    div.id = id;
+    div.style.cssText = `
+        align-self: flex-start;
+        background: rgba(255,255,255,0.05);
+        color: var(--text-muted);
+        padding: 8px 12px;
+        border-radius: 12px 12px 12px 0px;
+        max-width: 85%;
+        font-style: italic;
+    `;
+    div.innerText = "Thinking...";
+    
+    history.appendChild(div);
+    history.scrollTop = history.scrollHeight;
+}
+
+function removeTvChatLoading(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}
+
+let tvActiveSpeechUtterance = null;
+function triggerTvChatTTS(text, btn) {
+    if (!window.speechSynthesis) {
+        showToast("Speech synthesis is not supported in this browser.", "warning");
+        return;
+    }
+    
+    window.speechSynthesis.cancel();
+    document.querySelectorAll('.tv-chat-speak-btn').forEach(b => {
+        b.innerHTML = '🔊 Speak';
+        b.classList.remove('speaking');
+    });
+    
+    const stopTtsBtn = document.getElementById('tv-chart-stop-tts-btn');
+    if (stopTtsBtn) stopTtsBtn.style.display = 'none';
+    
+    if (btn.classList.contains('speaking')) {
+        btn.classList.remove('speaking');
+        return;
+    }
+    
+    btn.innerHTML = '🗣️ Speaking...';
+    btn.classList.add('speaking');
+    if (stopTtsBtn) stopTtsBtn.style.display = 'inline-block';
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-IN';
+    utterance.rate = 1.0;
+    
+    utterance.onend = () => {
+        btn.innerHTML = '🔊 Speak';
+        btn.classList.remove('speaking');
+        if (stopTtsBtn) stopTtsBtn.style.display = 'none';
+    };
+    
+    utterance.onerror = () => {
+        btn.innerHTML = '🔊 Speak';
+        btn.classList.remove('speaking');
+        if (stopTtsBtn) stopTtsBtn.style.display = 'none';
+    };
+    
+    tvActiveSpeechUtterance = utterance;
+    window.speechSynthesis.speak(utterance);
+}
+
+function setupTvChatSTT() {
+    const micBtn = document.getElementById('tv-chart-chat-mic-btn');
+    const inputEl = document.getElementById('tv-chart-chat-input');
+    if (!micBtn || !inputEl) return;
+    
+    const isAndroidSpeech = window.AndroidSpeech && typeof window.AndroidSpeech.startListening === 'function';
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (isAndroidSpeech) {
+        micBtn.addEventListener('click', () => {
+            if (window.AndroidSpeechListening && window.activeSpeechRecognizerTarget === 'tv_chart_chat') {
+                window.AndroidSpeech.stopListening();
+            } else {
+                window.activeSpeechRecognizerTarget = 'tv_chart_chat';
+                window.AndroidSpeech.startListening();
+            }
+        });
+    } else if (!SpeechRecognition) {
+        micBtn.style.display = 'none';
+    } else {
+        let recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        let isListening = false;
+        
+        recognition.onstart = () => {
+            isListening = true;
+            micBtn.innerHTML = '🔴';
+            micBtn.classList.add('mic-listening');
+        };
+        
+        recognition.onend = () => {
+            isListening = false;
+            micBtn.innerHTML = '🎙️';
+            micBtn.classList.remove('mic-listening');
+        };
+        
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            if (inputEl) {
+                inputEl.value = (inputEl.value ? inputEl.value + ' ' : '') + transcript;
+            }
+        };
+        
+        recognition.onerror = (event) => {
+            console.error("Speech recognition error:", event.error);
+        };
+        
+        micBtn.addEventListener('click', () => {
+            if (isListening) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        });
+    }
+}
+
+function updateTvChartConsensusRating() {
+    const ratingBadge = document.getElementById('tv-chart-rating-badge');
+    if (!ratingBadge) return;
+    
+    let score = 0;
+    
+    const smcBiasEl = document.getElementById('smc-hud-bias');
+    if (smcBiasEl) {
+        const text = smcBiasEl.innerText.toUpperCase();
+        if (text.includes('BULLISH')) score += 1;
+        else if (text.includes('BEARISH')) score -= 1;
+    }
+    
+    const lrtcDirectionEl = document.getElementById('lrtc-hud-slope');
+    if (lrtcDirectionEl) {
+        const text = lrtcDirectionEl.innerText.toUpperCase();
+        if (text.includes('RISING') || text.includes('BULLISH')) score += 1;
+        else if (text.includes('FALLING') || text.includes('BEARISH')) score -= 1;
+    }
+    
+    const pfBiasEl = document.getElementById('pf-hud-bias');
+    if (pfBiasEl) {
+        const text = pfBiasEl.innerText.toUpperCase();
+        if (text.includes('ABOVE MEDIAN') || text.includes('BULLISH')) score += 1;
+        else if (text.includes('BELOW MEDIAN') || text.includes('BEARISH')) score -= 1;
+    }
+    
+    let ratingStr = "NEUTRAL";
+    let color = "#fbbf24";
+    let bg = "rgba(245, 158, 11, 0.2)";
+    let border = "rgba(245, 158, 11, 0.3)";
+    
+    if (score >= 2) {
+        ratingStr = "STRONG BUY";
+        color = "#10b981";
+        bg = "rgba(16, 185, 129, 0.2)";
+        border = "rgba(16, 185, 129, 0.3)";
+    } else if (score === 1) {
+        ratingStr = "BUY";
+        color = "#34d399";
+        bg = "rgba(52, 211, 153, 0.15)";
+        border = "rgba(52, 211, 153, 0.25)";
+    } else if (score === -1) {
+        ratingStr = "SELL";
+        color = "#f87171";
+        bg = "rgba(239, 68, 68, 0.15)";
+        border = "rgba(239, 68, 68, 0.25)";
+    } else if (score <= -2) {
+        ratingStr = "STRONG SELL";
+        color = "#ef4444";
+        bg = "rgba(239, 68, 68, 0.25)";
+        border = "rgba(239, 68, 68, 0.35)";
+    }
+    
+    ratingBadge.innerText = ratingStr;
+    ratingBadge.style.color = color;
+    ratingBadge.style.background = bg;
+    ratingBadge.style.borderColor = border;
+    
+    const confluenceWarning = document.getElementById('tv-chart-confluence-warning');
+    if (confluenceWarning) {
+        let isConfluence = false;
+        
+        const breaksLevels = document.getElementById('breaks-hud-levels')?.innerText;
+        const smcSupply = document.getElementById('smc-hud-supply')?.innerText;
+        const smcDemand = document.getElementById('smc-hud-demand')?.innerText;
+        
+        if (breaksLevels && (smcSupply || smcDemand)) {
+            isConfluence = true;
+        }
+        
+        confluenceWarning.style.display = isConfluence ? 'flex' : 'none';
+    }
+}
+
 
 async function triggerTVIndicatorSynthesis() {
     const btn = document.getElementById('tv-btn-generate-synthesis');
