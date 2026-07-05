@@ -564,9 +564,9 @@ def calculate_mxwll_suite(df, int_sens=3, ext_sens=25, show_last=10):
                 intra_calc = 1
                 
             if intra_calc == 0 and prev_intra != 0:
-                top_swings[i] = float(cHi)
+                top_swings[i - length] = float(cHi)
             elif intra_calc == 1 and prev_intra != 1:
-                bot_swings[i] = float(cLo)
+                bot_swings[i - length] = float(cLo)
                 
         return top_swings, bot_swings
         
@@ -590,7 +590,7 @@ def calculate_mxwll_suite(df, int_sens=3, ext_sens=25, show_last=10):
     for i in range(n):
         if big_upper[i] != 0.0:
             upside = 1
-            x1_idx = i - ext_sens
+            x1_idx = i
             upaxis = big_upper[i]
             upaxis2_idx = x1_idx
             
@@ -608,7 +608,7 @@ def calculate_mxwll_suite(df, int_sens=3, ext_sens=25, show_last=10):
                 
         if big_lower[i] != 0.0:
             downside = 1
-            x1_idx = i - ext_sens
+            x1_idx = i
             dnaxis = big_lower[i]
             dnaxis2_idx = x1_idx
             
@@ -676,12 +676,12 @@ def calculate_mxwll_suite(df, int_sens=3, ext_sens=25, show_last=10):
         if small_upper[i] != 0.0:
             upside_small = 1
             upaxis_small = small_upper[i]
-            upaxis2_small_idx = i - int_sens
+            upaxis2_small_idx = i
             
         if small_lower[i] != 0.0:
             downside_small = 1
             dnaxis_small = small_lower[i]
-            dnaxis_small2_idx = i - int_sens
+            dnaxis_small2_idx = i
             
         if i > 0 and upaxis_small > 0.0 and upside_small != 0:
             if closes[i-1] <= upaxis_small and closes[i] > upaxis_small:
@@ -786,11 +786,68 @@ def calculate_mxwll_suite(df, int_sens=3, ext_sens=25, show_last=10):
         
         fib_levels["anchor_end_time"] = times[max(last_high_idx, last_low_idx)]
         
+    # 6. Tag swing pivots as HH, LH, HL, LL
+    pivots_tags = []
+    last_high = None
+    last_low = None
+    for i in range(n):
+        if big_upper[i] != 0.0:
+            val = float(big_upper[i])
+            tag = "HH" if (last_high is None or val > last_high) else "LH"
+            last_high = val
+            pivots_tags.append({
+                "time": times[i],
+                "type": tag,
+                "price": val,
+                "direction": "high"
+            })
+        if big_lower[i] != 0.0:
+            val = float(big_lower[i])
+            tag = "HL" if (last_low is None or val > last_low) else "LL"
+            last_low = val
+            pivots_tags.append({
+                "time": times[i],
+                "type": tag,
+                "price": val,
+                "direction": "low"
+            })
+
+    # 7. Extract diagonal trendline (connecting last major low LL and last major high HH)
+    trendline = {}
+    last_ll = None
+    last_hh = None
+    for p in reversed(pivots_tags):
+        if p["type"] == "LL" and last_ll is None:
+            last_ll = p
+        if p["type"] == "HH" and last_hh is None:
+            last_hh = p
+        if last_ll is not None and last_hh is not None:
+            break
+
+    # Fallback if no LL or HH has been encountered yet
+    if last_ll is None or last_hh is None:
+        for p in reversed(pivots_tags):
+            if p["direction"] == "high" and last_hh is None:
+                last_hh = p
+            if p["direction"] == "low" and last_ll is None:
+                last_ll = p
+
+    if last_ll is not None and last_hh is not None:
+        trendline = {
+            "start_time": last_ll["time"],
+            "start_val": last_ll["price"],
+            "end_time": last_hh["time"],
+            "end_val": last_hh["price"],
+            "direction": "bullish" if last_ll["time"] < last_hh["time"] else "bearish"
+        }
+
     return {
         "fib_levels": fib_levels,
         "order_blocks": active_obs,
         "fvg": active_fvgs,
-        "structures": structures
+        "structures": structures,
+        "pivots": pivots_tags,
+        "trendline": trendline
     }
 
 def get_smc_pivots(highs, lows, size):
@@ -1309,5 +1366,234 @@ def calculate_linear_regression_trend_channel(df, period=40, deviations_mult=2.0
         "ready_to_sell": ready_to_sell,
         "latest_channel": latest_channel
     }
+
+
+def calculate_pitchfork_indicators(df, deviation=5.0, depth=34, type_pf='Original'):
+    """
+    Calculates Auto Pitchfork, Fib Retracement, and Zig Zag indicators.
+    Inputs:
+    - df: historical price dataframe
+    - deviation: float multiplier for pivot threshold
+    - depth: lookback depth window
+    - type_pf: string 'Original', 'Schiff', 'Modified Schiff', or 'Inside'
+    """
+    n = len(df)
+    empty_result = {
+        "zigzag": [],
+        "pitchfork": {
+            "median": [],
+            "upper_levels": {},
+            "lower_levels": {}
+        },
+        "fibonacci": {}
+    }
+    if n < depth:
+        return empty_result
+        
+    try:
+        close = df['Close'].values
+        high = df['High'].values
+        low = df['Low'].values
+        times = [t.strftime("%Y-%m-%d") for t in df.index]
+        
+        # 1. Calculate ATR (10) for deviation threshold
+        tr = np.maximum(high - low, np.maximum(np.abs(high - np.roll(close, 1)), np.abs(low - np.roll(close, 1))))
+        tr[0] = high[0] - low[0]
+        atr_10 = np.zeros_like(tr)
+        if len(tr) >= 10:
+            atr_10[9] = np.mean(tr[:10])
+            alpha = 1.0 / 10.0
+            for idx in range(10, len(tr)):
+                atr_10[idx] = alpha * tr[idx] + (1 - alpha) * atr_10[idx-1]
+            for idx in range(9):
+                atr_10[idx] = atr_10[9]
+        else:
+            atr_10[:] = np.mean(tr) if len(tr) > 0 else 0.0
+            
+        # 2. Pivot Highs & Lows finding
+        length = max(1, depth // 2)
+        ph = [None] * n
+        pl = [None] * n
+        
+        for i in range(2 * length, n):
+            p_idx = i - length
+            val_h = high[p_idx]
+            val_l = low[p_idx]
+            
+            # Check pivot high
+            is_ph = True
+            for j in range(i - 2 * length, p_idx):
+                if high[j] > val_h:
+                    is_ph = False
+                    break
+            if is_ph:
+                for j in range(p_idx + 1, i + 1):
+                    if high[j] >= val_h:
+                        is_ph = False
+                        break
+            if is_ph:
+                ph[p_idx] = float(val_h)
+                
+            # Check pivot low
+            is_pl = True
+            for j in range(i - 2 * length, p_idx):
+                if low[j] < val_l:
+                    is_pl = False
+                    break
+            if is_pl:
+                for j in range(p_idx + 1, i + 1):
+                    if low[j] <= val_l:
+                        is_pl = False
+                        break
+            if is_pl:
+                pl[p_idx] = float(val_l)
+                
+        # 3. Zig Zag bar-by-bar discovery simulation
+        confirmed_pivots = []
+        is_high_last = None
+        p_last = None
+        
+        for i in range(2 * length, n):
+            p_idx = i - length
+            
+            is_h_candidate = (ph[p_idx] is not None)
+            is_l_candidate = (pl[p_idx] is not None)
+            
+            candidates = []
+            if is_h_candidate:
+                candidates.append((ph[p_idx], True))
+            if is_l_candidate:
+                candidates.append((pl[p_idx], False))
+                
+            for price, is_high in candidates:
+                if len(confirmed_pivots) == 0:
+                    confirmed_pivots.append({"index": p_idx, "price": price, "is_high": is_high})
+                    is_high_last = is_high
+                    p_last = price
+                else:
+                    if is_high_last == is_high:
+                        # Update same direction if it extends further
+                        if (is_high and price > p_last) or (not is_high and price < p_last):
+                            confirmed_pivots[-1] = {"index": p_idx, "price": price, "is_high": is_high}
+                            p_last = price
+                    else:
+                        # Opposite direction: check deviation threshold
+                        dev = 100.0 * (price - p_last) / price if price != 0 else 0.0
+                        dev_thresh = (atr_10[i] / close[i]) * 100.0 * deviation if close[i] != 0 else 0.0
+                        if abs(dev) > dev_thresh:
+                            confirmed_pivots.append({"index": p_idx, "price": price, "is_high": is_high})
+                            is_high_last = is_high
+                            p_last = price
+                            
+        # Map zigzag to output format
+        zigzag_out = [{"time": times[p["index"]], "value": round(float(p["price"]), 2)} for p in confirmed_pivots]
+        
+        if len(confirmed_pivots) < 3:
+            return {
+                "zigzag": zigzag_out,
+                "pitchfork": {
+                    "type": type_pf,
+                    "p1": None,
+                    "p2": None,
+                    "p3": None,
+                    "median": [],
+                    "upper_levels": {},
+                    "lower_levels": {}
+                },
+                "fibonacci": {}
+            }
+            
+        # 4. Calculate Pitchfork points from last 3 confirmed pivots (A, B, C)
+        A = confirmed_pivots[-3]
+        B = confirmed_pivots[-2]
+        C = confirmed_pivots[-1]
+        
+        i_A, p_A = A["index"], A["price"]
+        i_B, p_B = B["index"], B["price"]
+        i_C, p_C = C["index"], C["price"]
+        
+        if type_pf == 'Original':
+            iStart = i_A
+            pStart = p_A
+            iEnd = (i_B + i_C) / 2.0
+            pEnd = (p_B + p_C) / 2.0
+        elif type_pf == 'Schiff':
+            iStart = i_A
+            pStart = (p_B + p_A) / 2.0
+            iEnd = (i_B + i_C) / 2.0
+            pEnd = (p_B + p_C) / 2.0
+        elif type_pf == 'Modified Schiff':
+            iStart = (i_B + i_A) / 2.0
+            pStart = (p_B + p_A) / 2.0
+            iEnd = (i_B + i_C) / 2.0
+            pEnd = (p_B + p_C) / 2.0
+        elif type_pf == 'Inside':
+            iStart = (i_B + i_C) / 2.0
+            pStart = (p_B + p_C) / 2.0
+            slopeInside = (p_C - (p_B + p_A)/2.0) / (i_C - (i_B + i_A)/2.0) if (i_C - (i_B + i_A)/2.0) != 0 else 0.0
+            pPvtDiff = abs(p_B - p_C) / 2.0
+            iPvtDiff = abs(i_B - i_C) / 2.0
+            interceptX = p_C + (1.0 if p_B > p_C else -1.0) * pPvtDiff - slopeInside * (i_C - iPvtDiff)
+            iEnd = i_C
+            pEnd = slopeInside * iEnd + interceptX
+        else:
+            iStart = i_A
+            pStart = p_A
+            iEnd = (i_B + i_C) / 2.0
+            pEnd = (p_B + p_C) / 2.0
+            
+        slope = (pEnd - pStart) / (iEnd - iStart) if (iEnd - iStart) != 0 else 0.0
+        
+        # Calculate offset
+        y_m_B = slope * (i_B - iStart) + pStart
+        offset = abs(p_B - y_m_B)
+        
+        # Generate Pitchfork series
+        median_series = []
+        upper_levels = {}
+        lower_levels = {}
+        
+        levels = [0.25, 0.382, 0.5, 0.618, 0.75, 1.0, 1.5, 1.75, 2.0]
+        for L in levels:
+            upper_levels[str(L)] = []
+            lower_levels[str(L)] = []
+            
+        # Draw from iStart to the end of the data series
+        start_idx = int(max(0, min(iStart, n - 1)))
+        for x in range(start_idx, n):
+            t = times[x]
+            med_val = slope * (x - iStart) + pStart
+            median_series.append({"time": t, "value": round(float(med_val), 2)})
+            for L in levels:
+                upper_levels[str(L)].append({"time": t, "value": round(float(med_val + L * offset), 2)})
+                lower_levels[str(L)].append({"time": t, "value": round(float(med_val - L * offset), 2)})
+                
+        # 5. Fibonacci Levels on the last leg (between B and C)
+        fib_levels_val = {}
+        # Retracements & Extensions levels
+        for L in [0.0, 0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618, 2.0, 2.618]:
+            price = p_C - L * (p_C - p_B)
+            fib_levels_val[str(L)] = round(float(price), 2)
+            
+        p1 = {"time": times[A["index"]], "value": round(float(A["price"]), 2)}
+        p2 = {"time": times[B["index"]], "value": round(float(B["price"]), 2)}
+        p3 = {"time": times[C["index"]], "value": round(float(C["price"]), 2)}
+
+        return {
+            "zigzag": zigzag_out,
+            "pitchfork": {
+                "type": type_pf,
+                "p1": p1,
+                "p2": p2,
+                "p3": p3,
+                "median": median_series,
+                "upper_levels": upper_levels,
+                "lower_levels": lower_levels
+            },
+            "fibonacci": fib_levels_val
+        }
+    except Exception as e:
+        print(f"Error calculating pitchfork indicators: {e}")
+        return empty_result
 
 

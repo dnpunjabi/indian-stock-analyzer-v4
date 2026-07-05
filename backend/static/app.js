@@ -34,6 +34,7 @@
         if (activeTarget === 'analyzer') micBtnId = 'analyzer-voice-search-btn';
         else if (activeTarget === 'rotation') micBtnId = 'sector-ai-voice-btn';
         else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
+        else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🔴';
@@ -47,6 +48,7 @@
         if (activeTarget === 'analyzer') micBtnId = 'analyzer-voice-search-btn';
         else if (activeTarget === 'rotation') micBtnId = 'sector-ai-voice-btn';
         else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
+        else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -60,6 +62,7 @@
         if (activeTarget === 'analyzer') micBtnId = 'analyzer-voice-search-btn';
         else if (activeTarget === 'rotation') micBtnId = 'sector-ai-voice-btn';
         else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
+        else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -87,6 +90,11 @@
             }
         } else if (activeTarget === 'academy') {
             const input = document.getElementById('academy-ai-input');
+            if (input) {
+                input.value = (input.value ? input.value + ' ' : '') + transcript;
+            }
+        } else if (activeTarget === 'fs_chat') {
+            const input = document.getElementById('fs-chat-input');
             if (input) {
                 input.value = (input.value ? input.value + ' ' : '') + transcript;
             }
@@ -3344,8 +3352,33 @@ window.SpeechPlayer = {
         }
 
         text = text.trim();
-        // Clean markdown indicators
-        text = text.replace(/[*#`_\-]/g, '');
+        // Clean markdown indicators (but preserve hyphens for ranges and words)
+        text = text.replace(/[*#`_]/g, '');
+        // Remove markdown list bullets (hyphens or asterisks followed by space at start of line)
+        text = text.replace(/^\s*[-*]\s+/gm, '');
+
+        // Standardize currency for TTS
+        text = text.replace(/₹\s*(\d+)/g, ' Rupees $1');
+        text = text.replace(/Rs\.?\s*(\d+)/g, ' Rupees $1');
+        text = text.replace(/(\d+)\s*₹/g, '$1 Rupees');
+        text = text.replace(/(\d+)\s*Rs\.?/g, '$1 Rupees');
+        text = text.replace(/₹/g, ' Rupees');
+
+        // Expand Cr./Cr (Crores) and Lakhs
+        text = text.replace(/([\d,]+(?:\.\d+)?)\s*cr\b\.?/gi, '$1 Crores');
+        text = text.replace(/\bcr\b\.?/gi, 'Crores');
+        text = text.replace(/([\d,]+(?:\.\d+)?)\s*lakhs?\b\.?/gi, '$1 Lakhs');
+
+        // Replace number ranges like 10-15 with '10 to 15' preserving dates
+        const dates = [];
+        text = text.replace(/\b(\d{1,4})[-/](\d{1,2})[-/](\d{1,4})\b/g, (match) => {
+            dates.push(match);
+            return `__DATE_PLACEHOLDER_${dates.length - 1}__`;
+        });
+        text = text.replace(/(\b\d+)\s*-\s*(\d+\b)/g, '$1 to $2');
+        text = text.replace(/__DATE_PLACEHOLDER_(\d+)__/g, (match, idx) => {
+            return dates[parseInt(idx)].replace(/[-/]/g, ' ');
+        });
 
         if (!text || text === "..." || text.includes("Generating") || text.includes("Analyzing") || text.includes("Select a topic") || text.includes("Run analysis to compile") || text.includes("Diagnostic text loaded here") || text.includes("Click \"Generate Report\"") || text.includes("Click 'Generate Report'") || text.includes("AI Prescription text loaded here")) {
             if (typeof showToast === 'function') {
@@ -12147,6 +12180,36 @@ function toggleSpeechForMessage(text, button) {
         button.setAttribute('data-original-text', button.innerHTML);
     }
 
+    // Clean text: strip html, basic markdown symbols, and action payloads
+    let cleanText = text
+        .replace(/<\/?[?^>]+(>|$)/g, "") // strip html tags
+        .replace(/\*\*|###|\*|\|/g, "")  // strip basic markdown symbols
+        .replace(/\[ACTIONS_PAYLOAD\].*$/g, "") // strip action payloads
+        .trim();
+
+    // Standardize currency for TTS
+    cleanText = cleanText.replace(/₹\s*(\d+)/g, ' Rupees $1');
+    cleanText = cleanText.replace(/Rs\.?\s*(\d+)/g, ' Rupees $1');
+    cleanText = cleanText.replace(/(\d+)\s*₹/g, '$1 Rupees');
+    cleanText = cleanText.replace(/(\d+)\s*Rs\.?/g, '$1 Rupees');
+    cleanText = cleanText.replace(/₹/g, ' Rupees');
+
+    // Expand Cr./Cr (Crores) and Lakhs
+    cleanText = cleanText.replace(/([\d,]+(?:\.\d+)?)\s*cr\b\.?/gi, '$1 Crores');
+    cleanText = cleanText.replace(/\bcr\b\.?/gi, 'Crores');
+    cleanText = cleanText.replace(/([\d,]+(?:\.\d+)?)\s*lakhs?\b\.?/gi, '$1 Lakhs');
+
+    // Replace number ranges like 10-15 with '10 to 15' preserving dates
+    const dates = [];
+    cleanText = cleanText.replace(/\b(\d{1,4})[-/](\d{1,2})[-/](\d{1,4})\b/g, (match) => {
+        dates.push(match);
+        return `__DATE_PLACEHOLDER_${dates.length - 1}__`;
+    });
+    cleanText = cleanText.replace(/(\b\d+)\s*-\s*(\d+\b)/g, '$1 to $2');
+    cleanText = cleanText.replace(/__DATE_PLACEHOLDER_(\d+)__/g, (match, idx) => {
+        return dates[parseInt(idx)].replace(/[-/]/g, ' ');
+    });
+
     if (isAndroidTts) {
         if (window.AndroidSpeechSpeaking && window.currentAdvisorSpeechButton === button) {
             window.AndroidTts.stop();
@@ -12160,12 +12223,6 @@ function toggleSpeechForMessage(text, button) {
         
         window.speechSynthesis.cancel();
         window.AndroidTts.stop();
-        
-        const cleanText = text
-            .replace(/<\/?[^>]+(>|$)/g, "") // strip html tags
-            .replace(/\*\*|###|\*|\|/g, "")  // strip basic markdown symbols
-            .replace(/\[ACTIONS_PAYLOAD\].*$/g, "") // strip action payloads
-            .trim();
             
         window.AndroidSpeechSpeaking = true;
         window.currentAdvisorSpeechButton = button;
@@ -12187,12 +12244,6 @@ function toggleSpeechForMessage(text, button) {
     }
 
     window.speechSynthesis.cancel();
-
-    const cleanText = text
-        .replace(/<\/?[^>]+(>|$)/g, "") // strip html tags
-        .replace(/\*\*|###|\*|\|/g, "")  // strip basic markdown symbols
-        .replace(/\[ACTIONS_PAYLOAD\].*$/g, "") // strip action payloads
-        .trim();
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'en-US';
@@ -22382,6 +22433,11 @@ let activeTVLrtcMiddleSeries = null;
 let activeTVLrtcLatestUpperSeries = null;
 let activeTVLrtcLatestMiddleSeries = null;
 let activeTVLrtcLatestLowerSeries = null;
+let activeTVPitchforkMedianSeries = null;
+let activeTVPitchforkUpperSeries = null;
+let activeTVPitchforkLowerSeries = null;
+let activeTVPitchforkZigzagSeries = null;
+let activeTVPitchforkFibSeriesList = [];
 
 function setupSwingWorkspace() {
     // Horizon Switch Syncing & Binding
@@ -26371,6 +26427,7 @@ async function renderTVWorkstationChart(symbol) {
     const showMxwll = document.getElementById('tv-indicator-mxwll')?.checked ?? false;
     const showLuxSMC = document.getElementById('tv-indicator-lux-smc')?.checked ?? false;
     const showLRTC = document.getElementById('tv-indicator-lrtc')?.checked ?? false;
+    const showPitchfork = document.getElementById('tv-indicator-pitchfork')?.checked ?? false;
 
     // Sync tv-active-indicator value for backwards compatibility
     const activeIndInput = document.getElementById('tv-active-indicator');
@@ -26380,8 +26437,13 @@ async function renderTVWorkstationChart(symbol) {
         if (showMxwll) activeList.push('mxwll');
         if (showLuxSMC) activeList.push('lux-smc');
         if (showLRTC) activeList.push('lrtc');
+        if (showPitchfork) activeList.push('pitchfork');
         activeIndInput.value = activeList.length > 0 ? activeList.join(',') : 'none';
     }
+
+    const pitchforkType = document.getElementById('tv-pitchfork-type')?.value || 'Original';
+    const pitchforkShowZigzag = document.getElementById('tv-pitchfork-show-zigzag')?.checked ?? true;
+    const pitchforkShowFibs = document.getElementById('tv-pitchfork-show-fibs')?.checked ?? true;
 
     const length = parseInt(document.getElementById('tv-length')?.value || '14', 10);
     const mult = parseFloat(document.getElementById('tv-mult')?.value || '1.0');
@@ -26394,6 +26456,7 @@ async function renderTVWorkstationChart(symbol) {
     const showOBs = document.getElementById('tv-show-obs')?.checked ?? true;
     const showFVGs = document.getElementById('tv-show-fvgs')?.checked ?? true;
     const showStructs = document.getElementById('tv-show-structs')?.checked ?? true;
+    const showInternalStructs = document.getElementById('tv-show-internal-structs')?.checked ?? true;
 
     // LuxAlgo SMC Controls
     const showSMCSwing = document.getElementById('tv-smc-swing')?.checked ?? true;
@@ -26433,9 +26496,10 @@ async function renderTVWorkstationChart(symbol) {
     const luxSMCCtrls = document.querySelectorAll('.lux-smc-control-element');
     const lrtcCtrls = document.querySelectorAll('.lrtc-control-element');
     const lrtcLegends = document.querySelectorAll('.lrtc-legend');
+    const pitchforkCtrls = document.querySelectorAll('.pitchfork-control-element');
 
     // Manage Length select disabled state
-    if (showLuxAlgo || showMxwll || showLuxSMC || showLRTC || showEmaCustom) {
+    if (showLuxAlgo || showMxwll || showLuxSMC || showLRTC || showPitchfork || showEmaCustom) {
         if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = false;
     } else {
         if (document.getElementById('tv-length')) document.getElementById('tv-length').disabled = true;
@@ -26453,12 +26517,34 @@ async function renderTVWorkstationChart(symbol) {
     luxAlgoCtrls.forEach(el => el.style.display = showLuxAlgo ? 'flex' : 'none');
     mxwllCtrls.forEach(el => el.style.display = showMxwll ? 'flex' : 'none');
     luxSMCCtrls.forEach(el => el.style.display = showLuxSMC ? 'flex' : 'none');
+    // Toggle sub-cards within the HUD panel and the panel itself
+    const hasAnyActiveHUD = showLuxSMC || showLuxAlgo || showMxwll || showLRTC || showPitchfork;
+    if (document.getElementById('tv-chart-smc-hud-panel')) {
+        document.getElementById('tv-chart-smc-hud-panel').style.display = hasAnyActiveHUD ? 'flex' : 'none';
+    }
+    const setSubcardDisplay = (id, show) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = show ? 'flex' : 'none';
+    };
+    setSubcardDisplay('hud-card-smc-bias', showLuxSMC);
+    setSubcardDisplay('hud-card-smc-supply', showLuxSMC);
+    setSubcardDisplay('hud-card-smc-demand', showLuxSMC);
+    setSubcardDisplay('hud-card-smc-pd', showLuxSMC);
+    setSubcardDisplay('hud-card-breaks-levels', showLuxAlgo);
+    setSubcardDisplay('hud-card-breaks-signal', showLuxAlgo);
+    setSubcardDisplay('hud-card-mxwll-golden', showMxwll);
+    setSubcardDisplay('hud-card-mxwll-fib-pos', showMxwll);
+    setSubcardDisplay('hud-card-lrtc-slope', showLRTC);
+    setSubcardDisplay('hud-card-lrtc-signal', showLRTC);
+    setSubcardDisplay('hud-card-pf-bias', showPitchfork);
+    setSubcardDisplay('hud-card-pf-anchors', showPitchfork);
     lrtcCtrls.forEach(el => el.style.display = showLRTC ? 'flex' : 'none');
     lrtcLegends.forEach(el => el.style.display = showLRTC ? 'flex' : 'none');
+    pitchforkCtrls.forEach(el => el.style.display = showPitchfork ? 'flex' : 'none');
 
     try {
         // Fetch data (ext_sens corresponds to the Length parameter selected)
-        const res = await fetch(`/api/chart/tv-chart-data?ticker=${encodeURIComponent(symbol)}&length=${length}&mult=${mult}&ext_sens=${length}&int_sens=5`);
+        const res = await fetch(`/api/chart/tv-chart-data?ticker=${encodeURIComponent(symbol)}&length=${length}&mult=${mult}&ext_sens=${length}&int_sens=5&pitchfork_type=${encodeURIComponent(pitchforkType)}&pitchfork_dev=5.0&pitchfork_depth=34`);
         if (!res.ok) throw new Error("Failed to fetch interactive chart indicators.");
         const data = await res.json();
 
@@ -26548,8 +26634,8 @@ async function renderTVWorkstationChart(symbol) {
         // EMA 20
         if (showEma20) {
             const ema20Series = chart.addLineSeries({
-                color: '#3b82f6',
-                lineWidth: 1.5,
+                color: '#2962FF',
+                lineWidth: 1,
                 title: 'EMA 20',
                 axisLabelVisible: false,
                 priceLineVisible: false
@@ -26566,8 +26652,8 @@ async function renderTVWorkstationChart(symbol) {
         // EMA 50
         if (showEma50) {
             const ema50Series = chart.addLineSeries({
-                color: '#f59e0b',
-                lineWidth: 1.5,
+                color: '#FF6D00',
+                lineWidth: 1,
                 title: 'EMA 50',
                 axisLabelVisible: false,
                 priceLineVisible: false
@@ -26584,8 +26670,8 @@ async function renderTVWorkstationChart(symbol) {
         // EMA 100
         if (showEma100) {
             const ema100Series = chart.addLineSeries({
-                color: '#10b981',
-                lineWidth: 1.5,
+                color: '#4CAF50',
+                lineWidth: 1,
                 title: 'EMA 100',
                 axisLabelVisible: false,
                 priceLineVisible: false
@@ -26602,8 +26688,8 @@ async function renderTVWorkstationChart(symbol) {
         // EMA 200
         if (showEma200) {
             const ema200Series = chart.addLineSeries({
-                color: '#ef4444',
-                lineWidth: 1.5,
+                color: '#F44336',
+                lineWidth: 1,
                 title: 'EMA 200',
                 axisLabelVisible: false,
                 priceLineVisible: false
@@ -26620,8 +26706,8 @@ async function renderTVWorkstationChart(symbol) {
         // EMA Custom
         if (showEmaCustom) {
             const emaCustomSeries = chart.addLineSeries({
-                color: '#a855f7',
-                lineWidth: 1.5,
+                color: '#E040FB',
+                lineWidth: 1,
                 title: `EMA ${length}`,
                 axisLabelVisible: false,
                 priceLineVisible: false
@@ -26639,14 +26725,42 @@ async function renderTVWorkstationChart(symbol) {
 
         // 1. LuxAlgo Trendlines & Breakouts
         if (showLuxAlgo) {
+            // Update Breaks Status HUD
+            const lastCandle = data.candlesticks && data.candlesticks.length > 0 ? data.candlesticks[data.candlesticks.length - 1] : null;
+            const currentPrice = lastCandle ? lastCandle.close : null;
+            
+            let levelsText = "N/A";
+            const latestSupportCandle = [...data.candlesticks].reverse().find(c => c.support !== null && c.support !== undefined);
+            const latestResistanceCandle = [...data.candlesticks].reverse().find(c => c.resistance !== null && c.resistance !== undefined);
+            if (latestSupportCandle && latestResistanceCandle && currentPrice) {
+                const supVal = latestSupportCandle.support;
+                const resVal = latestResistanceCandle.resistance;
+                const supPct = ((currentPrice - supVal) / currentPrice) * 100;
+                const resPct = ((resVal - currentPrice) / currentPrice) * 100;
+                levelsText = `Res: ₹${resVal.toFixed(2)} (+${resPct.toFixed(1)}%)<br/>Sup: ₹${supVal.toFixed(2)} (-${supPct.toFixed(1)}%)`;
+            }
+            if (document.getElementById('breaks-hud-levels')) {
+                document.getElementById('breaks-hud-levels').innerHTML = levelsText;
+            }
+
+            let signalText = "None";
+            const latestBreakCandle = [...data.candlesticks].reverse().find(c => c.bullish_break || c.bearish_break);
+            if (latestBreakCandle) {
+                const breakDirection = latestBreakCandle.bullish_break ? 'Bullish Breakout 🟢' : 'Bearish Breakout 🔴';
+                signalText = `${breakDirection} (${latestBreakCandle.time})`;
+            }
+            if (document.getElementById('breaks-hud-signal')) {
+                document.getElementById('breaks-hud-signal').innerText = signalText;
+            }
+
             if (showLines) {
                 // Resistance Line
                 const resSeries = chart.addLineSeries({
-                    color: '#ef4444',
-                    lineWidth: 1.5,
+                    color: 'rgba(239, 68, 68, 0.65)',
+                    lineWidth: 1.2,
                     lineStyle: LightweightCharts.LineStyle.Dashed,
                     title: 'Resistance',
-                    axisLabelVisible: false,
+                    axisLabelVisible: true,
                     priceLineVisible: false
                 });
                 const resData = data.candlesticks
@@ -26657,11 +26771,11 @@ async function renderTVWorkstationChart(symbol) {
 
                 // Support Line
                 const supSeries = chart.addLineSeries({
-                    color: '#10b981',
-                    lineWidth: 1.5,
+                    color: 'rgba(76, 175, 80, 0.65)',
+                    lineWidth: 1.2,
                     lineStyle: LightweightCharts.LineStyle.Dashed,
                     title: 'Support',
-                    axisLabelVisible: false,
+                    axisLabelVisible: true,
                     priceLineVisible: false
                 });
                 const supData = data.candlesticks
@@ -26700,6 +26814,39 @@ async function renderTVWorkstationChart(symbol) {
         if (showMxwll && data.mxwll) {
             const mxwll = data.mxwll;
 
+            // Update Maxwell HUD
+            const lastCandle = data.candlesticks && data.candlesticks.length > 0 ? data.candlesticks[data.candlesticks.length - 1] : null;
+            const currentPrice = lastCandle ? lastCandle.close : null;
+            
+            if (mxwll.fib_levels && currentPrice) {
+                const fibs = mxwll.fib_levels;
+                const f0 = fibs["0.0"];
+                const f1 = fibs["1.0"];
+                const f05 = fibs["0.5"];
+                const f0618 = fibs["0.618"];
+                
+                if (f05 !== undefined && f0618 !== undefined) {
+                    const minZone = Math.min(f05, f0618);
+                    const maxZone = Math.max(f05, f0618);
+                    const isInside = currentPrice >= minZone && currentPrice <= maxZone;
+                    const zoneText = isInside ? `Inside Golden Zone 🟢 (₹${minZone.toFixed(2)} - ₹${maxZone.toFixed(2)})` : `Outside Golden Zone ⚪ (₹${minZone.toFixed(2)} - ₹${maxZone.toFixed(2)})`;
+                    if (document.getElementById('mxwll-hud-golden')) {
+                        document.getElementById('mxwll-hud-golden').innerText = zoneText;
+                    }
+                }
+                
+                if (f0 !== undefined && f1 !== undefined) {
+                    const lowVal = Math.min(f0, f1);
+                    const highVal = Math.max(f0, f1);
+                    const diff = highVal - lowVal;
+                    const pct = diff > 0 ? ((currentPrice - lowVal) / diff) * 100 : 0;
+                    const fibPosText = `₹${currentPrice.toFixed(2)} (${pct.toFixed(1)}% of Range)`;
+                    if (document.getElementById('mxwll-hud-fib-pos')) {
+                        document.getElementById('mxwll-hud-fib-pos').innerText = fibPosText;
+                    }
+                }
+            }
+
             // Fibonacci Levels
             if (showFibs && mxwll.fib_levels) {
                 const fibs = mxwll.fib_levels;
@@ -26714,13 +26861,15 @@ async function renderTVWorkstationChart(symbol) {
                 };
                 for (const lvl in fibColors) {
                     if (fibs[lvl] !== undefined && fibs[lvl] !== null) {
+                        const isAoi = lvl === "0.5" || lvl === "0.618";
+                        const labelTitle = isAoi ? `Area of Interest (Fib ${lvl}) (Rs. ${fibs[lvl]})` : `Fib ${lvl} (Rs. ${fibs[lvl]})`;
                         candleSeries.createPriceLine({
                             price: fibs[lvl],
                             color: fibColors[lvl],
                             lineWidth: 1.5,
                             lineStyle: LightweightCharts.LineStyle.Dashed,
                             axisLabelVisible: true,
-                            title: `Fib ${lvl} (Rs. ${fibs[lvl]})`
+                            title: labelTitle
                         });
                     }
                 }
@@ -26729,17 +26878,19 @@ async function renderTVWorkstationChart(symbol) {
             // Order Blocks (Supply/Demand Zones)
             if (showOBs && mxwll.order_blocks) {
                 mxwll.order_blocks.forEach(ob => {
-                    const color = ob.type === 'supply' ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)';
+                    const color = ob.type === 'supply' ? 'rgba(239, 68, 68, 0.35)' : 'rgba(76, 175, 80, 0.35)';
+                    const labelTitle = ob.type === 'supply' ? 'Area of Interest (Supply OB)' : 'Area of Interest (Demand OB)';
                     const obTopSeries = chart.addLineSeries({
                         color: color,
-                        lineWidth: 1.5,
+                        lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dotted,
                         axisLabelVisible: false,
-                        priceLineVisible: false
+                        priceLineVisible: false,
+                        title: labelTitle
                     });
                     const obBottomSeries = chart.addLineSeries({
                         color: color,
-                        lineWidth: 1.5,
+                        lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dotted,
                         axisLabelVisible: false,
                         priceLineVisible: false
@@ -26804,30 +26955,164 @@ async function renderTVWorkstationChart(symbol) {
                 });
             }
 
-            // BOS/CHoCH Structures Markers
-            if (showStructs && mxwll.structures) {
+            // BOS/CHoCH Structures Markers & Horizontal Lines
+            if ((showStructs || showInternalStructs) && mxwll.structures) {
                 mxwll.structures.forEach(s => {
+                    const isInternal = s.type.startsWith('I-');
+                    if (isInternal && !showInternalStructs) return;
+                    if (!isInternal && !showStructs) return;
+                    
                     const candleExists = data.candlesticks.some(c => c.time === s.time);
                     if (candleExists) {
                         const color = s.direction === 'bullish' ? '#10b981' : '#ef4444';
                         const position = s.direction === 'bullish' ? 'aboveBar' : 'belowBar';
                         const shape = s.direction === 'bullish' ? 'arrowUp' : 'arrowDown';
+                        
+                        // Draw breakout vertical arrow marker
                         mergedMarkers.push({
                             time: s.time,
                             position: position,
                             color: color,
                             shape: shape,
                             text: s.type,
-                            size: 1.2
+                            size: isInternal ? 1.0 : 1.2
+                        });
+
+                        // Draw horizontal breakout segment line from pivot to breakout
+                        const structLineSeries = chart.addLineSeries({
+                            color: s.direction === 'bullish' 
+                                ? (isInternal ? 'rgba(76, 175, 80, 0.45)' : 'rgba(76, 175, 80, 0.75)') 
+                                : (isInternal ? 'rgba(244, 67, 54, 0.45)' : 'rgba(244, 67, 54, 0.75)'),
+                            lineWidth: isInternal ? 1.0 : 1.2,
+                            lineStyle: isInternal ? LightweightCharts.LineStyle.Dotted : LightweightCharts.LineStyle.Dashed,
+                            title: s.type,
+                            axisLabelVisible: false,
+                            priceLineVisible: false
+                        });
+                        structLineSeries.setData([
+                            { time: s.pivot_time, value: s.price },
+                            { time: s.time, value: s.price }
+                        ]);
+                    }
+                });
+            }
+
+            // Tag Swing Pivots: HH, LH, HL, LL
+            if (showStructs && mxwll.pivots) {
+                mxwll.pivots.forEach(p => {
+                    const candleExists = data.candlesticks.some(c => c.time === p.time);
+                    if (candleExists) {
+                        const isHigh = p.direction === 'high';
+                        mergedMarkers.push({
+                            time: p.time,
+                            position: isHigh ? 'aboveBar' : 'belowBar',
+                            color: isHigh ? '#10b981' : '#ef4444',
+                            shape: isHigh ? 'arrowUp' : 'arrowDown',
+                            text: p.type,
+                            size: 1.0
                         });
                     }
                 });
+            }
+
+            // Draw Dynamic Major Trendline
+            if (showStructs && mxwll.trendline && mxwll.trendline.start_time) {
+                const tl = mxwll.trendline;
+                const trendlineSeries = chart.addLineSeries({
+                    color: tl.direction === 'bullish' ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)',
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'Major Trendline',
+                    axisLabelVisible: false,
+                    priceLineVisible: false
+                });
+                const tlPoints = [
+                    { time: tl.start_time, value: tl.start_val },
+                    { time: tl.end_time, value: tl.end_val }
+                ].sort((a, b) => (a.time > b.time ? 1 : -1));
+                trendlineSeries.setData(tlPoints);
             }
         }
 
         // 3. LuxAlgo SMC Concepts Rendering
         if (showLuxSMC && data.lux_smc) {
             const smc = data.lux_smc;
+
+            // Update SMC Status HUD
+            const lastCandle = data.candlesticks && data.candlesticks.length > 0
+                ? data.candlesticks[data.candlesticks.length - 1]
+                : null;
+            const currentPrice = lastCandle ? lastCandle.close : null;
+
+            // 1. Bias
+            let biasText = "Neutral ⚪";
+            if (smc.structures && smc.structures.length > 0) {
+                const latestStruct = smc.structures[smc.structures.length - 1];
+                const directionText = latestStruct.direction === 'bullish' ? 'Bullish 🟢' : 'Bearish 🔴';
+                biasText = `${latestStruct.type} (${directionText})`;
+            }
+            if (document.getElementById('smc-hud-bias')) {
+                document.getElementById('smc-hud-bias').innerText = biasText;
+            }
+
+            // 2. Active Supply Zone
+            let supplyText = "None";
+            let nearestActiveSupply = null;
+            if (smc.order_blocks && smc.order_blocks.length > 0) {
+                const supplyObs = smc.order_blocks.filter(ob => ob.type === 'supply');
+                if (supplyObs.length > 0) {
+                    let targetSupply = currentPrice 
+                        ? supplyObs.filter(ob => ob.bottom >= currentPrice).sort((a, b) => a.bottom - b.bottom)[0]
+                        : null;
+                    if (!targetSupply) {
+                        targetSupply = supplyObs[supplyObs.length - 1];
+                    }
+                    nearestActiveSupply = targetSupply;
+                    supplyText = `₹${targetSupply.bottom.toFixed(2)} - ₹${targetSupply.top.toFixed(2)} ${targetSupply.class === 'swing' ? '(Swing)' : '(Int)'}`;
+                }
+            }
+            if (document.getElementById('smc-hud-supply')) {
+                document.getElementById('smc-hud-supply').innerText = supplyText;
+            }
+
+            // 3. Active Demand Zone
+            let demandText = "None";
+            let nearestActiveDemand = null;
+            if (smc.order_blocks && smc.order_blocks.length > 0) {
+                const demandObs = smc.order_blocks.filter(ob => ob.type === 'demand');
+                if (demandObs.length > 0) {
+                    let targetDemand = currentPrice 
+                        ? demandObs.filter(ob => ob.top <= currentPrice).sort((a, b) => b.top - a.top)[0]
+                        : null;
+                    if (!targetDemand) {
+                        targetDemand = demandObs[demandObs.length - 1];
+                    }
+                    nearestActiveDemand = targetDemand;
+                    demandText = `₹${targetDemand.bottom.toFixed(2)} - ₹${targetDemand.top.toFixed(2)} ${targetDemand.class === 'swing' ? '(Swing)' : '(Int)'}`;
+                }
+            }
+            if (document.getElementById('smc-hud-demand')) {
+                document.getElementById('smc-hud-demand').innerText = demandText;
+            }
+
+            // 4. Premium / Discount Status
+            let pdText = "N/A";
+            if (smc.premium_discount && currentPrice) {
+                const pd = smc.premium_discount;
+                const range = pd.top - pd.bottom;
+                const pct = range > 0 ? ((currentPrice - pd.bottom) / range) * 100 : 50;
+                
+                if (currentPrice > pd.equilibrium) {
+                    pdText = `Premium 🔴 (${pct.toFixed(0)}% of range)`;
+                } else if (currentPrice < pd.equilibrium) {
+                    pdText = `Discount 🟢 (${pct.toFixed(0)}% of range)`;
+                } else {
+                    pdText = `Equilibrium ⚪ (50% of range)`;
+                }
+            }
+            if (document.getElementById('smc-hud-pd-status')) {
+                document.getElementById('smc-hud-pd-status').innerText = pdText;
+            }
 
             // Swing & Internal Structures Markers
             if (smc.structures) {
@@ -26856,21 +27141,26 @@ async function renderTVWorkstationChart(symbol) {
                 smc.order_blocks.forEach(ob => {
                     const isSwing = ob.class === 'swing';
                     const color = ob.type === 'supply'
-                        ? (isSwing ? 'rgba(239, 68, 68, 0.45)' : 'rgba(247, 124, 128, 0.35)')
-                        : (isSwing ? 'rgba(16, 185, 129, 0.45)' : 'rgba(49, 121, 245, 0.35)');
+                        ? (isSwing ? 'rgba(239, 68, 68, 0.35)' : 'rgba(247, 124, 128, 0.25)')
+                        : (isSwing ? 'rgba(76, 175, 80, 0.35)' : 'rgba(49, 121, 245, 0.25)');
+
+                    const isNearest = (ob === nearestActiveSupply) || (ob === nearestActiveDemand);
+                    const labelTitle = isNearest ? (ob.type === 'supply' ? 'Supply OB' : 'Demand OB') : '';
 
                     const topSeries = chart.addLineSeries({
                         color: color,
-                        lineWidth: isSwing ? 1.5 : 1,
+                        lineWidth: isSwing ? 1.2 : 0.8,
                         lineStyle: isSwing ? LightweightCharts.LineStyle.Dotted : LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: false,
+                        title: labelTitle,
+                        axisLabelVisible: isNearest,
                         priceLineVisible: false
                     });
                     const bottomSeries = chart.addLineSeries({
                         color: color,
-                        lineWidth: isSwing ? 1.5 : 1,
+                        lineWidth: isSwing ? 1.2 : 0.8,
                         lineStyle: isSwing ? LightweightCharts.LineStyle.Dotted : LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: false,
+                        title: isNearest ? 'OB Bound' : '',
+                        axisLabelVisible: isNearest,
                         priceLineVisible: false
                     });
 
@@ -26896,20 +27186,25 @@ async function renderTVWorkstationChart(symbol) {
 
             // Fair Value Gaps (FVG)
             if (showSMCFVGs && smc.fvg) {
+                const mostRecentFVG = smc.fvg.length > 0 ? smc.fvg[smc.fvg.length - 1] : null;
                 smc.fvg.forEach(g => {
-                    const color = g.type === 'bullish' ? 'rgba(0, 255, 104, 0.25)' : 'rgba(255, 0, 8, 0.25)';
+                    const isMostRecent = (g === mostRecentFVG);
+                    const labelTitle = isMostRecent ? (g.type === 'bullish' ? 'Bull FVG' : 'Bear FVG') : '';
+                    const color = g.type === 'bullish' ? 'rgba(224, 64, 251, 0.25)' : 'rgba(255, 109, 0, 0.25)';
                     const topSeries = chart.addLineSeries({
                         color: color,
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: false,
+                        title: labelTitle,
+                        axisLabelVisible: isMostRecent,
                         priceLineVisible: false
                     });
                     const bottomSeries = chart.addLineSeries({
                         color: color,
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: false,
+                        title: isMostRecent ? 'FVG Bound' : '',
+                        axisLabelVisible: isMostRecent,
                         priceLineVisible: false
                     });
 
@@ -26942,6 +27237,7 @@ async function renderTVWorkstationChart(symbol) {
                             color: color,
                             lineWidth: 1.5,
                             lineStyle: LightweightCharts.LineStyle.Dotted,
+                            title: tag,
                             axisLabelVisible: true,
                             priceLineVisible: false
                         });
@@ -26972,7 +27268,7 @@ async function renderTVWorkstationChart(symbol) {
                     const d = smc.daily_levels[smc.daily_levels.length - 1];
                     candleSeries.createPriceLine({
                         price: d.high,
-                        color: '#3b82f6',
+                        color: '#3b82f6', // Daily Blue
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Solid,
                         title: 'PDH'
@@ -26989,14 +27285,14 @@ async function renderTVWorkstationChart(symbol) {
                     const w = smc.weekly_levels[smc.weekly_levels.length - 1];
                     candleSeries.createPriceLine({
                         price: w.high,
-                        color: '#3b82f6',
+                        color: '#f59e0b', // Weekly Amber
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dashed,
                         title: 'PWH'
                     });
                     candleSeries.createPriceLine({
                         price: w.low,
-                        color: '#3b82f6',
+                        color: '#f59e0b',
                         lineWidth: 1,
                         lineStyle: LightweightCharts.LineStyle.Dashed,
                         title: 'PWL'
@@ -27006,14 +27302,14 @@ async function renderTVWorkstationChart(symbol) {
                     const m = smc.monthly_levels[smc.monthly_levels.length - 1];
                     candleSeries.createPriceLine({
                         price: m.high,
-                        color: '#3b82f6',
+                        color: '#8b5cf6', // Monthly Purple
                         lineWidth: 1.5,
                         lineStyle: LightweightCharts.LineStyle.Dotted,
                         title: 'PMH'
                     });
                     candleSeries.createPriceLine({
                         price: m.low,
-                        color: '#3b82f6',
+                        color: '#8b5cf6',
                         lineWidth: 1.5,
                         lineStyle: LightweightCharts.LineStyle.Dotted,
                         title: 'PML'
@@ -27050,14 +27346,52 @@ async function renderTVWorkstationChart(symbol) {
 
         // 4. Linear Regression Trend Channel (LRTC) Rendering
         if (showLRTC) {
+            // Update LRTC HUD
+            if (data.lrtc_latest) {
+                const latest = data.lrtc_latest;
+                const lastCandle = data.candlesticks && data.candlesticks.length > 0 ? data.candlesticks[data.candlesticks.length - 1] : null;
+                const currentPrice = lastCandle ? lastCandle.close : null;
+                
+                // 1. Slope
+                const totalChange = latest.median_start > 0 ? ((latest.median_end - latest.median_start) / latest.median_start) * 100 : 0;
+                const slopeDirection = latest.slope > 0 ? 'Ascending ↗️' : 'Descending ↘️';
+                const slopeText = `${slopeDirection} (${totalChange.toFixed(2)}% over window)`;
+                if (document.getElementById('lrtc-hud-slope')) {
+                    document.getElementById('lrtc-hud-slope').innerText = slopeText;
+                }
+                
+                // 2. Signal / Position
+                let signalText = "Neutral ⚪";
+                if (lastCandle && currentPrice) {
+                    if (lastCandle.lrtc_ready_to_buy) {
+                        signalText = "Buy Signal 🟢";
+                    } else if (lastCandle.lrtc_ready_to_sell) {
+                        signalText = "Sell Signal 🔴";
+                    } else {
+                        const range = latest.upper_end - latest.lower_end;
+                        const posPct = range > 0 ? ((currentPrice - latest.lower_end) / range) * 100 : 50;
+                        if (posPct <= 20) {
+                            signalText = `Oversold 🟢 (${posPct.toFixed(0)}% of Channel)`;
+                        } else if (posPct >= 80) {
+                            signalText = `Overbought 🔴 (${posPct.toFixed(0)}% of Channel)`;
+                        } else {
+                            signalText = `Neutral ⚪ (${posPct.toFixed(0)}% of Channel)`;
+                        }
+                    }
+                }
+                if (document.getElementById('lrtc-hud-signal')) {
+                    document.getElementById('lrtc-hud-signal').innerText = signalText;
+                }
+            }
+
             if (showLrtcHistorical) {
-                // Upper Entry Line
+                // Upper Entry Line (Purple solid curve)
                 const lrtcUpperSeries = chart.addLineSeries({
-                    color: 'rgba(239, 68, 68, 0.5)',
-                    lineWidth: 1.5,
-                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    color: '#a855f7',
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
                     title: 'LRTC Upper (Sell)',
-                    axisLabelVisible: false,
+                    axisLabelVisible: true,
                     priceLineVisible: false
                 });
                 const lrtcUpperData = data.candlesticks
@@ -27066,13 +27400,13 @@ async function renderTVWorkstationChart(symbol) {
                 lrtcUpperSeries.setData(lrtcUpperData);
                 activeTVLrtcUpperSeries = lrtcUpperSeries;
 
-                // Lower Entry Line
+                // Lower Entry Line (Green solid curve)
                 const lrtcLowerSeries = chart.addLineSeries({
-                    color: 'rgba(16, 185, 129, 0.5)',
-                    lineWidth: 1.5,
-                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    color: '#10b981',
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
                     title: 'LRTC Lower (Buy)',
-                    axisLabelVisible: false,
+                    axisLabelVisible: true,
                     priceLineVisible: false
                 });
                 const lrtcLowerData = data.candlesticks
@@ -27081,9 +27415,9 @@ async function renderTVWorkstationChart(symbol) {
                 lrtcLowerSeries.setData(lrtcLowerData);
                 activeTVLrtcLowerSeries = lrtcLowerSeries;
 
-                // Median Line
+                // Median Line (Orange dashed line)
                 const lrtcMiddleSeries = chart.addLineSeries({
-                    color: 'rgba(245, 158, 11, 0.4)',
+                    color: 'rgba(245, 158, 11, 0.45)',
                     lineWidth: 1.2,
                     lineStyle: LightweightCharts.LineStyle.Dashed,
                     title: 'LRTC Median',
@@ -27102,8 +27436,8 @@ async function renderTVWorkstationChart(symbol) {
 
                 // Upper Channel segment
                 const lrtcLatestUpperSeries = chart.addLineSeries({
-                    color: '#ef4444',
-                    lineWidth: 2,
+                    color: '#a855f7',
+                    lineWidth: 2.5,
                     lineStyle: LightweightCharts.LineStyle.Solid,
                     axisLabelVisible: true,
                     priceLineVisible: false,
@@ -27133,7 +27467,7 @@ async function renderTVWorkstationChart(symbol) {
                 // Lower Channel segment
                 const lrtcLatestLowerSeries = chart.addLineSeries({
                     color: '#10b981',
-                    lineWidth: 2,
+                    lineWidth: 2.5,
                     lineStyle: LightweightCharts.LineStyle.Solid,
                     axisLabelVisible: true,
                     priceLineVisible: false,
@@ -27144,6 +27478,28 @@ async function renderTVWorkstationChart(symbol) {
                     { time: latest.end_time, value: latest.lower_end }
                 ]);
                 activeTVLrtcLatestLowerSeries = lrtcLatestLowerSeries;
+
+                // Add callouts for current and previous entries (using Lightweight Charts price line overlays)
+                const prevUpper = data.candlesticks[data.candlesticks.length - 4]?.lrtc_upper;
+                const prevLower = data.candlesticks[data.candlesticks.length - 4]?.lrtc_lower;
+
+                lrtcLatestUpperSeries.createPriceLine({
+                    price: latest.upper_end,
+                    color: '#a855f7',
+                    lineWidth: 1.2,
+                    lineStyle: LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: true,
+                    title: `Current Sell Entry: ${latest.upper_end} | Prev: ${prevUpper !== undefined ? prevUpper : 'N/A'}`
+                });
+
+                lrtcLatestLowerSeries.createPriceLine({
+                    price: latest.lower_end,
+                    color: '#10b981',
+                    lineWidth: 1.2,
+                    lineStyle: LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: true,
+                    title: `Current Buy Entry: ${latest.lower_end} | Prev: ${prevLower !== undefined ? prevLower : 'N/A'}`
+                });
             }
 
             if (showLrtcAlerts) {
@@ -27154,8 +27510,7 @@ async function renderTVWorkstationChart(symbol) {
                             position: 'aboveBar',
                             color: '#ef4444',
                             shape: 'arrowDown',
-                            text: 'Sell Alert',
-                            size: 1.5
+                            size: 1.2
                         });
                     } else if (c.lrtc_ready_to_buy) {
                         mergedMarkers.push({
@@ -27163,11 +27518,148 @@ async function renderTVWorkstationChart(symbol) {
                             position: 'belowBar',
                             color: '#10b981',
                             shape: 'arrowUp',
-                            text: 'Buy Alert',
-                            size: 1.5
+                            size: 1.2
                         });
                     }
                 });
+            }
+        }
+
+        // 5. Auto Pitchfork Rendering
+        if (showPitchfork && data.pitchfork) {
+            const pf = data.pitchfork;
+
+            // Update Pitchfork HUD
+            if (pf.median_line && pf.median_line.length >= 2) {
+                const startVal = pf.median_line[0].value;
+                const endVal = pf.median_line[pf.median_line.length - 1].value;
+                const bias = endVal > startVal ? 'Bullish Bias ↗️' : (endVal < startVal ? 'Bearish Bias ↘️' : 'Neutral Bias ➡️');
+                const biasText = `${bias} (${pf.type || 'Original'})`;
+                if (document.getElementById('pitchfork-hud-bias')) {
+                    document.getElementById('pitchfork-hud-bias').innerText = biasText;
+                }
+            }
+            if (pf.p1 && pf.p2 && pf.p3) {
+                const anchorsText = `P1: ₹${pf.p1.value.toFixed(1)} | P2: ₹${pf.p2.value.toFixed(1)} | P3: ₹${pf.p3.value.toFixed(1)}`;
+                if (document.getElementById('pitchfork-hud-anchors')) {
+                    document.getElementById('pitchfork-hud-anchors').innerText = anchorsText;
+                }
+            }
+
+            // Draw Pitchfork Median Line
+            if (pf.median_line && pf.median_line.length > 0) {
+                const pfMedianSeries = chart.addLineSeries({
+                    color: 'rgba(99, 102, 241, 0.9)', // Indigo median
+                    lineWidth: 1.5,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    title: `${pf.type} Pitchfork Median`,
+                    axisLabelVisible: true,
+                    priceLineVisible: false
+                });
+                pfMedianSeries.setData(pf.median_line);
+                activeTVPitchforkMedianSeries = pfMedianSeries;
+            }
+
+            // Draw Pitchfork Upper Line
+            if (pf.upper_line && pf.upper_line.length > 0) {
+                const pfUpperSeries = chart.addLineSeries({
+                    color: 'rgba(148, 163, 184, 0.8)', // Steel gray borders
+                    lineWidth: 1.2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    title: 'Pitchfork Upper',
+                    axisLabelVisible: true,
+                    priceLineVisible: false
+                });
+                pfUpperSeries.setData(pf.upper_line);
+                activeTVPitchforkUpperSeries = pfUpperSeries;
+            }
+
+            // Draw Pitchfork Lower Line
+            if (pf.lower_line && pf.lower_line.length > 0) {
+                const pfLowerSeries = chart.addLineSeries({
+                    color: 'rgba(148, 163, 184, 0.8)', // Steel gray borders
+                    lineWidth: 1.2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    title: 'Pitchfork Lower',
+                    axisLabelVisible: true,
+                    priceLineVisible: false
+                });
+                pfLowerSeries.setData(pf.lower_line);
+                activeTVPitchforkLowerSeries = pfLowerSeries;
+            }
+
+            // Draw ZigZag points if enabled
+            if (pitchforkShowZigzag && pf.zigzag && pf.zigzag.length > 0) {
+                const pfZigzagSeries = chart.addLineSeries({
+                    color: 'rgba(156, 163, 175, 0.6)', // light gray
+                    lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    title: 'ZigZag Path',
+                    axisLabelVisible: false,
+                    priceLineVisible: false
+                });
+                pfZigzagSeries.setData(pf.zigzag);
+                activeTVPitchforkZigzagSeries = pfZigzagSeries;
+
+                // Add A, B, C text labels at the anchor points
+                if (pf.p1 && pf.p1.time) {
+                    mergedMarkers.push({
+                        time: pf.p1.time,
+                        position: 'aboveBar',
+                        color: '#3b82f6',
+                        shape: 'circle',
+                        text: 'P1',
+                        size: 1.2
+                    });
+                }
+                if (pf.p2 && pf.p2.time) {
+                    mergedMarkers.push({
+                        time: pf.p2.time,
+                        position: 'aboveBar',
+                        color: '#ef4444',
+                        shape: 'circle',
+                        text: 'P2',
+                        size: 1.2
+                    });
+                }
+                if (pf.p3 && pf.p3.time) {
+                    mergedMarkers.push({
+                        time: pf.p3.time,
+                        position: 'belowBar',
+                        color: '#10b981',
+                        shape: 'circle',
+                        text: 'P3',
+                        size: 1.2
+                    });
+                }
+            }
+
+            // Draw Fib Levels if enabled
+            if (pitchforkShowFibs && pf.levels) {
+                activeTVPitchforkFibSeriesList = [];
+                const fibColors = {
+                    "0.25": "rgba(0, 188, 212, 0.25)",  // Soft Teal
+                    "0.382": "rgba(76, 175, 80, 0.25)", // Soft Green
+                    "0.5": "rgba(255, 235, 59, 0.25)",  // Soft Yellow
+                    "0.618": "rgba(255, 152, 0, 0.25)", // Soft Orange
+                    "0.75": "rgba(244, 67, 54, 0.25)"   // Soft Red
+                };
+                for (const lvl in pf.levels) {
+                    const lvlData = pf.levels[lvl];
+                    if (lvlData && lvlData.length > 0) {
+                        const baseLvl = lvl.replace("upper_", "").replace("lower_", "");
+                        const fibLvlSeries = chart.addLineSeries({
+                            color: fibColors[baseLvl] || 'rgba(156, 163, 175, 0.3)',
+                            lineWidth: 1,
+                            lineStyle: LightweightCharts.LineStyle.Dotted,
+                            title: `Fib ${lvl}`,
+                            axisLabelVisible: false,
+                            priceLineVisible: false
+                        });
+                        fibLvlSeries.setData(lvlData);
+                        activeTVPitchforkFibSeriesList.push(fibLvlSeries);
+                    }
+                }
             }
         }
 
@@ -27188,7 +27680,8 @@ function updateIndicatorPillStyles() {
         { cb: document.getElementById('tv-indicator-lux-algo'), color: '#a855f7', bgChecked: 'rgba(168, 85, 247, 0.25)', borderChecked: '#a855f7', colorChecked: '#d8b4fe' },
         { cb: document.getElementById('tv-indicator-mxwll'), color: '#3b82f6', bgChecked: 'rgba(59, 130, 246, 0.25)', borderChecked: '#3b82f6', colorChecked: '#93c5fd' },
         { cb: document.getElementById('tv-indicator-lux-smc'), color: '#f59e0b', bgChecked: 'rgba(245, 158, 11, 0.25)', borderChecked: '#f59e0b', colorChecked: '#fde047' },
-        { cb: document.getElementById('tv-indicator-lrtc'), color: '#10b981', bgChecked: 'rgba(16, 185, 129, 0.25)', borderChecked: '#10b981', colorChecked: '#6ee7b7' }
+        { cb: document.getElementById('tv-indicator-lrtc'), color: '#10b981', bgChecked: 'rgba(16, 185, 129, 0.25)', borderChecked: '#10b981', colorChecked: '#6ee7b7' },
+        { cb: document.getElementById('tv-indicator-pitchfork'), color: '#ef4444', bgChecked: 'rgba(239, 68, 68, 0.25)', borderChecked: '#ef4444', colorChecked: '#f87171' }
     ];
     pills.forEach(p => {
         if (p.cb) {
@@ -27246,6 +27739,7 @@ function setupTVWorkstationChartControls() {
     const showOBs = document.getElementById('tv-show-obs');
     const showFVGs = document.getElementById('tv-show-fvgs');
     const showStructs = document.getElementById('tv-show-structs');
+    const showInternalStructs = document.getElementById('tv-show-internal-structs');
 
     // LuxAlgo SMC Controls
     const smcSwing = document.getElementById('tv-smc-swing');
@@ -27261,11 +27755,17 @@ function setupTVWorkstationChartControls() {
     const showLrtcHistorical = document.getElementById('tv-lrtc-show-historical');
     const showLrtcAlerts = document.getElementById('tv-lrtc-show-alerts');
 
+    // Pitchfork Controls
+    const pfTypeSelect = document.getElementById('tv-pitchfork-type');
+    const pfZigzag = document.getElementById('tv-pitchfork-show-zigzag');
+    const pfFibs = document.getElementById('tv-pitchfork-show-fibs');
+
     // Indicators checkboxes
     const indicatorLuxAlgo = document.getElementById('tv-indicator-lux-algo');
     const indicatorMxwll = document.getElementById('tv-indicator-mxwll');
     const indicatorLuxSMC = document.getElementById('tv-indicator-lux-smc');
     const indicatorLRTC = document.getElementById('tv-indicator-lrtc');
+    const indicatorPitchfork = document.getElementById('tv-indicator-pitchfork');
 
     // EMA checkboxes
     const tvEma20 = document.getElementById('tv-ema-20');
@@ -27283,7 +27783,8 @@ function setupTVWorkstationChartControls() {
         { cb: indicatorLuxAlgo, length: '14' },
         { cb: indicatorMxwll, length: '14' },
         { cb: indicatorLuxSMC, length: '50' },
-        { cb: indicatorLRTC, length: '40', mult: '2.0' }
+        { cb: indicatorLRTC, length: '40', mult: '2.0' },
+        { cb: indicatorPitchfork, length: '100' }
     ];
     indCheckboxes.forEach(item => {
         if (item.cb) {
@@ -27304,6 +27805,7 @@ function setupTVWorkstationChartControls() {
                     if (indicatorMxwll?.checked) activeList.push('mxwll');
                     if (indicatorLuxSMC?.checked) activeList.push('lux-smc');
                     if (indicatorLRTC?.checked) activeList.push('lrtc');
+                    if (indicatorPitchfork?.checked) activeList.push('pitchfork');
                     activeInd.value = activeList.length > 0 ? activeList.join(',') : 'none';
                 }
                 if (activeStockProfile && activeStockProfile.ticker) {
@@ -27327,9 +27829,10 @@ function setupTVWorkstationChartControls() {
 
     const elements = [
         activeInd, lengthSelect, multSelect, showVolume, showLines, showBreaks,
-        showFibs, showOBs, showFVGs, showStructs,
+        showFibs, showOBs, showFVGs, showStructs, showInternalStructs,
         smcSwing, smcInternal, smcOBs, smcFVGs, smcEqhl, smcMtf, smcZones,
-        showLrtcChannel, showLrtcHistorical, showLrtcAlerts
+        showLrtcChannel, showLrtcHistorical, showLrtcAlerts,
+        pfTypeSelect, pfZigzag, pfFibs
     ];
     elements.forEach(el => {
         if (el) {
@@ -37133,6 +37636,44 @@ async function loadStockEvents(ticker) {
 
 
 // ─── Market-Wide Events (Bottom Section) ─────────────────────────────────────
+
+/**
+ * Manually trigger a backend events refresh and then reload the list
+ */
+async function refreshMarketEvents() {
+    var tbody = document.getElementById('events-market-tbody');
+    var mobileCards = document.getElementById('events-market-cards');
+    
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 11.5px;">' +
+            '<span style="display: inline-block; animation: spinRefresh 1s linear infinite;">🔄</span> Triggering backend market crawl (takes a few seconds)...' +
+            '</td></tr>';
+    }
+    if (mobileCards) mobileCards.innerHTML = '';
+    
+    try {
+        if (typeof showToast === 'function') {
+            showToast("Triggering full backend events refresh...", "info");
+        }
+        var resp = await fetch('/api/events/refresh', { method: 'POST' });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var data = await resp.json();
+        if (typeof showToast === 'function') {
+            showToast("Events updated successfully. Cached " + (data.events_updated || 0) + " events.", "success");
+        }
+    } catch (err) {
+        console.error('[Events] Manual refresh failed:', err);
+        if (typeof showToast === 'function') {
+            showToast("Backend refresh failed, loading cached events.", "warning");
+        }
+    }
+    
+    // Reload events from cache
+    await loadMarketEvents();
+}
+
+// Expose refreshMarketEvents globally
+window.refreshMarketEvents = refreshMarketEvents;
 
 /**
  * Load market-wide events from /api/events/calendar

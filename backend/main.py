@@ -2821,7 +2821,10 @@ async def get_tv_chart_data(
     mult: float = 1.0,
     int_sens: int = 3,
     ext_sens: int = 25,
-    show_last: int = 10
+    show_last: int = 10,
+    pitchfork_type: str = "Original",
+    pitchfork_dev: float = 5.0,
+    pitchfork_depth: int = 34
 ):
     """
     Exposes raw candlestick data, EMAs, volume, custom Trendlines with Breaks,
@@ -2846,11 +2849,18 @@ async def get_tv_chart_data(
         df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
         df['EMA_Custom'] = df['Close'].ewm(span=length, adjust=False).mean()
         
-        from backend.swing_utils import calculate_trendlines_with_breaks, calculate_mxwll_suite, calculate_lux_smc, calculate_linear_regression_trend_channel
+        from backend.swing_utils import (
+            calculate_trendlines_with_breaks,
+            calculate_mxwll_suite,
+            calculate_lux_smc,
+            calculate_linear_regression_trend_channel,
+            calculate_pitchfork_indicators
+        )
         breaks_data = calculate_trendlines_with_breaks(df, length=length, atr_mult=mult)
         mxwll_data = calculate_mxwll_suite(df, int_sens=int_sens, ext_sens=ext_sens, show_last=show_last)
         lux_smc_data = calculate_lux_smc(df, int_sens=int_sens, ext_sens=ext_sens, show_last=show_last)
         lrtc_data = calculate_linear_regression_trend_channel(df, period=length, deviations_mult=mult)
+        pitchfork_data = calculate_pitchfork_indicators(df, deviation=pitchfork_dev, depth=pitchfork_depth, type_pf=pitchfork_type)
         
         df['Resistance'] = breaks_data["resistance"]
         df['Support'] = breaks_data["support"]
@@ -2904,6 +2914,42 @@ async def get_tv_chart_data(
                 "lrtc_ready_to_sell": bool(df_sliced["lrtc_ready_to_sell"].iloc[idx])
             })
             
+        # Filter pitchfork data to only include dates in df_sliced
+        sliced_times = set(c["time"] for c in candlesticks)
+        pf_details = pitchfork_data.get("pitchfork", {})
+        zigzag_filtered = [p for p in pitchfork_data["zigzag"] if p["time"] in sliced_times]
+        median_filtered = [p for p in pf_details.get("median", []) if p["time"] in sliced_times]
+        
+        # 1.0 standard upper parallel line
+        upper_1_0 = pf_details.get("upper_levels", {}).get("1.0", [])
+        upper_line_filtered = [p for p in upper_1_0 if p["time"] in sliced_times]
+        
+        # 1.0 standard lower parallel line
+        lower_1_0 = pf_details.get("lower_levels", {}).get("1.0", [])
+        lower_line_filtered = [p for p in lower_1_0 if p["time"] in sliced_times]
+        
+        # Intermediate fib levels
+        levels_filtered = {}
+        for lvl in ["0.25", "0.382", "0.5", "0.618", "0.75"]:
+            pts_upper = pf_details.get("upper_levels", {}).get(lvl, [])
+            levels_filtered[f"upper_{lvl}"] = [p for p in pts_upper if p["time"] in sliced_times]
+            
+            pts_lower = pf_details.get("lower_levels", {}).get(lvl, [])
+            levels_filtered[f"lower_{lvl}"] = [p for p in pts_lower if p["time"] in sliced_times]
+            
+        filtered_pitchfork = {
+            "type": pf_details.get("type", "Original"),
+            "p1": pf_details.get("p1"),
+            "p2": pf_details.get("p2"),
+            "p3": pf_details.get("p3"),
+            "zigzag": zigzag_filtered,
+            "median_line": median_filtered,
+            "upper_line": upper_line_filtered,
+            "lower_line": lower_line_filtered,
+            "levels": levels_filtered,
+            "fibonacci": pitchfork_data.get("fibonacci", {})
+        }
+        
         return {
             "symbol": ticker,
             "period": period,
@@ -2913,7 +2959,8 @@ async def get_tv_chart_data(
             "candlesticks": candlesticks,
             "mxwll": mxwll_data,
             "lux_smc": lux_smc_data,
-            "lrtc_latest": lrtc_data["latest_channel"]
+            "lrtc_latest": lrtc_data["latest_channel"],
+            "pitchfork": filtered_pitchfork
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"TradingView chart data calculation error: {str(e)}")

@@ -88,6 +88,8 @@ class TestSwingUtils(unittest.TestCase):
         self.assertIn("order_blocks", res)
         self.assertIn("fvg", res)
         self.assertIn("structures", res)
+        self.assertIn("pivots", res)
+        self.assertIn("trendline", res)
 
     def test_calculate_linear_regression_trend_channel(self):
         """Verifies calculation of Linear Regression Trend Channel (LRTC)."""

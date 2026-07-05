@@ -1160,7 +1160,7 @@
                                 <option value="90">Next 90 days</option>
                                 <option value="365">Next 1 year</option>
                             </select>
-                            <button onclick="loadMarketEvents()" title="Refresh market events" style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; padding: 4px 10px; cursor: pointer; color: var(--text-secondary); font-size: 11px; transition: all 0.2s;">🔄 Refresh</button>
+                            <button onclick="refreshMarketEvents()" title="Refresh market events" style="background: var(--bg-glass); border: 1px solid var(--border-glass); border-radius: 6px; padding: 4px 10px; cursor: pointer; color: var(--text-secondary); font-size: 11px; transition: all 0.2s;">🔄 Refresh</button>
                         </div>
                     </div>
 
@@ -3426,42 +3426,45 @@
                                     <div style="font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); user-select: none; flex-wrap: wrap;">
                                         <span>Indicators:</span>
                                         <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="tv-indicator-selector">
-                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; cursor: pointer; user-select: none; font-weight: 500;">
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Plot resistance & support breakout signal arrows from LuxAlgo." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-indicator-lux-algo" checked style="cursor: pointer; accent-color: #a855f7;"> Breaks
                                             </label>
-                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); color: #60a5fa; cursor: pointer; user-select: none; font-weight: 500;">
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Maxwell price action predictor: dynamic supply/demand zones and structures." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); color: #60a5fa; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-indicator-mxwll" style="cursor: pointer; accent-color: #3b82f6;"> Mxwll
                                             </label>
-                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); color: #fbbf24; cursor: pointer; user-select: none; font-weight: 500;">
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Smart Money Concepts (SMC): swing structure, internal structure, equal highs/lows." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); color: #fbbf24; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-indicator-lux-smc" style="cursor: pointer; accent-color: #f59e0b;"> SMC
                                             </label>
-                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #34d399; cursor: pointer; user-select: none; font-weight: 500;">
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Linear Regression Trend Channel: plots trendlines and breakout levels." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #34d399; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-indicator-lrtc" style="cursor: pointer; accent-color: #10b981;"> LRTC
+                                            </label>
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Andrews Pitchfork channel bands generated from recent swing pivots." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; cursor: pointer; user-select: none; font-weight: 500;">
+                                                <input type="checkbox" id="tv-indicator-pitchfork" style="cursor: pointer; accent-color: #ef4444;"> Pitchfork
                                             </label>
                                         </div>
                                     </div>
                                     <div style="font-size: 11px; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); user-select: none; flex-wrap: wrap;">
                                         <span>EMAs:</span>
                                         <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="tv-ema-selector">
-                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; cursor: pointer; user-select: none; font-weight: 500;">
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Exponential Moving Average for short-term momentum (20 periods)." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-ema-20" checked style="cursor: pointer; accent-color: #3b82f6;"> EMA 20
                                             </label>
-                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; cursor: pointer; user-select: none; font-weight: 500;">
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Medium-term trend tracking Exponential Moving Average (50 periods)." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3); color: #fbbf24; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-ema-50" checked style="cursor: pointer; accent-color: #f59e0b;"> EMA 50
                                             </label>
-                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #34d399; cursor: pointer; user-select: none; font-weight: 500;">
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Medium-to-long term Exponential Moving Average (100 periods)." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #34d399; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-ema-100" style="cursor: pointer; accent-color: #10b981;"> EMA 100
                                             </label>
-                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #f87171; cursor: pointer; user-select: none; font-weight: 500;">
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Long-term institutional support/resistance Exponential Moving Average (200 periods)." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: #f87171; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-ema-200" style="cursor: pointer; accent-color: #ef4444;"> EMA 200
                                             </label>
-                                            <label class="indicator-pill" style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; cursor: pointer; user-select: none; font-weight: 500;">
+                                            <label class="indicator-pill has-tooltip" data-tooltip="Plot an Exponential Moving Average with custom period length settings." style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 4px; font-size:11px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; cursor: pointer; user-select: none; font-weight: 500;">
                                                 <input type="checkbox" id="tv-ema-custom" style="cursor: pointer; accent-color: #a855f7;"> Custom
                                             </label>
                                         </div>
                                     </div>
                                     <input type="hidden" id="tv-active-indicator" value="lux-algo">
-                                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary);">
+                                    <label class="has-tooltip-select" data-tooltip="Period length size parameters used across indicators." style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary);">
                                         Length: 
                                         <select id="tv-length" style="padding: 2px 6px; border-radius: 4px; font-size:11px; background: var(--bg-select-input); color: var(--text-primary); border: 1px solid var(--border-glass); cursor:pointer;">
                                             <option value="5">5</option>
@@ -3473,7 +3476,7 @@
                                             <option value="50">50</option>
                                         </select>
                                     </label>
-                                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary);">
+                                    <label class="has-tooltip-select" data-tooltip="ATR (Average True Range) multipliers settings used to compute channel widths." style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary);">
                                         ATR Mult: 
                                         <select id="tv-mult" style="padding: 2px 6px; border-radius: 4px; font-size:11px; background: var(--bg-select-input); color: var(--text-primary); border: 1px solid var(--border-glass); cursor:pointer;">
                                             <option value="0.0">0.0</option>
@@ -3485,58 +3488,78 @@
                                             <option value="3.0">3.0</option>
                                         </select>
                                     </label>
-                                    <label style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="has-tooltip" data-tooltip="Toggle displaying volume bar histograms at the bottom." style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-show-volume" checked style="cursor: pointer;"> Show Volume
                                     </label>
-                                    <label class="lux-algo-control-element" style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lux-algo-control-element has-tooltip" data-tooltip="Display support and resistance dynamic trendlines." style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-show-lines" checked style="cursor: pointer;"> Show lines
                                     </label>
-                                    <label class="lux-algo-control-element" style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lux-algo-control-element has-tooltip" data-tooltip="Highlight bullish & bearish breakout breakout tags." style="font-size: 11px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-show-breaks" checked style="cursor: pointer;"> Show breaks
                                     </label>
-                                    <label class="lrtc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lrtc-control-element has-tooltip" data-tooltip="Toggle displaying regression channels boundaries." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-lrtc-show-channel" checked style="cursor: pointer;"> Show Channel
                                     </label>
-                                    <label class="lrtc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lrtc-control-element has-tooltip" data-tooltip="Draw historical channel bounds at previous pivots." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-lrtc-show-historical" checked style="cursor: pointer;"> Show Entry Lines
                                     </label>
-                                    <label class="lrtc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
-                                        <input type="checkbox" id="tv-lrtc-show-alerts" checked style="cursor: pointer;"> Show Alerts
+                                    <label class="lrtc-control-element has-tooltip" data-tooltip="Mark target buy/sell entry signal triggers." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-lrtc-show-alerts" style="cursor: pointer;"> Show Alerts
                                     </label>
-                                    <label class="mxwll-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="mxwll-control-element has-tooltip" data-tooltip="Display horizontal Fibonacci retracement levels." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-show-fibs" checked style="cursor: pointer;"> Show Fibs
                                     </label>
-                                    <label class="mxwll-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="mxwll-control-element has-tooltip" data-tooltip="Highlight institutional supply/demand Order Blocks." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-show-obs" checked style="cursor: pointer;"> Show OBs
                                     </label>
-                                    <label class="mxwll-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="mxwll-control-element has-tooltip" data-tooltip="Display Fair Value Gaps (FVG) structural zones." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-show-fvgs" checked style="cursor: pointer;"> Show FVGs
                                     </label>
-                                    <label class="mxwll-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
-                                        <input type="checkbox" id="tv-show-structs" checked style="cursor: pointer;"> Show Structures
+                                    <label class="mxwll-control-element has-tooltip" data-tooltip="Plot major structural transitions (BOS / CHoCH)." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-show-structs" checked style="cursor: pointer;"> Major Structs
+                                    </label>
+                                    <label class="mxwll-control-element has-tooltip" data-tooltip="Plot short-term internal structure breaks (I-BOS / I-CHoCH)." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-show-internal-structs" style="cursor: pointer;"> Internal Structs
                                     </label>
                                     
                                     <!-- LuxAlgo SMC Controls -->
-                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lux-smc-control-element has-tooltip" data-tooltip="Plot long-term swing BOS/CHoCH structures." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-smc-swing" checked style="cursor: pointer;"> Swing Struct
                                     </label>
-                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lux-smc-control-element has-tooltip" data-tooltip="Plot short-term internal BOS/CHoCH structures." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-smc-internal" checked style="cursor: pointer;"> Internal Struct
                                     </label>
-                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lux-smc-control-element has-tooltip" data-tooltip="Display institutional supply & demand zone areas." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-smc-obs" checked style="cursor: pointer;"> Order Blocks
                                     </label>
-                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lux-smc-control-element has-tooltip" data-tooltip="Display fair value imbalance gaps." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-smc-fvgs" checked style="cursor: pointer;"> FVGs
                                     </label>
-                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lux-smc-control-element has-tooltip" data-tooltip="Plot equal peaks & troughs (double tops/bottoms)." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-smc-eqhl" checked style="cursor: pointer;"> Equal H/L
                                     </label>
-                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                    <label class="lux-smc-control-element has-tooltip" data-tooltip="Highlight Premium (expensive) vs Discount (cheap) zones." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-smc-zones" style="cursor: pointer;"> Prem/Disc Zones
+                                    </label>
+                                    <label class="lux-smc-control-element has-tooltip" data-tooltip="Overlay Multi-Timeframe trend levels." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
                                         <input type="checkbox" id="tv-smc-mtf" style="cursor: pointer;"> MTF Levels
                                     </label>
-                                    <label class="lux-smc-control-element" style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
-                                        <input type="checkbox" id="tv-smc-zones" style="cursor: pointer;"> Prem/Disc Zones
+                                    
+                                    <!-- Auto Pitchfork Controls -->
+                                    <label class="pitchfork-control-element has-tooltip-multiline" data-tooltip="Auto Pitchfork Type Selection Guide:&#10;• Original: Classic. Best for sharp, steep trends (impulse).&#10;• Schiff: Shifted Y-axis. Best for steady, moderate trends.&#10;• Modified Schiff: Shifted X & Y. Best for volatile, noisy markets.&#10;• Inside: Shifted origin. Best for tight ranges / corrections." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary);">
+                                        PF Type:
+                                        <select id="tv-pitchfork-type" style="padding: 2px 6px; border-radius: 4px; font-size:11px; background: var(--bg-select-input); color: var(--text-primary); border: 1px solid var(--border-glass); cursor:pointer;">
+                                            <option value="Original" selected>Original</option>
+                                            <option value="Schiff">Schiff</option>
+                                            <option value="Modified Schiff">Modified Schiff</option>
+                                            <option value="Inside">Inside</option>
+                                        </select>
+                                    </label>
+                                    <label class="pitchfork-control-element has-tooltip" data-tooltip="Show the Zigzag line connecting the pivot points." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-pitchfork-show-zigzag" checked style="cursor: pointer;"> ZigZag
+                                    </label>
+                                    <label class="pitchfork-control-element has-tooltip" data-tooltip="Show standard Fibonacci channel lines (0.25, 0.382, 0.5, 0.618, 0.75)." style="font-size: 11px; display: none; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); user-select: none;">
+                                        <input type="checkbox" id="tv-pitchfork-show-fibs" checked style="cursor: pointer;"> Fib Levels
                                     </label>
                                 </div>
                             </div>
@@ -3592,6 +3615,83 @@
                                             <span style="font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 2px 6px; border-radius: 4px;">🟢 B = Bullish Breakout</span>
                                             <span style="font-weight: 700; color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px;">🔴 S = Bearish Breakout</span>
                                         </div>
+                                    </div>
+                                </div>
+                                    
+                                <!-- Unified Dashboard HUD Panel -->
+                                <div id="tv-chart-smc-hud-panel" style="display: none; width: 100%; margin-top: 10px; background: var(--bg-card-sub); border: 1px solid var(--border-glass); border-radius: 6px; padding: 12px 15px; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-glass); padding-bottom: 6px;">
+                                        <div style="display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-primary); font-size: 12px;">
+                                            <span>📊</span> Interactive Indicator Insights HUD
+                                        </div>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; font-size: 11px;">
+                                        
+                                        <!-- SMC Sub-cards -->
+                                        <div id="hud-card-smc-bias" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Market Bias: Bullish or Bearish trend orientation derived from the most recent swing structure break (BOS) or character change (CHoCH).">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">SMC Market Bias</span>
+                                            <span id="smc-hud-bias" style="font-weight: 700; font-size: 13px; color: var(--text-primary);">N/A</span>
+                                        </div>
+                                        
+                                        <div id="hud-card-smc-supply" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Active Supply Zone: The closest unmitigated bearish order block above the current price, acting as high-probability overhead resistance.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">SMC Supply Zone</span>
+                                            <span id="smc-hud-supply" style="font-weight: 700; font-size: 13px; color: #ef4444;">N/A</span>
+                                        </div>
+                                        
+                                        <div id="hud-card-smc-demand" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Active Demand Zone: The closest unmitigated bullish order block below the current price, acting as high-probability support.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">SMC Demand Zone</span>
+                                            <span id="smc-hud-demand" style="font-weight: 700; font-size: 13px; color: #10b981;">N/A</span>
+                                        </div>
+                                        
+                                        <div id="hud-card-smc-pd" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Premium / Discount Status: Tells you if the price is overvalued (Premium zone, upper 50% of recent range) or undervalued (Discount zone, lower 50% of recent range) relative to the equilibrium level.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">SMC Premium/Discount</span>
+                                            <span id="smc-hud-pd-status" style="font-weight: 700; font-size: 13px; color: var(--text-primary);">N/A</span>
+                                        </div>
+
+                                        <!-- Breaks Sub-cards -->
+                                        <div id="hud-card-breaks-levels" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Trendlines with Breaks: Current support/resistance lines. Shows numerical levels and distance (%) from current price to trigger a potential breakout.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">Breaks Support / Resistance</span>
+                                            <span id="breaks-hud-levels" style="font-weight: 700; font-size: 13px; color: var(--text-primary); line-height: 1.4;">N/A</span>
+                                        </div>
+
+                                        <div id="hud-card-breaks-signal" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Latest Breaks Signal: Shows the most recent historical breakout trigger direction and time.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">Latest Break Signal</span>
+                                            <span id="breaks-hud-signal" style="font-weight: 700; font-size: 13px; color: var(--text-primary);">N/A</span>
+                                        </div>
+
+                                        <!-- Maxwell Sub-cards -->
+                                        <div id="hud-card-mxwll-golden" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Maxwell Golden Zone: The highly watchable Fibonacci 0.5 to 0.618 retracement area where reversals frequently occur, and whether current price is inside it.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">Maxwell Golden Zone</span>
+                                            <span id="mxwll-hud-golden" style="font-weight: 700; font-size: 13px; color: var(--text-primary);">N/A</span>
+                                        </div>
+
+                                        <div id="hud-card-mxwll-fib-pos" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Maxwell Fib Position: Current price expressed as a percentage relative to the extreme swing levels (0% is swing low, 100% is swing high).">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">Maxwell Fib Retracement</span>
+                                            <span id="mxwll-hud-fib-pos" style="font-weight: 700; font-size: 13px; color: var(--text-primary);">N/A</span>
+                                        </div>
+
+                                        <!-- LRTC Sub-cards -->
+                                        <div id="hud-card-lrtc-slope" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="LRTC Channel Slope: The slope and direction of the linear regression median line. A positive slope indicates an uptrend, while a negative slope indicates a downtrend.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">LRTC Channel Direction</span>
+                                            <span id="lrtc-hud-slope" style="font-weight: 700; font-size: 13px; color: var(--text-primary);">N/A</span>
+                                        </div>
+
+                                        <div id="hud-card-lrtc-signal" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="LRTC Entry Signal: Displays whether the current close price is near the upper channel boundary (Ready to Sell), lower boundary (Ready to Buy), or inside the median channel.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">LRTC Trade Boundary</span>
+                                            <span id="lrtc-hud-signal" style="font-weight: 700; font-size: 13px; color: var(--text-primary);">N/A</span>
+                                        </div>
+
+                                        <!-- Pitchfork Sub-cards -->
+                                        <div id="hud-card-pf-bias" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Pitchfork Bias: Indicates if price is currently trading above or below the central Median Line. Being above indicates bullish strength; being below indicates bearish momentum.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">Pitchfork Median Bias</span>
+                                            <span id="pf-hud-bias" style="font-weight: 700; font-size: 13px; color: var(--text-primary);">N/A</span>
+                                        </div>
+
+                                        <div id="hud-card-pf-anchors" style="display: none; flex-direction: column; gap: 4px; background: rgba(255,255,255,0.02); padding: 8px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);" class="has-tooltip-multiline" data-tooltip="Pitchfork Anchor Pivots: The price levels of the three swing anchors (P1, P2, P3) used to project the pitchfork lines.">
+                                            <span style="color: var(--text-secondary); font-weight: 500;">Pitchfork Anchor Prices</span>
+                                            <span id="pf-hud-anchors" style="font-weight: 700; font-size: 13px; color: var(--text-primary); line-height: 1.4;">N/A</span>
+                                        </div>
+
                                     </div>
                                 </div>
                                     

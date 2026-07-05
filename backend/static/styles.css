@@ -15154,9 +15154,24 @@ details[open] .academy-hud-arrow {
     }
 
     .events-filter-pills {
-        flex-wrap: wrap !important;
-        gap: 8px 6px;
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        gap: 8px !important;
         padding: 10px 14px !important;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .events-filter-pills::-webkit-scrollbar {
+        display: none;
+    }
+    .events-filter-pills button {
+        flex-shrink: 0 !important;
+    }
+    #events-watchlist-btn {
+        margin-left: 0 !important;
     }
 
     #events-market-container {
@@ -15239,3 +15254,166 @@ details[open] .academy-hud-arrow {
     border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
     color: #0b0f19 !important;
 }
+
+/* ─── Sleek TradingView-Style Tooltips ────────────────────────── */
+.has-tooltip {
+    position: relative;
+}
+.has-tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 130%;
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    color: #f1f5f9;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 10000;
+}
+.has-tooltip:hover::after,
+.has-tooltip:focus-within::after,
+.has-tooltip:active::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.has-tooltip.tooltip-right::after {
+    left: 0;
+    transform: translateY(4px);
+}
+.has-tooltip.tooltip-right:hover::after,
+.has-tooltip.tooltip-right:focus-within::after,
+.has-tooltip.tooltip-right:active::after {
+    transform: translateY(0);
+}
+.has-tooltip.tooltip-left::after {
+    left: auto;
+    right: 0;
+    transform: translateX(0) translateY(4px);
+}
+.has-tooltip.tooltip-left:hover::after,
+.has-tooltip.tooltip-left:focus-within::after,
+.has-tooltip.tooltip-left:active::after {
+    transform: translateX(0) translateY(0);
+}
+
+.has-tooltip-select {
+    position: relative;
+}
+.has-tooltip-select::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 130%;
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    color: #f1f5f9;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 10000;
+}
+.has-tooltip-select:hover::after,
+.has-tooltip-select:focus-within::after,
+.has-tooltip-select:active::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Multi-line detailed tooltips */
+.has-tooltip-multiline {
+    position: relative;
+}
+.has-tooltip-multiline::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 135%;
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(15, 23, 42, 0.96);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    color: #f1f5f9;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: pre-line;
+    width: 290px;
+    pointer-events: none;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 10000;
+    text-align: left;
+}
+.has-tooltip-multiline:hover::after,
+.has-tooltip-multiline:focus-within::after,
+.has-tooltip-multiline:active::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ─── Responsive Tooltips for Mobile & Tablet ─────────────────── */
+@media (max-width: 768px) {
+    .has-tooltip::after,
+    .has-tooltip-select::after,
+    .has-tooltip-multiline::after {
+        position: fixed !important;
+        bottom: 16px !important;
+        top: auto !important;
+        left: 50% !important;
+        right: auto !important;
+        transform: translateX(-50%) translateY(10px) !important;
+        white-space: pre-wrap !important; /* Allow wraps and preserve newlines */
+        word-wrap: break-word !important;
+        max-width: calc(100vw - 32px) !important;
+        width: 320px !important;
+        box-sizing: border-box !important;
+        font-size: 10px !important;
+        line-height: 1.4 !important;
+        padding: 10px 14px !important;
+        background: rgba(15, 23, 42, 0.98) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+        z-index: 2000000000 !important;
+        transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    .has-tooltip:hover::after,
+    .has-tooltip:focus-within::after,
+    .has-tooltip:active::after,
+    .has-tooltip-select:hover::after,
+    .has-tooltip-select:focus-within::after,
+    .has-tooltip-select:active::after,
+    .has-tooltip-multiline:hover::after,
+    .has-tooltip-multiline:focus-within::after,
+    .has-tooltip-multiline:active::after {
+        transform: translateX(-50%) translateY(0) !important;
+        opacity: 1 !important;
+    }
+}
+
