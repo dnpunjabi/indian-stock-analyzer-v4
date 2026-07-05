@@ -27931,6 +27931,7 @@ function setupTVWorkstationChartControls() {
     renderTvChartTemplates();
     setupTvChatSTT();
     updateTvChartConsensusRating();
+    initSmcGlossaryModal();
 }
 
 // ----------------------------------------------------
@@ -28404,6 +28405,205 @@ function updateTvChartConsensusRating() {
         
         confluenceWarning.style.display = isConfluence ? 'flex' : 'none';
     }
+}
+
+const smcGlossaryTerms = [
+    {
+        id: "bos",
+        name: "BOS (Break of Structure)",
+        category: "smc",
+        desc: "A structural continuation signal. Occurs when price breaks and closes past a previous swing high (in an uptrend) or swing low (in a downtrend). Confirming that the active trend remains strong.",
+        signal: "🟢 Trend Continuation (Bullish/Bearish)"
+    },
+    {
+        id: "choch",
+        name: "CHoCH (Change of Character)",
+        category: "smc",
+        desc: "The first signal of a potential trend reversal. Occurs when price breaks the key pivot that created the last major high/low in the opposite direction.",
+        signal: "⚡ Trend Reversal Warning"
+    },
+    {
+        id: "demand-ob",
+        name: "Demand OB (Bullish Order Block)",
+        category: "smc",
+        desc: "A price zone where institutions (banks, market makers) placed massive buy orders. Typically identified as the last down-close candle before a strong upward impulse move.",
+        signal: "📥 High-Probability Buy/Long Entry Zone"
+    },
+    {
+        id: "supply-ob",
+        name: "Supply OB (Bearish Order Block)",
+        category: "smc",
+        desc: "A price zone where institutions placed massive sell orders. Typically identified as the last up-close candle before a strong downward impulse move.",
+        signal: "📤 High-Probability Sell/Short Entry Zone"
+    },
+    {
+        id: "ob-bound",
+        name: "OB Bound (Order Block Boundary)",
+        category: "smc",
+        desc: "The highest and lowest prices of an Order Block candle. It defines the exact entry mitigation zone and standard invalidation (stop-loss) ceiling/floor.",
+        signal: "🛡️ Entry mitigation & Stop-Loss Level"
+    },
+    {
+        id: "bull-fvg",
+        name: "Bull FVG (Bullish Fair Value Gap)",
+        category: "mxwll",
+        desc: "A 3-candle price imbalance created during a rapid upward move. The high of candle 1 does not overlap with the low of candle 3, leaving an open 'gap' where buying was too fast.",
+        signal: "🧲 Price Magnet / Potential Re-entry Support"
+    },
+    {
+        id: "bear-fvg",
+        name: "Bear FVG (Bearish Fair Value Gap)",
+        category: "mxwll",
+        desc: "A 3-candle price imbalance created during a rapid downward move. The low of candle 1 does not overlap with the high of candle 3, representing an open imbalance where selling was too fast.",
+        signal: "🧲 Price Magnet / Potential Invalidation Resistance"
+    },
+    {
+        id: "fvg-bound",
+        name: "FVG Bound (Fair Value Gap Boundary)",
+        category: "mxwll",
+        desc: "The exact prices marking the starting and ending wick limits of the 3-candle Fair Value Gap imbalance.",
+        signal: "📊 Imbalance Support / Resistance Zone"
+    },
+    {
+        id: "eql",
+        name: "EQL (Equal Lows)",
+        category: "liquidity",
+        desc: "Two or more swing lows forming at nearly identical price points. This creates a huge pool of retail stop-losses. Institutions often drive the price below EQL to trigger stops ('stop hunt') before going long.",
+        signal: "🌊 Liquidity Pool (Stop-Hunt Warning)"
+    },
+    {
+        id: "eqh",
+        name: "EQH (Equal Highs)",
+        category: "liquidity",
+        desc: "Two or more swing highs forming at nearly identical price points. This creates a large pool of short stop-losses. Institutions sweep EQH before driving prices lower.",
+        signal: "🌊 Liquidity Pool (Stop-Hunt Warning)"
+    },
+    {
+        id: "premium-zone",
+        name: "Premium Zone",
+        category: "smc",
+        desc: "The upper half (above 50%) of a swing range. Considered overpriced/expensive for buying, making it ideal for taking profit or initiating short setups.",
+        signal: "🔴 Distribution / Sell Area"
+    },
+    {
+        id: "discount-zone",
+        name: "Discount Zone",
+        category: "smc",
+        desc: "The lower half (below 50%) of a swing range. Considered underpriced/cheap, making it optimal for entering long trades.",
+        signal: "🟢 Accumulation / Buy Area"
+    },
+    {
+        id: "equilibrium",
+        name: "Equilibrium",
+        category: "smc",
+        desc: "The exact 50% midpoint of a trading swing range, separating the premium and discount pricing structures.",
+        signal: "⚖️ Fair Value Midpoint"
+    }
+];
+
+function renderSmcGlossary(filter = 'all') {
+    const listContainer = document.getElementById('smc-glossary-list');
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+    
+    const filtered = filter === 'all' 
+        ? smcGlossaryTerms 
+        : smcGlossaryTerms.filter(t => t.category === filter);
+        
+    filtered.forEach(term => {
+        const card = document.createElement('div');
+        card.style.cssText = `
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-glass);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: all 0.2s ease;
+        `;
+        
+        let catColor = '#a855f7';
+        let catLabel = 'SMC Core';
+        if (term.category === 'mxwll') {
+            catColor = '#3b82f6';
+            catLabel = 'Mxwll FVG';
+        } else if (term.category === 'liquidity') {
+            catColor = '#fbbf24';
+            catLabel = 'Liquidity';
+        }
+        
+        card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                <strong style="color:var(--text-primary); font-size:12.5px;">${term.name}</strong>
+                <span style="font-size:8px; font-weight:700; background:rgba(255,255,255,0.05); color:${catColor}; padding:2px 6px; border-radius:4px; text-transform:uppercase; letter-spacing: 0.05em;">${catLabel}</span>
+            </div>
+            <div style="color:var(--text-secondary); line-height:1.4; font-size:11px;">${term.desc}</div>
+            <div style="font-size:10px; font-weight:600; color:var(--text-muted); display:flex; align-items:center; gap:4px; margin-top:2px;">
+                <span>Trading Interpretation:</span>
+                <span style="color:var(--text-primary); font-style:italic;">${term.signal}</span>
+            </div>
+        `;
+        listContainer.appendChild(card);
+    });
+}
+
+function initSmcGlossaryModal() {
+    const btn = document.getElementById('tv-chart-smc-glossary-btn');
+    const modal = document.getElementById('smc-glossary-modal');
+    const closeBtn = document.getElementById('smc-glossary-close-btn');
+    
+    if (btn && modal) {
+        btn.addEventListener('click', () => {
+            modal.style.display = 'flex';
+            renderSmcGlossary('all');
+            
+            // Reset filter button styles
+            document.querySelectorAll('.smc-filter-btn').forEach(fb => {
+                fb.classList.remove('active');
+                fb.style.borderColor = 'var(--border-glass)';
+                fb.style.background = 'transparent';
+                fb.style.color = 'var(--text-secondary)';
+            });
+            const allBtn = document.querySelector('.smc-filter-btn[data-filter="all"]');
+            if (allBtn) {
+                allBtn.classList.add('active');
+                allBtn.style.borderColor = 'var(--color-primary)';
+                allBtn.style.background = 'rgba(124, 58, 237, 0.15)';
+                allBtn.style.color = '#a78bfa';
+            }
+        });
+    }
+    
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+    
+    // Bind filter buttons
+    document.querySelectorAll('.smc-filter-btn').forEach(btnEl => {
+        btnEl.addEventListener('click', () => {
+            document.querySelectorAll('.smc-filter-btn').forEach(fb => {
+                fb.classList.remove('active');
+                fb.style.borderColor = 'var(--border-glass)';
+                fb.style.background = 'transparent';
+                fb.style.color = 'var(--text-secondary)';
+            });
+            btnEl.classList.add('active');
+            btnEl.style.borderColor = 'var(--color-primary)';
+            btnEl.style.background = 'rgba(124, 58, 237, 0.15)';
+            btnEl.style.color = '#a78bfa';
+            
+            const filter = btnEl.getAttribute('data-filter');
+            renderSmcGlossary(filter);
+        });
+    });
 }
 
 
