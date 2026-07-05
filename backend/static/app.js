@@ -27670,6 +27670,9 @@ async function renderTVWorkstationChart(symbol) {
             candleSeries.setMarkers(mergedMarkers);
         }
 
+        // Recalculate consensus rating and confluence levels for the new stock data
+        updateTvChartConsensusRating();
+
     } catch (err) {
         console.error("Error drawing Interactive Chart Terminal: ", err);
         container.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--text-muted);">Failed to load and calculate indicators for ${symbol}. Please try again.</div>`;
