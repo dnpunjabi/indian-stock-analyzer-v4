@@ -3739,7 +3739,7 @@
                                     <div id="tv-chart-consensus-gauge" style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: 6px;">
                                         <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Consensus Technical Rating:</div>
                                         <span id="tv-chart-rating-badge" style="font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">NEUTRAL</span>
-                                        <div id="tv-chart-confluence-warning" style="display: none; align-items: center; gap: 4px; color: #fbbf24; font-size: 10px; margin-left: auto;">
+                                        <div id="tv-chart-confluence-warning" style="display: none; align-items: center; gap: 4px; color: #fbbf24; font-size: 10px; margin-left: auto; cursor: pointer; background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251, 191, 36, 0.25); padding: 2px 6px; border-radius: 4px; transition: all 0.2s ease;">
                                             <span>⚠️</span> <span style="font-weight: 600;">Confluence Cluster Detected!</span>
                                         </div>
                                     </div>
@@ -6933,6 +6933,68 @@
             <!-- Content Area -->
             <div style="flex-grow:1; overflow-y:auto; padding-right:5px; font-size:12px; display:flex; flex-direction:column; gap:12px;" id="smc-glossary-list">
                 <!-- Terms will be listed here dynamically -->
+            </div>
+    </div>
+
+    <!-- Interactive Confluence Breakdown Modal -->
+    <div id="tv-confluence-modal" class="modal no-print" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center; box-sizing:border-box; padding: 15px;">
+        <div class="modal-content" style="background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:12px; width:95%; max-width:550px; max-height:85vh; display:flex; flex-direction:column; padding:20px; box-shadow:0 8px 32px rgba(0,0,0,0.5); box-sizing:border-box; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
+                <h3 style="margin:0; font-family:'Outfit',sans-serif; color:var(--text-primary); font-size:14px; text-transform:uppercase; font-weight: 700; display:flex; align-items:center; gap:6px; letter-spacing: 0.05em;">
+                    <span>⚠️</span> Confluence Cluster Breakdown
+                </h3>
+                <button id="tv-confluence-close-btn" class="action-btn" style="background:rgba(255,255,255,0.05); color:var(--text-primary); border:1px solid var(--border-glass); padding:4px 10px; border-radius:4px; font-size:11px; cursor:pointer; transition: all 0.2s;">✕ Close</button>
+            </div>
+            
+            <div style="flex-grow:1; overflow-y:auto; padding-right:5px; font-size:12px; display:flex; flex-direction:column; gap:15px;">
+                <!-- Target signal badge -->
+                <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 12px; border-radius: 8px;">
+                    <div>
+                        <div style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em; margin-bottom: 2px;">CONFLUENCE DIRECTION</div>
+                        <div id="tv-confluence-signal-val" style="font-size: 16px; font-weight: 800; color: #fbbf24;">NEUTRAL / CONGESTION</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 10px; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em; margin-bottom: 2px;">CLUSTER SPREAD</div>
+                        <div id="tv-confluence-spread-val" style="font-size: 13px; font-weight: 700; color: var(--text-primary);">0.00%</div>
+                    </div>
+                </div>
+
+                <!-- Overlap details list -->
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Intersecting Price Levels:</div>
+                    <div id="tv-confluence-levels-list" style="display: flex; flex-direction: column; gap: 8px;">
+                        <!-- Dynamically filled with intersecting indicators -->
+                    </div>
+                </div>
+
+                <!-- Target Strategy Guide -->
+                <div style="background: rgba(255, 255, 255, 0.01); border: 1px solid var(--border-glass); border-radius: 8px; padding: 15px; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-glass); padding-bottom: 6px;">Proposed Technical Setup</div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">PROPOSED ENTRY ZONE</div>
+                            <div id="tv-confluence-entry-zone" style="font-size: 13px; font-weight: 700; color: #a78bfa;">₹0.00 - ₹0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">INVALIDATION (STOP-LOSS)</div>
+                            <div id="tv-confluence-sl" style="font-size: 13px; font-weight: 700; color: #f87171;">₹0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">TARGET 1 (CONSERVATIVE)</div>
+                            <div id="tv-confluence-t1" style="font-size: 13px; font-weight: 700; color: #34d399;">₹0.00</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-muted); font-weight: 600; margin-bottom: 2px;">TARGET 2 (AGGRESSIVE)</div>
+                            <div id="tv-confluence-t2" style="font-size: 13px; font-weight: 700; color: #10b981;">₹0.00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Deep AI action button -->
+                <button id="tv-confluence-ai-action-btn" style="width: 100%; padding: 12px; background: linear-gradient(135deg, var(--color-primary) 0%, #6d28d9 100%); border: none; color: #ffffff; border-radius: 8px; font-weight: 700; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12.5px; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);">
+                    <span>✨</span> Generate Detailed AI Trade Plan
+                </button>
             </div>
         </div>
     </div>

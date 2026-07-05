@@ -26547,6 +26547,7 @@ async function renderTVWorkstationChart(symbol) {
         const res = await fetch(`/api/chart/tv-chart-data?ticker=${encodeURIComponent(symbol)}&length=${length}&mult=${mult}&ext_sens=${length}&int_sens=5&pitchfork_type=${encodeURIComponent(pitchforkType)}&pitchfork_dev=5.0&pitchfork_depth=34`);
         if (!res.ok) throw new Error("Failed to fetch interactive chart indicators.");
         const data = await res.json();
+        window.latestTvChartData = data;
 
         // Clean up previous instance
         if (activeTVWorkstationChart) {
@@ -27932,6 +27933,7 @@ function setupTVWorkstationChartControls() {
     setupTvChatSTT();
     updateTvChartConsensusRating();
     initSmcGlossaryModal();
+    initConfluenceModal();
 }
 
 // ----------------------------------------------------
@@ -28366,41 +28368,139 @@ function updateTvChartConsensusRating() {
     if (confluenceWarning) {
         let isConfluence = false;
         
+        const extractPrices = (txt) => {
+            if (!txt || txt.toUpperCase().includes("NONE") || txt.toUpperCase().includes("N/A")) return [];
+            const matches = txt.match(/\d+(?:\.\d+)?/g);
+            return matches ? matches.map(Number) : [];
+        };
+
+        const activeLevels = [];
         const showBreaks = document.getElementById('tv-indicator-lux-algo')?.checked;
         const showMxwll = document.getElementById('tv-indicator-mxwll')?.checked;
         
-        if (showBreaks && (showSmc || showMxwll)) {
-            const breaksLevels = document.getElementById('breaks-hud-levels')?.innerText;
-            const smcSupply = showSmc ? document.getElementById('smc-hud-supply')?.innerText : '';
-            const smcDemand = showSmc ? document.getElementById('smc-hud-demand')?.innerText : '';
-            const mxwllSupply = showMxwll ? document.getElementById('mxwll-hud-supply')?.innerText : '';
-            const mxwllDemand = showMxwll ? document.getElementById('mxwll-hud-demand')?.innerText : '';
-            
-            const extractPrices = (txt) => {
-                if (!txt || txt.toUpperCase().includes("NONE") || txt.toUpperCase().includes("N/A")) return [];
-                const matches = txt.match(/\d+(?:\.\d+)?/g);
-                return matches ? matches.map(Number) : [];
-            };
-            
-            const breaksPrices = extractPrices(breaksLevels);
-            const demandPrices = extractPrices(smcDemand).concat(extractPrices(mxwllDemand));
-            const supplyPrices = extractPrices(smcSupply).concat(extractPrices(mxwllSupply));
-            const allSMCLevels = demandPrices.concat(supplyPrices);
-            
-            if (breaksPrices.length > 0 && allSMCLevels.length > 0) {
-                for (let bp of breaksPrices) {
-                    for (let sp of allSMCLevels) {
-                        if (sp > 0) {
-                            const diffPct = Math.abs(bp - sp) / sp;
-                            if (diffPct <= 0.015) {
-                                isConfluence = true;
-                                break;
-                            }
-                        }
+        // 1. Breaks
+        if (showBreaks) {
+            const txt = document.getElementById('breaks-hud-levels')?.innerText || '';
+            if (txt.includes("Bullish")) {
+                const parts = txt.split("Bearish");
+                const prices = extractPrices(parts[0]);
+                prices.forEach(p => activeLevels.push({ name: "LuxAlgo Bullish Break", value: p, type: "bullish", indicator: "LuxAlgo" }));
+                if (parts.length > 1) {
+                    extractPrices(parts[1]).forEach(p => activeLevels.push({ name: "LuxAlgo Bearish Break", value: p, type: "bearish", indicator: "LuxAlgo" }));
+                }
+            } else if (txt.includes("Bearish")) {
+                extractPrices(txt).forEach(p => activeLevels.push({ name: "LuxAlgo Bearish Break", value: p, type: "bearish", indicator: "LuxAlgo" }));
+            } else {
+                extractPrices(txt).forEach(p => activeLevels.push({ name: "LuxAlgo Break", value: p, type: "neutral", indicator: "LuxAlgo" }));
+            }
+        }
+        
+        // 2. SMC
+        if (showSmc) {
+            const supTxt = document.getElementById('smc-hud-supply')?.innerText || '';
+            extractPrices(supTxt).forEach(p => activeLevels.push({ name: "SMC Supply OB", value: p, type: "bearish", indicator: "SMC" }));
+            const demTxt = document.getElementById('smc-hud-demand')?.innerText || '';
+            extractPrices(demTxt).forEach(p => activeLevels.push({ name: "SMC Demand OB", value: p, type: "bullish", indicator: "SMC" }));
+        }
+
+        // 3. Maxwell FVG
+        if (showMxwll) {
+            const supTxt = document.getElementById('mxwll-hud-supply')?.innerText || '';
+            extractPrices(supTxt).forEach(p => activeLevels.push({ name: "Maxwell Supply FVG", value: p, type: "bearish", indicator: "Maxwell" }));
+            const demTxt = document.getElementById('mxwll-hud-demand')?.innerText || '';
+            extractPrices(demTxt).forEach(p => activeLevels.push({ name: "Maxwell Demand FVG", value: p, type: "bullish", indicator: "Maxwell" }));
+        }
+
+        // 4. LRTC
+        if (showLrtc && window.latestTvChartData?.lrtc_latest) {
+            const latest = window.latestTvChartData.lrtc_latest;
+            if (latest.upper_end) {
+                activeLevels.push({ name: "LRTC Upper Boundary", value: Number(latest.upper_end), type: "bearish", indicator: "LRTC" });
+            }
+            if (latest.lower_end) {
+                activeLevels.push({ name: "LRTC Lower Boundary", value: Number(latest.lower_end), type: "bullish", indicator: "LRTC" });
+            }
+            if (latest.median_end) {
+                activeLevels.push({ name: "LRTC Median Line", value: Number(latest.median_end), type: "neutral", indicator: "LRTC" });
+            }
+        }
+
+        // 5. Pitchfork
+        if (showPf && window.latestTvChartData?.pitchfork) {
+            const pf = window.latestTvChartData.pitchfork;
+            if (pf.upper_line && pf.upper_line.length > 0) {
+                const val = pf.upper_line[pf.upper_line.length - 1].value;
+                activeLevels.push({ name: "Pitchfork Upper Line", value: Number(val), type: "bearish", indicator: "Pitchfork" });
+            }
+            if (pf.lower_line && pf.lower_line.length > 0) {
+                const val = pf.lower_line[pf.lower_line.length - 1].value;
+                activeLevels.push({ name: "Pitchfork Lower Line", value: Number(val), type: "bullish", indicator: "Pitchfork" });
+            }
+            if (pf.median_line && pf.median_line.length > 0) {
+                const val = pf.median_line[pf.median_line.length - 1].value;
+                activeLevels.push({ name: "Pitchfork Median Line", value: Number(val), type: "neutral", indicator: "Pitchfork" });
+            }
+        }
+
+        let clusterLevels = [];
+        let minSpread = 9999;
+        
+        for (let i = 0; i < activeLevels.length; i++) {
+            for (let j = i + 1; j < activeLevels.length; j++) {
+                const lv1 = activeLevels[i];
+                const lv2 = activeLevels[j];
+                if (lv1.indicator === lv2.indicator) continue;
+                
+                const diffPct = Math.abs(lv1.value - lv2.value) / Math.min(lv1.value, lv2.value);
+                if (diffPct <= 0.015) {
+                    isConfluence = true;
+                    if (diffPct < minSpread) {
+                        minSpread = diffPct;
                     }
-                    if (isConfluence) break;
+                    if (!clusterLevels.includes(lv1)) clusterLevels.push(lv1);
+                    if (!clusterLevels.includes(lv2)) clusterLevels.push(lv2);
                 }
             }
+        }
+
+        if (isConfluence && clusterLevels.length > 0) {
+            const prices = clusterLevels.map(l => l.value);
+            const minPrice = Math.min(...prices);
+            const maxPrice = Math.max(...prices);
+            const avgPrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+            const spread = ((maxPrice - minPrice) / avgPrice) * 100;
+            
+            const bullCount = clusterLevels.filter(l => l.type === "bullish").length;
+            const bearCount = clusterLevels.filter(l => l.type === "bearish").length;
+            
+            let signal = "NEUTRAL / CONGESTION";
+            let signalColor = "#fbbf24";
+            if (bullCount > bearCount) {
+                signal = "🟢 BUY / LONG (Support Confluence)";
+                signalColor = "#34d399";
+            } else if (bearCount > bullCount) {
+                signal = "🔴 SELL / SHORT (Resistance Confluence)";
+                signalColor = "#f87171";
+            }
+
+            const sl = bullCount > bearCount ? minPrice * 0.985 : maxPrice * 1.015;
+            const t1 = bullCount > bearCount ? avgPrice * 1.03 : avgPrice * 0.97;
+            const t2 = bullCount > bearCount ? avgPrice * 1.06 : avgPrice * 0.94;
+
+            window.currentConfluenceDetails = {
+                signal: signal,
+                signalColor: signalColor,
+                spread: spread.toFixed(2) + "%",
+                levels: clusterLevels,
+                entryMin: minPrice.toFixed(2),
+                entryMax: maxPrice.toFixed(2),
+                sl: sl.toFixed(2),
+                t1: t1.toFixed(2),
+                t2: t2.toFixed(2),
+                avgPrice: avgPrice.toFixed(2)
+            };
+        } else {
+            window.currentConfluenceDetails = null;
         }
         
         confluenceWarning.style.display = isConfluence ? 'flex' : 'none';
@@ -28604,6 +28704,107 @@ function initSmcGlossaryModal() {
             renderSmcGlossary(filter);
         });
     });
+}
+
+function initConfluenceModal() {
+    const warningBadge = document.getElementById('tv-chart-confluence-warning');
+    const modal = document.getElementById('tv-confluence-modal');
+    const closeBtn = document.getElementById('tv-confluence-close-btn');
+    const aiActionBtn = document.getElementById('tv-confluence-ai-action-btn');
+    
+    if (warningBadge && modal) {
+        warningBadge.addEventListener('click', () => {
+            if (!window.currentConfluenceDetails) return;
+            
+            const details = window.currentConfluenceDetails;
+            
+            // Populate dialog elements
+            const signalVal = document.getElementById('tv-confluence-signal-val');
+            if (signalVal) {
+                signalVal.innerText = details.signal.replace(/🟢 |🔴 /g, '');
+                signalVal.style.color = details.signalColor;
+            }
+            
+            const spreadVal = document.getElementById('tv-confluence-spread-val');
+            if (spreadVal) {
+                spreadVal.innerText = details.spread;
+            }
+            
+            const entryZone = document.getElementById('tv-confluence-entry-zone');
+            if (entryZone) {
+                entryZone.innerText = `₹${details.entryMin} - ₹${details.entryMax}`;
+            }
+            
+            const slVal = document.getElementById('tv-confluence-sl');
+            if (slVal) {
+                slVal.innerText = `₹${details.sl}`;
+            }
+            
+            const t1Val = document.getElementById('tv-confluence-t1');
+            if (t1Val) {
+                t1Val.innerText = `₹${details.t1}`;
+            }
+            
+            const t2Val = document.getElementById('tv-confluence-t2');
+            if (t2Val) {
+                t2Val.innerText = `₹${details.t2}`;
+            }
+            
+            const list = document.getElementById('tv-confluence-levels-list');
+            if (list) {
+                list.innerHTML = '';
+                details.levels.forEach(lv => {
+                    const div = document.createElement('div');
+                    div.style.display = 'flex';
+                    div.style.justifyContent = 'space-between';
+                    div.style.background = 'rgba(255,255,255,0.02)';
+                    div.style.border = '1px solid var(--border-glass)';
+                    div.style.padding = '8px 10px';
+                    div.style.borderRadius = '4px';
+                    
+                    const badgeColor = lv.type === 'bullish' ? '#34d399' : (lv.type === 'bearish' ? '#f87171' : '#9ca3af');
+                    const badgeBg = lv.type === 'bullish' ? 'rgba(52, 211, 153, 0.1)' : (lv.type === 'bearish' ? 'rgba(248, 113, 113, 0.1)' : 'rgba(156, 163, 175, 0.1)');
+                    
+                    div.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="font-size: 8px; padding: 2px 6px; border-radius: 4px; color: ${badgeColor}; background: ${badgeBg}; font-weight: 700; text-transform: uppercase; border: 1px solid ${badgeColor}40;">${lv.type}</span>
+                            <span style="font-weight: 600; color: var(--text-primary); font-size: 11px;">${lv.name}</span>
+                        </div>
+                        <div style="font-weight: 700; color: var(--text-primary); font-size: 11px;">₹${Number(lv.value).toFixed(2)}</div>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+            
+            modal.style.display = 'flex';
+        });
+    }
+    
+    if (closeBtn && modal) {
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+    
+    if (aiActionBtn && modal) {
+        aiActionBtn.addEventListener('click', () => {
+            if (!window.currentConfluenceDetails) return;
+            modal.style.display = 'none';
+            
+            const details = window.currentConfluenceDetails;
+            const input = document.getElementById('tv-chart-chat-input');
+            if (input) {
+                const levelsStr = details.levels.map(l => `${l.name} (₹${Number(l.value).toFixed(2)})`).join(', ');
+                input.value = `Explain the trade setup for the Confluence Cluster detected near ₹${details.avgPrice} (overlapping indicators: ${levelsStr}). Recommend a step-by-step entry strategy, invalidation stop-loss, and target profit levels.`;
+                triggerTvChatQuery();
+            }
+        });
+    }
 }
 
 

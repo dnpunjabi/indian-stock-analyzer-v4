@@ -15507,4 +15507,31 @@ html[data-mode="light"] .clickable-price-level:hover {
     }
 }
 
+/* Confluence warning hover state and glowing border */
+#tv-chart-confluence-warning {
+    cursor: pointer;
+    animation: confluenceGlow 2s infinite ease-in-out;
+    transition: all 0.2s ease;
+}
+#tv-chart-confluence-warning:hover {
+    background: rgba(251, 191, 36, 0.2) !important;
+    border-color: rgba(251, 191, 36, 0.5) !important;
+    color: #ffffff !important;
+}
+@keyframes confluenceGlow {
+    0% {
+        box-shadow: 0 0 4px rgba(251, 191, 36, 0.1);
+        border-color: rgba(251, 191, 36, 0.25);
+    }
+    50% {
+        box-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
+        border-color: rgba(251, 191, 36, 0.5);
+    }
+    100% {
+        box-shadow: 0 0 4px rgba(251, 191, 36, 0.1);
+        border-color: rgba(251, 191, 36, 0.25);
+    }
+}
+
+
 
