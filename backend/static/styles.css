@@ -15450,10 +15450,21 @@ details[open] .academy-hud-arrow {
     transition: all 0.2s ease;
     padding: 0 2px;
     border-radius: 2px;
+    text-decoration: underline;
+    cursor: pointer;
+    font-weight: 600;
+    color: #fbd38d !important;
 }
 .clickable-price-level:hover {
     background: rgba(251, 191, 36, 0.2);
     color: #fcd34d !important;
+}
+html[data-mode="light"] .clickable-price-level {
+    color: #b45309 !important;
+}
+html[data-mode="light"] .clickable-price-level:hover {
+    background: rgba(180, 83, 9, 0.15);
+    color: #78350f !important;
 }
 
 /* Pulsing voice recording indicator */

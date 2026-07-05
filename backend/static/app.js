@@ -28133,10 +28133,10 @@ function addTvTemporaryPriceLine(price, label) {
 window.addTvTemporaryPriceLine = addTvTemporaryPriceLine;
 
 function makePricesClickable(htmlText) {
-    const regex = /(?:Rs\.|₹)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?|\d+(?:\.\d{2})?)/g;
+    const regex = /(?:Rs\.|₹)\s*([\d,]+(?:\.\d{1,2})?)/g;
     return htmlText.replace(regex, (match, val) => {
         const numericVal = val.replace(/,/g, '');
-        return `<span class="clickable-price-level" data-price="${numericVal}" style="color: #fbbf24; text-decoration: underline; cursor: pointer; font-weight: 600;" onclick="window.addTvTemporaryPriceLine(${numericVal}, 'Target Level: ₹${numericVal}')">${match}</span>`;
+        return `<span class="clickable-price-level" data-price="${numericVal}" onclick="window.addTvTemporaryPriceLine(${numericVal}, 'Target Level: ₹${numericVal}')">${match}</span>`;
     });
 }
 
@@ -28175,12 +28175,20 @@ function appendTvChatMessage(role, content) {
         
         const speakBtn = document.createElement('button');
         speakBtn.className = 'tv-chat-speak-btn';
-        speakBtn.style.cssText = 'background: transparent; border: 1px solid var(--border-glass); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; cursor: pointer;';
-        speakBtn.innerHTML = '🔊 Speak';
+        speakBtn.style.cssText = 'background: transparent; border: none; padding: 2px 4px; cursor: pointer; font-size: 14px; opacity: 0.7;';
+        speakBtn.innerHTML = '🔊';
         
-        const plainText = content.replace(/[#*`_-]/g, '').trim();
         speakBtn.addEventListener('click', () => {
-            triggerTvChatTTS(plainText, speakBtn);
+            const rawText = content;
+            const plainText = rawText.replace(/[#*`_-]/g, '').trim();
+            const cleanForSpeech = plainText
+                .replace(/\+/g, ' plus ')
+                .replace(/\b-\b/g, ' minus ')
+                .replace(/^-/mg, ' minus ')
+                .replace(/\s+-\s*/g, ' minus ');
+            if (window.SpeechPlayer) {
+                window.SpeechPlayer.startSpeakingSection(cleanForSpeech, "AI Technical Analyst", true);
+            }
         });
         
         speechContainer.appendChild(speakBtn);
@@ -28221,50 +28229,6 @@ function removeTvChatLoading(id) {
     if (el) el.remove();
 }
 
-let tvActiveSpeechUtterance = null;
-function triggerTvChatTTS(text, btn) {
-    if (!window.speechSynthesis) {
-        showToast("Speech synthesis is not supported in this browser.", "warning");
-        return;
-    }
-    
-    window.speechSynthesis.cancel();
-    document.querySelectorAll('.tv-chat-speak-btn').forEach(b => {
-        b.innerHTML = '🔊 Speak';
-        b.classList.remove('speaking');
-    });
-    
-    const stopTtsBtn = document.getElementById('tv-chart-stop-tts-btn');
-    if (stopTtsBtn) stopTtsBtn.style.display = 'none';
-    
-    if (btn.classList.contains('speaking')) {
-        btn.classList.remove('speaking');
-        return;
-    }
-    
-    btn.innerHTML = '🗣️ Speaking...';
-    btn.classList.add('speaking');
-    if (stopTtsBtn) stopTtsBtn.style.display = 'inline-block';
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-IN';
-    utterance.rate = 1.0;
-    
-    utterance.onend = () => {
-        btn.innerHTML = '🔊 Speak';
-        btn.classList.remove('speaking');
-        if (stopTtsBtn) stopTtsBtn.style.display = 'none';
-    };
-    
-    utterance.onerror = () => {
-        btn.innerHTML = '🔊 Speak';
-        btn.classList.remove('speaking');
-        if (stopTtsBtn) stopTtsBtn.style.display = 'none';
-    };
-    
-    tvActiveSpeechUtterance = utterance;
-    window.speechSynthesis.speak(utterance);
-}
 
 function setupTvChatSTT() {
     const micBtn = document.getElementById('tv-chart-chat-mic-btn');
@@ -28331,25 +28295,36 @@ function updateTvChartConsensusRating() {
     
     let score = 0;
     
-    const smcBiasEl = document.getElementById('smc-hud-bias');
-    if (smcBiasEl) {
-        const text = smcBiasEl.innerText.toUpperCase();
-        if (text.includes('BULLISH')) score += 1;
-        else if (text.includes('BEARISH')) score -= 1;
+    // Check which indicators are selected/checked
+    const showSmc = document.getElementById('tv-indicator-lux-smc')?.checked;
+    const showLrtc = document.getElementById('tv-indicator-lrtc')?.checked;
+    const showPf = document.getElementById('tv-indicator-pitchfork')?.checked;
+    
+    if (showSmc) {
+        const smcBiasEl = document.getElementById('smc-hud-bias');
+        if (smcBiasEl) {
+            const text = smcBiasEl.innerText.toUpperCase();
+            if (text.includes('BULLISH')) score += 1;
+            else if (text.includes('BEARISH')) score -= 1;
+        }
     }
     
-    const lrtcDirectionEl = document.getElementById('lrtc-hud-slope');
-    if (lrtcDirectionEl) {
-        const text = lrtcDirectionEl.innerText.toUpperCase();
-        if (text.includes('RISING') || text.includes('BULLISH')) score += 1;
-        else if (text.includes('FALLING') || text.includes('BEARISH')) score -= 1;
+    if (showLrtc) {
+        const lrtcDirectionEl = document.getElementById('lrtc-hud-slope');
+        if (lrtcDirectionEl) {
+            const text = lrtcDirectionEl.innerText.toUpperCase();
+            if (text.includes('RISING') || text.includes('BULLISH')) score += 1;
+            else if (text.includes('FALLING') || text.includes('BEARISH')) score -= 1;
+        }
     }
     
-    const pfBiasEl = document.getElementById('pf-hud-bias');
-    if (pfBiasEl) {
-        const text = pfBiasEl.innerText.toUpperCase();
-        if (text.includes('ABOVE MEDIAN') || text.includes('BULLISH')) score += 1;
-        else if (text.includes('BELOW MEDIAN') || text.includes('BEARISH')) score -= 1;
+    if (showPf) {
+        const pfBiasEl = document.getElementById('pf-hud-bias');
+        if (pfBiasEl) {
+            const text = pfBiasEl.innerText.toUpperCase();
+            if (text.includes('ABOVE MEDIAN') || text.includes('BULLISH')) score += 1;
+            else if (text.includes('BELOW MEDIAN') || text.includes('BEARISH')) score -= 1;
+        }
     }
     
     let ratingStr = "NEUTRAL";
@@ -28388,12 +28363,41 @@ function updateTvChartConsensusRating() {
     if (confluenceWarning) {
         let isConfluence = false;
         
-        const breaksLevels = document.getElementById('breaks-hud-levels')?.innerText;
-        const smcSupply = document.getElementById('smc-hud-supply')?.innerText;
-        const smcDemand = document.getElementById('smc-hud-demand')?.innerText;
+        const showBreaks = document.getElementById('tv-indicator-lux-algo')?.checked;
+        const showMxwll = document.getElementById('tv-indicator-mxwll')?.checked;
         
-        if (breaksLevels && (smcSupply || smcDemand)) {
-            isConfluence = true;
+        if (showBreaks && (showSmc || showMxwll)) {
+            const breaksLevels = document.getElementById('breaks-hud-levels')?.innerText;
+            const smcSupply = showSmc ? document.getElementById('smc-hud-supply')?.innerText : '';
+            const smcDemand = showSmc ? document.getElementById('smc-hud-demand')?.innerText : '';
+            const mxwllSupply = showMxwll ? document.getElementById('mxwll-hud-supply')?.innerText : '';
+            const mxwllDemand = showMxwll ? document.getElementById('mxwll-hud-demand')?.innerText : '';
+            
+            const extractPrices = (txt) => {
+                if (!txt || txt.toUpperCase().includes("NONE") || txt.toUpperCase().includes("N/A")) return [];
+                const matches = txt.match(/\d+(?:\.\d+)?/g);
+                return matches ? matches.map(Number) : [];
+            };
+            
+            const breaksPrices = extractPrices(breaksLevels);
+            const demandPrices = extractPrices(smcDemand).concat(extractPrices(mxwllDemand));
+            const supplyPrices = extractPrices(smcSupply).concat(extractPrices(mxwllSupply));
+            const allSMCLevels = demandPrices.concat(supplyPrices);
+            
+            if (breaksPrices.length > 0 && allSMCLevels.length > 0) {
+                for (let bp of breaksPrices) {
+                    for (let sp of allSMCLevels) {
+                        if (sp > 0) {
+                            const diffPct = Math.abs(bp - sp) / sp;
+                            if (diffPct <= 0.015) {
+                                isConfluence = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (isConfluence) break;
+                }
+            }
         }
         
         confluenceWarning.style.display = isConfluence ? 'flex' : 'none';
