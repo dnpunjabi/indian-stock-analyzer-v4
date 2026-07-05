@@ -8892,11 +8892,51 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     #screener-results-pagination,
     #alerts-log-pagination,
     #watchlist-table-pagination,
-    #swing-scan-pagination {
-        flex-direction: column !important;
+    #swing-scan-pagination,
+    #universe-explorer-pagination,
+    #global-trades-pagination,
+    #events-market-pagination {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
         gap: 12px !important;
+        padding: 15px 10px !important;
         align-items: center !important;
         text-align: center;
+        box-sizing: border-box !important;
+        width: 100% !important;
+    }
+
+    #rule-scanner-pagination > div,
+    #screener-results-pagination > div,
+    #alerts-log-pagination > div,
+    #watchlist-table-pagination > div,
+    #swing-scan-pagination > div,
+    #universe-explorer-pagination > div,
+    #global-trades-pagination > div,
+    #events-market-pagination > div {
+        grid-column: 1 / span 2 !important;
+        order: -1 !important;
+        display: flex !important;
+        justify-content: center !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+        width: 100% !important;
+    }
+    
+    #rule-scanner-pagination > button,
+    #screener-results-pagination > button,
+    #alerts-log-pagination > button,
+    #watchlist-table-pagination > button,
+    #swing-scan-pagination > button,
+    #universe-explorer-pagination > button,
+    #global-trades-pagination > button,
+    #events-market-pagination > button {
+        width: 100% !important;
+        height: 32px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
     }
     
     /* Responsive condition rows stack nicely on mobile */
