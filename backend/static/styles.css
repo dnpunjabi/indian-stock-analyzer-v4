@@ -15418,6 +15418,71 @@ details[open] .academy-hud-arrow {
     }
 }
 
+/* ────────────────── Custom Indicator AI Insights Styles ─────────────────── */
+#tv-chart-ai-insights-panel {
+    width: 100% !important;
+    margin-top: 10px !important;
+    background: var(--bg-card-sub) !important;
+    border: 1px solid var(--border-glass) !important;
+    border-radius: 6px !important;
+    padding: 15px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    box-sizing: border-box !important;
+}
+
+#tv-ai-insights-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-bottom: 1px solid var(--border-glass) !important;
+    padding-bottom: 8px !important;
+    cursor: pointer !important;
+    user-select: none !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+.tv-ai-insights-title-wrapper {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-weight: 600 !important;
+    color: var(--text-primary) !important;
+    font-size: 12.5px !important;
+    flex-wrap: wrap !important;
+}
+
+#tv-btn-generate-synthesis {
+    background: linear-gradient(135deg, #7c3aed, #4f46e5) !important;
+    color: #ffffff !important;
+    border: none !important;
+    padding: 6px 14px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+    white-space: nowrap !important;
+}
+
+#tv-ai-synthesis-content {
+    font-size: 12px !important;
+    color: var(--text-secondary) !important;
+    line-height: 1.6 !important;
+    max-height: 250px !important;
+    overflow-y: auto !important;
+    padding-right: 5px !important;
+    padding-top: 5px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
 /* ────────────────── Chatbot UI Custom Styles ─────────────────── */
 #tv-chart-chatbot-panel {
     width: 100% !important;
@@ -15740,6 +15805,24 @@ html[data-mode="light"] .clickable-price-level:hover {
         margin-left: 0 !important;
         width: 100% !important;
         justify-content: center !important;
+    }
+
+    /* Custom Indicator AI Insights Mobile Layout */
+    #tv-ai-insights-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+    }
+    
+    #tv-ai-insights-header .tv-ai-insights-title-wrapper {
+        width: 100% !important;
+        justify-content: space-between !important;
+    }
+    
+    #tv-btn-generate-synthesis {
+        width: 100% !important;
+        justify-content: center !important;
+        padding: 8px 16px !important;
     }
 }
 
