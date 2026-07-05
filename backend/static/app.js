@@ -28715,71 +28715,86 @@ function initConfluenceModal() {
     const closeBtn = document.getElementById('tv-confluence-close-btn');
     const aiActionBtn = document.getElementById('tv-confluence-ai-action-btn');
     
-    if (warningBadge && modal) {
-        warningBadge.addEventListener('click', () => {
-            if (!window.currentConfluenceDetails) return;
-            
-            const details = window.currentConfluenceDetails;
-            
-            // Populate dialog elements
-            const signalVal = document.getElementById('tv-confluence-signal-val');
-            if (signalVal) {
-                signalVal.innerText = details.signal.replace(/🟢 |🔴 /g, '');
-                signalVal.style.color = details.signalColor;
-            }
-            
-            const spreadVal = document.getElementById('tv-confluence-spread-val');
-            if (spreadVal) {
-                spreadVal.innerText = details.spread;
-            }
-            
-            const entryZone = document.getElementById('tv-confluence-entry-zone');
-            if (entryZone) {
-                entryZone.innerText = `₹${details.entryMin} - ₹${details.entryMax}`;
-            }
-            
-            const slVal = document.getElementById('tv-confluence-sl');
-            if (slVal) {
-                slVal.innerText = `₹${details.sl}`;
-            }
-            
-            const t1Val = document.getElementById('tv-confluence-t1');
-            if (t1Val) {
-                t1Val.innerText = `₹${details.t1}`;
-            }
-            
-            const t2Val = document.getElementById('tv-confluence-t2');
-            if (t2Val) {
-                t2Val.innerText = `₹${details.t2}`;
-            }
-            
-            const list = document.getElementById('tv-confluence-levels-list');
-            if (list) {
-                list.innerHTML = '';
-                details.levels.forEach(lv => {
-                    const div = document.createElement('div');
-                    div.style.display = 'flex';
-                    div.style.justifyContent = 'space-between';
-                    div.style.background = 'rgba(255,255,255,0.02)';
-                    div.style.border = '1px solid var(--border-glass)';
-                    div.style.padding = '8px 10px';
-                    div.style.borderRadius = '4px';
-                    
-                    const badgeColor = lv.type === 'bullish' ? '#34d399' : (lv.type === 'bearish' ? '#f87171' : '#9ca3af');
-                    const badgeBg = lv.type === 'bullish' ? 'rgba(52, 211, 153, 0.1)' : (lv.type === 'bearish' ? 'rgba(248, 113, 113, 0.1)' : 'rgba(156, 163, 175, 0.1)');
-                    
-                    div.innerHTML = `
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <span style="font-size: 8px; padding: 2px 6px; border-radius: 4px; color: ${badgeColor}; background: ${badgeBg}; font-weight: 700; text-transform: uppercase; border: 1px solid ${badgeColor}40;">${lv.type}</span>
-                            <span style="font-weight: 600; color: var(--text-primary); font-size: 11px;">${lv.name}</span>
-                        </div>
-                        <div style="font-weight: 700; color: var(--text-primary); font-size: 11px;">₹${Number(lv.value).toFixed(2)}</div>
-                    `;
-                    list.appendChild(div);
-                });
-            }
-            
-            modal.style.display = 'flex';
+    // Define globally to allow robust fallback inline onclick triggering
+    window.showConfluenceBreakdownModal = function() {
+        console.log("showConfluenceBreakdownModal called. currentConfluenceDetails:", window.currentConfluenceDetails);
+        const tvModal = document.getElementById('tv-confluence-modal');
+        if (!tvModal) {
+            console.error("tv-confluence-modal not found in DOM");
+            return;
+        }
+        if (!window.currentConfluenceDetails) {
+            console.warn("No current confluence details available");
+            return;
+        }
+        
+        const details = window.currentConfluenceDetails;
+        
+        // Populate dialog elements
+        const signalVal = document.getElementById('tv-confluence-signal-val');
+        if (signalVal) {
+            signalVal.innerText = details.signal.replace(/🟢 |🔴 /g, '');
+            signalVal.style.color = details.signalColor;
+        }
+        
+        const spreadVal = document.getElementById('tv-confluence-spread-val');
+        if (spreadVal) {
+            spreadVal.innerText = details.spread;
+        }
+        
+        const entryZone = document.getElementById('tv-confluence-entry-zone');
+        if (entryZone) {
+            entryZone.innerText = `₹${details.entryMin} - ₹${details.entryMax}`;
+        }
+        
+        const slVal = document.getElementById('tv-confluence-sl');
+        if (slVal) {
+            slVal.innerText = `₹${details.sl}`;
+        }
+        
+        const t1Val = document.getElementById('tv-confluence-t1');
+        if (t1Val) {
+            t1Val.innerText = `₹${details.t1}`;
+        }
+        
+        const t2Val = document.getElementById('tv-confluence-t2');
+        if (t2Val) {
+            t2Val.innerText = `₹${details.t2}`;
+        }
+        
+        const list = document.getElementById('tv-confluence-levels-list');
+        if (list) {
+            list.innerHTML = '';
+            details.levels.forEach(lv => {
+                const div = document.createElement('div');
+                div.style.display = 'flex';
+                div.style.justifyContent = 'space-between';
+                div.style.background = 'rgba(255,255,255,0.02)';
+                div.style.border = '1px solid var(--border-glass)';
+                div.style.padding = '8px 10px';
+                div.style.borderRadius = '4px';
+                
+                const badgeColor = lv.type === 'bullish' ? '#34d399' : (lv.type === 'bearish' ? '#f87171' : '#9ca3af');
+                const badgeBg = lv.type === 'bullish' ? 'rgba(52, 211, 153, 0.1)' : (lv.type === 'bearish' ? 'rgba(248, 113, 113, 0.1)' : 'rgba(156, 163, 175, 0.1)');
+                
+                div.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 8px; padding: 2px 6px; border-radius: 4px; color: ${badgeColor}; background: ${badgeBg}; font-weight: 700; text-transform: uppercase; border: 1px solid ${badgeColor}40;">${lv.type}</span>
+                        <span style="font-weight: 600; color: var(--text-primary); font-size: 11px;">${lv.name}</span>
+                    </div>
+                    <div style="font-weight: 700; color: var(--text-primary); font-size: 11px;">₹${Number(lv.value).toFixed(2)}</div>
+                `;
+                list.appendChild(div);
+            });
+        }
+        
+        tvModal.style.display = 'flex';
+    };
+    
+    if (warningBadge) {
+        warningBadge.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.showConfluenceBreakdownModal();
         });
     }
     
