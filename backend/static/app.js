@@ -28718,13 +28718,15 @@ function initConfluenceModal() {
     // Define globally to allow robust fallback inline onclick triggering
     window.showConfluenceBreakdownModal = function() {
         console.log("showConfluenceBreakdownModal called. currentConfluenceDetails:", window.currentConfluenceDetails);
-        const tvModal = document.getElementById('tv-confluence-modal');
-        if (!tvModal) {
-            console.error("tv-confluence-modal not found in DOM");
+        
+        if (!window.currentConfluenceDetails) {
+            console.warn("Warning badge clicked, but NO confluence details are available yet.");
             return;
         }
-        if (!window.currentConfluenceDetails) {
-            console.warn("No current confluence details available");
+        
+        const tvModal = document.getElementById('tv-confluence-modal');
+        if (!tvModal) {
+            console.error("DOM Error: tv-confluence-modal element not found in index.html!");
             return;
         }
         
