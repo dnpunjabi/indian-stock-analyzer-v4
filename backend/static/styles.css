@@ -15984,72 +15984,6 @@ html[data-mode="light"] .clickable-price-level:hover {
     transform: translateY(-2px) scale(1.03) !important;
 }
 
-/* Mobile Responsive Card-Stack Table Collapser */
-@media (max-width: 768px) {
-    /* For screener and other wide comparison tables */
-    .data-table, .screener-table, .peers-table, .holdings-table, .tax-table {
-        display: block !important;
-        width: 100% !important;
-        border: none !important;
-    }
-    
-    .data-table thead, .screener-table thead, .peers-table thead, .holdings-table thead, .tax-table thead {
-        display: none !important; /* Hide standard wide table headers */
-    }
-    
-    .data-table tbody, .screener-table tbody, .peers-table tbody, .holdings-table tbody, .tax-table tbody {
-        display: block !important;
-        width: 100% !important;
-    }
-    
-    .data-table tr, .screener-table tr, .peers-table tr, .holdings-table tr, .tax-table tr {
-        display: block !important;
-        width: 100% !important;
-        background: rgba(255, 255, 255, 0.02) !important;
-        border: 1px solid var(--border-glass) !important;
-        border-radius: 8px !important;
-        margin-bottom: 12px !important;
-        padding: 10px !important;
-        box-sizing: border-box !important;
-    }
-    
-    [data-theme="light"] .data-table tr, 
-    [data-theme="light"] .screener-table tr, 
-    [data-theme="light"] .peers-table tr, 
-    [data-theme="light"] .holdings-table tr, 
-    [data-theme="light"] .tax-table tr {
-        background: rgba(0, 0, 0, 0.015) !important;
-    }
-    
-    .data-table td, .screener-table td, .peers-table td, .holdings-table td, .tax-table td {
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        padding: 8px 6px !important;
-        border: none !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
-        text-align: right !important;
-        font-size: 11px !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-    }
-    
-    .data-table td:last-child, .screener-table td:last-child, .peers-table td:last-child, .holdings-table td:last-child, .tax-table td:last-child {
-        border-bottom: none !important;
-    }
-    
-    /* Dynamically insert column label via data-label */
-    .data-table td::before, .screener-table td::before, .peers-table td::before, .holdings-table td::before, .tax-table td::before {
-        content: attr(data-label) !important;
-        float: left !important;
-        font-weight: 700 !important;
-        text-transform: uppercase !important;
-        font-size: 9px !important;
-        color: var(--text-secondary) !important;
-        padding-right: 10px !important;
-        text-align: left !important;
-    }
-}
 
 /* Interactive & Dynamic Glossary Styling */
 .glossary-tab-btn {
@@ -16261,69 +16195,254 @@ html[data-mode="light"] .clickable-price-level:hover {
 
 /* Mobile Responsiveness Rules */
 @media (max-width: 768px) {
+    /* === Card container === */
     #margin-bridge-card {
         width: 100% !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
         overflow-x: hidden !important;
+        gap: 12px !important;
+        padding: 14px !important;
     }
 
+    /* === Card header: stack title and controls vertically === */
+    #margin-bridge-card > .card-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+    }
+    #margin-bridge-card > .card-header h3 {
+        font-size: 13px !important;
+    }
+    #margin-bridge-card > .card-header > div:last-child {
+        width: 100% !important;
+        justify-content: flex-start !important;
+    }
+
+    /* === Grid: single column on mobile === */
     .margin-bridge-grid {
         grid-template-columns: 1fr !important;
-        gap: 15px !important;
+        gap: 12px !important;
         max-width: 100% !important;
         width: 100% !important;
         box-sizing: border-box !important;
     }
-    
-    #margin-chatbot-box {
-        min-height: 420px !important;
-        height: auto;
+
+    /* === Left & Right columns: full width === */
+    .margin-bridge-left,
+    .margin-bridge-right {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+        gap: 12px !important;
     }
-    
-    #margin-chatbot-history {
-        height: 240px !important;
-    }
-    
-    .margin-comparison-hud {
+
+    /* === Waterfall chart: reduced height for mobile === */
+    #margin-bridge-card .chart-container {
+        height: 200px !important;
+        min-height: 180px !important;
         padding: 8px !important;
-        gap: 8px !important;
+    }
+
+    /* === Comparison HUD: vertical stack === */
+    .margin-comparison-hud {
+        padding: 10px !important;
+        gap: 0 !important;
         flex-direction: column !important;
         width: 100% !important;
         box-sizing: border-box !important;
     }
     .margin-comparison-hud > div {
         min-width: 100% !important;
+        width: 100% !important;
         border-left: none !important;
         padding-left: 0 !important;
         border-bottom: 1px solid var(--border-glass);
-        padding-bottom: 6px;
-        margin-bottom: 2px;
+        padding-bottom: 8px;
+        margin-bottom: 6px;
     }
     .margin-comparison-hud > div:last-child {
         border-bottom: none !important;
         padding-bottom: 0 !important;
         margin-bottom: 0 !important;
     }
-    
-    /* Interactive input form mobile display adjustment */
-    #margin-chatbot-box .fs-chat-input-row {
-        display: flex !important;
-        flex-wrap: wrap !important;
+    .margin-comparison-hud span[style*="font-size: 15px"] {
+        font-size: 14px !important;
+    }
+
+    /* === Sandbox Sliders panel === */
+    #margin-bridge-card .margin-bridge-left > .card {
+        padding: 12px !important;
+        gap: 10px !important;
+    }
+    .margin-slider-item {
+        gap: 4px !important;
+    }
+    .margin-slider-info {
+        font-size: 10px !important;
+    }
+    .margin-slider-pct-indicator {
+        font-size: 10px !important;
+        min-width: 38px !important;
+    }
+
+    /* === Chatbot box === */
+    #margin-chatbot-box {
+        min-height: 380px !important;
+        height: auto !important;
+        padding: 12px !important;
         gap: 8px !important;
     }
+
+    /* === Chatbot history === */
+    #margin-chatbot-history {
+        height: 220px !important;
+    }
+
+    /* === Chat templates: horizontal scroll pills === */
+    #margin-chatbot-templates {
+        gap: 4px !important;
+        padding-bottom: 6px !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+    #margin-chatbot-templates .chat-prompt-pill {
+        font-size: 9px !important;
+        padding: 4px 8px !important;
+    }
+
+    /* === Chat input row: wrap for mobile === */
+    #margin-chatbot-box .fs-chat-input-row {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+    }
     #margin-chatbot-input {
-        flex: 1 1 100% !important; /* Spans full width on row 1 */
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+        font-size: 11px !important;
     }
     #margin-chatbot-mic-btn {
         flex: 0 0 auto !important;
-        width: 45px !important;
+        width: 36px !important;
+        height: 32px !important;
+        padding: 4px !important;
     }
     #margin-chatbot-send-btn {
-        flex: 1 1 auto !important;
+        flex: 0 0 auto !important;
+        padding: 0 10px !important;
+        font-size: 10px !important;
+    }
+
+    /* === Reset button === */
+    #margin-reset-sliders-btn {
+        font-size: 9px !important;
+        padding: 4px 8px !important;
     }
 }
 
+/* Extra-small mobile (≤480px) */
+@media (max-width: 480px) {
+    #margin-bridge-card {
+        padding: 10px !important;
+        gap: 10px !important;
+    }
+    #margin-bridge-card > .card-header h3 {
+        font-size: 12px !important;
+    }
+    #margin-bridge-card .chart-container {
+        height: 180px !important;
+        min-height: 160px !important;
+        padding: 6px !important;
+    }
+    .margin-comparison-hud {
+        padding: 8px !important;
+    }
+    .margin-comparison-hud span[style*="font-size: 15px"] {
+        font-size: 13px !important;
+    }
+    .margin-comparison-hud span[style*="font-size: 8px"] {
+        font-size: 7px !important;
+    }
+    #margin-chatbot-box {
+        min-height: 340px !important;
+        padding: 10px !important;
+    }
+    #margin-chatbot-history {
+        height: 200px !important;
+    }
+    #margin-chatbot-templates .chat-prompt-pill {
+        font-size: 8.5px !important;
+        padding: 3px 6px !important;
+    }
+    .margin-slider-info {
+        font-size: 9.5px !important;
+    }
+    .margin-slider-input-row input[type="range"]::-webkit-slider-thumb {
+        width: 12px !important;
+        height: 12px !important;
+    }
+    .margin-slider-input-row input[type="range"]::-moz-range-thumb {
+        width: 12px !important;
+        height: 12px !important;
+    }
+    #margin-bridge-card .margin-bridge-left > .card {
+        padding: 10px !important;
+    }
+
+    /* Chat input compact layout */
+    #margin-chatbot-box .fs-chat-input-row {
+        gap: 4px !important;
+    }
+    #margin-chatbot-mic-btn {
+        width: 32px !important;
+        height: 30px !important;
+        font-size: 11px !important;
+    }
+    #margin-chatbot-send-btn {
+        padding: 0 8px !important;
+        height: 30px !important;
+        font-size: 9.5px !important;
+    }
+    #margin-chatbot-input {
+        height: 30px !important;
+        font-size: 10.5px !important;
+        padding: 4px 8px !important;
+    }
+}
+
+/* Very small mobile (≤375px, e.g. iPhone SE / older Android) */
+@media (max-width: 375px) {
+    #margin-bridge-card {
+        padding: 8px !important;
+        gap: 8px !important;
+    }
+    #margin-bridge-card > .card-header h3 {
+        font-size: 11px !important;
+        gap: 4px !important;
+    }
+    #margin-bridge-card > .card-header span[style*="font-size: 10px"] {
+        font-size: 8px !important;
+    }
+    #margin-bridge-card .chart-container {
+        height: 160px !important;
+        min-height: 140px !important;
+    }
+    .margin-bridge-grid {
+        gap: 8px !important;
+    }
+    .margin-comparison-hud {
+        padding: 6px !important;
+    }
+    #margin-chatbot-box {
+        min-height: 300px !important;
+        padding: 8px !important;
+    }
+    #margin-chatbot-history {
+        height: 180px !important;
+        padding: 6px !important;
+    }
+}
 
 
 
