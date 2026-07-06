@@ -36,6 +36,7 @@
         else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
         else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
         else if (activeTarget === 'solvency_chat') micBtnId = 'solvency-chat-mic-btn';
+        else if (activeTarget === 'audit_chat') micBtnId = 'audit-chatbot-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🔴';
@@ -51,6 +52,7 @@
         else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
         else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
         else if (activeTarget === 'solvency_chat') micBtnId = 'solvency-chat-mic-btn';
+        else if (activeTarget === 'audit_chat') micBtnId = 'audit-chatbot-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -66,6 +68,7 @@
         else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
         else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
         else if (activeTarget === 'solvency_chat') micBtnId = 'solvency-chat-mic-btn';
+        else if (activeTarget === 'audit_chat') micBtnId = 'audit-chatbot-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -120,6 +123,11 @@
                 } else {
                     input.value = (input.value ? input.value + ' ' : '') + transcript;
                 }
+            }
+        } else if (activeTarget === 'audit_chat') {
+            const input = document.getElementById('audit-chatbot-input');
+            if (input) {
+                input.value = (input.value ? input.value + ' ' : '') + transcript;
             }
         } else {
             const input = document.getElementById('chat-user-input');
@@ -5508,6 +5516,17 @@ function renderStockDashboard(p) {
     updateSolvencyChatbotPrompts(p.ticker);
     setupSolvencyGlossaryToggle();
     initSolvencyChatbot();
+
+    // Reset Strategy Audit Chatbot
+    if (typeof setupAuditChatbot === 'function') {
+        setupAuditChatbot();
+    }
+    if (typeof clearAuditChat === 'function') {
+        clearAuditChat();
+    }
+    if (typeof updateAuditChatContextHUD === 'function') {
+        updateAuditChatContextHUD(p);
+    }
 
     const exportBtn = document.getElementById('export-pdf-btn');
     if (exportBtn) exportBtn.removeAttribute('disabled');
@@ -12096,8 +12115,9 @@ async function fetchAndRenderStockSynthesis(symbol) {
         if (!response.ok) throw new Error("Synthesis failed.");
         const data = await response.json();
 
-        // Cache the result
-        window.synthesisCache[symbol] = data;
+        // Cache the result under clean symbol to ensure consistency
+        const cleanSymbol = symbol.split('.')[0].toUpperCase();
+        window.synthesisCache[cleanSymbol] = data;
 
         displaySynthesisData(data);
     } catch (e) {
@@ -12408,9 +12428,14 @@ function displaySynthesisData(data) {
         }
     }
 
+    const combinedHtml = `${warningHtml}${conflictHtml}${finalHtml}`;
+    const formattedHtml = typeof injectMetricTooltips === 'function' ? injectMetricTooltips(combinedHtml) : combinedHtml;
+    
+    // Store formatted HTML in data cache for on-demand debate widget
+    data.formattedHtml = formattedHtml;
+    
     if (reportTextEl) {
-        const combinedHtml = `${warningHtml}${conflictHtml}${finalHtml}`;
-        reportTextEl.innerHTML = typeof injectMetricTooltips === 'function' ? injectMetricTooltips(combinedHtml) : combinedHtml;
+        reportTextEl.innerHTML = formattedHtml;
     }
 }
 
@@ -12436,8 +12461,10 @@ async function loadStockSynthesis(symbol) {
         stopAudioPlayback();
     }
 
-    if (window.synthesisCache && window.synthesisCache[symbol]) {
-        displaySynthesisData(window.synthesisCache[symbol]);
+    const cleanSymbol = symbol.split('.')[0].toUpperCase();
+
+    if (window.synthesisCache && window.synthesisCache[cleanSymbol]) {
+        displaySynthesisData(window.synthesisCache[cleanSymbol]);
     } else {
         renderSynthesisLandingScreen(symbol);
     }
@@ -15986,139 +16013,69 @@ function renderAIDebate(p) {
 
     dialogueContainer.innerHTML = '';
 
-    const ticker = p.ticker.split('.')[0].toUpperCase();
-    const curPrice = p.fundamentals.current_price || 0;
-    const pe = p.fundamentals.pe_ratio || 0;
-    const pb = p.fundamentals.pb_ratio || 0;
-    const peg = p.score_metrics ? (p.score_metrics.peg_ratio || "N/A") : "N/A";
-    const de = p.fundamentals.debt_to_equity || 0;
-    const cr = p.fundamentals.current_ratio || 0;
-    const cfoPat = p.fundamentals.cfo_to_pat || 0;
-    const fScore = p.earnings_quality ? (p.earnings_quality.piotroski_score || 0) : 0;
-    const zScore = p.earnings_quality ? (p.earnings_quality.altman_z_score || 0) : 0;
-    const zZone = p.earnings_quality ? (p.earnings_quality.altman_zone || "Unknown Zone") : "Unknown Zone";
-    const pledge = p.fundamentals.promoter_pledge_pct || 0;
+    const cleanSymbol = p.ticker.split('.')[0].toUpperCase();
 
-    const rsi = p.technicals ? (p.technicals.rsi || 50) : 50;
-    const rsiStatus = p.technicals ? (p.technicals.rsi_status || "Neutral") : "Neutral";
-    const trend = p.technicals ? (p.technicals.trend_50_vs_200 || "Neutral") : "Neutral";
-    const breakout = p.technicals ? (p.technicals.breakout_status || "Neutral") : "Neutral";
-    const high52w = p.technicals ? (p.technicals.high_52w || 0) : 0;
-    const low52w = p.technicals ? (p.technicals.low_52w || 0) : 0;
-    const distHigh52w = p.technicals ? (p.technicals.dist_high_52w_pct || 0) : 0;
-    const distLow52w = p.technicals ? (p.technicals.dist_low_52w_pct || 0) : 0;
-    const sma50 = p.technicals ? (p.technicals.sma_50 || 0) : 0;
-    const sma200 = p.technicals ? (p.technicals.sma_200 || 0) : 0;
-    const squeeze = p.technicals ? (p.technicals.bb_squeeze_pct || 0) : 0;
-    const atr = p.technicals ? (p.technicals.atr || 0) : 0;
-    const atrStop = p.technicals ? (p.technicals.volatility_stop_loss_floor || (curPrice - 2 * atr)) : (curPrice - 2 * atr);
-    const macdVal = p.technicals ? (p.technicals.macd || 0) : 0;
-    const macdSig = p.technicals ? (p.technicals.macd_signal || 0) : 0;
-    const macdHist = p.technicals ? (p.technicals.macd_hist || 0) : 0;
-    const macdStatus = macdHist > 0 ? "Bullish Crossover" : (macdHist < 0 ? "Bearish Divergence" : "Neutral");
-    const vptVal = p.technicals ? (p.technicals.vpt || 0) : 0;
-    const vptStatus = p.technicals ? (p.technicals.vpt_status || "Neutral") : "Neutral";
-    const delivZ = p.technicals ? (p.technicals.delivery_z_score || 0.0) : 0.0;
-    const vsaPattern = p.technicals ? (p.technicals.vsa_pattern || "Normal Price Action") : "Normal Price Action";
-    const vsaDesc = p.technicals ? (p.technicals.vsa_desc || "") : "";
-    const poc = p.technicals ? (p.technicals.poc_price || curPrice) : curPrice;
+    // Check if the AI synthesis/debate exists in cache and has formattedHtml
+    if (window.synthesisCache && window.synthesisCache[cleanSymbol] && window.synthesisCache[cleanSymbol].formattedHtml) {
+        dialogueContainer.innerHTML = window.synthesisCache[cleanSymbol].formattedHtml;
+        return;
+    }
 
-    const intrinsic = (p.dcf_model && p.dcf_model.intrinsic_value) || 0;
-    const margin = (p.dcf_model && p.dcf_model.margin_of_safety) || 0;
-    const action = p.score_metrics ? (p.score_metrics.action || "HOLD") : "HOLD";
-    const score = p.score_metrics ? (p.score_metrics.final_score || 50) : 50;
+    // Otherwise, render the on-demand trigger landing state
+    dialogueContainer.innerHTML = `
+        <div style="padding: 20px 10px; text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; width: 100%; box-sizing: border-box;">
+            <p style="margin: 0; font-size: 10.5px; color: var(--text-muted); line-height: 1.5; max-width: 320px;">
+                Initiate the Chief Investment Officer's autonomous multi-agent panel to run an on-demand, institutional-grade AI/LLM verdict debate for <strong>${p.company_name} (${cleanSymbol})</strong>.
+            </p>
+            <button id="trigger-dashboard-debate-btn" class="action-btn" style="height: 30px; padding: 0 16px; font-size: 10.5px; font-weight: bold; background: var(--color-amber); color: #000; border: none; border-radius: 4px; cursor: pointer; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px;">
+                ⚡ Start AI Multi-Agent Debate
+            </button>
+        </div>
+    `;
 
-    const niftyBeta = p.capm_risk_nifty50 ? (p.capm_risk_nifty50.beta || 1.0) : 1.0;
-    const niftyAlpha = p.capm_risk_nifty50 ? (p.capm_risk_nifty50.alpha || 0.0) : 0.0;
-    const niftyCorr = p.capm_risk_nifty50 ? (p.capm_risk_nifty50.correlation || 1.0) : 1.0;
-    const upCapture = p.capture_ratios ? (p.capture_ratios.upside_capture || 100.0) : 100.0;
-    const downCapture = p.capture_ratios ? (p.capture_ratios.downside_capture || 100.0) : 100.0;
-    const maxDd = p.drawdown_metrics ? (p.drawdown_metrics.max_drawdown_pct || 0.0) : 0.0;
-    const worstDdDays = p.drawdown_metrics ? (p.drawdown_metrics.worst_drawdown_duration_days || 0) : 0;
+    const btn = document.getElementById('trigger-dashboard-debate-btn');
+    if (btn) {
+        btn.addEventListener('click', async () => {
+            // Show loading spinner
+            dialogueContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px 10px; gap: 10px; width: 100%; height: 100%;">
+                    <div class="spinner" style="width: 24px; height: 24px; border-width: 2.5px; border-color: rgba(245, 158, 11, 0.2); border-top-color: var(--color-amber);"></div>
+                    <div style="font-size: 10.5px; color: var(--text-secondary); font-weight: 500;">Synthesizing multi-agent debate panel...</div>
+                </div>
+            `;
 
-    const speeches = [
-        {
-            role: "📊 Fundamental & Valuation Analyst",
-            class: "fundamental",
-            align: "left",
-            content: `From a quality and solvency perspective, **${ticker}** holds a Piotroski F-Score of **${fScore}/9** (${fScore >= 7 ? 'Strong' : fScore >= 4 ? 'Moderate' : 'Weak'}) and Altman Z-Score of **${zScore.toFixed(2)}** (${zZone}). Debt-to-Equity is comfortable at **${de.toFixed(2)}x**, Current Ratio is **${cr.toFixed(2)}x**, and cash conversion quality is at a CFO-to-PAT ratio of **${cfoPat.toFixed(2)}x**. Under our DCF analysis, the intrinsic value is **Rs. ${intrinsic.toFixed(2)}**, representing a **${margin.toFixed(1)}% margin of safety**. Current PE stands at **${pe.toFixed(1)}x** with PB at **${pb.toFixed(1)}x** and PEG at **${peg}**.`
-        },
-        {
-            role: "📈 Technical & VSA Tactician",
-            class: "technical",
-            align: "right",
-            content: `Technically, the structure is in a **${trend}** structure relative to its 50-day SMA (**Rs. ${sma50.toFixed(1)}**) and 200-day SMA (**Rs. ${sma200.toFixed(1)}**). Momentum is **${rsiStatus}** with RSI (14) at **${rsi.toFixed(1)}**. The price is **${distHigh52w.toFixed(1)}%** below its 52w High of **Rs. ${high52w.toFixed(1)}** and **${distLow52w.toFixed(1)}%** above its 52w Low of **Rs. ${low52w.toFixed(1)}**. Volatility squeeze width is **${squeeze.toFixed(1)}%** with ATR volatility at **Rs. ${atr.toFixed(1)}** (stop floor at **Rs. ${atrStop.toFixed(1)}**). MACD hist reports **${macdVal.toFixed(2)}** (${macdStatus}). Volume Price Trend (VPT) is at **${vptVal.toFixed(0)}** (${vptStatus}), and Point of Control (POC) liquidity support sits at **Rs. ${poc.toFixed(1)}**.`
-        },
-        {
-            role: "🛡️ Sentiment & Smart Money Auditor",
-            class: "sentiment",
-            align: "left",
-            content: `Promoter pledging is at **${pledge.toFixed(1)}%**. Smart money delivers a Z-Score of **${delivZ.toFixed(2)}**, showing institutional ${delivZ >= 1.0 ? 'accumulation' : delivZ <= -1.0 ? 'distribution' : 'churn'}. Volume Spread Analysis (VSA) setup shows: **${vsaPattern}** (${vsaDesc}). Benchmark capture ratios report Upside Capture of **${upCapture.toFixed(1)}%** and Downside Capture of **${downCapture.toFixed(1)}%** under systematic Nifty 50 risk (Beta: **${niftyBeta.toFixed(2)}**, Alpha: **${niftyAlpha.toFixed(2)}%**, Corr: **${niftyCorr.toFixed(2)}**). Maximum historical drawdown is **${maxDd.toFixed(1)}%** with a recovery time of **${worstDdDays} days**.`
-        },
-        {
-            role: "⚖️ Lead CIO Referee (Consensus Moderator)",
-            class: "cio",
-            align: "right",
-            content: `Synthesizing the panel's debate, **${ticker}** displays a classic interplay between its solvency profile, valuation premiums, and technical timing. Considering these factors, we declare a consensus **${action}** verdict for the specified horizon. The overall Composite AI Score is **${score}/100**. Actionable Buy/Entry price range is suggested at **${p.analysis && p.analysis.suggested_buy_price_range ? p.analysis.suggested_buy_price_range : 'Rs. ' + (curPrice * 0.95).toFixed(0) + ' - Rs. ' + (curPrice * 1.02).toFixed(0)}**, and Sell/Exit target range is suggested at **${p.analysis && p.analysis.suggested_sell_price_range ? p.analysis.suggested_sell_price_range : 'Rs. ' + (curPrice * 1.15).toFixed(0) + ' - Rs. ' + (curPrice * 1.25).toFixed(0)}**.`
-        }
-    ];
+            try {
+                const horizon = document.getElementById('profile-horizon')?.value || 'Long-term (3+ years)';
+                const risk = document.getElementById('profile-risk')?.value || 'Moderate';
 
-    const scoring = p.score_metrics || {};
-    const f_score_val = scoring.fundamental_score !== undefined ? scoring.fundamental_score : 15.0;
-    const v_score_val = scoring.valuation_score !== undefined ? scoring.valuation_score : 12.0;
-    const g_score_val = scoring.growth_score !== undefined ? scoring.growth_score : 7.0;
-    const fundamentalConv = p.fundamental_conviction !== undefined ? p.fundamental_conviction : Math.min(100, Math.max(0, Math.round(((f_score_val + v_score_val + g_score_val) / 70.0) * 100.0)));
+                const response = await fetch(`/api/synthesis?symbol=${encodeURIComponent(p.ticker)}&horizon=${encodeURIComponent(horizon)}&risk=${encodeURIComponent(risk)}`);
+                if (!response.ok) throw new Error("Debate synthesis failed.");
+                const data = await response.json();
 
-    const t_score_val = scoring.technical_score !== undefined ? scoring.technical_score : 12.0;
-    const technicalConv = p.technical_conviction !== undefined ? p.technical_conviction : Math.min(100, Math.max(0, Math.round((t_score_val / 25.0) * 100.0)));
+                // Cache the result under clean symbol
+                window.synthesisCache[cleanSymbol] = data;
 
-    const s_score_val = scoring.sentiment_score !== undefined ? scoring.sentiment_score : 2.0;
-    const deliveryZVal = p.technicals ? (p.technicals.delivery_z_score || 0.0) : 0.0;
-    const sentiment_bonus = deliveryZVal >= 1.0 ? 1.0 : 0.0;
-    const sentimentConv = p.sentiment_conviction !== undefined ? p.sentiment_conviction : Math.min(100, Math.max(0, Math.round(((s_score_val + sentiment_bonus) / 6.0) * 100.0)));
+                // Sync conviction data and trigger display in conviction drawer and dashboard!
+                try {
+                    displaySynthesisData(data);
+                } catch (dispErr) {
+                    console.error("Error displaying synthesis data:", dispErr);
+                }
 
-    speeches.forEach(speech => {
-        const bubble = document.createElement('div');
-        bubble.className = `agent-debate-block ${speech.class}`;
-        bubble.style.alignSelf = speech.align === 'left' ? 'flex-start' : 'flex-end';
-        bubble.style.maxWidth = '90%';
-        bubble.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-        bubble.style.display = 'flex';
-        bubble.style.flexDirection = 'column';
-        bubble.style.gap = '4px';
-
-        const sender = document.createElement('span');
-        sender.className = 'agent-header';
-        sender.style.display = 'flex';
-        sender.style.justifyContent = 'space-between';
-        sender.style.alignItems = 'center';
-        sender.style.width = '100%';
-
-        const roleSpan = document.createElement('span');
-        roleSpan.innerText = speech.role;
-        sender.appendChild(roleSpan);
-
-        const badge = document.createElement('span');
-        badge.className = 'agent-conviction-badge';
-
-        let convictionVal = 0;
-        if (speech.class === 'fundamental') convictionVal = fundamentalConv;
-        else if (speech.class === 'technical') convictionVal = technicalConv;
-        else if (speech.class === 'sentiment') convictionVal = sentimentConv;
-        else if (speech.class === 'cio') convictionVal = score;
-
-        badge.innerText = `Conviction: ${convictionVal}%`;
-        sender.appendChild(badge);
-
-        const message = document.createElement('p');
-        message.className = 'agent-comment';
-        message.style.margin = '0';
-        message.innerHTML = speech.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-        bubble.appendChild(sender);
-        bubble.appendChild(message);
-        dialogueContainer.appendChild(bubble);
-    });
+                // Explicitly render the debate blocks in the dialogueContainer directly from cache!
+                if (window.synthesisCache[cleanSymbol] && window.synthesisCache[cleanSymbol].formattedHtml) {
+                    dialogueContainer.innerHTML = window.synthesisCache[cleanSymbol].formattedHtml;
+                } else if (data.synthesis_text) {
+                    dialogueContainer.innerHTML = data.synthesis_text;
+                } else {
+                    throw new Error("No synthesis text returned from backend.");
+                }
+            } catch (err) {
+                console.error("Dashboard debate load error:", err);
+                dialogueContainer.innerHTML = `<span class="red-text" style="font-size: 11px; padding: 15px; display: block; text-align: center;">Failed to compile AI debate: ${err.message}. Please try again.</span>`;
+            }
+        });
+    }
 }
 
 // CSV Export Button Controller Bindings
@@ -39916,5 +39873,380 @@ function changeEventsPageSize(size) {
         }
     }, 60000);
 })();
+
+
+// ─── AI Strategy Audit Chatbot Module ─────────────────────────────────────────
+let auditChatHistory = [];
+
+function clearAuditChat() {
+    auditChatHistory = [];
+    const historyEl = document.getElementById('audit-chatbot-history');
+    if (historyEl) {
+        historyEl.innerHTML = `
+            <div style="font-style: italic; color: var(--text-muted); font-size: 11px; text-align: center; margin: auto 0;">
+                Start a conversational strategy audit. Ask follow-up questions or select a template above.
+            </div>
+        `;
+    }
+}
+
+function updateAuditChatContextHUD(profile) {
+    const hud = document.getElementById('audit-chatbot-context-hud');
+    if (!hud) return;
+    if (profile) {
+        const cleanTicker = profile.ticker.split('.')[0].toUpperCase();
+        const price = profile.fundamentals?.current_price || profile.price || 0;
+        hud.innerText = `${cleanTicker} (Rs. ${price})`;
+        hud.style.display = 'inline-flex';
+    } else {
+        hud.style.display = 'none';
+    }
+}
+
+function setupAuditChatbot() {
+    const templatesContainer = document.getElementById('audit-chatbot-templates');
+    if (templatesContainer) {
+        templatesContainer.onclick = (e) => {
+            const btn = e.target.closest('.chat-prompt-pill');
+            if (btn) {
+                const prompt = btn.getAttribute('data-prompt');
+                const input = document.getElementById('audit-chatbot-input');
+                if (input) {
+                    input.value = prompt;
+                    input.focus();
+                }
+            }
+        };
+    }
+
+    const sendBtn = document.getElementById('audit-chatbot-send-btn');
+    if (sendBtn) {
+        sendBtn.onclick = triggerAuditChatQuery;
+    }
+
+    const input = document.getElementById('audit-chatbot-input');
+    if (input) {
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                triggerAuditChatQuery();
+            }
+        };
+    }
+
+    const clearBtn = document.getElementById('audit-chatbot-clear-btn');
+    if (clearBtn) {
+        clearBtn.onclick = clearAuditChat;
+    }
+
+    const exportBtn = document.getElementById('audit-chatbot-export-btn');
+    if (exportBtn) {
+        exportBtn.onclick = exportAuditChatTranscript;
+    }
+
+    // Voice recognition (Speech to Text) Mic button setup
+    const micBtn = document.getElementById('audit-chatbot-mic-btn');
+    if (micBtn) {
+        const isAndroidSpeech = window.AndroidSpeech && typeof window.AndroidSpeech.startListening === 'function';
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (isAndroidSpeech) {
+            micBtn.onclick = () => {
+                if (window.AndroidSpeechListening && window.activeSpeechRecognizerTarget === 'audit_chat') {
+                    window.AndroidSpeech.stopListening();
+                } else {
+                    window.activeSpeechRecognizerTarget = 'audit_chat';
+                    window.AndroidSpeech.startListening();
+                }
+            };
+        } else if (!SpeechRecognition) {
+            micBtn.style.display = 'none';
+        } else {
+            let auditRecognition = new SpeechRecognition();
+            auditRecognition.continuous = false;
+            auditRecognition.interimResults = false;
+            auditRecognition.lang = 'en-US';
+            let isAuditListening = false;
+
+            auditRecognition.onstart = () => {
+                isAuditListening = true;
+                micBtn.innerHTML = '🔴';
+                micBtn.classList.add('mic-listening');
+            };
+
+            auditRecognition.onend = () => {
+                isAuditListening = false;
+                micBtn.innerHTML = '🎙️';
+                micBtn.classList.remove('mic-listening');
+            };
+
+            auditRecognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                const inputEl = document.getElementById('audit-chatbot-input');
+                if (inputEl) {
+                    inputEl.value = (inputEl.value ? inputEl.value + ' ' : '') + transcript;
+                }
+            };
+
+            auditRecognition.onerror = (event) => {
+                console.error("Audit Speech recognition error:", event.error);
+            };
+
+            micBtn.onclick = () => {
+                if (isAuditListening) {
+                    auditRecognition.stop();
+                } else {
+                    auditRecognition.start();
+                }
+            };
+        }
+    }
+}
+
+async function triggerAuditChatQuery() {
+    const input = document.getElementById('audit-chatbot-input');
+    if (!input) return;
+    const message = input.value.trim();
+    if (!message) return;
+
+    const sendBtn = document.getElementById('audit-chatbot-send-btn');
+    const spinner = document.getElementById('audit-chatbot-send-spinner');
+    const historyEl = document.getElementById('audit-chatbot-history');
+    if (!historyEl) return;
+
+    // Append user message
+    appendAuditChatMessage('user', message);
+    input.value = '';
+
+    // Save to conversation history
+    auditChatHistory.push({ role: 'user', content: message });
+
+    if (sendBtn) sendBtn.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+
+    const botMsgId = 'audit-bot-' + Date.now();
+    appendAuditChatLoading(botMsgId);
+
+    const startTime = Date.now();
+
+    try {
+        const payload = {
+            history: auditChatHistory.slice(0, -1),
+            message: message,
+            profile: activeStockProfile
+        };
+
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Failed to compile AI response");
+        const data = await res.json();
+
+        const latencySec = ((Date.now() - startTime) / 1000).toFixed(1);
+
+        removeAuditChatLoading(botMsgId);
+        const botResponse = data.response || "No response received.";
+        appendAuditChatMessage('bot', botResponse, latencySec);
+
+        // Save to local history
+        auditChatHistory.push({ role: 'assistant', content: botResponse });
+    } catch (err) {
+        console.error("Audit chatbot query error:", err);
+        removeAuditChatLoading(botMsgId);
+        appendAuditChatMessage('bot', "❌ Error: Failed to generate response from AI model.");
+    } finally {
+        if (sendBtn) sendBtn.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+    }
+}
+
+function appendAuditChatMessage(sender, text, latency) {
+    const history = document.getElementById('audit-chatbot-history');
+    if (!history) return;
+
+    // Clear placeholder
+    if (history.children.length === 1 && history.children[0].style.fontStyle === 'italic') {
+        history.innerHTML = '';
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-self: ${sender === 'user' ? 'flex-end' : 'flex-start'};
+        max-width: 85%;
+        margin-bottom: 4px;
+    `;
+
+    const contentDiv = document.createElement('div');
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+
+    let bg = sender === 'user' 
+        ? 'var(--color-primary)' 
+        : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)');
+    let color = sender === 'user' 
+        ? '#ffffff' 
+        : 'var(--text-primary)';
+
+    contentDiv.style.cssText = `
+        background: ${bg};
+        color: ${color};
+        font-size: 11.5px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        line-height: 1.5;
+        word-break: break-word;
+        font-family: 'Inter', sans-serif;
+        white-space: pre-wrap;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    `;
+
+    const msgId = 'audit-msg-text-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+
+    if (sender === 'bot') {
+        const pTag = document.createElement('p');
+        pTag.id = msgId;
+        pTag.style.margin = '0';
+        pTag.innerHTML = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        contentDiv.appendChild(pTag);
+    } else {
+        contentDiv.innerText = text;
+    }
+
+    messageDiv.appendChild(contentDiv);
+
+    if (sender === 'bot') {
+        const actionsDiv = document.createElement('div');
+        actionsDiv.style.cssText = `
+            display: flex;
+            gap: 12px;
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            padding: 0 4px;
+            align-self: flex-start;
+            align-items: center;
+        `;
+
+        const speakBtn = document.createElement('button');
+        speakBtn.className = 'section-speak-btn';
+        speakBtn.setAttribute('data-target', msgId);
+        speakBtn.setAttribute('data-title', 'Strategy Audit Co-Pilot');
+        speakBtn.style.cssText = 'background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0; outline: none; font-size: 10px; display: flex; align-items: center; gap: 2px;';
+        speakBtn.innerHTML = '🔊 Speak';
+        actionsDiv.appendChild(speakBtn);
+
+        if (latency) {
+            const latencyBadge = document.createElement('span');
+            latencyBadge.style.cssText = 'font-size: 9px; color: var(--text-muted); font-style: italic;';
+            latencyBadge.innerText = `⚡ Latency: ${latency}s`;
+            actionsDiv.appendChild(latencyBadge);
+        }
+
+        messageDiv.appendChild(actionsDiv);
+    }
+
+    history.appendChild(messageDiv);
+    history.scrollTop = history.scrollHeight;
+}
+
+function appendAuditChatLoading(botMsgId) {
+    const history = document.getElementById('audit-chatbot-history');
+    if (!history) return;
+
+    if (history.children.length === 1 && history.children[0].style.fontStyle === 'italic') {
+        history.innerHTML = '';
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.id = botMsgId;
+    messageDiv.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-self: flex-start;
+        max-width: 85%;
+        margin-bottom: 4px;
+    `;
+
+    const contentDiv = document.createElement('div');
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+
+    let bg = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
+    contentDiv.style.cssText = `
+        background: ${bg};
+        color: var(--text-secondary);
+        font-size: 11px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        line-height: 1.5;
+        font-family: 'Inter', sans-serif;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+
+    const spinner = document.createElement('div');
+    spinner.className = 'spinner';
+    spinner.style.cssText = 'width: 10px; height: 10px; border-width: 1.5px; border-top-color: var(--color-primary);';
+
+    const textSpan = document.createElement('span');
+    textSpan.innerText = 'Analyzing strategic parameters...';
+
+    contentDiv.appendChild(spinner);
+    contentDiv.appendChild(textSpan);
+    messageDiv.appendChild(contentDiv);
+
+    history.appendChild(messageDiv);
+    history.scrollTop = history.scrollHeight;
+}
+
+// Helper to remove loaders
+function removeAuditChatLoading(botMsgId) {
+    const loadingEl = document.getElementById(botMsgId);
+    if (loadingEl) {
+        loadingEl.remove();
+    }
+}
+
+function exportAuditChatTranscript() {
+    if (!auditChatHistory || auditChatHistory.length === 0) {
+        showToast("No chat history to export.", "warning");
+        return;
+    }
+
+    let md = `# AI Strategy Audit Co-Pilot Transcript\n`;
+    const ticker = activeStockProfile ? activeStockProfile.ticker : 'N/A';
+    const company = activeStockProfile ? activeStockProfile.company_name : 'N/A';
+    md += `**Stock Context**: ${company} (${ticker})\n`;
+    md += `**Generated At**: ${new Date().toLocaleString()}\n\n`;
+    md += `---\n\n`;
+
+    auditChatHistory.forEach(msg => {
+        const roleName = msg.role === 'user' ? 'User' : 'Strategy Co-Pilot';
+        md += `### 👤 ${roleName}\n\n${msg.content}\n\n`;
+    });
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${ticker}_Strategy_Audit_Transcript.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// Auto-run setup when DOM content is loaded
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupAuditChatbot);
+} else {
+    setupAuditChatbot();
+}
 
 

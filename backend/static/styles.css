@@ -14720,7 +14720,7 @@ details[open] .academy-hud-arrow {
         box-sizing: border-box !important;
     }
     
-    #fs-chat-input {
+    #fs-chat-input, #audit-chatbot-input {
         grid-column: 1 / span 2 !important;
         grid-row: 1 !important;
         width: 100% !important;
@@ -14729,7 +14729,7 @@ details[open] .academy-hud-arrow {
         box-sizing: border-box !important;
     }
     
-    #fs-chat-mic-btn {
+    #fs-chat-mic-btn, #audit-chatbot-mic-btn {
         grid-column: 1 !important;
         grid-row: 2 !important;
         height: 36px !important;
@@ -14741,7 +14741,7 @@ details[open] .academy-hud-arrow {
         justify-content: center !important;
     }
     
-    #fs-chat-send-btn {
+    #fs-chat-send-btn, #audit-chatbot-send-btn {
         grid-column: 2 !important;
         grid-row: 2 !important;
         height: 36px !important;
