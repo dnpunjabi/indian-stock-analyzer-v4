@@ -1093,19 +1093,19 @@
 
                         <!-- Source Filters -->
                         <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="market-news-source-filters">
-                            <button class="news-filter-chip active" data-source="all" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.05); color: var(--text-secondary); transition: all 0.2s;">
+                            <button class="global-news-source-chip active" data-source="all">
                                 All Sources
                             </button>
-                            <button class="news-filter-chip" data-source="Economic Times" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.02); color: var(--text-muted); transition: all 0.2s;">
+                            <button class="global-news-source-chip" data-source="Economic Times">
                                 Economic Times
                             </button>
-                            <button class="news-filter-chip" data-source="LiveMint" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.02); color: var(--text-muted); transition: all 0.2s;">
+                            <button class="global-news-source-chip" data-source="LiveMint">
                                 LiveMint
                             </button>
-                            <button class="news-filter-chip" data-source="Yahoo Finance" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.02); color: var(--text-muted); transition: all 0.2s;">
+                            <button class="global-news-source-chip" data-source="Yahoo Finance">
                                 Yahoo Finance
                             </button>
-                            <button class="news-filter-chip" data-source="Business Standard" style="border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 12px; font-size: 10.5px; font-weight: 600; cursor: pointer; background: rgba(255,255,255,0.02); color: var(--text-muted); transition: all 0.2s;">
+                            <button class="global-news-source-chip" data-source="Business Standard">
                                 Business Standard
                             </button>
                         </div>
@@ -1113,13 +1113,13 @@
 
                     <!-- Category Tab Filters -->
                     <div style="display: flex; gap: 8px; margin-top: 15px; border-top: 1px solid var(--border-glass); padding-top: 15px; flex-wrap: wrap; width: 100%;" id="market-news-category-filters">
-                        <button class="screener-filter-chip active" data-category="all" style="cursor: pointer;">All Sectors</button>
-                        <button class="screener-filter-chip" data-category="Macro & Indices" style="cursor: pointer;">📈 Macro</button>
-                        <button class="screener-filter-chip" data-category="Corporate & Earnings" style="cursor: pointer;">💼 Corporate</button>
-                        <button class="screener-filter-chip" data-category="IPOs & Primary Markets" style="cursor: pointer;">🚀 IPOs</button>
-                        <button class="screener-filter-chip" data-category="Regulatory & Policy" style="cursor: pointer;">🏦 Policy</button>
-                        <button class="screener-filter-chip" data-category="Institutional Flows" style="cursor: pointer;">📊 FII/DII</button>
-                        <button class="screener-filter-chip" data-category="Global Markets" style="cursor: pointer;">🌍 Global</button>
+                        <button class="global-news-category-chip active" data-category="all">All Sectors</button>
+                        <button class="global-news-category-chip" data-category="Macro & Indices">📈 Macro</button>
+                        <button class="global-news-category-chip" data-category="Corporate & Earnings">💼 Corporate</button>
+                        <button class="global-news-category-chip" data-category="IPOs & Primary Markets">🚀 IPOs</button>
+                        <button class="global-news-category-chip" data-category="Regulatory & Policy">🏦 Policy</button>
+                        <button class="global-news-category-chip" data-category="Institutional Flows">📊 FII/DII</button>
+                        <button class="global-news-category-chip" data-category="Global Markets">🌍 Global</button>
                     </div>
                 </div>
 
@@ -4365,6 +4365,24 @@
                                         <option value="momentum">Momentum Swing Trader</option>
                                         <option value="macro">Macro & Commodities</option>
                                     </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Content options -->
+                            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                                <div style="flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px;">
+                                    <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Include Events</span>
+                                    <label class="switch-toggle" style="position: relative; display: inline-block; width: 34px; height: 18px; margin-bottom: 0;">
+                                        <input type="checkbox" id="wrapup-include-events" style="opacity: 0; width: 0; height: 0;">
+                                        <span class="slider-toggle-round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 18px; border: 1px solid var(--border-glass);"></span>
+                                    </label>
+                                </div>
+                                <div style="flex: 1; display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px;">
+                                    <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Include Deals</span>
+                                    <label class="switch-toggle" style="position: relative; display: inline-block; width: 34px; height: 18px; margin-bottom: 0;">
+                                        <input type="checkbox" id="wrapup-include-deals" style="opacity: 0; width: 0; height: 0;">
+                                        <span class="slider-toggle-round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .3s; border-radius: 18px; border: 1px solid var(--border-glass);"></span>
+                                    </label>
                                 </div>
                             </div>
                             

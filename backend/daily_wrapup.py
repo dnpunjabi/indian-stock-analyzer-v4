@@ -304,22 +304,231 @@ async def fetch_global_news_summary() -> list:
         print(f"Daily Wrap-up: Global news fetch error: {e}")
         return []
 
+def fetch_upcoming_events_summary(portfolio_symbols: list, watchlist_symbols: list, days: int = 7) -> dict:
+    """
+    Queries SQLite cache for upcoming results, dividends, splits, bonuses in the next 7 days.
+    Capped at 3 details for portfolio holdings, with watchlist aggregated into a count.
+    """
+    from datetime import date, timedelta
+    import json
+    
+    result = {
+        "portfolio_text": "",
+        "watchlist_count": 0
+    }
+    
+    port_set = {s.replace(".NS", "").replace(".BO", "").strip().upper() for s in portfolio_symbols if s}
+    watch_set = {s.replace(".NS", "").replace(".BO", "").strip().upper() for s in watchlist_symbols if s}
+    
+    today_str = date.today().isoformat()
+    end_str = (date.today() + timedelta(days=days)).isoformat()
+    
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """SELECT symbol, event_type, event_date, description, details_json 
+                   FROM stock_events 
+                   WHERE event_date >= ? AND event_date <= ? 
+                   ORDER BY event_date ASC, symbol ASC""",
+                (today_str, end_str)
+            )
+            rows = [dict(r) for r in cursor.fetchall()]
+            
+        port_events = []
+        watch_events_count = 0
+        
+        for r in rows:
+            sym = r["symbol"].upper()
+            if sym in port_set:
+                port_events.append(r)
+            elif sym in watch_set:
+                watch_events_count += 1
+                
+        lines = []
+        event_labels = {
+            "quarterly_results": "Results",
+            "dividend": "Dividend",
+            "split": "Split",
+            "bonus": "Bonus",
+            "rights": "Rights",
+            "buyback": "Buyback"
+        }
+        
+        for ev in port_events[:3]:
+            lbl = event_labels.get(ev["event_type"], ev["event_type"].title().replace("_", " "))
+            try:
+                date_obj = datetime.strptime(ev["event_date"], "%Y-%m-%d")
+                date_fmt = date_obj.strftime("%d-%b")
+            except Exception:
+                date_fmt = ev["event_date"]
+            
+            detail_str = ""
+            if ev["details_json"]:
+                try:
+                    details = json.loads(ev["details_json"])
+                    if ev["event_type"] == "dividend":
+                        rate = details.get("dividend_rate") or details.get("trailing_annual_rate")
+                        if rate:
+                            detail_str = f" (₹{float(rate):.2f})"
+                    elif ev["event_type"] == "split":
+                        ratio = details.get("split_factor")
+                        if ratio:
+                            detail_str = f" ({ratio})"
+                except Exception:
+                    pass
+            lines.append(f"• {ev['symbol']}: {lbl} ({date_fmt}){detail_str}")
+            
+        if len(port_events) > 3:
+            lines.append(f"• ...and {len(port_events) - 3} other portfolio events.")
+            
+        result["portfolio_text"] = "\n".join(lines) if lines else "_No upcoming portfolio events scheduled._"
+        result["watchlist_count"] = watch_events_count
+        
+    except Exception as e:
+        print(f"Daily Wrap-up: Events summary error: {e}")
+        result["portfolio_text"] = "_Failed to fetch upcoming events._"
+        
+    return result
+
+def fetch_recent_deals_summary(portfolio_symbols: list, watchlist_symbols: list, days: int = 3) -> dict:
+    """
+    Queries SQLite cache for promoter & large institutional trades in the last 3 days.
+    Capped at 3 details for portfolio holdings, with watchlist aggregated into a count.
+    """
+    from datetime import datetime, timedelta
+    import json
+    
+    result = {
+        "portfolio_text": "",
+        "watchlist_count": 0
+    }
+    
+    port_set = {s.replace(".NS", "").replace(".BO", "").strip().upper() for s in portfolio_symbols if s}
+    watch_set = {s.replace(".NS", "").replace(".BO", "").strip().upper() for s in watchlist_symbols if s}
+    
+    def parse_deal_date(date_str):
+        if not date_str:
+            return datetime.min
+        for fmt in ('%d %b %Y', '%b %Y', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(date_str, fmt)
+            except ValueError:
+                pass
+        return datetime.min
+        
+    now = datetime.now()
+    cutoff = now - timedelta(days=days)
+    
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT symbol, data_json FROM cached_trades")
+            rows = [dict(r) for r in cursor.fetchall()]
+            
+        all_deals = []
+        for r in rows:
+            symbol = r["symbol"].upper()
+            try:
+                data = json.loads(r["data_json"])
+            except Exception:
+                continue
+                
+            for item in data.get("insider_trades", []):
+                item["category"] = "Insider"
+                item["symbol"] = symbol
+                all_deals.append(item)
+                
+            for item in data.get("bulk_deals", []):
+                item["category"] = "Bulk"
+                item["symbol"] = symbol
+                all_deals.append(item)
+                
+            for item in data.get("block_deals", []):
+                item["category"] = "Block"
+                item["symbol"] = symbol
+                all_deals.append(item)
+                
+            for item in data.get("sast_deals", []):
+                item["category"] = "SAST"
+                item["symbol"] = symbol
+                all_deals.append(item)
+                
+        port_deals = []
+        watch_deals_count = 0
+        
+        for d in all_deals:
+            deal_dt = parse_deal_date(d.get("date"))
+            if deal_dt == datetime.min or deal_dt < cutoff:
+                continue
+                
+            sym = d["symbol"]
+            if sym in port_set:
+                port_deals.append(d)
+            elif sym in watch_set:
+                watch_deals_count += 1
+                
+        # Sort portfolio deals by value descending
+        port_deals.sort(key=lambda x: x.get("value", 0), reverse=True)
+        
+        lines = []
+        def format_indian_rupees(num):
+            if not num:
+                return "₹0"
+            if num >= 10000000:
+                return f"₹{num / 10000000:.2f} Cr"
+            elif num >= 100000:
+                return f"₹{num / 100000:.2f} L"
+            return f"₹{num:,.0f}"
+            
+        for d in port_deals[:3]:
+            val_str = format_indian_rupees(d.get("value", 0))
+            category = d.get("category", "Insider")
+            dtype = d.get("type", "Trade")
+            person = d.get("person", "")
+            if len(person) > 20:
+                person = person[:18] + ".."
+                
+            if category == "Insider":
+                lines.append(f"• {d['symbol']}: Promoter {dtype} of {val_str} ({person})")
+            else:
+                lines.append(f"• {d['symbol']}: {category} {dtype} of {val_str} ({person})")
+                
+        if len(port_deals) > 3:
+            lines.append(f"• ...and {len(port_deals) - 3} other portfolio deals.")
+            
+        result["portfolio_text"] = "\n".join(lines) if lines else "_No recent promoter or institutional deals._"
+        result["watchlist_count"] = watch_deals_count
+        
+    except Exception as e:
+        print(f"Daily Wrap-up: Deals summary error: {e}")
+        result["portfolio_text"] = "_Failed to fetch recent deals._"
+        
+    return result
+
 async def generate_daily_wrapup_text(persona_override: str = None) -> str:
     """
     Assembles data from all components, invokes LLM to compile commentary based on selected persona,
     and returns a formatted WhatsApp text payload.
     """
-    # 1. Fetch settings to determine AI persona
+    # 1. Fetch settings to determine AI persona and checkboxes
     persona = "institutional"
-    if persona_override:
-        persona = persona_override
-    else:
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT value FROM alert_settings WHERE key = 'daily_wrapup_persona'")
-            row = cursor.fetchone()
-            if row:
+    include_events = True
+    include_deals = True
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """SELECT key, value FROM alert_settings 
+               WHERE key IN ('daily_wrapup_persona', 'daily_wrapup_include_events', 'daily_wrapup_include_deals')"""
+        )
+        for row in cursor.fetchall():
+            if row["key"] == "daily_wrapup_persona":
                 persona = row["value"]
+            elif row["key"] == "daily_wrapup_include_events":
+                include_events = (row["value"] == "true")
+            elif row["key"] == "daily_wrapup_include_deals":
+                include_deals = (row["value"] == "true")
 
     # 2. Gather market indices
     indices_str = ""
@@ -356,7 +565,6 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
             if not ticks.empty:
                 for sym, name in [("^NSEI", "Nifty 50"), ("^BSESN", "BSE Sensex")]:
                     try:
-                        # Handle multi-index or single index DataFrame
                         if isinstance(ticks.columns, pd.MultiIndex):
                             curr = ticks["Close"][sym].iloc[-1]
                             prev = ticks["Close"][sym].iloc[-2]
@@ -451,7 +659,49 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
     else:
         news_str = "_No significant market news cached._\n"
 
-    # 7. Generate AI commentary
+    # Gather Portfolio and Watchlist symbols for details
+    port_symbols = []
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, symbol, name, sector, quantity, purchase_price, purchase_date, transaction_type FROM portfolio_items")
+            all_txs = [dict(row) for row in cursor.fetchall()]
+        active_holdings = compute_active_holdings(all_txs)
+        port_symbols = [h["symbol"] for h in active_holdings]
+    except Exception as e:
+        print(f"Daily Wrap-up symbols query error: {e}")
+
+    watchlist_symbols = []
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT symbol FROM watchlist_items")
+            watchlist_symbols = [row["symbol"] for row in cursor.fetchall()]
+    except Exception as e:
+        print(f"Daily Wrap-up watchlist query error: {e}")
+
+    # 7. Gather Events and Deals blocks
+    events_block = ""
+    events_summary = {}
+    if include_events:
+        events_summary = fetch_upcoming_events_summary(port_symbols, watchlist_symbols)
+        events_block += f"📅 *6. UPCOMING PORTFOLIO EVENTS*\n"
+        events_block += f"{events_summary['portfolio_text']}\n"
+        if events_summary['watchlist_count'] > 0:
+            events_block += f"• _Watchlist summary: {events_summary['watchlist_count']} upcoming events scheduled._\n"
+        events_block += "\n"
+
+    deals_block = ""
+    deals_summary = {}
+    if include_deals:
+        deals_summary = fetch_recent_deals_summary(port_symbols, watchlist_symbols)
+        deals_block += f"🤝 *7. PORTFOLIO INSIDER FLOWS*\n"
+        deals_block += f"{deals_summary['portfolio_text']}\n"
+        if deals_summary['watchlist_count'] > 0:
+            deals_block += f"• _Watchlist summary: {deals_summary['watchlist_count']} recent promoter deals detected._\n"
+        deals_block += "\n"
+
+    # 8. Generate AI commentary
     system_prompts = {
         "institutional": (
             "You are an institutional portfolio manager. "
@@ -473,6 +723,14 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
         )
     }
     
+    events_commentary_context = ""
+    if include_events and events_summary.get("portfolio_text") and "_No upcoming portfolio" not in events_summary["portfolio_text"]:
+        events_commentary_context = f"\nUpcoming Portfolio Events:\n{events_summary['portfolio_text']}"
+
+    deals_commentary_context = ""
+    if include_deals and deals_summary.get("portfolio_text") and "_No recent promoter" not in deals_summary["portfolio_text"]:
+        deals_commentary_context = f"\nRecent Insider Deals:\n{deals_summary['portfolio_text']}"
+
     sys_prompt = system_prompts.get(persona, system_prompts["institutional"])
     user_prompt = (
         f"TODAY'S MARKET STATS:\n"
@@ -480,6 +738,8 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
         f"Portfolio P&L:\n{port_str}\n"
         f"Strongest Sectors:\n{sectors_str}\n"
         f"Global News Headlines:\n{news_str}\n"
+        f"{events_commentary_context}"
+        f"{deals_commentary_context}\n"
         f"Output only the 2-3 sentence summary."
     )
     
@@ -491,7 +751,7 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
         print(f"Daily Wrap-up AI commentary failed: {ai_err}")
         ai_commentary = "Market closed with standard distributions. Rebalancing and sector rotation remained active within structural bands."
 
-    # 8. Assemble final WhatsApp payload
+    # 9. Assemble final WhatsApp payload
     today_date = datetime.now().strftime("%B %d, %Y")
     
     msg = (
@@ -515,6 +775,9 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
         
         f"📰 *5. MARKET CATALYST HEADLINES*\n"
         f"{news_str}\n"
+        
+        f"{events_block}"
+        f"{deals_block}"
         
         f"🤖 *AI COPILOT BRIEFING* (_{persona.title()}_)\n"
         f"_{ai_commentary}_\n"

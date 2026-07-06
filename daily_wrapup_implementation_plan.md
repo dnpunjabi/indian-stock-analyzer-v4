@@ -1,118 +1,134 @@
-# WhatsApp Daily Market Close Wrap-Up Summary Implementation Plan
+# Event Calendar & Deals Sweep Integration Plan (Constrained/Refined)
 
-This document outlines the design, scheduling, and implementation details for the daily market wrap-up summary sent to the user's WhatsApp shortly after the Indian market close (4:00 PM IST). 
-
-The summary aggregates index standings, portfolio daily changes, sector relative strength (with leaders and laggards), watchlist highlights, global market news headlines, and a concise AI-generated commentary.
+This plan outlines how to integrate the existing **Corporate Event Calendar** and **Deals Sweep** features into the **Daily Closing Wrap-Up** WhatsApp alert and main dashboard under the specific constraints of an Oracle Cloud VM deployment and Meta's WhatsApp API.
 
 ---
 
-## 🏗️ System Flow & Architecture
+## 🛑 Infrastructure & Platform Constraints
 
-The daily wrap-up system consists of four main parts:
-1. **Configurable Settings in SQLite** to toggle the scheduler, adjust the trigger time, and set the AI persona.
-2. **An Aggregator Engine** that pulls index performance, nets active portfolio holdings, gathers sector data, parses market movers, scrapes watchlist tickers, pulls top global news headlines, and feeds a summary to the LLM for market commentary.
-3. **An Asynchronous Background Loop** running in FastAPI that sweeps every 5 minutes to check if it's time to send today's summary.
-4. **An Interactive UI Card** in the alerts tab allowing the user to configure settings, view execution logs, and trigger an on-demand wrap-up with a live preview.
+1. **Oracle Cloud VM & Rate-Limiting**:
+   - External data providers (NSE India, Yahoo Finance, Screener.in) heavily rate-limit or ban cloud VM IPs (returning HTTP `403` or `429`).
+   - The backend runs a cache-first architecture. Any real-time scraping of trades or calendar events during alert generation at 4:00 PM IST is highly risky and must be avoided.
+2. **WhatsApp (Meta Cloud API) Constraints**:
+   - Maximum text length is 4096 characters.
+   - Mobile screens display a "Read More" cutoff if the vertical length is too long, reducing readability.
+   - HTML/CSS are not supported; formatting relies on emojis and simple markdown.
 
-```mermaid
-graph TD
-    Start[FastAPI Startup Scheduler] --> |Every 5 min check| CheckTime{Is it Weekday & 4:00 PM IST?}
-    CheckTime -->|No| Sleep[Sleep 5 minutes]
-    CheckTime -->|Yes & Not Sent Today| Run[Run Wrap-up Pipeline]
-    
-    subgraph Data Aggregator Pipeline
-        Run --> P_Holdings[Nets Portfolio Holdings & Daily P&L]
-        Run --> M_Movers[Fetches Index & Market Movers Cache]
-        Run --> S_Regime[Pulls Sector Regime Stats with Leaders/Laggards]
-        Run --> W_Watchlists[Gathers Watchlist Items]
-        Run --> N_News[Fetches Top 3 High-Impact Global News Headlines]
-        
-        P_Holdings & M_Movers & S_Regime & W_Watchlists & N_News --> Collator[Format Structured Text Summary]
-    end
-    
-    Collator --> LLM[Call Llama-3 for AI Commentary]
-    LLM --> Formatter[Format WhatsApp Markdowns & Emojis]
-    Formatter --> Dispatch[Send Meta WhatsApp Cloud API Message]
-    Dispatch --> DB_Log[Update last_sent_date in SQLite]
+---
+
+## 💡 Refined Recommendations
+
+To respect these constraints, we propose the following implementation choices:
+
+### 1. Cache-Only Evaluation
+- **No live API fetches** will be triggered when constructing the daily wrap-up message. The pipeline will strictly read from the `stock_events` and `cached_trades` SQLite tables in `watchlist_database.db`, which are updated in the background.
+
+### 2. Portfolio-Centric Details (Watchlist Summarized)
+- Detailed event lists and promoter deal highlights will be displayed **exclusively for active portfolio holdings** (which is a small, high-priority set, e.g., 5-15 stocks).
+- Watchlist stocks will be aggregated into a single, compact summary line to save characters and prevent database overhead (e.g., `👀 Watchlist: 2 upcoming results, 0 recent insider trades`).
+
+### 3. Timeframes & Strict Caps
+- **Upcoming Events Calendar**: Lookahead of **7 days** (to catch earnings/dividends in advance). Max items capped at **3** (prioritized by closest date).
+- **Insider Deals Sweep**: Lookback of **3 days** (to catch recent catalyst trades). Max items capped at **3** (prioritized by highest value in INR).
+- If more events or deals exist, format a compact line: `• ...and X other portfolio events.`
+
+---
+
+## 🚀 Advanced Operational Recommendations
+
+To elevate the robustness and value of this integration, we recommend implementing the following enhancements:
+
+### A. AI Portfolio Doctor Synchronization
+- Inject corporate events and recent promoter transactions into the **AI Portfolio Doctor** analysis prompts. This allows the portfolio diagnostic logic to detect critical structural anomalies, such as warning the user if a portfolio company has upcoming earnings and the promoters are actively selling down their stakes.
+
+### B. Pre-Alert Cache Warm Up
+- Set the background scraping task schedule to execute a sweep at **3:00 PM IST** (one hour prior to the wrap-up dispatch). This refreshes the local SQLite cache with the afternoon's corporate announcements and large block deals, ensuring that the 4:00 PM wrap-up is populated with fresh, current data.
+
+### C. Proactive Cookie Diagnostics
+- Render a warning badge (e.g. `⚠️ Deals Scanner Offline: Cookie Expired`) on the Alerts Tab UI if the Screener.in session cookie fails authentication diagnostics. This provides immediate visibility and lets the user refresh their cookie before the 4:00 PM alert runs.
+
+---
+
+## Proposed Changes
+
+### Backend Implementation
+
+#### [MODIFY] [daily_wrapup.py](file:///c:/Users/dheer/Desktop/AI/indian-stock-analyzer/backend/daily_wrapup.py)
+
+- Implement a helper `fetch_upcoming_events_summary(portfolio_symbols: list, watchlist_symbols: list) -> dict`:
+  - Query cached events in `stock_events` for `[today, today + 7 days]`.
+  - Compile up to **3** portfolio events: `• TICKER: Event Type (Date)` (e.g., `• HDFCBANK: quarterly_results (08-Jul)`).
+  - Compute a count of upcoming watchlist events.
+  - Return a dictionary containing the formatted portfolio events string and the watchlist summary count.
+- Implement a helper `fetch_recent_deals_summary(portfolio_symbols: list, watchlist_symbols: list) -> dict`:
+  - Query cached trades in `cached_trades` for the last **3 days**.
+  - Filter for portfolio transactions exceeding ₹10 Lakhs.
+  - Group by ticker, sort by descending value, and take the top **3** items.
+  - Format: `• TICKER: Promoter [Buy/Sell] of Rs. X [Qty @ Price]`
+  - Compute watchlist matches as a summary count.
+  - Return a dictionary with the formatted portfolio deals string and the watchlist summary count.
+- Update `generate_daily_wrapup_text(persona_override: str = None)`:
+  - Extract settings toggles `daily_wrapup_include_events` and `daily_wrapup_include_deals`.
+  - Fetch portfolio symbols from `compute_active_holdings()`.
+  - Generate the text blocks and feed them into the LLM context prompt for AI commentary.
+  - Append the text sections to the final WhatsApp message payload.
+
+#### [MODIFY] [main.py](file:///c:/Users/dheer/Desktop/AI/indian-stock-analyzer/backend/main.py)
+
+- Seeding the new config values in `init_db()`:
+  - `daily_wrapup_include_events`: `"true"` (default)
+  - `daily_wrapup_include_deals`: `"true"` (default)
+- Update settings endpoints `GET /api/alerts/daily-wrapup/settings` and `POST /api/alerts/daily-wrapup/settings` to expose and persist these toggles.
+
+---
+
+### Frontend Cockpit
+
+#### [MODIFY] [index.html](file:///c:/Users/dheer/Desktop/AI/indian-stock-analyzer/backend/static/index.html)
+- Insert UI checkboxes `#wrapup-include-events` and `#wrapup-include-deals` into the Daily Closing Wrap-Up cockpit card.
+
+#### [MODIFY] [app.js](file:///c:/Users/dheer/Desktop/AI/indian-stock-analyzer/backend/static/app.js)
+- Bind the UI checkboxes to the configuration payload in `fetchDailyWrapupSettings()` and `setupDailyWrapupListeners()`.
+
+---
+
+## WhatsApp Alert Formatting Mockup
+
+Here is how the enhanced sections will render in the final message:
+
+```text
+════════════════════════
+📈 APEX EQUITIES WORKSTATION
+📅 Daily Close Wrap-Up | July 05, 2026
+════════════════════════
+
+... (Indices, Portfolio P&L, Sector Momentum, Watchlist Status) ...
+
+📅 *6. UPCOMING PORTFOLIO EVENTS*
+• HDFCBANK: quarterly_results (08-Jul) - Est. EPS: ₹24.50
+• TCS: dividend (10-Jul) - Yield: 1.8% (₹28.00)
+• ...and 2 other portfolio events.
+• _Watchlist summary: 3 upcoming earnings/dividends scheduled._
+
+🤝 *7. PORTFOLIO INSIDER FLOWS*
+• INFY: Promoter Buy of Rs. 45.00 L (3,000 shares @ ₹1,500)
+• TATAMOTORS: Promoter Buy of Rs. 1.20 Cr (15,000 shares @ ₹800)
+• _Watchlist summary: 0 recent promoter deals detected._
+
+🤖 *AI COPILOT BRIEFING* (Institutional)
+_Nifty held technical support despite sector rotation. Promoters increased accumulation in Auto and IT, while upcoming earnings in HDFCBANK provide a near-term catalyst._
+────────────────────────
+_APEX AI Workstation Client Portal_
 ```
 
 ---
 
-## 📱 WhatsApp Styling & Formatting Rules
-
-Since WhatsApp does not support HTML/CSS, the layout is styled strictly using WhatsApp's markdown rules:
-1. **Consistent Color Coding**:
-   - `🟢` / `🔺` for positive returns / gains.
-   - `🔴` / `🔻` for negative returns / losses.
-   - `🟡` or `⚪` for flat/neutral states.
-2. **Visual Section Delimiters**:
-   - Separate sections using bold double lines `════════════════════` or dotted dividers `────────────────────` to simulate card boundaries.
-3. **Monospaced Numerical Columns**:
-   - Wrap prices and change percentages in monospace blocks (e.g. ` ```24,123.85 (+0.45%)``` `) to force consistent character spacing, preventing wrap alignment issues on mobile screens.
-4. **Indentation and Hierarchy**:
-   - Bullet lists use `•`. Sub-bullets (like Leader/Laggard) use indents with visual indicators:
-     - `  ├─ 🏆 Leader: RELIANCE.NS (+2.10%)`
-     - `  └─ ⚠️ Laggard: HDFCBANK.NS (-0.50%)`
-5. **Length Constraints**:
-   - Cap list sizes (e.g., maximum of 2 strongest/weakest sectors, top 3 movers, top 3 watchlist changes) to prevent the message from getting cut off by WhatsApp's "Read More..." truncation.
-
----
-
-## 🛠️ Implementation Details
-
-### 1. Database & Settings
-The daily wrap-up configuration is saved in the existing `alert_settings` SQLite table:
-*   `daily_wrapup_enabled`: `"true"` or `"false"` (default: `"true"`)
-*   `daily_wrapup_time`: `"16:00"` (default trigger time in IST)
-*   `daily_wrapup_last_sent`: `"YYYY-MM-DD"` (stores the date of the last successful dispatch to prevent duplicate messages if the server restarts).
-*   `daily_wrapup_persona`: `"institutional"` (AI style: `"institutional"`, `"momentum"`, or `"macro"`).
-
----
-
-### 2. Backend Modules
-
-#### [daily_wrapup.py](file:///c:/Users/dheer/Desktop/AI/indian-stock-analyzer/backend/daily_wrapup.py)
-A dedicated service file handling the data aggregation and formatting:
-*   `fetch_portfolio_summary()`: Computes active holdings using `compute_active_holdings()`. Calculates daily valuation changes by resolving each stock's current price and percentage change, backing out previous closes, and calculating overall portfolio absolute and percentage daily change. Identifies the top gainer/loser.
-*   `fetch_watchlist_summary()`: Collects unique symbols across all watchlists. Performs a batch `yfinance` fetch to get daily gains/losses. Identifies top watchlist gainer/loser.
-*   `fetch_sector_momentum()`: Reads `sector_regime_stats` in SQLite to extract the 1-day strongest and weakest sectors, alongside their Leaders and Laggards.
-*   `fetch_global_news_summary()`: Integrates with the existing `get_market_news` logic to extract the top 3 high-impact global or Indian market headlines.
-*   `generate_daily_wrapup_text()`: Combines all sections, triggers the LLM for commentary, and outputs the final WhatsApp message body.
-*   `send_whatsapp_wrapup(msg_body)`: Sends the formatted payload via Meta's WhatsApp Cloud API.
-
-#### [main.py](file:///c:/Users/dheer/Desktop/AI/indian-stock-analyzer/backend/main.py)
-*   **Database Seeding**: Initializes defaults inside `init_db()`.
-*   **New Endpoints**:
-    *   `GET /api/alerts/daily-wrapup/settings`: Returns schedule configuration.
-    *   `POST /api/alerts/daily-wrapup/settings`: Updates schedule configuration in SQLite.
-    *   `POST /api/alerts/daily-wrapup/trigger`: Instantly triggers wrap-up generation and sends to WhatsApp.
-*   **Background Scheduler**: Spawns `run_background_daily_wrapup_scheduler()` inside startup event to sweep time registers every 5 minutes.
-
----
-
-### 3. Frontend Cockpit Card
-
-#### [index.html](file:///c:/Users/dheer/Desktop/AI/indian-stock-analyzer/backend/static/index.html)
-Adds a configuration card containing toggle switches, a time input, a persona dropdown selector, save button, manual trigger action, and a preview modal.
-
-#### [app.js](file:///c:/Users/dheer/Desktop/AI/indian-stock-analyzer/backend/static/app.js)
-Handles dashboard binding:
-*   `fetchDailyWrapupSettings()`: Populates UI inputs with saved configuration fields.
-*   `setupDailyWrapupListeners()`: Wires form saves to POST settings, and manual dispatches to trigger endpoint.
-
----
-
-## 🧪 Verification Plan
+## Verification Plan
 
 ### Automated Tests
-Appended `TestWhatsAppDailyWrapup` to `backend/test_models.py`:
-*   Tests settings retrieval and storage lifecycle.
-*   Tests pipeline execution, FIFO arithmetic calculations, and LLM compilation using patch mocks.
-*   **Test Command**: `python -m backend.test_models` (Ran and verified successfully - `OK`).
+- Append unit tests to `backend/test_models.py` inside `TestWhatsAppDailyWrapup` to verify event and deal rendering logic.
+- Run tests: `python -m backend.test_models`
 
 ### Manual Verification
-1. Open the workstation UI and confirm the **DAILY CLOSING WRAP-UP** card is active under the Alerts cockpit.
-2. Select your AI Persona, click **Save Schedule Settings**, and verify settings persist.
-3. Click **Send & Preview On-Demand Wrap-Up** to verify:
-   - Instant visual preview panel renders with the compiled report.
-   - WhatsApp message successfully arrives on your phone.
+- Save settings through the cockpit UI and ensure toggles persist on reload.
+- Trigger an on-demand wrap-up and confirm that the preview modal and WhatsApp notification display the structured text blocks without overflow or formatting glitches.

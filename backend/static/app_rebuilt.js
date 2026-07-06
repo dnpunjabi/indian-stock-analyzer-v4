@@ -28490,12 +28490,12 @@ function setupGlobalMarketNewsControls() {
     const sourceFiltersWrap = document.getElementById('market-news-source-filters');
     if (sourceFiltersWrap) {
         sourceFiltersWrap.addEventListener('click', (e) => {
-            const chip = e.target.closest('.news-filter-chip');
+            const chip = e.target.closest('.global-news-source-chip');
             if (!chip) return;
             e.preventDefault();
             e.stopPropagation();
 
-            sourceFiltersWrap.querySelectorAll('.news-filter-chip').forEach(c => c.classList.remove('active'));
+            sourceFiltersWrap.querySelectorAll('.global-news-source-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
 
             currentMarketNewsSource = chip.dataset.source;
@@ -28507,12 +28507,12 @@ function setupGlobalMarketNewsControls() {
     const categoryFiltersWrap = document.getElementById('market-news-category-filters');
     if (categoryFiltersWrap) {
         categoryFiltersWrap.addEventListener('click', (e) => {
-            const chip = e.target.closest('.screener-filter-chip');
+            const chip = e.target.closest('.global-news-category-chip');
             if (!chip) return;
             e.preventDefault();
             e.stopPropagation();
 
-            categoryFiltersWrap.querySelectorAll('.screener-filter-chip').forEach(c => c.classList.remove('active'));
+            categoryFiltersWrap.querySelectorAll('.global-news-category-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
 
             currentMarketNewsCategory = chip.dataset.category;

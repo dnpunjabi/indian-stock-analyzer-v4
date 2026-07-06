@@ -10393,10 +10393,14 @@ async function fetchDailyWrapupSettings() {
         const timeInput = document.getElementById('wrapup-time');
         const personaSelect = document.getElementById('wrapup-persona');
         const lastSentLbl = document.getElementById('wrapup-last-sent-lbl');
+        const includeEventsChkbx = document.getElementById('wrapup-include-events');
+        const includeDealsChkbx = document.getElementById('wrapup-include-deals');
 
         if (enabledChkbx) enabledChkbx.checked = data.enabled;
         if (timeInput) timeInput.value = data.time;
         if (personaSelect) personaSelect.value = data.persona;
+        if (includeEventsChkbx) includeEventsChkbx.checked = data.include_events;
+        if (includeDealsChkbx) includeDealsChkbx.checked = data.include_deals;
         if (lastSentLbl) {
             lastSentLbl.textContent = data.last_sent ? `Last dispatched: ${data.last_sent}` : "Last dispatched: Never";
         }
@@ -10412,6 +10416,8 @@ function setupDailyWrapupListeners() {
             const enabled = document.getElementById('wrapup-enabled')?.checked;
             const time = document.getElementById('wrapup-time')?.value;
             const persona = document.getElementById('wrapup-persona')?.value;
+            const include_events = document.getElementById('wrapup-include-events')?.checked;
+            const include_deals = document.getElementById('wrapup-include-deals')?.checked;
 
             if (!time) {
                 showToast("Please enter a valid dispatch time.", "error");
@@ -10422,7 +10428,7 @@ function setupDailyWrapupListeners() {
                 const response = await fetch('/api/alerts/daily-wrapup/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ enabled, time, persona })
+                    body: JSON.stringify({ enabled, time, persona, include_events, include_deals })
                 });
 
                 if (response.ok) {
@@ -31385,12 +31391,12 @@ function setupGlobalMarketNewsControls() {
     const sourceFiltersWrap = document.getElementById('market-news-source-filters');
     if (sourceFiltersWrap) {
         sourceFiltersWrap.addEventListener('click', (e) => {
-            const chip = e.target.closest('.news-filter-chip');
+            const chip = e.target.closest('.global-news-source-chip');
             if (!chip) return;
             e.preventDefault();
             e.stopPropagation();
 
-            sourceFiltersWrap.querySelectorAll('.news-filter-chip').forEach(c => c.classList.remove('active'));
+            sourceFiltersWrap.querySelectorAll('.global-news-source-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
 
             currentMarketNewsSource = chip.dataset.source;
@@ -31402,12 +31408,12 @@ function setupGlobalMarketNewsControls() {
     const categoryFiltersWrap = document.getElementById('market-news-category-filters');
     if (categoryFiltersWrap) {
         categoryFiltersWrap.addEventListener('click', (e) => {
-            const chip = e.target.closest('.screener-filter-chip');
+            const chip = e.target.closest('.global-news-category-chip');
             if (!chip) return;
             e.preventDefault();
             e.stopPropagation();
 
-            categoryFiltersWrap.querySelectorAll('.screener-filter-chip').forEach(c => c.classList.remove('active'));
+            categoryFiltersWrap.querySelectorAll('.global-news-category-chip').forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
 
             currentMarketNewsCategory = chip.dataset.category;

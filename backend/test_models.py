@@ -1835,6 +1835,8 @@ class TestWhatsAppDailyWrapup(unittest.TestCase):
     def setUpClass(cls):
         cls.client = TestClient(app)
         main.init_db()
+        from backend.events_scraper import init_events_table
+        init_events_table()
 
     def setUp(self):
         with get_db() as conn:
@@ -1842,6 +1844,8 @@ class TestWhatsAppDailyWrapup(unittest.TestCase):
             cursor.execute("DELETE FROM alert_settings WHERE key LIKE 'daily_wrapup_%'")
             cursor.execute("DELETE FROM portfolio_items")
             cursor.execute("DELETE FROM watchlist_items")
+            cursor.execute("DELETE FROM stock_events")
+            cursor.execute("DELETE FROM cached_trades")
             conn.commit()
 
     def test_settings_flow(self):
@@ -1853,9 +1857,11 @@ class TestWhatsAppDailyWrapup(unittest.TestCase):
         self.assertIn("enabled", data)
         self.assertIn("time", data)
         self.assertIn("persona", data)
+        self.assertIn("include_events", data)
+        self.assertIn("include_deals", data)
 
         # 2. Save new settings
-        payload = {"enabled": False, "time": "17:30", "persona": "momentum"}
+        payload = {"enabled": False, "time": "17:30", "persona": "momentum", "include_events": False, "include_deals": False}
         post_res = self.client.post("/api/alerts/daily-wrapup/settings", json=payload)
         self.assertEqual(post_res.status_code, 200)
         self.assertEqual(post_res.json()["status"], "success")
@@ -1867,6 +1873,8 @@ class TestWhatsAppDailyWrapup(unittest.TestCase):
         self.assertFalse(updated["enabled"])
         self.assertEqual(updated["time"], "17:30")
         self.assertEqual(updated["persona"], "momentum")
+        self.assertFalse(updated["include_events"])
+        self.assertFalse(updated["include_deals"])
 
     @patch("backend.daily_wrapup.yf.download")
     @patch("backend.daily_wrapup.call_llm")
@@ -1897,6 +1905,36 @@ class TestWhatsAppDailyWrapup(unittest.TestCase):
                 "INSERT INTO watchlist_items (watchlist_id, symbol, name, sector) VALUES (?, ?, ?, ?)",
                 (1, "TCS.NS", "Tata Consultancy Services", "Technology")
             )
+            
+            # Seed mock event for INFY
+            from datetime import date, timedelta
+            tomorrow_str = (date.today() + timedelta(days=1)).isoformat()
+            cursor.execute(
+                """INSERT OR REPLACE INTO stock_events 
+                   (symbol, company_name, event_type, event_date, description, details_json, fetched_at) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                ("INFY", "Infosys Ltd", "quarterly_results", tomorrow_str, "Q1 Results", "{}", "2026-07-06T00:00:00Z")
+            )
+            
+            # Seed mock deals for INFY
+            today_str = date.today().isoformat()
+            deal_data = {
+                "insider_trades": [{
+                    "date": today_str,
+                    "person": "Promoter Guy",
+                    "type": "Buy",
+                    "quantity": 1000,
+                    "price": 1500.0,
+                    "value": 1500000
+                }],
+                "bulk_deals": [],
+                "block_deals": [],
+                "sast_deals": []
+            }
+            cursor.execute(
+                "INSERT OR REPLACE INTO cached_trades (symbol, data_json, last_updated) VALUES (?, ?, ?)",
+                ("INFY", json.dumps(deal_data), "2026-07-06 00:00:00")
+            )
             conn.commit()
 
         # Trigger wrap-up
@@ -1907,6 +1945,8 @@ class TestWhatsAppDailyWrapup(unittest.TestCase):
         self.assertIn("message_body", data)
         self.assertIn("APEX EQUITIES WORKSTATION", data["message_body"])
         self.assertIn("PORTFOLIO DAILY STATUS", data["message_body"])
+        self.assertIn("UPCOMING PORTFOLIO EVENTS", data["message_body"])
+        self.assertIn("PORTFOLIO INSIDER FLOWS", data["message_body"])
         self.assertIn("AI COPILOT BRIEFING", data["message_body"])
 
     def test_screener_cookie_endpoints(self):

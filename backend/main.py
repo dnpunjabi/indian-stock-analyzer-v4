@@ -434,6 +434,8 @@ def init_db():
             cursor.execute("INSERT OR IGNORE INTO alert_settings (key, value) VALUES ('daily_wrapup_enabled', 'true')")
             cursor.execute("INSERT OR IGNORE INTO alert_settings (key, value) VALUES ('daily_wrapup_time', '16:00')")
             cursor.execute("INSERT OR IGNORE INTO alert_settings (key, value) VALUES ('daily_wrapup_persona', 'institutional')")
+            cursor.execute("INSERT OR IGNORE INTO alert_settings (key, value) VALUES ('daily_wrapup_include_events', 'true')")
+            cursor.execute("INSERT OR IGNORE INTO alert_settings (key, value) VALUES ('daily_wrapup_include_deals', 'true')")
         except Exception as e:
             print(f"Error seeding daily wrap up configurations: {e}")
             
@@ -4688,9 +4690,15 @@ async def get_daily_wrapup_settings():
     trigger_time = "16:00"
     persona = "institutional"
     last_sent = ""
+    include_events = "true"
+    include_deals = "true"
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT key, value FROM alert_settings WHERE key IN ('daily_wrapup_enabled', 'daily_wrapup_time', 'daily_wrapup_persona', 'daily_wrapup_last_sent')")
+        cursor.execute(
+            """SELECT key, value FROM alert_settings 
+               WHERE key IN ('daily_wrapup_enabled', 'daily_wrapup_time', 'daily_wrapup_persona', 
+                             'daily_wrapup_last_sent', 'daily_wrapup_include_events', 'daily_wrapup_include_deals')"""
+        )
         for row in cursor.fetchall():
             if row["key"] == "daily_wrapup_enabled":
                 enabled = row["value"]
@@ -4700,12 +4708,18 @@ async def get_daily_wrapup_settings():
                 persona = row["value"]
             elif row["key"] == "daily_wrapup_last_sent":
                 last_sent = row["value"]
+            elif row["key"] == "daily_wrapup_include_events":
+                include_events = row["value"]
+            elif row["key"] == "daily_wrapup_include_deals":
+                include_deals = row["value"]
     
     return {
         "enabled": enabled.lower() == "true",
         "time": trigger_time,
         "persona": persona,
-        "last_sent": last_sent
+        "last_sent": last_sent,
+        "include_events": include_events.lower() == "true",
+        "include_deals": include_deals.lower() == "true"
     }
 
 @app.post("/api/alerts/daily-wrapup/settings")
@@ -4720,6 +4734,12 @@ async def save_daily_wrapup_settings(payload: dict):
             cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_time', ?)", (payload["time"],))
         if "persona" in payload:
             cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_persona', ?)", (payload["persona"],))
+        if "include_events" in payload:
+            val = "true" if payload["include_events"] else "false"
+            cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_include_events', ?)", (val,))
+        if "include_deals" in payload:
+            val = "true" if payload["include_deals"] else "false"
+            cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_include_deals', ?)", (val,))
         conn.commit()
     return {"status": "success"}
 
