@@ -10,9 +10,34 @@ from datetime import datetime, timedelta
 from cachetools import TTLCache
 import threading
 
-# TTL cache for stock profiles: max 200 stocks, 5-minute expiry
 _profile_cache = TTLCache(maxsize=200, ttl=300)
 _cache_lock = threading.Lock()
+
+def clear_profile_cache():
+    """Thread-safe purge of the in-memory TTLCache."""
+    with _cache_lock:
+        _profile_cache.clear()
+
+def get_statement_row_history(table_data, label_name):
+    """Retrieves a historical list of float values from statement table rows based on matching label."""
+    if not table_data or "rows" not in table_data:
+        return []
+    for row in table_data["rows"]:
+        clean_lbl = row.get("label", "").strip().lower()
+        target_lbl = label_name.strip().lower()
+        if clean_lbl == target_lbl or (target_lbl in clean_lbl) or (clean_lbl in target_lbl):
+            vals = []
+            for val in row.get("values", []):
+                try:
+                    cleaned_val = str(val).replace(",", "").replace("%", "").strip()
+                    if not cleaned_val or cleaned_val == "N/A" or cleaned_val == "-":
+                        vals.append(0.0)
+                    else:
+                        vals.append(float(cleaned_val))
+                except Exception:
+                    vals.append(0.0)
+            return vals
+    return []
 
 # Standard popular Indian stocks local mapping for instant high-accuracy resolution
 POPULAR_INDIAN_STOCKS = {
@@ -1583,13 +1608,14 @@ def calculate_dcf_valuation(ticker_symbol: str,
 def calculate_composite_score(p: dict) -> dict:
     """
     Calculates the exact weighted composite score out of 100:
-    Fundamental Score (30%) + Technical Score (25%) + Valuation Score (25%) + Growth Score (15%) + Sentiment Score (5%)
+    Fundamental Strength (30%) + Earnings Quality/Solvency (15%) + Valuation (20%) + Technicals (20%) + Growth (10%) + Sentiment (5%)
     """
     f = p["fundamentals"]
     t = p["technicals"]
     dcf = p["dcf_model"]
     sh = p["shareholding"]
     consensus = p["consensus"]
+    eq = p.get("earnings_quality", {})
     
     roe = f.get("roe_pct", 15.0)
     roce = f.get("roce_pct", 15.0)
@@ -1598,6 +1624,8 @@ def calculate_composite_score(p: dict) -> dict:
     interest_cov = f.get("interest_coverage", 4.5)
     current_ratio = f.get("current_ratio", 1.3)
     cfo_to_pat = f.get("cfo_to_pat", 0.9)
+    pledged = f.get("promoter_pledge_pct", 0.0)
+    tax_rate = f.get("tax_rate_pct", 25.0)
     
     pe = f.get("pe_ratio", 24.5)
     peers_pe = []
@@ -1615,7 +1643,13 @@ def calculate_composite_score(p: dict) -> dict:
     growth_est = max(5.0, f.get("profit_growth_3y_pct", 12.0))
     peg = pe / growth_est
     
-    ev_ebitda = 12.0
+    mcap_cr = f.get("market_cap_cr", 1000.0)
+    ev_val = mcap_cr * (1.0 + debt_eq)
+    ebitda_margin = f.get("ebitda_margin_pct", 15.0)
+    net_profit_est = mcap_cr * (roe / 100.0) if roe > 0 else mcap_cr * 0.05
+    ebitda_est = (net_profit_est / (net_margin / 100.0)) * (ebitda_margin / 100.0) if net_margin > 0 else net_profit_est * 1.5
+    ev_ebitda = ev_val / ebitda_est if ebitda_est > 0 else 12.0
+    
     pb = pe * roe / 100.0 if roe > 0 else 2.5
     if pb <= 0 or pd.isna(pb):
         pb = 2.5
@@ -1624,13 +1658,16 @@ def calculate_composite_score(p: dict) -> dict:
     curr_price = f.get("current_price", 100.0)
     sma_200 = t.get("sma_200", curr_price)
     sma_50 = t.get("sma_50", curr_price)
+    sma_20 = t.get("sma_20") or t.get("sma_50") or curr_price
     adx = t.get("adx", 22.0)
     rsi = t.get("rsi", 52.0)
     vol_vs_avg = t.get("volume_vs_avg20", 1.1)
     
     rev_cagr = f.get("sales_growth_3y_pct", 12.0)
     pat_cagr = f.get("profit_growth_3y_pct", 15.0)
-    ebitda_cagr = f.get("profit_growth_3y_pct", 12.0)
+    cwip_ratio = f.get("cwip_fixed_assets_pct", 0.0)
+    reserves_growth = f.get("reserves_compounding_3y", False)
+    acceleration = f.get("profit_accelerating_qoq", False)
     
     cons_rec = consensus.get("recommendation", "Buy").lower()
     insiders = sh.get("Promoter", 50.0)
@@ -1663,67 +1700,102 @@ def calculate_composite_score(p: dict) -> dict:
     if cfo_to_pat >= 0.8: f_score += 4.0
     else: f_score += 1.0
     
-    # B. Valuation (max 25)
+    if pledged <= 5.0: f_score += 4.0
+    elif pledged <= 20.0: f_score += 2.0
+    
+    if tax_rate < 10.0:
+        f_score -= 1.5
+        
+    f_score = min(30.0, max(0.0, f_score))
+    
+    # B. Earnings Quality & Solvency (max 15)
+    eq_score = 0.0
+    piotroski = eq.get("piotroski_score", 5)
+    altman_z = eq.get("altman_z_score", 3.0)
+    
+    if piotroski >= 7: eq_score += 10.0
+    elif piotroski >= 5: eq_score += 6.0
+    elif piotroski >= 3: eq_score += 3.0
+    else: eq_score += 1.0
+    
+    if altman_z > 2.99: eq_score += 5.0
+    elif altman_z >= 1.81: eq_score += 3.0
+    
+    eq_score = min(15.0, max(0.0, eq_score))
+    
+    # C. Valuation (max 20)
     v_score = 0.0
     pe_ratio_vs_sector = pe / sector_pe if sector_pe > 0 else 1.0
-    if pe_ratio_vs_sector <= 1.0: v_score += 6.0
-    elif pe_ratio_vs_sector <= 1.2: v_score += 4.0
+    if pe_ratio_vs_sector <= 1.0: v_score += 5.0
+    elif pe_ratio_vs_sector <= 1.2: v_score += 3.0
     else: v_score += 1.0
     
-    if peg <= 1.0: v_score += 6.0
-    elif peg <= 1.5: v_score += 4.0
+    if peg <= 1.0: v_score += 5.0
+    elif peg <= 1.5: v_score += 3.0
+    else: v_score += 0.5
+    
+    if ev_ebitda <= 15.0: v_score += 5.0
+    elif ev_ebitda <= 20.0: v_score += 3.0
     else: v_score += 1.0
-    
-    if ev_ebitda <= 15.0: v_score += 4.0
-    elif ev_ebitda <= 20.0: v_score += 2.0
-    
-    if pb <= 3.0: v_score += 4.0
-    elif pb <= 5.0: v_score += 2.0
     
     if margin_safety >= 15.0: v_score += 5.0
     elif margin_safety >= 5.0: v_score += 3.0
+    else: v_score += 1.0
     
-    # C. Technicals/Momentum (max 25)
+    v_score = min(20.0, max(0.0, v_score))
+    
+    # D. Technicals/Momentum (max 20)
     t_score = 0.0
-    if curr_price >= sma_200: t_score += 6.0
-    else: t_score += 1.0
+    if curr_price >= sma_200: t_score += 4.0
+    if curr_price >= sma_50: t_score += 3.0
+    if curr_price >= sma_20: t_score += 3.0
     
-    if curr_price >= sma_50: t_score += 5.0
-    else: t_score += 1.0
-    
-    if adx >= 20.0: t_score += 4.0
-    else: t_score += 1.0
-    
-    if 45.0 <= rsi <= 70.0: t_score += 6.0
+    if 45.0 <= rsi <= 70.0: t_score += 4.0
+    elif rsi <= 30.0: t_score += 3.0
+    elif rsi >= 80.0: t_score += 1.0
     else: t_score += 2.0
     
-    if vol_vs_avg >= 1.2: t_score += 4.0
-    else: t_score += 1.0
+    if adx >= 20.0: t_score += 3.0
+    if vol_vs_avg >= 1.2: t_score += 3.0
     
-    # D. Growth & Quality (max 15)
+    t_score = min(20.0, max(0.0, t_score))
+    
+    # E. Growth & Quality (max 10)
     g_score = 0.0
-    if rev_cagr >= 12.0: g_score += 5.0
-    else: g_score += 1.5
+    if rev_cagr >= 12.0: g_score += 2.5
+    else: g_score += 1.0
     
-    if pat_cagr >= 15.0: g_score += 5.0
-    else: g_score += 1.5
+    if pat_cagr >= 15.0: g_score += 2.5
+    else: g_score += 1.0
     
-    if ebitda_cagr >= 12.0: g_score += 5.0
-    else: g_score += 1.5
+    if cwip_ratio >= 10.0: g_score += 2.0
+    if reserves_growth: g_score += 1.0
+    if acceleration: g_score += 2.0
     
-    # E. Sentiment & News (max 5)
+    g_score = min(10.0, max(0.0, g_score))
+    
+    # F. Sentiment & News (max 5)
     s_score = 0.0
     if "buy" in cons_rec or "outperform" in cons_rec: s_score += 2.0
     else: s_score += 0.5
     
     if inst_holding >= 15.0: s_score += 1.0
+    if insiders >= 50.0: s_score += 1.0
     
-    s_score += 2.0
+    if p.get("news_has_real_audit", False):
+        sentiment_idx = p.get("news_sentiment_index", 50.0)
+        if sentiment_idx >= 65.0: s_score += 1.0
+        elif sentiment_idx >= 40.0: s_score += 0.5
+    else:
+        s_score += 0.5
+        
+    s_score = min(5.0, max(0.0, s_score))
     
-    total_score = f_score + v_score + t_score + g_score + s_score
+    total_score = f_score + eq_score + v_score + t_score + g_score + s_score
     total_score = min(100.0, max(0.0, total_score))
     
     f_score_rounded = round(f_score, 1)
+    eq_score_rounded = round(eq_score, 1)
     v_score_rounded = round(v_score, 1)
     t_score_rounded = round(t_score, 1)
     g_score_rounded = round(g_score, 1)
@@ -1741,12 +1813,14 @@ def calculate_composite_score(p: dict) -> dict:
         "final_score": total_score_rounded,
         "fundamental_score": f_score_rounded,
         "fundamental_max": 30,
+        "earnings_quality_score": eq_score_rounded,
+        "earnings_quality_max": 15,
         "valuation_score": v_score_rounded,
-        "valuation_max": 25,
+        "valuation_max": 20,
         "technical_score": t_score_rounded,
-        "technical_max": 25,
+        "technical_max": 20,
         "growth_score": g_score_rounded,
-        "growth_max": 15,
+        "growth_max": 10,
         "sentiment_score": s_score_rounded,
         "sentiment_max": 5,
         "action": rec,
@@ -1754,10 +1828,11 @@ def calculate_composite_score(p: dict) -> dict:
         "sector_pe": round(sector_pe, 1)
     }
 
-def calculate_earnings_quality_scores(stock_obj) -> dict:
+def calculate_earnings_quality_scores(stock_obj, base_symbol: str = None) -> dict:
     """
     Calculates Piotroski F-Score (0-9) and Altman Z-Score for earnings quality assessment.
-    Uses yfinance balance_sheet, financials, and cashflow data.
+    First tries to fetch from SQLite cached_financial_statements, then falls back to
+    yfinance balance_sheet, financials, and cashflow data.
     """
     result = {
         "piotroski_score": 0,
@@ -1769,19 +1844,310 @@ def calculate_earnings_quality_scores(stock_obj) -> dict:
     }
     
     try:
-        info = stock_obj.info
-        bs = stock_obj.balance_sheet
-        fin = stock_obj.financials
-        cf = stock_obj.cashflow
+        import sqlite3
+        import json
+        import os
+        import numpy as np
+        import pandas as pd
+        
+        # --- Try loading from live yfinance data first for high accuracy ---
+        if stock_obj:
+            try:
+                bs = stock_obj.balance_sheet
+                fin = stock_obj.financials
+                cf = stock_obj.cashflow
+                info = stock_obj.info if hasattr(stock_obj, "info") else {}
+                
+                if bs is not None and not bs.empty and fin is not None and not fin.empty:
+                    f_score = 0
+                    details = []
+                    
+                    def safe_get(df, key, col=0, default=0.0):
+                        try:
+                            if key in df.index and col < len(df.columns):
+                                val = df.loc[key].iloc[col]
+                                return float(val) if pd.notna(val) else default
+                        except Exception:
+                            pass
+                        return default
+                    
+                    net_income = safe_get(fin, "Net Income", 0)
+                    net_income_prev = safe_get(fin, "Net Income", 1)
+                    total_assets = safe_get(bs, "Total Assets", 0, 1.0)
+                    total_assets_prev = safe_get(bs, "Total Assets", 1, 1.0)
+                    
+                    ocf = 0.0
+                    if cf is not None and not cf.empty:
+                        ocf = safe_get(cf, "Operating Cash Flow", 0) or safe_get(cf, "Cash Flow From Operating Activities", 0)
+                    
+                    total_debt = safe_get(bs, "Total Debt", 0) or safe_get(bs, "Long Term Debt", 0)
+                    total_debt_prev = safe_get(bs, "Total Debt", 1) or safe_get(bs, "Long Term Debt", 1)
+                    
+                    current_assets = safe_get(bs, "Current Assets", 0)
+                    current_liabilities = safe_get(bs, "Current Liabilities", 0, 1.0)
+                    current_assets_prev = safe_get(bs, "Current Assets", 1)
+                    current_liabilities_prev = safe_get(bs, "Current Liabilities", 1, 1.0)
+                    
+                    shares_outstanding = info.get("sharesOutstanding") or 1e8
+                    
+                    revenue = safe_get(fin, "Total Revenue", 0)
+                    revenue_prev = safe_get(fin, "Total Revenue", 1)
+                    gross_profit = safe_get(fin, "Gross Profit", 0)
+                    gross_profit_prev = safe_get(fin, "Gross Profit", 1)
+                    
+                    passed = net_income > 0
+                    if passed: f_score += 1
+                    details.append({"test": "Positive Net Income", "passed": passed, "category": "Profitability"})
+                    
+                    passed = ocf > 0
+                    if passed: f_score += 1
+                    details.append({"test": "Positive Operating Cash Flow", "passed": passed, "category": "Profitability"})
+                    
+                    roa_current = net_income / total_assets if total_assets > 0 else 0
+                    roa_prev = net_income_prev / total_assets_prev if total_assets_prev > 0 else 0
+                    passed = roa_current > roa_prev
+                    if passed: f_score += 1
+                    details.append({"test": "ROA Improving YoY", "passed": passed, "category": "Profitability"})
+                    
+                    passed = ocf > net_income
+                    if passed: f_score += 1
+                    details.append({"test": "Cash Flow > Net Income", "passed": passed, "category": "Profitability"})
+                    
+                    leverage_current = total_debt / total_assets if total_assets > 0 else 0
+                    leverage_prev = total_debt_prev / total_assets_prev if total_assets_prev > 0 else 0
+                    passed = leverage_current <= leverage_prev
+                    if passed: f_score += 1
+                    details.append({"test": "Leverage Decreasing", "passed": passed, "category": "Leverage"})
+                    
+                    cr_current = current_assets / current_liabilities if current_liabilities > 0 else 1.0
+                    cr_prev = current_assets_prev / current_liabilities_prev if current_liabilities_prev > 0 else 1.0
+                    passed = cr_current > cr_prev
+                    if passed: f_score += 1
+                    details.append({"test": "Current Ratio Improving", "passed": passed, "category": "Leverage"})
+                    
+                    shares_data = info.get("floatShares") or shares_outstanding
+                    passed = True
+                    if passed: f_score += 1
+                    details.append({"test": "No Share Dilution", "passed": passed, "category": "Leverage"})
+                    
+                    gm_current = gross_profit / revenue if revenue > 0 else 0
+                    gm_prev = gross_profit_prev / revenue_prev if revenue_prev > 0 else 0
+                    passed = gm_current >= gm_prev
+                    if passed: f_score += 1
+                    details.append({"test": "Gross Margin Improving", "passed": passed, "category": "Efficiency"})
+                    
+                    at_current = revenue / total_assets if total_assets > 0 else 0
+                    at_prev = revenue_prev / total_assets_prev if total_assets_prev > 0 else 0
+                    passed = at_current >= at_prev
+                    if passed: f_score += 1
+                    details.append({"test": "Asset Turnover Improving", "passed": passed, "category": "Efficiency"})
+                    
+                    result["piotroski_score"] = f_score
+                    result["piotroski_details"] = details
+                    if f_score >= 7:
+                        result["piotroski_label"] = "Strong"
+                    elif f_score >= 4:
+                        result["piotroski_label"] = "Moderate"
+                    else:
+                        result["piotroski_label"] = "Weak"
+                        
+                    working_capital = current_assets - (current_liabilities or 0)
+                    retained_earnings = safe_get(bs, "Retained Earnings", 0) or (net_income * 3)
+                    ebit = safe_get(fin, "EBIT", 0) or safe_get(fin, "Operating Income", 0) or (net_income * 1.3)
+                    market_cap = info.get("marketCap") or (info.get("currentPrice", 100) * shares_outstanding)
+                    total_liabilities = safe_get(bs, "Total Liabilities Net Minority Interest", 0) or safe_get(bs, "Total Liab", 0) or (total_debt * 1.5)
+                    
+                    if total_assets > 0 and total_liabilities > 0:
+                        A = working_capital / total_assets
+                        B = retained_earnings / total_assets
+                        C = ebit / total_assets
+                        D = market_cap / total_liabilities if total_liabilities > 0 else 3.0
+                        E = revenue / total_assets
+                        
+                        z_score = 1.2 * A + 1.4 * B + 3.3 * C + 0.6 * D + 1.0 * E
+                        z_score = float(max(-2.0, z_score))
+                        
+                        result["altman_z_score"] = round(z_score, 2)
+                        result["altman_components"] = {
+                            "working_capital_ta": round(A, 3),
+                            "retained_earnings_ta": round(B, 3),
+                            "ebit_ta": round(C, 3),
+                            "market_cap_tl": round(D, 3),
+                            "revenue_ta": round(E, 3)
+                        }
+                        
+                        if z_score > 2.99:
+                            result["altman_zone"] = "Safe Zone"
+                        elif z_score >= 1.81:
+                            result["altman_zone"] = "Grey Zone"
+                        else:
+                            result["altman_zone"] = "Distress Zone"
+                    return result
+            except Exception as yf_err:
+                print(f"Error calculating live yfinance earnings quality: {yf_err}")
+
+        # --- Try loading from cached_financial_statements ---
+        DATABASE_DIR_LOCAL = os.environ.get(
+            "DATABASE_DIR",
+            os.path.join(os.path.dirname(__file__), "data")
+        )
+        DATABASE_PATH_LOCAL = os.path.join(DATABASE_DIR_LOCAL, "watchlist_database.db")
+        
+        statements = None
+        if base_symbol and os.path.exists(DATABASE_PATH_LOCAL):
+            try:
+                conn = sqlite3.connect(DATABASE_PATH_LOCAL)
+                cursor = conn.cursor()
+                cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, "consolidated"))
+                row = cursor.fetchone()
+                if not row:
+                    cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, "standalone"))
+                    row = cursor.fetchone()
+                conn.close()
+                if row:
+                    statements = json.loads(row[0])
+            except Exception as db_err:
+                print(f"Error querying cached_financial_statements for {base_symbol}: {db_err}")
+
+        if statements:
+
+
+            net_profit_history = get_statement_row_history(statements.get("profit_loss"), "Net Profit")
+            sales_history = get_statement_row_history(statements.get("profit_loss"), "Sales")
+            opm_history = get_statement_row_history(statements.get("profit_loss"), "OPM %")
+            interest_history = get_statement_row_history(statements.get("profit_loss"), "Interest")
+            reserves_history = get_statement_row_history(statements.get("balance_sheet"), "Reserves")
+            borrowings_history = get_statement_row_history(statements.get("balance_sheet"), "Borrowings")
+            other_liab_history = get_statement_row_history(statements.get("balance_sheet"), "Other Liabilities")
+            other_assets_history = get_statement_row_history(statements.get("balance_sheet"), "Other Assets")
+            total_assets_history = get_statement_row_history(statements.get("balance_sheet"), "Total Assets")
+            equity_cap_history = get_statement_row_history(statements.get("balance_sheet"), "Equity Capital") or get_statement_row_history(statements.get("balance_sheet"), "Share Capital")
+            depreciation_history = get_statement_row_history(statements.get("profit_loss"), "Depreciation")
+            pbt_history = get_statement_row_history(statements.get("profit_loss"), "Profit before tax")
+
+            if net_profit_history and total_assets_history:
+                latest_np = net_profit_history[-1]
+                prev_np = net_profit_history[-2] if len(net_profit_history) >= 2 else latest_np
+                latest_ta = total_assets_history[-1] or 1.0
+                prev_ta = total_assets_history[-2] if len(total_assets_history) >= 2 else latest_ta
+                prev_ta = prev_ta or 1.0
+                
+                latest_depr = depreciation_history[-1] if depreciation_history else 0.0
+                latest_interest = interest_history[-1] if interest_history else 0.0
+                latest_cfo = latest_np + latest_depr + latest_interest
+                
+                pass1 = latest_np > 0
+                pass2 = latest_cfo > 0
+                
+                roa_curr = latest_np / latest_ta
+                roa_prev = prev_np / prev_ta
+                pass3 = roa_curr > roa_prev
+                
+                pass4 = latest_cfo > latest_np
+                
+                latest_debt = borrowings_history[-1] if borrowings_history else 0.0
+                prev_debt = borrowings_history[-2] if (borrowings_history and len(borrowings_history) >= 2) else latest_debt
+                lev_curr = latest_debt / latest_ta
+                lev_prev = prev_debt / prev_ta
+                pass5 = lev_curr <= lev_prev
+                
+                latest_oa = other_assets_history[-1] if other_assets_history else 1.0
+                prev_oa = other_assets_history[-2] if (other_assets_history and len(other_assets_history) >= 2) else latest_oa
+                latest_ol = other_liab_history[-1] if other_liab_history else 1.0
+                prev_ol = other_liab_history[-2] if (other_liab_history and len(other_liab_history) >= 2) else latest_ol
+                latest_ol = latest_ol or 1.0
+                prev_ol = prev_ol or 1.0
+                cr_curr = latest_oa / latest_ol
+                cr_prev = prev_oa / prev_ol
+                pass6 = cr_curr > cr_prev
+                
+                latest_eq = equity_cap_history[-1] if equity_cap_history else 100.0
+                prev_eq = equity_cap_history[-2] if (equity_cap_history and len(equity_cap_history) >= 2) else latest_eq
+                pass7 = latest_eq <= prev_eq
+                
+                latest_opm = opm_history[-1] if opm_history else 0.0
+                prev_opm = opm_history[-2] if (opm_history and len(opm_history) >= 2) else latest_opm
+                pass8 = latest_opm >= prev_opm
+                
+                latest_sales = sales_history[-1] if sales_history else 0.0
+                prev_sales = sales_history[-2] if (sales_history and len(sales_history) >= 2) else latest_sales
+                at_curr = latest_sales / latest_ta
+                at_prev = prev_sales / prev_ta
+                pass9 = at_curr >= at_prev
+                
+                f_score = sum([pass1, pass2, pass3, pass4, pass5, pass6, pass7, pass8, pass9])
+                
+                details = [
+                    {"test": "Positive Net Income", "passed": bool(pass1), "category": "Profitability"},
+                    {"test": "Positive Operating Cash Flow", "passed": bool(pass2), "category": "Profitability"},
+                    {"test": "ROA Improving YoY", "passed": bool(pass3), "category": "Profitability"},
+                    {"test": "Cash Flow > Net Income", "passed": bool(pass4), "category": "Profitability"},
+                    {"test": "Leverage Decreasing", "passed": bool(pass5), "category": "Leverage"},
+                    {"test": "Current Ratio Improving", "passed": bool(pass6), "category": "Leverage"},
+                    {"test": "No Share Dilution", "passed": bool(pass7), "category": "Leverage"},
+                    {"test": "Gross Margin Improving", "passed": bool(pass8), "category": "Efficiency"},
+                    {"test": "Asset Turnover Improving", "passed": bool(pass9), "category": "Efficiency"}
+                ]
+                
+                result["piotroski_score"] = f_score
+                result["piotroski_details"] = details
+                if f_score >= 7:
+                    result["piotroski_label"] = "Strong"
+                elif f_score >= 4:
+                    result["piotroski_label"] = "Moderate"
+                else:
+                    result["piotroski_label"] = "Weak"
+                    
+                # --- Altman Z-Score ---
+                working_capital = latest_oa - latest_ol
+                retained_earnings = reserves_history[-1] if reserves_history else latest_np * 3.0
+                latest_pbt = pbt_history[-1] if pbt_history else latest_np * 1.3
+                ebit = latest_pbt + latest_interest
+                
+                info = stock_obj.info if stock_obj else {}
+                market_cap = float(info.get("marketCap") or (info.get("currentPrice", 100) * 1e8))
+                mcap_crores = market_cap / 1e7
+                total_liab = latest_debt + latest_ol
+                
+                A = working_capital / latest_ta
+                B = retained_earnings / latest_ta
+                C = ebit / latest_ta
+                D = mcap_crores / total_liab if total_liab > 0 else 3.0
+                E = latest_sales / latest_ta
+                
+                z_score = 1.2 * A + 1.4 * B + 3.3 * C + 0.6 * D + 1.0 * E
+                z_score = float(max(-2.0, z_score))
+                
+                result["altman_z_score"] = round(z_score, 2)
+                result["altman_components"] = {
+                    "working_capital_ta": round(A, 3),
+                    "retained_earnings_ta": round(B, 3),
+                    "ebit_ta": round(C, 3),
+                    "market_cap_tl": round(D, 3),
+                    "revenue_ta": round(E, 3)
+                }
+                
+                if z_score > 2.99:
+                    result["altman_zone"] = "Safe Zone"
+                elif z_score >= 1.81:
+                    result["altman_zone"] = "Grey Zone"
+                else:
+                    result["altman_zone"] = "Distress Zone"
+                    
+                return result
+
+        # --- Fallback to live yfinance data ---
+        info = stock_obj.info if stock_obj else {}
+        bs = stock_obj.balance_sheet if stock_obj else pd.DataFrame()
+        fin = stock_obj.financials if stock_obj else pd.DataFrame()
+        cf = stock_obj.cashflow if stock_obj else pd.DataFrame()
         
         if bs.empty or fin.empty:
             return result
         
-        # --- Piotroski F-Score (9 criteria) ---
         f_score = 0
         details = []
         
-        # Get current and previous year data
         def safe_get(df, key, col=0, default=0.0):
             try:
                 if key in df.index and col < len(df.columns):
@@ -1791,7 +2157,6 @@ def calculate_earnings_quality_scores(stock_obj) -> dict:
                 pass
             return default
         
-        # Current year
         net_income = safe_get(fin, "Net Income", 0)
         net_income_prev = safe_get(fin, "Net Income", 1)
         total_assets = safe_get(bs, "Total Assets", 0, 1.0)
@@ -1816,56 +2181,47 @@ def calculate_earnings_quality_scores(stock_obj) -> dict:
         gross_profit = safe_get(fin, "Gross Profit", 0)
         gross_profit_prev = safe_get(fin, "Gross Profit", 1)
         
-        # 1. Positive Net Income (Profitability)
         passed = net_income > 0
         if passed: f_score += 1
         details.append({"test": "Positive Net Income", "passed": passed, "category": "Profitability"})
         
-        # 2. Positive Operating Cash Flow
         passed = ocf > 0
         if passed: f_score += 1
         details.append({"test": "Positive Operating Cash Flow", "passed": passed, "category": "Profitability"})
         
-        # 3. ROA Improving (Net Income / Total Assets increasing)
         roa_current = net_income / total_assets if total_assets > 0 else 0
         roa_prev = net_income_prev / total_assets_prev if total_assets_prev > 0 else 0
         passed = roa_current > roa_prev
         if passed: f_score += 1
         details.append({"test": "ROA Improving YoY", "passed": passed, "category": "Profitability"})
         
-        # 4. Cash Flow > Net Income (Accrual Quality)
         passed = ocf > net_income
         if passed: f_score += 1
         details.append({"test": "Cash Flow > Net Income", "passed": passed, "category": "Profitability"})
         
-        # 5. Decreasing Leverage (Debt/Assets)
         leverage_current = total_debt / total_assets if total_assets > 0 else 0
         leverage_prev = total_debt_prev / total_assets_prev if total_assets_prev > 0 else 0
         passed = leverage_current <= leverage_prev
         if passed: f_score += 1
         details.append({"test": "Leverage Decreasing", "passed": passed, "category": "Leverage"})
         
-        # 6. Improving Current Ratio
         cr_current = current_assets / current_liabilities if current_liabilities > 0 else 1.0
         cr_prev = current_assets_prev / current_liabilities_prev if current_liabilities_prev > 0 else 1.0
         passed = cr_current > cr_prev
         if passed: f_score += 1
         details.append({"test": "Current Ratio Improving", "passed": passed, "category": "Leverage"})
         
-        # 7. No New Share Dilution
         shares_data = info.get("floatShares") or shares_outstanding
-        passed = True  # Conservative: assume no dilution unless proven otherwise
+        passed = True
         if passed: f_score += 1
         details.append({"test": "No Share Dilution", "passed": passed, "category": "Leverage"})
         
-        # 8. Gross Margin Improving
         gm_current = gross_profit / revenue if revenue > 0 else 0
         gm_prev = gross_profit_prev / revenue_prev if revenue_prev > 0 else 0
         passed = gm_current >= gm_prev
         if passed: f_score += 1
         details.append({"test": "Gross Margin Improving", "passed": passed, "category": "Efficiency"})
         
-        # 9. Asset Turnover Improving
         at_current = revenue / total_assets if total_assets > 0 else 0
         at_prev = revenue_prev / total_assets_prev if total_assets_prev > 0 else 0
         passed = at_current >= at_prev
@@ -1880,9 +2236,7 @@ def calculate_earnings_quality_scores(stock_obj) -> dict:
             result["piotroski_label"] = "Moderate"
         else:
             result["piotroski_label"] = "Weak"
-        
-        # --- Altman Z-Score ---
-        # Z = 1.2*A + 1.4*B + 3.3*C + 0.6*D + 1.0*E
+            
         working_capital = current_assets - (current_liabilities or 0)
         retained_earnings = safe_get(bs, "Retained Earnings", 0) or (net_income * 3)
         ebit = safe_get(fin, "EBIT", 0) or safe_get(fin, "Operating Income", 0) or (net_income * 1.3)
@@ -1897,7 +2251,7 @@ def calculate_earnings_quality_scores(stock_obj) -> dict:
             E = revenue / total_assets
             
             z_score = 1.2 * A + 1.4 * B + 3.3 * C + 0.6 * D + 1.0 * E
-            z_score = float(np.clip(z_score, -2.0, 10.0))
+            z_score = float(max(-2.0, z_score))
             
             result["altman_z_score"] = round(z_score, 2)
             result["altman_components"] = {
@@ -1914,10 +2268,9 @@ def calculate_earnings_quality_scores(stock_obj) -> dict:
                 result["altman_zone"] = "Grey Zone"
             else:
                 result["altman_zone"] = "Distress Zone"
+    except Exception as main_err:
+        print(f"Error calculating earnings quality scores: {main_err}")
         
-    except Exception as e:
-        print(f"Error calculating earnings quality scores: {e}")
-    
     return result
 
 
@@ -2322,6 +2675,31 @@ def _build_financial_profile(ticker_query: str) -> dict:
     yf_ticker = resolution["yf_ticker"]
     base_symbol = resolution["base_symbol"]
     
+    # Load cached statement tables for self-healing and scoring
+    statements_data = None
+    import sqlite3
+    import json
+    import os
+    DATABASE_DIR_LOCAL = os.environ.get(
+        "DATABASE_DIR",
+        os.path.join(os.path.dirname(__file__), "data")
+    )
+    DATABASE_PATH_LOCAL = os.path.join(DATABASE_DIR_LOCAL, "watchlist_database.db")
+    if os.path.exists(DATABASE_PATH_LOCAL):
+        try:
+            conn = sqlite3.connect(DATABASE_PATH_LOCAL)
+            cursor = conn.cursor()
+            cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, "consolidated"))
+            row = cursor.fetchone()
+            if not row:
+                cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, "standalone"))
+                row = cursor.fetchone()
+            conn.close()
+            if row:
+                statements_data = json.loads(row[0])
+        except Exception as db_err:
+            print(f"Error reading statements for self-healing: {db_err}")
+
     # 1. Scrape Screener.in
     screener_data = fetch_screener_data(base_symbol)
     
@@ -2383,46 +2761,32 @@ def _build_financial_profile(ticker_query: str) -> dict:
 
     name_clean = resolution["name"]
     if not news_items:
-        import urllib.parse
-        enc_name = urllib.parse.quote(name_clean)
-        
-        # Calculate dynamic parameter baselines for dynamic headlines
-        roe_val = screener_data["ratios"].get("ROE") or info.get("returnOnEquity", 0) * 100 or 15.0
-        debt_val = screener_data["ratios"].get("Debt to Equity") or info.get("totalDebt", 0) / (info.get("marketCap", 1) or 1) or 0.1
-        rsi_val = tech.get("rsi") or 50.0
-        margin_val = dcf.get("margin_of_safety") or 15.0
-        
-        headline_1 = f"{name_clean} secures multi-million rupee development project adding strong cash visibility"
-        if roe_val > 18.0:
-            headline_1 = f"{name_clean} secures major capacity expansion order, boosting long-term ROE growth projections"
-        elif roe_val < 10.0:
-            headline_1 = f"{name_clean} faces near-term return on equity pressure amid rising raw material inflation"
-            
-        headline_2 = f"Strategic Analysis: Why {name_clean} remains a highly preferred institutional buy candidate"
-        if margin_val > 15.0:
-            headline_2 = f"Strategic Analysis: Why {name_clean} remains a highly preferred institutional buy candidate with safe DCF margin"
-        elif margin_val < -15.0:
-            headline_2 = f"Valuation Check: {name_clean} shares trade at a premium, raising near-term overvalued correction risk"
-            
-        headline_3 = f"Technical Indicators check: {name_clean} consolidates near short-term moving average support"
-        if rsi_val > 70.0:
-            headline_3 = f"Technical Indicator check: {name_clean} shows strong bullish momentum as daily RSI enters overbought zone"
-        elif rsi_val < 35.0:
-            headline_3 = f"Technical Indicator check: {name_clean} slips to near-term oversold support levels, indicating bearish pressure"
-            
-        headline_4 = f"{name_clean} quarterly margins demonstrate resilient pricing power relative to peer groups"
-        if debt_val > 1.2:
-            headline_4 = f"{name_clean} leverage metrics flag potential interest coverage pressure as debt levels rise"
-        elif debt_val < 0.2:
-            headline_4 = f"{name_clean} balance sheet remains exceptionally strong with record low leverage"
-
-        # Dynamic Corporate Catalyst Headlines customized uniquely by company financials
-        news_items = [
-            {"title": headline_1, "publisher": "Livemint", "link": f"https://www.livemint.com/search?q={enc_name}", "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")},
-            {"title": headline_2, "publisher": "Economic Times", "link": f"https://economictimes.indiatimes.com/topic/{enc_name}", "date": (datetime.now() - timedelta(days=4)).strftime("%Y-%m-%d")},
-            {"title": headline_3, "publisher": "Moneycontrol", "link": f"https://www.moneycontrol.com/news/tags/{enc_name}.html", "date": (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")},
-            {"title": headline_4, "publisher": "Bloomberg Quint", "link": f"https://www.ndtvprofit.com/search?q={enc_name}", "date": (datetime.now() - timedelta(days=11)).strftime("%Y-%m-%d")}
-        ]
+        events = []
+        if os.path.exists(DATABASE_PATH_LOCAL):
+            try:
+                conn = sqlite3.connect(DATABASE_PATH_LOCAL)
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT event_type, event_date, details 
+                    FROM stock_events 
+                    WHERE symbol = ? 
+                    ORDER BY event_date DESC
+                    LIMIT 6
+                """, (base_symbol,))
+                events = cursor.fetchall()
+                conn.close()
+            except Exception as ev_err:
+                print(f"Error querying stock_events fallback for {base_symbol}: {ev_err}")
+                
+        if events:
+            for ev in events:
+                ev_type, ev_date, ev_details = ev
+                news_items.append({
+                    "title": f"Scheduled Corporate Action: {ev_type} - {ev_details}",
+                    "publisher": "NSE Corporate Event Calendar",
+                    "link": "#",
+                    "date": ev_date
+                })
         
     # 4. Build Unified Financial Profile
     current_price = tech.get("current_price")
@@ -2514,6 +2878,47 @@ def _build_financial_profile(ticker_query: str) -> dict:
     roce = screener_data["ratios"].get("ROCE") or info.get("returnOnAssets", 0) * 120 or 18.5
     roe = screener_data["ratios"].get("ROE") or info.get("returnOnEquity", 0) * 100 or 16.2
     face_value = screener_data["ratios"].get("Face Value") or 10.0
+    debt_eq = float(screener_data["ratios"].get("Debt to Equity") or info.get("debtToEquity", 0.0) / 100.0 if info.get("debtToEquity") else 0.1)
+    
+    # Self-Healing from Statement tables
+    if statements_data:
+        def get_row_last_val(table_data, label_name):
+            if not table_data or "rows" not in table_data:
+                return None
+            for row in table_data["rows"]:
+                clean_lbl = row.get("label", "").strip().lower()
+                target_lbl = label_name.strip().lower()
+                if clean_lbl == target_lbl or (target_lbl in clean_lbl) or (clean_lbl in target_lbl):
+                    vals = row.get("values", [])
+                    if vals:
+                        try:
+                            cleaned_val = str(vals[-1]).replace(",", "").replace("%", "").strip()
+                            return float(cleaned_val) if cleaned_val and cleaned_val != "N/A" and cleaned_val != "-" else 0.0
+                        except Exception:
+                            return 0.0
+            return None
+
+        equity_cap = get_row_last_val(statements_data.get("balance_sheet"), "Equity Capital") or get_row_last_val(statements_data.get("balance_sheet"), "Share Capital") or 10.0
+        reserves_val = get_row_last_val(statements_data.get("balance_sheet"), "Reserves") or 0.0
+        net_worth = equity_cap + reserves_val
+        borrowings_val = get_row_last_val(statements_data.get("balance_sheet"), "Borrowings") or 0.0
+        net_profit_val = get_row_last_val(statements_data.get("profit_loss"), "Net Profit") or 0.0
+        pbt_val = get_row_last_val(statements_data.get("profit_loss"), "Profit before tax") or net_profit_val * 1.3
+        interest_val = get_row_last_val(statements_data.get("profit_loss"), "Interest") or 0.0
+        ebit_val = pbt_val + interest_val
+
+        if roce == 0.0 or roce is None or math.isnan(roce) or roce == 18.5:
+            capital_employed = net_worth + borrowings_val
+            if capital_employed > 0:
+                roce = (ebit_val / capital_employed) * 100.0
+                
+        if roe == 0.0 or roe is None or math.isnan(roe) or roe == 16.2:
+            if net_worth > 0:
+                roe = (net_profit_val / net_worth) * 100.0
+                
+        if debt_eq == 0.0 or debt_eq is None or math.isnan(debt_eq) or debt_eq == 0.1:
+            if net_worth > 0:
+                debt_eq = borrowings_val / net_worth
     
     # Calculate true 3-Year CAGR from yfinance annual financials
     sales_growth_3y = None
@@ -2564,10 +2969,58 @@ def _build_financial_profile(ticker_query: str) -> dict:
     if sales_growth_3y == 0.0 or sales_growth_3y is None or math.isnan(sales_growth_3y):
         sales_growth_3y = 12.4
         
-    if profit_growth_3y is None or math.isnan(profit_growth_3y):
-        profit_growth_3y = info.get("earningsGrowth", 0) * 100.0
     if profit_growth_3y == 0.0 or profit_growth_3y is None or math.isnan(profit_growth_3y):
         profit_growth_3y = 14.8
+        
+    # --- Advanced Corporate Metrics calculations from statement tables ---
+    tax_rate_pct = 25.0
+    if statements_data:
+        tax_vals = get_statement_row_history(statements_data.get("profit_loss"), "Tax %")
+        if tax_vals:
+            tax_rate_pct = tax_vals[-1]
+            
+    cwip_fixed_assets_pct = 0.0
+    if statements_data:
+        cwip_vals = get_statement_row_history(statements_data.get("balance_sheet"), "CWIP")
+        fa_vals = get_statement_row_history(statements_data.get("balance_sheet"), "Fixed Assets")
+        if cwip_vals and fa_vals and fa_vals[-1] > 0:
+            cwip_fixed_assets_pct = (cwip_vals[-1] / fa_vals[-1]) * 100.0
+            
+    reserves_compounding_3y = False
+    if statements_data:
+        res_vals = get_statement_row_history(statements_data.get("balance_sheet"), "Reserves")
+        if len(res_vals) >= 4:
+            if res_vals[-1] > res_vals[-2] > res_vals[-3] > res_vals[-4]:
+                reserves_compounding_3y = True
+                
+    ebitda_growth_3y = None
+    if statements_data:
+        op_vals = get_statement_row_history(statements_data.get("profit_loss"), "Operating Profit")
+        if len(op_vals) >= 4:
+            start_val = op_vals[-4]
+            end_val = op_vals[-1]
+            if start_val > 0 and end_val > 0:
+                ebitda_growth_3y = float((end_val / start_val) ** (1/3) - 1) * 100.0
+        elif len(op_vals) >= 2:
+            start_val = op_vals[0]
+            end_val = op_vals[-1]
+            n_y = len(op_vals) - 1
+            if start_val > 0 and end_val > 0:
+                ebitda_growth_3y = float((end_val / start_val) ** (1/n_y) - 1) * 100.0
+                
+    if ebitda_growth_3y is None or math.isnan(ebitda_growth_3y) or ebitda_growth_3y == 0.0:
+        ebitda_growth_3y = profit_growth_3y or 12.0
+        
+    profit_accelerating_qoq = False
+    q_results = screener_data.get("quarterly_results", {})
+    if q_results:
+        q_profits = q_results.get("net_profit", [])
+        if q_profits and len(q_profits) >= 3:
+            p_latest = q_profits[-1]
+            p_prev1 = q_profits[-2]
+            p_prev2 = q_profits[-3]
+            if p_latest > p_prev1 > p_prev2:
+                profit_accelerating_qoq = True
     
     # Peer table merging & highly robust sector fallback (Finding 2 resolution!)
     peers = screener_data["peers"]
@@ -2867,7 +3320,12 @@ def _build_financial_profile(ticker_query: str) -> dict:
             "day_low": float(tech.get("daily_low") or current_price) if tech else float(current_price),
             "day_high": float(tech.get("daily_high") or current_price) if tech else float(current_price),
             "low_52week": float(tech.get("low_52w") or current_price) if tech else float(current_price),
-            "high_52week": float(tech.get("high_52w") or current_price) if tech else float(current_price)
+            "high_52week": float(tech.get("high_52w") or current_price) if tech else float(current_price),
+            "tax_rate_pct": float(tax_rate_pct),
+            "cwip_fixed_assets_pct": float(cwip_fixed_assets_pct),
+            "reserves_compounding_3y": bool(reserves_compounding_3y),
+            "ebitda_growth_3y_pct": float(ebitda_growth_3y),
+            "profit_accelerating_qoq": bool(profit_accelerating_qoq)
         },
         "technicals": tech,
         "capture_ratios": capture,
@@ -2877,7 +3335,7 @@ def _build_financial_profile(ticker_query: str) -> dict:
         "shareholding": shareholding,
         "peers": peers,
         "news": news_items,
-        "earnings_quality": calculate_earnings_quality_scores(stock),
+        "earnings_quality": calculate_earnings_quality_scores(stock, base_symbol=base_symbol),
         "capm_risk_nifty50": risk_nifty50,
         "capm_risk_sector": risk_sector,
         "drawdown_metrics": drawdown,
@@ -2886,6 +3344,28 @@ def _build_financial_profile(ticker_query: str) -> dict:
             "swot": generate_swot_analysis(yf_ticker, screener_data, tech, dcf, performance_metrics)
         }
     }
+
+    # Load news sentiment audit if available
+    news_sentiment_index = 50.0
+    news_has_real_audit = False
+    if os.path.exists(DATABASE_PATH_LOCAL):
+        try:
+            conn = sqlite3.connect(DATABASE_PATH_LOCAL)
+            cursor = conn.cursor()
+            cursor.execute("SELECT sentiment_json FROM cached_news_impact WHERE symbol = ?", (yf_ticker,))
+            db_row = cursor.fetchone()
+            conn.close()
+            if db_row:
+                news_payload = json.loads(db_row[0])
+                if news_payload.get("has_audit") or news_payload.get("sentiment_index") is not None:
+                    news_sentiment_index = float(news_payload.get("sentiment_index", 50.0))
+                    if news_payload.get("has_audit"):
+                        news_has_real_audit = True
+        except Exception as db_err:
+            print(f"Error querying news sentiment for {yf_ticker}: {db_err}")
+
+    unified_profile["news_sentiment_index"] = news_sentiment_index
+    unified_profile["news_has_real_audit"] = news_has_real_audit
 
     scoring_result = calculate_composite_score(unified_profile)
     unified_profile["score_metrics"] = scoring_result

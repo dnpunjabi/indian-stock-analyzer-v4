@@ -2578,6 +2578,111 @@
                                 </div>
                                 <p id="earnings-quality-summary-text" style="font-size: 11px; color: var(--text-muted); line-height: 1.45; margin: 0;">Analyzing earnings quality indicators and structural solvency trends...</p>
                             </div>
+
+                            <!-- Solvency & Quality Glossary Accordion -->
+                            <div id="solvency-glossary-block" style="margin-top: 12px; background: var(--bg-card-sub); border: 1px solid var(--border-glass, var(--border-sub)); border-radius: 6px; padding: 10px 12px; transition: all 0.3s ease; display: flex; flex-direction: column; width: 100%; box-sizing: border-box;">
+                                <div id="solvency-glossary-header" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; width: 100%;">
+                                    <span style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                                        📚 Solvency & Quality Glossary
+                                    </span>
+                                    <span id="solvency-glossary-toggle-icon" style="font-size: 8px; color: var(--text-muted); transition: transform 0.2s ease; transform: rotate(0deg); display: inline-block;">▼</span>
+                                </div>
+                                <div id="solvency-glossary-content" style="display: none; flex-direction: column; margin-top: 10px; border-top: 1px dashed var(--border-glass, var(--border-sub)); padding-top: 10px; width: 100%;">
+                                    
+                                    <!-- Tabs -->
+                                    <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                                        <button id="glossary-tab-altman" class="glossary-tab-btn active" onclick="switchGlossaryTab('altman')" style="font-size: 9px; font-weight: 700; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary); cursor: pointer;">Altman Z-Score</button>
+                                        <button id="glossary-tab-piotroski" class="glossary-tab-btn" onclick="switchGlossaryTab('piotroski')" style="font-size: 9px; font-weight: 700; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary); cursor: pointer;">Piotroski F-Score</button>
+                                    </div>
+
+                                    <!-- Altman Z-Score list -->
+                                    <div id="glossary-list-altman" style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+                                        <div class="glossary-item" id="glossary-item-altman-0" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>Ratio A (Working Capital / Total Assets):</strong> Measures short-term liquidity. High working capital indicates a strong cushion to meet short-term obligations.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-altman-1" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>Ratio B (Retained Earnings / Total Assets):</strong> Measures cumulative profitability. High ratio shows strong historical earnings retention.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-altman-2" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>Ratio C (EBIT / Total Assets):</strong> Measures operating asset productivity. Shows how much earnings are generated per unit of assets.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-altman-3" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>Ratio D (Market Cap / Total Liabilities):</strong> Measures solvency leverage. A high ratio indicates strong equity cushion relative to total debt.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-altman-4" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>Ratio E (Sales / Total Assets):</strong> Measures asset turnover. Shows how efficiently management uses assets to generate revenue.
+                                        </div>
+                                    </div>
+
+                                    <!-- Piotroski list -->
+                                    <div id="glossary-list-piotroski" style="display: none; flex-direction: column; gap: 6px; width: 100%;">
+                                        <div class="glossary-item" id="glossary-item-piotroski-0" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>1. Net Income:</strong> Positive Net Profit after tax in the latest year.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-piotroski-1" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>2. ROA (Return on Assets):</strong> Positive Return on Assets in the latest year.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-piotroski-2" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>3. Cash Flow from Operations (CFO):</strong> Operating Cash Flow is positive.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-piotroski-3" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>4. Accrual Quality (CFO > PAT):</strong> Operating Cash Flow exceeds Net Profit (indicates high cash quality).
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-piotroski-4" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>5. Decreased Leverage:</strong> Long-term debt to total assets ratio decreased YoY.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-piotroski-5" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>6. Increased Liquidity:</strong> Current ratio increased YoY.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-piotroski-6" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>7. No Share Dilution:</strong> Total shares outstanding did not increase during the year.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-piotroski-7" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>8. Gross Margin Expansion:</strong> Operating profit margin increased YoY.
+                                        </div>
+                                        <div class="glossary-item" id="glossary-item-piotroski-8" style="padding: 6px; border-radius: 4px; background: rgba(255,255,255,0.01); border: 1px solid transparent; font-size: 10.5px; line-height: 1.4; transition: all 0.2s ease;">
+                                            <strong>9. Asset Turnover Expansion:</strong> Sales to total assets ratio increased YoY (operating efficiency).
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Conversational Solvency Analyst Chatbot Panel -->
+                            <div id="solvency-chatbot-panel" style="margin-top: 12px; background: var(--bg-card-sub); border: 1px solid var(--border-glass, var(--border-sub)); border-radius: 6px; padding: 10px 12px; transition: all 0.3s ease; display: flex; flex-direction: column; width: 100%; box-sizing: border-box;">
+                                <div id="solvency-chatbot-header" onclick="const content = document.getElementById('solvency-chatbot-content'); const icon = document.getElementById('solvency-chatbot-toggle-icon'); if (content) { const isHidden = content.style.display === 'none' || content.style.display === ''; if (isHidden) { content.style.display = 'flex'; if (icon) icon.style.transform = 'rotate(180deg)'; } else { content.style.display = 'none'; if (icon) icon.style.transform = 'rotate(0deg)'; } }" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; width: 100%;">
+                                    <span style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+                                        💬 Conversational Solvency & Quality Advisor
+                                    </span>
+                                    <span id="solvency-chatbot-toggle-icon" style="font-size: 8px; color: var(--text-muted); transition: transform 0.2s ease; transform: rotate(0deg); display: inline-block;">▼</span>
+                                </div>
+                                <div id="solvency-chatbot-content" style="display: none; flex-direction: column; margin-top: 10px; border-top: 1px dashed var(--border-glass, var(--border-sub)); padding-top: 10px; width: 100%;">
+                                    
+                                    <!-- Chat history -->
+                                    <div id="solvency-chat-history" style="display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto; padding: 6px 0; width: 100%; box-sizing: border-box;">
+                                        <div class="bot-message" style="align-self: flex-start; background: rgba(255,255,255,0.04); color: var(--text-secondary); padding: 6px 10px; border-radius: 8px 8px 8px 0px; max-width: 90%; line-height: 1.4; font-size: 10.5px; box-sizing: border-box;">
+                                            Hello! I am your Solvency & Earnings Quality Analyst. Ask me anything about Altman Z-Score zones, Piotroski check metrics, or select from the pre-defined template actions below.
+                                        </div>
+                                    </div>
+
+                                    <!-- Template pills -->
+                                    <div style="margin-top: 10px; width: 100%; box-sizing: border-box;">
+                                        <div style="font-size: 8px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 6px;">Suggested Audit Prompts:</div>
+                                        <div id="solvency-templates-container" style="display: flex; flex-wrap: wrap; gap: 6px; width: 100%;">
+                                            <!-- Dynamic template pills will be appended here -->
+                                        </div>
+                                    </div>
+
+                                    <!-- Chat input dock -->
+                                    <div style="display: flex; gap: 6px; margin-top: 12px; border-top: 1px dashed var(--border-glass, var(--border-sub)); padding-top: 10px; width: 100%; box-sizing: border-box; align-items: center; flex-wrap: wrap;">
+                                        <input type="text" id="solvency-chat-input" placeholder="Ask about Altman ratios, cash margins, or debt safety..." style="flex: 1; min-width: 150px; font-size: 10.5px; padding: 6px 10px; border-radius: 4px; border: 1px solid var(--border-glass, var(--border-sub)); background: rgba(0,0,0,0.2); color: var(--text-primary); outline: none; box-sizing: border-box;" />
+                                        <button id="solvency-chat-mic-btn" title="Voice Input (Speech-to-Text)" style="background: none; border: 1px solid var(--border-glass, var(--border-sub)); border-radius: 4px; color: var(--text-muted); cursor: pointer; padding: 6px 10px; font-size: 11px; transition: all 0.2s ease;">🎙️</button>
+                                        <button id="solvency-chat-send-btn" style="background: var(--color-primary); color: #fff; border: none; border-radius: 4px; cursor: pointer; padding: 6px 14px; font-size: 11px; font-weight: 700; transition: all 0.2s ease; display: inline-flex; align-items: center; gap: 4px;">
+                                            <span>Send</span>
+                                            <span id="solvency-chat-spinner" class="spinner" style="display: none; width: 8px; height: 8px; border: 1.5px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Relative Valuation PE Bands & Price Chart (Recommendation 2) -->

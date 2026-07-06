@@ -589,6 +589,20 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
     import json
     import math
 
+    # Top-Down strategy sector rankings query
+    top_sectors = set()
+    if strategy == "top_down":
+        try:
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT sector FROM sector_regime_stats ORDER BY return_1m DESC")
+                sector_rows = cursor.fetchall()
+                if sector_rows:
+                    limit = int(len(sector_rows) * 0.6)
+                    top_sectors = {row[0] for row in sector_rows[:limit]}
+        except Exception as e:
+            print(f"Error querying top sectors for Top-Down strategy: {e}")
+
     def clean_float(val, default=0.0):
         try:
             fval = float(val)
@@ -697,16 +711,18 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
             fii_holding = clean_float(sh.get("FIIs", 15.0))
             dii_holding = clean_float(sh.get("DIIs", 15.0))
             inst_holding = fii_holding + dii_holding
-            
-            # ============================================================
+                      # ============================================================
             # LAYER 1: Operational Pipeline Gates
             # ============================================================
             gates_passed = True
             risk_screen = risk_profile.lower()
             horizon_screen = horizon.lower()
             
-            # Enhancement 1: Top-Down minimum quality floor
+            # Enhancement 1: Top-Down minimum quality floor + Sector tailwinds
             if strategy == "top_down":
+                sector_name = p.get("sector") or stock_item.get("sector")
+                if top_sectors and sector_name not in top_sectors:
+                    gates_passed = False
                 if not (net_margin >= 3.0 and
                         debt_eq <= 2.0 and
                         promoter_holding >= 25.0 and
@@ -714,8 +730,7 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
                         current_ratio >= 0.8):
                     gates_passed = False
             
-            if strategy == "bottom_up" or strategy == "hybrid":
-                # Adjust quality gate thresholds based on investor risk profile
+            if (strategy == "bottom_up" or strategy == "hybrid") and style != "contra":
                 if "conservative" in risk_screen:
                     max_debt_eq, min_roe, min_eps_growth = 0.5, 18.0, 15.0
                 elif "aggressive" in risk_screen:
@@ -723,7 +738,7 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
                 else:
                     max_debt_eq, min_roe, min_eps_growth = 1.0, 15.0, 12.0
                 
-                # Must-Pass Quality Gates
+                # Must-Pass Quality Floors
                 if not (roe >= min_roe and
                         roce >= 12.0 and
                         net_margin >= 8.0 and
@@ -734,7 +749,9 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
                         eps_growth_3y >= min_eps_growth and
                         rev_growth_3y >= 5.0 and
                         promoter_holding >= 40.0 and
-                        promoter_pledge <= 10.0):
+                        promoter_pledge <= 15.0 and
+                        piotroski >= 5 and
+                        altman_z >= 1.81):
                     gates_passed = False
                 
                 if "conservative" in risk_screen and gates_passed:
@@ -743,22 +760,22 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
                         gates_passed = False
             
             if strategy == "hybrid" and gates_passed and style != "contra":
-                price_vs_200 = f["current_price"] >= t.get("sma_200", f["current_price"])
-                price_vs_50 = f["current_price"] >= t.get("sma_50", f["current_price"])
+                price_val = f["current_price"]
+                sma_200 = t.get("sma_200", price_val)
+                sma_50 = t.get("sma_50", price_val)
+                sma_20 = t.get("sma_20") or sma_50
                 rsi_val = t.get("rsi", 52.0)
+                adx_val = t.get("adx", 22.0)
                 
                 if "short" in horizon_screen:
-                    adx_trending = t.get("adx", 22.0) >= 25.0
-                    rsi_neutral = 40.0 <= rsi_val <= 65.0
+                    if not (price_val >= sma_20 and 40.0 <= rsi_val <= 65.0 and adx_val >= 25.0):
+                        gates_passed = False
                 elif "long" in horizon_screen:
-                    adx_trending = t.get("adx", 22.0) >= 20.0
-                    rsi_neutral = 35.0 <= rsi_val <= 72.0
+                    if not (price_val >= sma_200 and price_val >= sma_50 and 35.0 <= rsi_val <= 72.0 and adx_val >= 20.0):
+                        gates_passed = False
                 else:
-                    adx_trending = t.get("adx", 22.0) >= 20.0
-                    rsi_neutral = 45.0 <= rsi_val <= 70.0
-                
-                if not (price_vs_200 and price_vs_50 and adx_trending and rsi_neutral):
-                    gates_passed = False
+                    if not (price_val >= sma_50 and 45.0 <= rsi_val <= 70.0 and adx_val >= 20.0):
+                        gates_passed = False
             
             # ============================================================
             # LAYER 2: Investment Style Overlay Gates
@@ -766,9 +783,11 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
             if gates_passed and style != "all":
                 if style == "value":
                     pe_val = clean_float(f.get("pe_ratio", 20.0))
+                    # Guard against negative/zero P/E (loss-making companies) passing as Value
+                    if pe_val <= 0:
+                        pe_val = 999.0
                     mos_val = clean_float(dcf.get("margin_of_safety", 0.0))
                     
-                    # Wise PE Valuation Check
                     import numpy as np
                     median_pe = clean_float(p.get("pe_bands", {}).get("median_pe", 0.0))
                     peers_pe = []
@@ -786,16 +805,23 @@ def run_ai_stock_screener(strategy: str, universe: str = "all", horizon: str = "
                     pe_under_absolute = pe_val <= 22.0
                     pe_under_median = (median_pe > 0.0) and (pe_val <= median_pe * 1.1)
                     pe_under_peer = (sector_pe > 0.0) and (pe_val <= sector_pe * 1.1)
-                    
                     pe_passed = pe_under_absolute or pe_under_median or pe_under_peer
                     
                     if (not pe_passed or roe < 12.0 or peg_ratio > 1.5 or 
-                        cfo_to_pat < 0.8 or current_ratio < 1.2 or promoter_pledge > 10.0):
+                        cfo_to_pat < 0.8 or current_ratio < 1.2 or promoter_pledge > 10.0 or
+                        dividend_yield < 1.0 or piotroski < 4 or altman_z < 1.81):
                         gates_passed = False
                         
                 elif style == "growth":
+                    no_dilution_passed = True
+                    for detail in eq.get("piotroski_details", []):
+                        if "dilution" in detail.get("test", "").lower():
+                            no_dilution_passed = detail.get("passed", True)
+                            break
+                            
                     if (eps_growth_3y < 15.0 or roe < 18.0 or roce < 18.0 or rev_growth_3y < 12.0 or 
-                        net_margin < 10.0 or cfo_to_pat < 0.7 or debt_eq > 1.5 or promoter_holding < 35.0):
+                        net_margin < 10.0 or cfo_to_pat < 0.7 or debt_eq > 1.0 or promoter_holding < 35.0 or
+                        not no_dilution_passed or inst_holding < 10.0):
                         gates_passed = False
                         
                 elif style == "contra":
@@ -1267,9 +1293,15 @@ def calculate_portfolio_taxes(portfolio_items: list, run_prescription: bool = Fa
         is_ltcg = holding_days > 365
         
         curr_price = buy_price
+        is_distressed = False
         try:
             profile = get_complete_financial_profile(symbol)
             curr_price = float(profile["fundamentals"]["current_price"])
+            eq = profile.get("earnings_quality", {})
+            piotroski = eq.get("piotroski_score", 5)
+            altman_z = eq.get("altman_z_score", 3.0)
+            if altman_z < 1.81 or piotroski < 4:
+                is_distressed = True
         except Exception:
             pass
             
@@ -1300,10 +1332,13 @@ def calculate_portfolio_taxes(portfolio_items: list, run_prescription: bool = Fa
             else:
                 stcg_losses += pl
                 
+        display_sym = f"⚠️ Solvency Warning {symbol}" if is_distressed else symbol
+        display_name = f"⚠️ Solvency Warning {item.get('name') or symbol}" if is_distressed else (item.get("name") or symbol)
+        
         tranche_info = {
             "id": item.get("id"),
-            "symbol": symbol,
-            "name": item.get("name") or symbol,
+            "symbol": display_sym,
+            "name": display_name,
             "sector": item.get("sector") or "General Equities",
             "quantity": quantity,
             "purchase_price": buy_price,
@@ -1316,7 +1351,8 @@ def calculate_portfolio_taxes(portfolio_items: list, run_prescription: bool = Fa
             "profit_loss": round(pl, 2),
             "profit_loss_pct": round(pl_pct, 2),
             "tax_rate_pct": tax_rate * 100,
-            "estimated_tax": round(tranche_tax, 2)
+            "estimated_tax": round(tranche_tax, 2),
+            "is_distressed": is_distressed
         }
         
         if pl < 0:
@@ -1457,12 +1493,19 @@ def run_portfolio_doctor(portfolio_items: list) -> dict:
         if not symbol or quantity <= 0:
             continue
             
+        is_distressed = False
         try:
             profile = get_complete_financial_profile(symbol)
             curr_price = float(profile["fundamentals"]["current_price"])
             score = int(profile["score_metrics"]["final_score"])
             action = profile["score_metrics"]["action"]
             sector = profile.get("sector") or "Other"
+            
+            eq = profile.get("earnings_quality", {})
+            piotroski = eq.get("piotroski_score", 5)
+            altman_z = eq.get("altman_z_score", 3.0)
+            if altman_z < 1.81 or piotroski < 4:
+                is_distressed = True
         except Exception:
             # Fallback
             curr_price = buy_price
@@ -1481,8 +1524,10 @@ def run_portfolio_doctor(portfolio_items: list) -> dict:
         
         sector_exposure[sector] = sector_exposure.get(sector, 0.0) + curr_val
         
+        display_sym = f"⚠️ Solvency Warning {symbol}" if is_distressed else symbol
+        
         analyzed_items.append({
-            "symbol": symbol,
+            "symbol": display_sym,
             "quantity": quantity,
             "buy_price": buy_price,
             "current_price": curr_price,
@@ -1492,7 +1537,8 @@ def run_portfolio_doctor(portfolio_items: list) -> dict:
             "profit_loss_pct": round(profit_loss_pct, 2),
             "score": score,
             "action": action,
-            "sector": sector
+            "sector": sector,
+            "is_distressed": is_distressed
         })
         
     if not analyzed_items:

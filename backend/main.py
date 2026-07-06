@@ -1733,12 +1733,14 @@ async def get_rebalance_status():
 
 @app.post("/api/admin/flush-cache")
 async def flush_profile_cache():
-    """Manual administration endpoint to purge cached stock profiles from SQLite database."""
+    """Manual administration endpoint to purge cached stock profiles from SQLite database and server memory."""
     try:
         with get_db() as conn:
             conn.execute("DELETE FROM cached_profiles")
             conn.commit()
-        return {"status": "success", "message": "Successfully purged cached stock profiles from SQLite database."}
+        from backend.financial_utils import clear_profile_cache
+        clear_profile_cache()
+        return {"status": "success", "message": "Successfully purged cached stock profiles from SQLite database and memory."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to flush cache: {str(e)}")
 
@@ -1775,7 +1777,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     history: List[ChatMessage]
     message: str
-    profile: dict
+    profile: Optional[dict] = None
 
 class AlertRequest(BaseModel):
     ticker: str
@@ -1925,6 +1927,8 @@ async def analyze_stock(
             print(f"Error caching analyzed profile to persistent SQLite: {db_err}")
         return profile
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Orchestration Analysis error: {str(e)}")
 
 @app.post("/api/analyze-custom")

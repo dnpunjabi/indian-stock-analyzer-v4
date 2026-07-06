@@ -48,6 +48,11 @@
     --audit-pass-border: rgba(16, 185, 129, 0.25);
     --audit-fail-border: rgba(239, 68, 68, 0.2);
 
+    /* Piotroski Matrix variables */
+    --matrix-pass: #10B981;
+    --matrix-fail: #EF4444;
+    --matrix-selected-bg: rgba(16, 185, 129, 0.15);
+
     /* Theme sub-component & track colors */
     --bg-card-sub: rgba(255, 255, 255, 0.015);
     --border-sub: rgba(255, 255, 255, 0.04);
@@ -15955,6 +15960,124 @@ html[data-mode="light"] .clickable-price-level:hover {
     border-color: #7c3aed !important;
     color: #c084fc !important;
     box-shadow: 0 0 12px rgba(124, 58, 237, 0.25);
+}
+
+/* Piotroski Matrix Active state selections */
+.piotroski-matrix-cell.active-matrix-cell {
+    background: var(--matrix-selected-bg) !important;
+    border: 1px solid var(--color-primary) !important;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.4) !important;
+    transform: translateY(-2px) scale(1.03) !important;
+}
+
+/* Mobile Responsive Card-Stack Table Collapser */
+@media (max-width: 768px) {
+    /* For screener and other wide comparison tables */
+    .data-table, .screener-table, .peers-table, .holdings-table, .tax-table {
+        display: block !important;
+        width: 100% !important;
+        border: none !important;
+    }
+    
+    .data-table thead, .screener-table thead, .peers-table thead, .holdings-table thead, .tax-table thead {
+        display: none !important; /* Hide standard wide table headers */
+    }
+    
+    .data-table tbody, .screener-table tbody, .peers-table tbody, .holdings-table tbody, .tax-table tbody {
+        display: block !important;
+        width: 100% !important;
+    }
+    
+    .data-table tr, .screener-table tr, .peers-table tr, .holdings-table tr, .tax-table tr {
+        display: block !important;
+        width: 100% !important;
+        background: rgba(255, 255, 255, 0.02) !important;
+        border: 1px solid var(--border-glass) !important;
+        border-radius: 8px !important;
+        margin-bottom: 12px !important;
+        padding: 10px !important;
+        box-sizing: border-box !important;
+    }
+    
+    [data-theme="light"] .data-table tr, 
+    [data-theme="light"] .screener-table tr, 
+    [data-theme="light"] .peers-table tr, 
+    [data-theme="light"] .holdings-table tr, 
+    [data-theme="light"] .tax-table tr {
+        background: rgba(0, 0, 0, 0.015) !important;
+    }
+    
+    .data-table td, .screener-table td, .peers-table td, .holdings-table td, .tax-table td {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 8px 6px !important;
+        border: none !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.03) !important;
+        text-align: right !important;
+        font-size: 11px !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    .data-table td:last-child, .screener-table td:last-child, .peers-table td:last-child, .holdings-table td:last-child, .tax-table td:last-child {
+        border-bottom: none !important;
+    }
+    
+    /* Dynamically insert column label via data-label */
+    .data-table td::before, .screener-table td::before, .peers-table td::before, .holdings-table td::before, .tax-table td::before {
+        content: attr(data-label) !important;
+        float: left !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        font-size: 9px !important;
+        color: var(--text-secondary) !important;
+        padding-right: 10px !important;
+        text-align: left !important;
+    }
+}
+
+/* Interactive & Dynamic Glossary Styling */
+.glossary-tab-btn {
+    background: none;
+    border: 1px solid var(--border-sub);
+    color: var(--text-muted);
+    font-size: 8.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 4px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    letter-spacing: 0.04em;
+}
+.glossary-tab-btn:hover {
+    color: var(--text-secondary);
+    border-color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.02);
+}
+.glossary-tab-btn.active {
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--color-primary);
+    border-color: rgba(59, 130, 246, 0.3);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.1);
+}
+.glossary-item {
+    border-radius: 6px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent;
+}
+.glossary-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: var(--border-sub);
+    transform: translateX(4px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+.glossary-item.highlighted {
+    background: rgba(59, 130, 246, 0.08);
+    border-color: rgba(59, 130, 246, 0.3);
+    transform: translateX(4px);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
 }
 
 

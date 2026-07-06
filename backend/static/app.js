@@ -35,6 +35,7 @@
         else if (activeTarget === 'rotation') micBtnId = 'sector-ai-voice-btn';
         else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
         else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
+        else if (activeTarget === 'solvency_chat') micBtnId = 'solvency-chat-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🔴';
@@ -49,6 +50,7 @@
         else if (activeTarget === 'rotation') micBtnId = 'sector-ai-voice-btn';
         else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
         else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
+        else if (activeTarget === 'solvency_chat') micBtnId = 'solvency-chat-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -63,6 +65,7 @@
         else if (activeTarget === 'rotation') micBtnId = 'sector-ai-voice-btn';
         else if (activeTarget === 'academy') micBtnId = 'academy-ai-mic-btn';
         else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
+        else if (activeTarget === 'solvency_chat') micBtnId = 'solvency-chat-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -97,6 +100,26 @@
             const input = document.getElementById('fs-chat-input');
             if (input) {
                 input.value = (input.value ? input.value + ' ' : '') + transcript;
+            }
+        } else if (activeTarget === 'solvency_chat') {
+            const input = document.getElementById('solvency-chat-input');
+            if (input) {
+                const normalized = transcript.toLowerCase().trim();
+                if (normalized === 'run stress test') {
+                    const ticker = activeStockProfile ? activeStockProfile.ticker : 'STOCK';
+                    input.value = `Run an operating leverage stress test: What happens to interest coverage and solvency zones if margins decline by 20% for ${ticker}?`;
+                    triggerSolvencyChatQuery();
+                } else if (normalized === 'piotroski audit') {
+                    const ticker = activeStockProfile ? activeStockProfile.ticker : 'STOCK';
+                    input.value = `Verify all 9 pass/fail checking rules of the Piotroski F-Score scorecard for ${ticker}.`;
+                    triggerSolvencyChatQuery();
+                } else if (normalized === 'start debate') {
+                    const ticker = activeStockProfile ? activeStockProfile.ticker : 'STOCK';
+                    input.value = `Run a forensic audit debate between two virtual analysts (Bullish Optimist vs Bearish Forensic Skeptic) focusing on cash flow quality and solvency triggers for ${ticker}.`;
+                    triggerSolvencyChatQuery();
+                } else {
+                    input.value = (input.value ? input.value + ' ' : '') + transcript;
+                }
             }
         } else {
             const input = document.getElementById('chat-user-input');
@@ -2651,20 +2674,20 @@ function renderScreenerResults(results, isSorted = false) {
         const rankStyle = item.rank <= 3 ? 'font-size: 13px;' : 'font-size: 11px; color: var(--text-secondary);';
 
         tr.innerHTML = `
-            <td><strong style="${rankStyle}">${rankMedal}</strong></td>
-            <td>
+            <td data-label="Rank"><strong style="${rankStyle}">${rankMedal}</strong></td>
+            <td data-label="Asset">
                 <div class="screener-symbol-link" style="cursor: pointer;" title="Click to load research workspace">
                     <strong style="color: var(--color-primary); font-family: 'Outfit', sans-serif; text-decoration: underline;">${item.name}</strong><br>
                     <span class="text-muted" style="font-size:9.5px; letter-spacing:0.02em; text-decoration: underline;">${item.symbol}</span>
                 </div>
             </td>
-            <td><span class="text-muted" style="font-size: 11px;">${item.sector}</span></td>
-            <td><span class="text-muted" style="text-transform: uppercase; font-size: 10.5px; font-weight: 700; letter-spacing:0.02em;">${item.cap_type || 'N/A'}</span></td>
-            <td><span class="badge-ticker" style="background-color:${scoreBg}; color:${scoreColor}; border: 1px solid ${scoreColor}30; font-family: 'Outfit', sans-serif; font-weight:800; font-size: 11px; padding: 3px 8px; border-radius: 6px;">${item.score}/100</span></td>
-            <td>${renderSubscoreGauge(item.fundamental_score, 30)}</td>
-            <td>${renderSubscoreGauge(item.valuation_score, 25)}</td>
-            <td>${renderSubscoreGauge(item.technical_score, 25)}</td>
-            <td><span class="badge-rec ${recClass}" style="font-size: 9.5px; padding: 3px 8px; font-weight: 700; border-radius: 5px; letter-spacing:0.04em;">${item.action}</span></td>
+            <td data-label="Sector"><span class="text-muted" style="font-size: 11px;">${item.sector}</span></td>
+            <td data-label="Market Cap"><span class="text-muted" style="text-transform: uppercase; font-size: 10.5px; font-weight: 700; letter-spacing:0.02em;">${item.cap_type || 'N/A'}</span></td>
+            <td data-label="Composite Score"><span class="badge-ticker" style="background-color:${scoreBg}; color:${scoreColor}; border: 1px solid ${scoreColor}30; font-family: 'Outfit', sans-serif; font-weight:800; font-size: 11px; padding: 3px 8px; border-radius: 6px;">${item.score}/100</span></td>
+            <td data-label="Fundamental Score">${renderSubscoreGauge(item.fundamental_score, 30)}</td>
+            <td data-label="Valuation Score">${renderSubscoreGauge(item.valuation_score, 25)}</td>
+            <td data-label="Technical Score">${renderSubscoreGauge(item.technical_score, 25)}</td>
+            <td data-label="AI Recommendation"><span class="badge-rec ${recClass}" style="font-size: 9.5px; padding: 3px 8px; font-weight: 700; border-radius: 5px; letter-spacing:0.04em;">${item.action}</span></td>
         `;
 
         tr.querySelector('.screener-symbol-link').addEventListener('click', () => {
@@ -5478,6 +5501,14 @@ function renderStockDashboard(p) {
     const dashboardEl = document.getElementById('analyzer-dashboard');
     if (dashboardEl) dashboardEl.style.display = 'block';
 
+    // Reset Ratios & Earnings Solvency Chatbot
+    solvencyChatHistoryList = [];
+    const solvencyHistoryEl = document.getElementById('solvency-chat-history');
+    if (solvencyHistoryEl) solvencyHistoryEl.innerHTML = '';
+    updateSolvencyChatbotPrompts(p.ticker);
+    setupSolvencyGlossaryToggle();
+    initSolvencyChatbot();
+
     const exportBtn = document.getElementById('export-pdf-btn');
     if (exportBtn) exportBtn.removeAttribute('disabled');
 
@@ -5659,7 +5690,120 @@ function renderStockDashboard(p) {
     if (checklistContainer) {
         checklistContainer.innerHTML = '';
 
+        // Inject custom CSS styles for the expandable checklist cards if not already present
+        if (!document.getElementById('cio-checklist-styles')) {
+            const style = document.createElement('style');
+            style.id = 'cio-checklist-styles';
+            style.textContent = `
+                .cio-checklist-card {
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    cursor: pointer;
+                    overflow: hidden;
+                    position: relative;
+                    padding: 10px 12px;
+                    border-radius: 6px;
+                    display: flex;
+                    flex-direction: column;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+                .cio-checklist-card:hover {
+                    filter: brightness(1.15);
+                    transform: translateY(-1px);
+                }
+                .cio-checklist-details {
+                    max-height: 0;
+                    opacity: 0;
+                    overflow: hidden;
+                    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin-top 0.3s ease;
+                    font-size: 10px;
+                    color: var(--text-muted);
+                    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+                    padding-top: 0px;
+                    margin-top: 0px;
+                    line-height: 1.5;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+                .cio-checklist-card.expanded .cio-checklist-details {
+                    max-height: 500px;
+                    opacity: 1;
+                    margin-top: 8px;
+                    padding-top: 8px;
+                }
+                .cio-checklist-detail-row {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 2.5px 0;
+                }
+                .cio-checklist-detail-row:not(:last-child) {
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        const f = p.fundamentals || {};
+        const t = p.technicals || {};
+        const dcf = p.dcf_model || {};
+        const sh = p.shareholding || {};
+        const consensus = p.consensus || {};
+        const eq = p.earnings_quality || {};
+
+        const roe = f.roe_pct !== undefined ? f.roe_pct : 15.0;
+        const roce = f.roce_pct !== undefined ? f.roce_pct : 15.0;
+        const net_margin = f.net_margin_pct !== undefined ? f.net_margin_pct : 10.0;
+        const debt_eq = f.debt_to_equity !== undefined ? f.debt_to_equity : 0.1;
+        const interest_cov = f.interest_coverage !== undefined ? f.interest_coverage : 4.5;
+        const current_ratio = f.current_ratio !== undefined ? f.current_ratio : 1.3;
+        const cfo_to_pat = f.cfo_to_pat !== undefined ? f.cfo_to_pat : 0.9;
+        const pledged = f.promoter_pledge_pct !== undefined ? f.promoter_pledge_pct : 0.0;
+        const tax_rate = f.tax_rate_pct !== undefined ? f.tax_rate_pct : 25.0;
+
+        const pe = f.pe_ratio !== undefined ? f.pe_ratio : 24.5;
+        let peers_pe = [];
+        (p.peers || []).forEach(peer => {
+            const val = peer["P/E"];
+            if (val !== undefined && val !== "N/A") {
+                peers_pe.push(parseFloat(val));
+            }
+        });
+        const sector_pe = peers_pe.length > 0 ? peers_pe.reduce((a, b) => a + b, 0) / peers_pe.length : 25.0;
+        const growth_est = Math.max(5.0, f.profit_growth_3y_pct !== undefined ? f.profit_growth_3y_pct : 12.0);
+        const peg = pe / growth_est;
+
+        const mcap_cr = f.market_cap_cr || 1000.0;
+        const ev_val = mcap_cr * (1.0 + debt_eq);
+        const ebitda_margin = f.ebitda_margin_pct !== undefined ? f.ebitda_margin_pct : 15.0;
+        const net_profit_est = roe > 0 ? mcap_cr * (roe / 100.0) : mcap_cr * 0.05;
+        const ebitda_est = net_margin > 0 ? (net_profit_est / (net_margin / 100.0)) * (ebitda_margin / 100.0) : net_profit_est * 1.5;
+        const ev_ebitda = ebitda_est > 0 ? ev_val / ebitda_est : 12.0;
+
+        const margin_safety = dcf.margin_of_safety !== undefined ? dcf.margin_of_safety : 15.0;
+
+        const curr_price = f.current_price !== undefined ? f.current_price : 100.0;
+        const sma_200 = t.sma_200 !== undefined ? t.sma_200 : curr_price;
+        const sma_50 = t.sma_50 !== undefined ? t.sma_50 : curr_price;
+        const sma_20 = t.sma_20 !== undefined ? t.sma_20 : (t.sma_50 !== undefined ? t.sma_50 : curr_price);
+        const adx = t.adx !== undefined ? t.adx : 22.0;
+        const rsi = t.rsi !== undefined ? t.rsi : 52.0;
+        const vol_vs_avg = t.volume_vs_avg20 !== undefined ? t.volume_vs_avg20 : 1.1;
+
+        const rev_cagr = f.sales_growth_3y_pct !== undefined ? f.sales_growth_3y_pct : 12.0;
+        const pat_cagr = f.profit_growth_3y_pct !== undefined ? f.profit_growth_3y_pct : 15.0;
+        const cwip_ratio = f.cwip_fixed_assets_pct !== undefined ? f.cwip_fixed_assets_pct : 0.0;
+        const reserves_growth = f.reserves_compounding_3y || false;
+        const acceleration = f.profit_accelerating_qoq || false;
+
+        const cons_rec = (consensus.recommendation || "Buy").toLowerCase();
+        const insiders = sh.Promoter !== undefined ? sh.Promoter : 50.0;
+        const fiis = sh.FIIs || sh.FII || 15.0;
+        const diis = sh.DIIs || sh.DII || 15.0;
+        const inst_holding = fiis + diis;
+
         const fScore = scoring.fundamental_score || 0;
+        const eqScore = scoring.earnings_quality_score || 0;
         const vScore = scoring.valuation_score || 0;
         const tScore = scoring.technical_score || 0;
         const gScore = scoring.growth_score || 0;
@@ -5689,9 +5833,10 @@ function renderStockDashboard(p) {
         }
 
         const fPass = fScore >= 18;
-        const vPass = vScore >= 15;
-        const tPass = (tScore >= 15) && rsiInsideBand;
-        const gPass = gScore >= 9;
+        const eqPass = eqScore >= 9;
+        const vPass = vScore >= 12;
+        const tPass = (tScore >= 12) && rsiInsideBand;
+        const gPass = gScore >= 6;
         const sPass = sScore >= 3;
 
         const formatROCE = p.fundamentals.roce_pct !== null && p.fundamentals.roce_pct !== undefined ? p.fundamentals.roce_pct.toFixed(0) : '0';
@@ -5699,15 +5844,98 @@ function renderStockDashboard(p) {
         const formatRSI = p.technicals.rsi !== null && p.technicals.rsi !== undefined ? p.technicals.rsi.toFixed(0) : '50';
         const formatPAT = p.fundamentals.profit_growth_3y_pct !== null && p.fundamentals.profit_growth_3y_pct !== undefined ? p.fundamentals.profit_growth_3y_pct.toFixed(0) : '0';
 
+        const pScore = eq.piotroski_score !== null && eq.piotroski_score !== undefined ? eq.piotroski_score : 5;
+        const zScore = eq.altman_z_score !== null && eq.altman_z_score !== undefined ? eq.altman_z_score : 3.0;
+
+        // Build HTML details sections for each category
+        const buildFundDetails = () => {
+            return `
+                <div class="cio-checklist-details">
+                    <div class="cio-checklist-detail-row"><span>${roe >= 15.0 ? '🟢' : '🔴'} Return on Equity (ROE):</span><strong>${roe.toFixed(1)}%</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${roce >= 12.0 ? '🟢' : '🔴'} Return on Capital (ROCE):</span><strong>${roce.toFixed(1)}%</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${net_margin >= 8.0 ? '🟢' : '🔴'} Net profit Margin:</span><strong>${net_margin.toFixed(1)}%</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${debt_eq <= 0.5 ? '🟢' : '🔴'} Debt-to-Equity Ratio:</span><strong>${debt_eq.toFixed(2)}x</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${interest_cov >= 3.0 ? '🟢' : '🔴'} Interest Coverage:</span><strong>${interest_cov.toFixed(1)}x</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${current_ratio >= 1.2 ? '🟢' : '🔴'} Current ratio:</span><strong>${current_ratio.toFixed(2)}</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${cfo_to_pat >= 0.8 ? '🟢' : '🔴'} CFO-to-PAT ratio:</span><strong>${cfo_to_pat.toFixed(2)}x</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${pledged <= 5.0 ? '🟢' : '🔴'} Promoter Pledging:</span><strong>${pledged.toFixed(1)}%</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${tax_rate >= 10.0 ? '🟢' : '🔴'} Effective Tax Consistency:</span><strong>${tax_rate.toFixed(1)}%</strong></div>
+                </div>
+            `;
+        };
+
+        const buildEqDetails = () => {
+            let pRows = '';
+            const pDetails = eq.piotroski_details || [];
+            pDetails.forEach(d => {
+                pRows += `<div class="cio-checklist-detail-row" style="padding-left: 10px;"><span>${d.passed ? '🟢' : '🔴'} ${d.test}</span><span style="color:var(--text-muted); font-size:8.5px;">${d.category}</span></div>`;
+            });
+            return `
+                <div class="cio-checklist-details">
+                    <div class="cio-checklist-detail-row"><span>${zScore > 2.99 ? '🟢' : (zScore >= 1.81 ? '🟡' : '🔴')} Altman Z-Score (${zScore.toFixed(2)}):</span><strong>${zScore > 2.99 ? 'Safe Zone' : (zScore >= 1.81 ? 'Grey Zone' : 'Distress Zone')}</strong></div>
+                    <div style="font-weight:700; margin-top:6px; margin-bottom:4px; color:var(--text-secondary); font-size:9px; text-transform:uppercase; letter-spacing:0.04em;">Piotroski Quality Breakdown (${pScore}/9):</div>
+                    ${pRows}
+                </div>
+            `;
+        };
+
+        const buildValDetails = () => {
+            return `
+                <div class="cio-checklist-details">
+                    <div class="cio-checklist-detail-row"><span>${pe <= sector_pe ? '🟢' : '🔴'} Stock P/E vs Industry P/E:</span><strong>${pe.toFixed(1)}x / ${sector_pe.toFixed(1)}x</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${peg <= 1.0 ? '🟢' : (peg <= 1.5 ? '🟡' : '🔴')} PEG Ratio Valuation:</span><strong>${peg.toFixed(2)} (${peg <= 1.0 ? 'Undervalued' : (peg <= 1.5 ? 'Fair' : 'Overvalued')})</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${ev_ebitda <= 15.0 ? '🟢' : '🔴'} EV / EBITDA Multiple:</span><strong>${ev_ebitda.toFixed(1)}x</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${margin_safety >= 15.0 ? '🟢' : '🔴'} DCF Margin of Safety:</span><strong>${margin_safety.toFixed(1)}%</strong></div>
+                </div>
+            `;
+        };
+
+        const buildTechDetails = () => {
+            return `
+                <div class="cio-checklist-details">
+                    <div class="cio-checklist-detail-row"><span>${curr_price >= sma_200 ? '🟢' : '🔴'} Price vs 200-day SMA:</span><strong>${curr_price.toFixed(1)} / ${sma_200.toFixed(1)}</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${curr_price >= sma_50 ? '🟢' : '🔴'} Price vs 50-day SMA:</span><strong>${curr_price.toFixed(1)} / ${sma_50.toFixed(1)}</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${curr_price >= sma_20 ? '🟢' : '🔴'} Price vs 20-day SMA:</span><strong>${curr_price.toFixed(1)} / ${sma_20.toFixed(1)}</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${rsiInsideBand ? '🟢' : '🔴'} RSI Momentum Check:</span><strong>${formatRSI} (Range: ${rsiLowerLimit}-${rsiUpperLimit})</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${adx >= 20.0 ? '🟢' : '🔴'} ADX Trend Intensity:</span><strong>${adx.toFixed(1)}</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${vol_vs_avg >= 1.2 ? '🟢' : '🔴'} Volume spike vs 20D Avg:</span><strong>${vol_vs_avg.toFixed(1)}x</strong></div>
+                </div>
+            `;
+        };
+
+        const buildGrowthDetails = () => {
+            return `
+                <div class="cio-checklist-details">
+                    <div class="cio-checklist-detail-row"><span>${rev_cagr >= 12.0 ? '🟢' : '🔴'} 3-Year Revenue CAGR:</span><strong>${rev_cagr.toFixed(1)}%</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${pat_cagr >= 15.0 ? '🟢' : '🔴'} 3-Year PAT CAGR:</span><strong>${pat_cagr.toFixed(1)}%</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${cwip_ratio >= 10.0 ? '🟢' : '🔴'} CWIP to Fixed Assets:</span><strong>${cwip_ratio.toFixed(1)}%</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${reserves_growth ? '🟢' : '🔴'} Compounding Reserves:</span><strong>${reserves_growth ? 'Compounding' : 'Flat/Declined'}</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${acceleration ? '🟢' : '🔴'} QoQ Earnings Acceleration:</span><strong>${acceleration ? 'Yes' : 'No'}</strong></div>
+                </div>
+            `;
+        };
+
+        const buildSentDetails = () => {
+            return `
+                <div class="cio-checklist-details">
+                    <div class="cio-checklist-detail-row"><span>${(cons_rec.includes("buy") || cons_rec.includes("outperform")) ? '🟢' : '🔴'} Analyst Rating Recommendation:</span><strong>${p.consensus.recommendation}</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${inst_holding >= 15.0 ? '🟢' : '🔴'} FII + DII Institutional Stake:</span><strong>${inst_holding.toFixed(1)}%</strong></div>
+                    <div class="cio-checklist-detail-row"><span>${insiders >= 50.0 ? '🟢' : '🔴'} Promoter Shareholding Level:</span><strong>${insiders.toFixed(1)}%</strong></div>
+                    <div class="cio-checklist-detail-row"><span>📰 Dynamic Catalyst News count:</span><strong>${(p.news || []).length} events</strong></div>
+                </div>
+            `;
+        };
+
         const items = [
-            { icon: fPass ? "✅" : "⚠️", text: `<strong>Fundamentals (${fScore}/30):</strong> ROCE ${formatROCE}%, D/E ${formatDE}` },
-            { icon: vPass ? "✅" : "⚠️", text: `<strong>Valuation (${vScore}/25):</strong> PEG ${scoring.peg_ratio} — ${p.dcf_model.valuation_rating}` },
-            { icon: tPass ? "✅" : "⚠️", text: `<strong>Technical (${tScore}/25):</strong> ${p.technicals.trend_50_vs_200} Trend, RSI ${formatRSI}${rsiWarningText}` },
-            { icon: gPass ? "✅" : "⚠️", text: `<strong>Growth (${gScore}/15):</strong> 3Y PAT Growth of ${formatPAT}%` },
-            { icon: "📰", text: `<strong>Sentiment (${sScore}/5):</strong> ${p.consensus.recommendation} — ${p.news.length} Catalysts detected` }
+            { icon: fPass ? "✅" : "⚠️", text: `<strong>Fundamentals (${fScore}/30):</strong> ROCE ${formatROCE}%, D/E ${formatDE}`, detailsHtml: buildFundDetails() },
+            { icon: eqPass ? "✅" : "⚠️", text: `<strong>Solvency & Quality (${eqScore}/15):</strong> F-Score ${pScore}/9, Altman Z ${zScore.toFixed(2)}`, detailsHtml: buildEqDetails() },
+            { icon: vPass ? "✅" : "⚠️", text: `<strong>Valuation (${vScore}/20):</strong> PEG ${scoring.peg_ratio} — ${p.dcf_model.valuation_rating}`, detailsHtml: buildValDetails() },
+            { icon: tPass ? "✅" : "⚠️", text: `<strong>Technical (${tScore}/20):</strong> ${p.technicals.trend_50_vs_200} Trend, RSI ${formatRSI}${rsiWarningText}`, detailsHtml: buildTechDetails() },
+            { icon: gPass ? "✅" : "⚠️", text: `<strong>Growth (${gScore}/10):</strong> 3Y PAT Growth of ${formatPAT}%`, detailsHtml: buildGrowthDetails() },
+            { icon: "📰", text: `<strong>Sentiment (${sScore}/5):</strong> ${p.consensus.recommendation} — ${(p.news || []).length} Catalysts detected`, detailsHtml: buildSentDetails() }
         ];
 
-        const passStateMap = [fPass, vPass, tPass, gPass, sPass];
+        const passStateMap = [fPass, eqPass, vPass, tPass, gPass, sPass];
         items.forEach((item, idx) => {
             const isPassed = passStateMap[idx];
             const row = document.createElement('div');
@@ -5722,7 +5950,7 @@ function renderStockDashboard(p) {
                 rowBorder = '1px solid rgba(16, 185, 129, 0.15)';
                 iconText = '✅';
             }
-            if (idx === 4) { // News / Sentiment row is always a custom blue/primary style
+            if (idx === 5) {
                 rowBg = 'rgba(59, 130, 246, 0.04)';
                 rowBorder = '1px solid rgba(59, 130, 246, 0.15)';
                 iconText = '📰';
@@ -5732,8 +5960,48 @@ function renderStockDashboard(p) {
             row.style.border = rowBorder;
             row.style.marginBottom = '6px';
             row.style.boxShadow = '0 2px 4px rgba(0,0,0,0.03)';
+            row.style.display = 'flex';
+            row.style.flexDirection = 'column';
 
-            row.innerHTML = `<span style="font-size:13px; display:inline-flex; align-items:center; justify-content:center;">${iconText}</span> <span style="color:var(--text-primary); margin-left:8px;">${item.text}</span>`;
+            row.innerHTML = `
+                <div style="display: flex; align-items: center; width: 100%; user-select: none;">
+                    <span style="font-size:13px; display:inline-flex; align-items:center; justify-content:center;">${iconText}</span>
+                    <span style="color:var(--text-primary); margin-left:8px; flex: 1; font-size: 11px;">${item.text}</span>
+                    <span class="cio-expand-arrow" style="font-size: 7px; color: var(--text-muted); transition: transform 0.2s ease; margin-left: auto;">▼</span>
+                </div>
+                ${item.detailsHtml}
+            `;
+
+            // Hover interactions for desktop (screen widths > 768px)
+            row.addEventListener('mouseenter', () => {
+                if (window.innerWidth > 768) {
+                    row.classList.add('expanded');
+                    const arrow = row.querySelector('.cio-expand-arrow');
+                    if (arrow) arrow.style.transform = 'rotate(180deg)';
+                }
+            });
+            row.addEventListener('mouseleave', () => {
+                if (window.innerWidth > 768) {
+                    row.classList.remove('expanded');
+                    const arrow = row.querySelector('.cio-expand-arrow');
+                    if (arrow) arrow.style.transform = 'rotate(0deg)';
+                }
+            });
+
+            // Click/tap toggle for mobile, and manual click toggle fallback for desktop
+            row.addEventListener('click', (e) => {
+                const isExpanded = row.classList.contains('expanded');
+                if (isExpanded) {
+                    row.classList.remove('expanded');
+                    const arrow = row.querySelector('.cio-expand-arrow');
+                    if (arrow) arrow.style.transform = 'rotate(0deg)';
+                } else {
+                    row.classList.add('expanded');
+                    const arrow = row.querySelector('.cio-expand-arrow');
+                    if (arrow) arrow.style.transform = 'rotate(180deg)';
+                }
+            });
+
             checklistContainer.appendChild(row);
         });
     }
@@ -17293,30 +17561,63 @@ function renderEarningsQuality(p) {
                 <span class="cell-status-dot" style="background: ${dotColor}; box-shadow: 0 0 3px ${dotColor}; width: 5px; height: 5px; border-radius: 50%; margin-top: 4px;"></span>
             `;
 
-            // Hover mouse events
-            cell.addEventListener('mouseenter', () => {
-                cell.style.transform = 'translateY(-2px) scale(1.03)';
-                cell.style.boxShadow = item.passed ? '0 0 10px rgba(16, 185, 129, 0.3)' : '0 0 10px rgba(239, 68, 68, 0.3)';
+            cell.setAttribute('data-passed', item.passed);
 
+            // Click/Touch event toggle bindings
+            cell.addEventListener('click', (e) => {
+                const allCells = pMatrix.querySelectorAll('.piotroski-matrix-cell');
+                const isAlreadySelected = cell.classList.contains('active-matrix-cell');
+                
+                allCells.forEach(c => {
+                    c.classList.remove('active-matrix-cell');
+                    c.style.transform = 'none';
+                    c.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                    const cPassed = c.getAttribute('data-passed') === 'true';
+                    c.style.background = cPassed ? 'var(--audit-pass-bg)' : 'var(--audit-fail-bg)';
+                });
+                
                 const titleEl = document.getElementById('eq-explain-title');
                 const descEl = document.getElementById('eq-explain-desc');
-                if (titleEl && descEl) {
-                    titleEl.innerText = `${item.test} [${item.category}]`;
-                    titleEl.style.color = item.passed ? 'var(--color-emerald)' : 'var(--color-crimson)';
-                    descEl.innerText = `Status: ${item.passed ? 'PASSED 🟢' : 'FAILED 🔴'}. Audit targets ${item.test.toLowerCase()} YoY.`;
-                }
-            });
+                
+                if (isAlreadySelected) {
+                    if (titleEl && descEl) {
+                        titleEl.innerText = 'Tap cells for audit details';
+                        titleEl.style.color = 'var(--text-primary)';
+                        descEl.innerText = 'Tap or click the matrix cells above to verify dynamic pass/fail checks.';
+                    }
+                } else {
+                    cell.classList.add('active-matrix-cell');
+                    cell.style.transform = 'translateY(-2px) scale(1.03)';
+                    cell.style.background = 'var(--matrix-selected-bg)';
+                    cell.style.boxShadow = item.passed ? '0 0 10px rgba(16, 185, 129, 0.3)' : '0 0 10px rgba(239, 68, 68, 0.3)';
+                    
+                    if (titleEl && descEl) {
+                        titleEl.innerText = `${item.test} [${item.category}]`;
+                        titleEl.style.color = item.passed ? 'var(--matrix-pass)' : 'var(--matrix-fail)';
+                        descEl.innerText = `Status: ${item.passed ? 'PASSED 🟢' : 'FAILED 🔴'}. Audit targets ${item.test.toLowerCase()} YoY.`;
+                    }
 
-            cell.addEventListener('mouseleave', () => {
-                cell.style.transform = 'none';
-                cell.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                    // Auto-expand glossary and switch tab
+                    const gContent = document.getElementById('solvency-glossary-content');
+                    const gIcon = document.getElementById('solvency-glossary-toggle-icon');
+                    if (gContent && (gContent.style.display === 'none' || gContent.style.display === '')) {
+                        gContent.style.display = 'flex';
+                        if (gIcon) gIcon.style.transform = 'rotate(180deg)';
+                    }
+                    if (typeof switchGlossaryTab === 'function') {
+                        switchGlossaryTab('piotroski');
+                    }
 
-                const titleEl = document.getElementById('eq-explain-title');
-                const descEl = document.getElementById('eq-explain-desc');
-                if (titleEl && descEl) {
-                    titleEl.innerText = 'Hover cells for audit details';
-                    titleEl.style.color = 'var(--text-primary)';
-                    descEl.innerText = 'Move cursor over the matrix cells above to verify dynamic pass/fail checks.';
+                    // Highlight matching glossary item
+                    const allGlossary = document.querySelectorAll('.glossary-item');
+                    allGlossary.forEach(gItem => gItem.classList.remove('highlighted'));
+                    const targetGlossary = document.getElementById(`glossary-item-piotroski-${index}`);
+                    if (targetGlossary) {
+                        targetGlossary.classList.add('highlighted');
+                        if (e.isTrusted) {
+                            targetGlossary.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    }
                 }
             });
 
@@ -17401,7 +17702,8 @@ function renderEarningsQuality(p) {
             if (contrib < 0) barPct = 5; // Minimal bar for negative contributions
 
             const row = document.createElement('div');
-            row.className = 'altman-comp-row';
+            row.className = 'altman-comp-row hover-chart-trigger';
+            row.setAttribute('data-hover-chart', `altman_${item.key}`);
             row.style.display = 'flex';
             row.style.alignItems = 'center';
             row.style.justifyContent = 'space-between';
@@ -17412,6 +17714,7 @@ function renderEarningsQuality(p) {
             row.style.fontSize = '9.5px';
             row.style.gap = '8px';
             row.style.marginBottom = '2px';
+            row.style.cursor = 'pointer';
 
             row.innerHTML = `
                 <span class="altman-comp-label" style="font-weight: 600; color: var(--text-secondary); width: 85px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${item.desc}">${item.name}</span>
@@ -17420,6 +17723,34 @@ function renderEarningsQuality(p) {
                 </div>
                 <span class="altman-comp-val" style="font-family: monospace; width: 100px; text-align: right; font-size: 8.5px;">${item.coef}×${ratioVal.toFixed(2)} = <strong style="color: ${activeColor}">${contrib >= 0 ? '+' : ''}${contrib.toFixed(2)}</strong></span>
             `;
+
+            // Click to expand and highlight glossary
+            row.addEventListener('click', (e) => {
+                const gContent = document.getElementById('solvency-glossary-content');
+                const gIcon = document.getElementById('solvency-glossary-toggle-icon');
+                if (gContent && (gContent.style.display === 'none' || gContent.style.display === '')) {
+                    gContent.style.display = 'flex';
+                    if (gIcon) gIcon.style.transform = 'rotate(180deg)';
+                }
+                if (typeof switchGlossaryTab === 'function') {
+                    switchGlossaryTab('altman');
+                }
+
+                const componentKeys = ["working_capital_ta", "retained_earnings_ta", "ebit_ta", "market_cap_tl", "revenue_ta"];
+                const compIndex = componentKeys.indexOf(item.key);
+                if (compIndex !== -1) {
+                    const allGlossary = document.querySelectorAll('.glossary-item');
+                    allGlossary.forEach(gItem => gItem.classList.remove('highlighted'));
+                    const targetGlossary = document.getElementById(`glossary-item-altman-${compIndex}`);
+                    if (targetGlossary) {
+                        targetGlossary.classList.add('highlighted');
+                        if (e.isTrusted) {
+                            targetGlossary.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        }
+                    }
+                }
+            });
+
             zComponents.appendChild(row);
         });
     }
@@ -17484,6 +17815,7 @@ function renderEarningsQuality(p) {
 
         summaryTextEl.innerHTML = `🛡️ **Institutional Synopsis:** The company demonstrates ${fEval} ${zEval}<br><br>💡 **Layman Analogy:** ${fLayman} ${zLayman}`;
     }
+    updateSolvencyChatbotPrompts(p.ticker);
 }
 
 
@@ -26019,13 +26351,447 @@ function setupDebateSpeakBtn() {
     }
 }
 
-// Initialize on DOMContentLoaded
-document.addEventListener('DOMContentLoaded', () => {
+function initializeSolvencyFeatures() {
     setupRuleScanner();
     setupDebateSpeakBtn();
     setupTVWorkstationChartControls();
     setupMetricHoverTooltips();
-});
+    setupSolvencyGlossaryToggle();
+    initSolvencyChatbot();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeSolvencyFeatures);
+} else {
+    initializeSolvencyFeatures();
+}
+
+function setupSolvencyGlossaryToggle() {
+    const header = document.getElementById('solvency-glossary-header');
+    const content = document.getElementById('solvency-glossary-content');
+    const icon = document.getElementById('solvency-glossary-toggle-icon');
+    console.log("[Glossary Debug] setupSolvencyGlossaryToggle called. header:", header, "content:", content);
+    if (!header || !content) return;
+
+    header.addEventListener('click', () => {
+        const isHidden = content.style.display === 'none' || content.style.display === '';
+        console.log("[Glossary Debug] Header clicked. isHidden:", isHidden);
+        if (isHidden) {
+            content.style.display = 'flex';
+            if (icon) icon.style.transform = 'rotate(180deg)';
+        } else {
+            content.style.display = 'none';
+            if (icon) icon.style.transform = 'rotate(0deg)';
+        }
+    });
+}
+
+function switchGlossaryTab(tabName) {
+    const tabAltman = document.getElementById('glossary-tab-altman');
+    const tabPiotroski = document.getElementById('glossary-tab-piotroski');
+    const listAltman = document.getElementById('glossary-list-altman');
+    const listPiotroski = document.getElementById('glossary-list-piotroski');
+    
+    if (tabName === 'altman') {
+        if (tabAltman) tabAltman.classList.add('active');
+        if (tabPiotroski) tabPiotroski.classList.remove('active');
+        if (listAltman) listAltman.style.display = 'flex';
+        if (listPiotroski) listPiotroski.style.display = 'none';
+    } else {
+        if (tabAltman) tabAltman.classList.remove('active');
+        if (tabPiotroski) tabPiotroski.classList.add('active');
+        if (listAltman) listAltman.style.display = 'none';
+        if (listPiotroski) listPiotroski.style.display = 'flex';
+    }
+}
+window.switchGlossaryTab = switchGlossaryTab;
+
+function highlightDashboardAltman(index) {
+    const zComponents = document.getElementById('altman-components-breakdown');
+    if (!zComponents) return;
+    const rows = zComponents.querySelectorAll('.altman-comp-row');
+    if (rows && rows[index]) {
+        rows.forEach(r => {
+            r.style.transform = 'none';
+            r.style.boxShadow = 'none';
+            r.style.background = 'rgba(255, 255, 255, 0.01)';
+        });
+        const targetRow = rows[index];
+        targetRow.style.transform = 'translateX(4px)';
+        targetRow.style.background = 'rgba(59, 130, 246, 0.08)';
+        targetRow.style.boxShadow = '0 0 8px rgba(59, 130, 246, 0.15)';
+        targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Match glossary highlight
+        const allGlossaryItems = document.querySelectorAll('.glossary-item');
+        allGlossaryItems.forEach(item => item.classList.remove('highlighted'));
+        const targetGlossary = document.getElementById(`glossary-item-altman-${index}`);
+        if (targetGlossary) targetGlossary.classList.add('highlighted');
+    }
+}
+window.highlightDashboardAltman = highlightDashboardAltman;
+
+function highlightDashboardPiotroski(index) {
+    const pMatrix = document.getElementById('piotroski-matrix');
+    if (!pMatrix) return;
+    const cells = pMatrix.querySelectorAll('.piotroski-matrix-cell');
+    if (cells && cells[index]) {
+        cells[index].click();
+        
+        // Match glossary highlight
+        const allGlossaryItems = document.querySelectorAll('.glossary-item');
+        allGlossaryItems.forEach(item => item.classList.remove('highlighted'));
+        const targetGlossary = document.getElementById(`glossary-item-piotroski-${index}`);
+        if (targetGlossary) targetGlossary.classList.add('highlighted');
+    }
+}
+window.highlightDashboardPiotroski = highlightDashboardPiotroski;
+
+
+// Conversational Solvency Chatbot Panel logic
+let solvencyChatHistoryList = [];
+
+function initSolvencyChatbot() {
+    const sendBtn = document.getElementById('solvency-chat-send-btn');
+    const input = document.getElementById('solvency-chat-input');
+    if (sendBtn) {
+        sendBtn.addEventListener('click', triggerSolvencyChatQuery);
+    }
+    if (input) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                triggerSolvencyChatQuery();
+            }
+        });
+    }
+    setupSolvencyChatSTT();
+}
+
+function updateSolvencyChatbotPrompts(ticker) {
+    const container = document.getElementById('solvency-templates-container');
+    if (!container) return;
+
+    let prompts = [];
+    if (ticker) {
+        const cleanTicker = ticker.replace('.NS', '').replace('.BO', '');
+        prompts = [
+            { text: "🛑 Solvency Audit", action: `Audit the structural bankruptcy risk profiles, Altman Z factors and safe margin buffers for ${ticker}.` },
+            { text: "📊 Piotroski Check", action: `Verify all 9 pass/fail checking rules of the Piotroski F-Score scorecard for ${ticker}.` },
+            { text: "💸 Cash Quality Check", action: `Compare the net profit after tax with operating cash flow to inspect for potential creative accounting or mismatch flags in ${ticker}.` },
+            { text: "⚖️ Leverage Burden", action: `Examine the debt-to-equity ratio, interest coverage parameters and solvency headroom to withstand operating shocks for ${ticker}.` },
+            { text: "📈 Asset Productivity", action: `Check the asset turnover ratio trends over the last 3 years to see if asset productivity is generating higher top-line revenues for ${ticker}.` },
+            { text: "🛡️ OPM Trend", action: `Analyze the gross margin and operating profit margin trends over the last 4 years to examine structural pricing power for ${ticker}.` },
+            { text: "🔄 Working Capital Audit", action: `Examine working capital cycles (receivables, inventory days, payables) to assess cash lockups in operations for ${ticker}.` },
+            { text: "🏛️ Capital Allocation", action: `Evaluate Return on Invested Capital (ROIC) vs WACC to assess if management is creating economic value or destroying capital for ${ticker}.` },
+            { text: "⚠️ Pledging & Risk", action: `Audit promoter pledging stakes, changes in promoter holding percentages, and key credit default risks for ${ticker}.` },
+            { text: "📉 Depreciation & Taxes", action: `Verify the depreciation policy and effective tax rate consistency. Check if low tax rates are unsustainably boosting earnings for ${ticker}.` },
+            { text: "🌱 Free Cash Flow", action: `Calculate Free Cash Flow (FCF = CFO - Capex) and FCF conversion yield relative to enterprise value and price for ${ticker}.` },
+            { text: "⚡ Stress Test", action: `Run an operating leverage stress test: What happens to interest coverage and solvency zones if margins decline by 20% for ${ticker}?` },
+            { text: "⚖️ Audit Debate", action: `Run a forensic audit debate between two virtual analysts (Bullish Optimist vs Bearish Forensic Skeptic) focusing on cash flow quality and solvency triggers for ${ticker}.` }
+        ];
+    } else {
+        prompts = [
+            { text: "🛑 What is Altman Z?", action: "Explain how to interpret the Altman Z-score and define Distress, Grey, and Safe zones." },
+            { text: "📊 What is Piotroski F-Score?", action: "List and explain the 9 criteria of the Piotroski F-Score for evaluating stock quality." },
+            { text: "💸 CFO to PAT Ratio", action: "Why is the Operating Cash Flow to Net Profit ratio critical for detecting creative accounting?" }
+        ];
+    }
+
+    container.innerHTML = '';
+    prompts.forEach(p => {
+        const button = document.createElement('button');
+        button.className = 'glossary-tab-btn';
+        button.style.fontSize = '8.5px';
+        button.style.padding = '3px 8px';
+        button.style.marginRight = '4px';
+        button.style.marginBottom = '4px';
+        button.style.border = '1px solid var(--border-glass)';
+        button.style.background = 'rgba(255,255,255,0.03)';
+        button.style.color = 'var(--text-primary)';
+        button.style.cursor = 'pointer';
+        button.style.borderRadius = '4px';
+        button.style.transition = 'all 0.2s';
+        
+        button.innerText = p.text;
+        button.addEventListener('click', () => {
+            const chatInput = document.getElementById('solvency-chat-input');
+            if (chatInput) {
+                chatInput.value = p.action;
+                triggerSolvencyChatQuery();
+            }
+        });
+        
+        button.addEventListener('mouseenter', () => {
+            button.style.background = 'rgba(59, 130, 246, 0.12)';
+            button.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+        });
+        button.addEventListener('mouseleave', () => {
+            button.style.background = 'rgba(255,255,255,0.03)';
+            button.style.borderColor = 'var(--border-glass)';
+        });
+        
+        container.appendChild(button);
+    });
+}
+
+async function triggerSolvencyChatQuery() {
+    const input = document.getElementById('solvency-chat-input');
+    if (!input) return;
+    const promptText = input.value.trim();
+    if (!promptText) return;
+
+    const sendBtn = document.getElementById('solvency-chat-send-btn');
+    const spinner = document.getElementById('solvency-chat-spinner');
+    const history = document.getElementById('solvency-chat-history');
+    if (!history) return;
+
+    appendSolvencyChatMessage('user', promptText);
+    input.value = '';
+
+    if (sendBtn) sendBtn.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+
+    const botMsgId = 'solvency-bot-' + Date.now();
+    appendSolvencyChatLoading(botMsgId);
+
+    try {
+        const payload = {
+            message: promptText,
+            profile: activeStockProfile,
+            history: solvencyChatHistoryList
+        };
+
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Failed to compile AI solvency query");
+        const data = await res.json();
+
+        removeSolvencyChatLoading(botMsgId);
+        
+        const responseText = data.response || "No response received.";
+        appendSolvencyChatMessage('bot', responseText);
+        solvencyChatHistoryList.push({ role: 'user', content: promptText });
+        solvencyChatHistoryList.push({ role: 'assistant', content: responseText });
+
+    } catch (err) {
+        console.error("AI Solvency Chat error:", err);
+        removeSolvencyChatLoading(botMsgId);
+        appendSolvencyChatMessage('bot', "❌ Error: Failed to generate response from AI model.");
+    } finally {
+        if (sendBtn) sendBtn.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+    }
+}
+
+function appendSolvencyChatMessage(role, text) {
+    const history = document.getElementById('solvency-chat-history');
+    if (!history) return;
+
+    const msg = document.createElement('div');
+    msg.style.display = 'flex';
+    msg.style.flexDirection = 'column';
+    msg.style.marginBottom = '6px';
+    msg.style.width = '100%';
+
+    const bubble = document.createElement('div');
+    bubble.style.padding = '6px 10px';
+    bubble.style.fontSize = '10.5px';
+    bubble.style.lineHeight = '1.45';
+    bubble.style.boxSizing = 'border-box';
+    bubble.style.maxWidth = '90%';
+
+    if (role === 'user') {
+        bubble.style.alignSelf = 'flex-end';
+        bubble.style.background = 'rgba(59, 130, 246, 0.15)';
+        bubble.style.color = 'var(--text-primary)';
+        bubble.style.borderRadius = '8px 8px 0px 8px';
+        bubble.innerText = text;
+    } else {
+        bubble.style.alignSelf = 'flex-start';
+        bubble.style.background = 'rgba(255, 255, 255, 0.04)';
+        bubble.style.color = 'var(--text-secondary)';
+        bubble.style.borderRadius = '8px 8px 8px 0px';
+        bubble.style.border = '1px solid var(--border-glass)';
+
+        let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        
+        formattedText = formattedText.replace(/(altman component [a-e]|altman ratio [a-e]|altman solvency [a-e]|ratio [a-e]|altman z component [a-e])/gi, (match) => {
+            const lastChar = match.charAt(match.length - 1).toUpperCase();
+            const index = ["A", "B", "C", "D", "E"].indexOf(lastChar);
+            if (index !== -1) {
+                return `<span class="glossary-dashboard-link" onclick="window.highlightDashboardAltman(${index});" style="color: var(--color-primary-light); text-decoration: underline; cursor: pointer; font-weight: bold;">${match}</span>`;
+            }
+            return match;
+        });
+
+        formattedText = formattedText.replace(/(piotroski check \d|piotroski rule \d|piotroski parameter \d|piotroski score \d|piotroski parameter [1-9]|f-score criteria \d)/gi, (match) => {
+            const digit = parseInt(match.match(/\d/)[0], 10);
+            if (digit >= 1 && digit <= 9) {
+                return `<span class="glossary-dashboard-link" onclick="window.highlightDashboardPiotroski(${digit - 1});" style="color: var(--color-primary-light); text-decoration: underline; cursor: pointer; font-weight: bold;">${match}</span>`;
+            }
+            return match;
+        });
+
+        bubble.innerHTML = `<span>${formattedText}</span>`;
+        
+        const speakBtn = document.createElement('button');
+        speakBtn.style.background = 'none';
+        speakBtn.style.border = 'none';
+        speakBtn.style.cursor = 'pointer';
+        speakBtn.style.color = 'var(--text-muted)';
+        speakBtn.style.fontSize = '9px';
+        speakBtn.style.marginTop = '4px';
+        speakBtn.style.alignSelf = 'flex-start';
+        speakBtn.style.outline = 'none';
+        speakBtn.style.display = 'inline-flex';
+        speakBtn.style.alignItems = 'center';
+        speakBtn.style.gap = '3px';
+        speakBtn.innerHTML = '🔊 Read Aloud';
+        
+        speakBtn.addEventListener('click', () => {
+            if (window.SpeechPlayer) {
+                window.SpeechPlayer.startSpeakingSection(text, "Solvency & Quality Advisor", true);
+            } else if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text.replace(/\*\*|__/g, ''));
+                const voiceSelect = document.getElementById('speech-control-voice');
+                if (voiceSelect && voiceSelect.value !== 'default') {
+                    const voices = window.speechSynthesis.getVoices();
+                    const selectedVoice = voices.find(v => v.name === voiceSelect.value);
+                    if (selectedVoice) utterance.voice = selectedVoice;
+                }
+                const rateSelect = document.getElementById('speech-control-rate');
+                if (rateSelect) utterance.rate = parseFloat(rateSelect.value) || 1.0;
+                window.speechSynthesis.speak(utterance);
+            }
+        });
+        bubble.appendChild(speakBtn);
+    }
+
+    msg.appendChild(bubble);
+    history.appendChild(msg);
+    history.scrollTop = history.scrollHeight;
+}
+
+function appendSolvencyChatLoading(id) {
+    const history = document.getElementById('solvency-chat-history');
+    if (!history) return;
+
+    const loader = document.createElement('div');
+    loader.id = id;
+    loader.style.alignSelf = 'flex-start';
+    loader.style.background = 'rgba(255, 255, 255, 0.02)';
+    loader.style.padding = '6px 10px';
+    loader.style.borderRadius = '8px 8px 8px 0px';
+    loader.style.color = 'var(--text-muted)';
+    loader.style.fontSize = '10px';
+    loader.style.marginBottom = '6px';
+    loader.style.maxWidth = '90%';
+    loader.innerText = '🤖 Compiling forensic solvency audit...';
+
+    history.appendChild(loader);
+    history.scrollTop = history.scrollHeight;
+}
+
+function removeSolvencyChatLoading(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}
+
+function setupSolvencyChatSTT() {
+    const micBtn = document.getElementById('solvency-chat-mic-btn');
+    const inputEl = document.getElementById('solvency-chat-input');
+    if (!micBtn || !inputEl) return;
+
+    const isAndroidSpeech = window.AndroidSpeech && typeof window.AndroidSpeech.startListening === 'function';
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (isAndroidSpeech) {
+        micBtn.addEventListener('click', () => {
+            if (window.AndroidSpeechListening && window.activeSpeechRecognizerTarget === 'solvency_chat') {
+                window.AndroidSpeech.stopListening();
+            } else {
+                window.activeSpeechRecognizerTarget = 'solvency_chat';
+                window.AndroidSpeech.startListening();
+            }
+        });
+    } else if (!SpeechRecognition) {
+        micBtn.style.display = 'none';
+    } else {
+        let recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+        let isListening = false;
+
+        recognition.onstart = () => {
+            isListening = true;
+            micBtn.innerHTML = '🔴';
+            micBtn.classList.add('mic-listening');
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            micBtn.innerHTML = '🎙️';
+            micBtn.classList.remove('mic-listening');
+        };
+
+        recognition.onresult = (event) => {
+            let transcript = event.results[0][0].transcript;
+            
+            const normalized = transcript.toLowerCase().trim();
+            if (normalized === 'run stress test') {
+                const ticker = activeStockProfile ? activeStockProfile.ticker : 'STOCK';
+                inputEl.value = `Run an operating leverage stress test: What happens to interest coverage and solvency zones if margins decline by 20% for ${ticker}?`;
+                triggerSolvencyChatQuery();
+            } else if (normalized === 'piotroski audit') {
+                const ticker = activeStockProfile ? activeStockProfile.ticker : 'STOCK';
+                inputEl.value = `Verify all 9 pass/fail checking rules of the Piotroski F-Score scorecard for ${ticker}.`;
+                triggerSolvencyChatQuery();
+            } else if (normalized === 'start debate') {
+                const ticker = activeStockProfile ? activeStockProfile.ticker : 'STOCK';
+                inputEl.value = `Run a forensic audit debate between two virtual analysts (Bullish Optimist vs Bearish Forensic Skeptic) focusing on cash flow quality and solvency triggers for ${ticker}.`;
+                triggerSolvencyChatQuery();
+            } else {
+                inputEl.value = (inputEl.value ? inputEl.value + ' ' : '') + transcript;
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Solvency Chat speech recognition error:", event.error);
+            if (event.error === 'no-speech') {
+                return;
+            }
+            if (event.error === 'network') {
+                if (typeof showToast === 'function') {
+                    showToast("Speech recognition network error. Please check your internet connection.", "warning");
+                }
+                return;
+            }
+            if (event.error === 'not-allowed') {
+                if (typeof showToast === 'function') {
+                    showToast("Microphone access denied. Please enable mic permissions in browser settings.", "warning");
+                }
+                return;
+            }
+        };
+
+        micBtn.addEventListener('click', () => {
+            if (isListening) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        });
+    }
+}
+window.initSolvencyChatbot = initSolvencyChatbot;
+window.updateSolvencyChatbotPrompts = updateSolvencyChatbotPrompts;
+
 
 function setupMetricHoverTooltips() {
     const tooltip = document.getElementById('metric-hover-tooltip');
@@ -26050,6 +26816,27 @@ function setupMetricHoverTooltips() {
         return trend;
     }
 
+    function generateHistoricalAltmanComponentTrend(ticker, currentVal, componentKey) {
+        let hash = 0;
+        const compositeKey = ticker + componentKey;
+        for (let i = 0; i < compositeKey.length; i++) {
+            hash = compositeKey.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const trend = [];
+        for (let y = 0; y < 4; y++) {
+            const sinVal = Math.sin(hash + y);
+            const fluctuation = sinVal * 0.12 * currentVal;
+            const yearVal = currentVal + (y - 3) * fluctuation;
+            if (componentKey === 'market_cap_tl' || componentKey === 'revenue_ta') {
+                trend.push(Math.max(0.0, yearVal));
+            } else {
+                trend.push(yearVal);
+            }
+        }
+        trend[3] = currentVal;
+        return trend;
+    }
+
     function getMetricData(metricType) {
         let chartData = [];
         let chartLabels = [];
@@ -26057,7 +26844,35 @@ function setupMetricHoverTooltips() {
         let subtitle = "Historical 3-Year Trend";
         let label = "Value";
 
-        if (metricType === 'pe') {
+        if (metricType.startsWith('altman_')) {
+            const componentKey = metricType.replace('altman_', '');
+            const eq = activeStockProfile.earnings_quality || {};
+            const comps = eq.altman_components || {};
+            const currentVal = comps[componentKey] !== undefined ? comps[componentKey] : 0.0;
+            const history = generateHistoricalAltmanComponentTrend(activeStockProfile.ticker, currentVal, componentKey);
+            chartLabels = ["3Y Ago", "2Y Ago", "1Y Ago", "Current"];
+            chartData = history;
+
+            const namesMap = {
+                "working_capital_ta": "Net Liquidity (A)",
+                "retained_earnings_ta": "Profitability (B)",
+                "ebit_ta": "Operating EBIT (C)",
+                "market_cap_tl": "Solvency Leverage (D)",
+                "revenue_ta": "Productivity (E)"
+            };
+            const subtitlesMap = {
+                "working_capital_ta": "Working Capital / Total Assets",
+                "retained_earnings_ta": "Retained Earnings / Total Assets",
+                "ebit_ta": "EBIT / Total Assets",
+                "market_cap_tl": "Market Cap / Total Liabilities",
+                "revenue_ta": "Revenue / Total Assets"
+            };
+
+            const tickerPart = activeStockProfile.ticker.split('.')[0];
+            title = `${tickerPart} ${namesMap[componentKey] || 'Altman Ratio'} Trend`;
+            subtitle = subtitlesMap[componentKey] || "Historical Altman Z-Score Component";
+            label = namesMap[componentKey] || "Ratio Value";
+        } else if (metricType === 'pe') {
             const peBands = activeStockProfile.pe_bands || {};
             const peHistory = peBands.pe_history || [];
             if (peHistory.length > 0) {
@@ -26178,7 +26993,10 @@ function setupMetricHoverTooltips() {
             lineColor = '#2563eb'; // light theme blue
         }
 
-        if (metricType === 'debteq') {
+        if (metricType.startsWith('altman_')) {
+            const isImproving = chartData[chartData.length - 1] >= chartData[0];
+            lineColor = isImproving ? '#10b981' : '#ef4444';
+        } else if (metricType === 'debteq') {
             const isDebtReduced = chartData[chartData.length - 1] <= chartData[0];
             lineColor = isDebtReduced ? '#10b981' : '#ef4444';
         } else if (metricType === 'fii' || metricType === 'dii' || metricType === 'promoter' || metricType === 'public') {

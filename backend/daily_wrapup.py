@@ -136,6 +136,20 @@ def fetch_portfolio_summary() -> dict:
         top_gainer = enriched_holdings[0] if enriched_holdings else None
         top_loser = enriched_holdings[-1] if enriched_holdings else None
 
+        # Check for distressed assets
+        distressed_symbols = []
+        for h in active_holdings:
+            sym = h["symbol"]
+            try:
+                profile = get_complete_financial_profile(sym)
+                eq = profile.get("earnings_quality", {})
+                piotroski = eq.get("piotroski_score", 5)
+                altman_z = eq.get("altman_z_score", 3.0)
+                if altman_z < 1.81 or piotroski < 4:
+                    distressed_symbols.append(sym.replace(".NS", "").replace(".BO", ""))
+            except Exception:
+                pass
+
         return {
             "active": True,
             "total_cost": total_cost,
@@ -145,7 +159,8 @@ def fetch_portfolio_summary() -> dict:
             "total_return_val": total_return_val,
             "total_return_pct": total_return_pct,
             "top_gainer": top_gainer,
-            "top_loser": top_loser
+            "top_loser": top_loser,
+            "distressed_symbols": distressed_symbols
         }
     except Exception as e:
         print(f"Daily Wrap-up: Portfolio aggregation error: {e}")
@@ -607,9 +622,22 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
         sign_ret = "+" if port['total_return_val'] >= 0 else ""
         port_str += f"• Total Return:  `{sign_ret}Rs. {port['total_return_val']:,.2f} ({port['total_return_pct']:+.2f}%)`\n"
         if port.get("top_gainer"):
-            port_str += f"  ├─ 🏆 *Top Gainer:* {port['top_gainer']['symbol'].replace('.NS','')} (`{port['top_gainer']['day_change_pct']:+.2f}%`)\n"
+            g_sym = port['top_gainer']['symbol'].replace('.NS','')
+            if g_sym in port.get("distressed_symbols", []):
+                g_sym = f"⚠️ {g_sym} (Solvency Warning)"
+            port_str += f"  ├─ 🏆 *Top Gainer:* {g_sym} (`{port['top_gainer']['day_change_pct']:+.2f}%`)\n"
         if port.get("top_loser"):
-            port_str += f"  └─ ⚠️ *Top Loser:*  {port['top_loser']['symbol'].replace('.NS','')} (`{port['top_loser']['day_change_pct']:+.2f}%`)\n"
+            l_sym = port['top_loser']['symbol'].replace('.NS','')
+            if l_sym in port.get("distressed_symbols", []):
+                l_sym = f"⚠️ {l_sym} (Solvency Warning)"
+            port_str += f"  ├─ ⚠️ *Top Loser:*  {l_sym} (`{port['top_loser']['day_change_pct']:+.2f}%`)\n"
+        if port.get("distressed_symbols"):
+            port_str += f"  └─ ⚠️ *Solvency Warnings:* {', '.join(port['distressed_symbols'])} flagged distressed\n"
+        else:
+            # Fix final branch bracket line
+            if port.get("top_loser"):
+                # replace last branch character with corner character
+                port_str = port_str.replace("├─ ⚠️ *Top Loser:*", "└─ ⚠️ *Top Loser:*")
     else:
         port_str = "_No active holdings in portfolio ledger._\n"
 
