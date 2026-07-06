@@ -1251,6 +1251,7 @@ button:disabled, .btn-secondary:disabled {
     padding: 20px;
     backdrop-filter: blur(12px);
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box;
 }
 
 .card:hover {
@@ -6648,6 +6649,9 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .dashboard-grid {
         grid-template-columns: 1fr !important;
         gap: 15px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     .dashboard-grid .col-span-2, 
@@ -7155,9 +7159,12 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 .subtabs-scroll-container {
     position: relative;
     width: 100%;
+    max-width: 100% !important;
+    min-width: 0 !important;
     margin-bottom: 24px;
     display: flex;
     align-items: center;
+    box-sizing: border-box;
 }
 
 .analyzer-subtabs {
@@ -7171,6 +7178,8 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     -webkit-overflow-scrolling: touch !important;
     scroll-behavior: smooth;
     width: 100%;
+    min-width: 0 !important;
+    max-width: 100% !important;
     scrollbar-width: thin !important; /* Force thin scrollbar in Firefox */
     scrollbar-color: var(--color-primary-glow, rgba(59, 130, 246, 0.35)) var(--border-glass) !important;
 }
@@ -11991,6 +12000,11 @@ tr.active-peer-row td:first-child {
         flex-direction: column;
         gap: 10px;
     }
+    .index-ticker-container {
+        max-width: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box;
+    }
     .header-utils {
         width: 100%;
         justify-content: flex-end;
@@ -16079,6 +16093,237 @@ html[data-mode="light"] .clickable-price-level:hover {
     transform: translateX(4px);
     box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
 }
+
+/* ==========================================================================
+   SECTION: MARGIN BRIDGE WATERFALL & CHATBOT STYLES
+   ========================================================================== */
+
+/* Layout & Grid */
+.margin-bridge-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 20px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+.margin-bridge-left,
+.margin-bridge-right {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Range Slider Styling */
+.margin-slider-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
+}
+.margin-slider-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.margin-slider-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+.margin-slider-value {
+    font-weight: 700;
+    color: var(--color-primary);
+}
+.margin-slider-input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.margin-slider-input-row input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    outline: none;
+    transition: background 0.3s;
+}
+[data-theme="light"] .margin-slider-input-row input[type="range"] {
+    background: rgba(0, 0, 0, 0.1);
+}
+.margin-slider-input-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    cursor: pointer;
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    transition: transform 0.1s ease;
+}
+.margin-slider-input-row input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+}
+.margin-slider-input-row input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: var(--color-primary);
+    cursor: pointer;
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5);
+    transition: transform 0.1s ease;
+}
+.margin-slider-input-row input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.2);
+}
+.margin-slider-pct-indicator {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 45px;
+    text-align: right;
+}
+
+/* Chatbot History Log Styles */
+#margin-chatbot-history::-webkit-scrollbar {
+    width: 5px;
+}
+#margin-chatbot-history::-webkit-scrollbar-track {
+    background: rgba(0,0,0,0.05);
+}
+#margin-chatbot-history::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+}
+[data-theme="light"] #margin-chatbot-history::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.1);
+}
+
+/* Message Bubble Styles */
+.margin-chat-msg {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    line-height: 1.45;
+    max-width: 90%;
+    margin-bottom: 5px;
+    box-sizing: border-box;
+}
+.margin-chat-msg.user {
+    align-self: flex-end;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: var(--text-primary);
+}
+.margin-chat-msg.assistant {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+}
+[data-theme="light"] .margin-chat-msg.assistant {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+/* Chatbot Box & Sizing Containment */
+#margin-chatbot-box {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+#margin-chatbot-history {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+#margin-chatbot-templates {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+}
+
+/* Predefined templates list styling */
+#margin-chatbot-templates::-webkit-scrollbar {
+    display: none;
+}
+
+/* Mobile Responsiveness Rules */
+@media (max-width: 768px) {
+    #margin-bridge-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        overflow-x: hidden !important;
+    }
+
+    .margin-bridge-grid {
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    #margin-chatbot-box {
+        min-height: 420px !important;
+        height: auto;
+    }
+    
+    #margin-chatbot-history {
+        height: 240px !important;
+    }
+    
+    .margin-comparison-hud {
+        padding: 8px !important;
+        gap: 8px !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    .margin-comparison-hud > div {
+        min-width: 100% !important;
+        border-left: none !important;
+        padding-left: 0 !important;
+        border-bottom: 1px solid var(--border-glass);
+        padding-bottom: 6px;
+        margin-bottom: 2px;
+    }
+    .margin-comparison-hud > div:last-child {
+        border-bottom: none !important;
+        padding-bottom: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    
+    /* Interactive input form mobile display adjustment */
+    #margin-chatbot-box .fs-chat-input-row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+    #margin-chatbot-input {
+        flex: 1 1 100% !important; /* Spans full width on row 1 */
+    }
+    #margin-chatbot-mic-btn {
+        flex: 0 0 auto !important;
+        width: 45px !important;
+    }
+    #margin-chatbot-send-btn {
+        flex: 1 1 auto !important;
+    }
+}
+
 
 
 

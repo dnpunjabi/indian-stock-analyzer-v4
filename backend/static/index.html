@@ -16,7 +16,7 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <!-- TradingView Advanced Widget -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <link rel="stylesheet" href="styles.css?v=1.5.1">
+    <link rel="stylesheet" href="styles.css?v=1.5.4">
 </head>
 <body>
     <!-- Emergency System Warning HUD -->
@@ -1500,6 +1500,7 @@
                             <button class="subtab-btn" data-subtab="fundamental">🩺 Ratios & Earnings</button>
                             <button class="subtab-btn" data-subtab="peers">👥 Peers & Ownership</button>
                             <button class="subtab-btn" data-subtab="financials">📋 Financial Statements</button>
+                            <button class="subtab-btn" data-subtab="margin-bridge">💸 Margin Bridge</button>
                             <button class="subtab-btn" data-subtab="audit">🔬 Agent Strategy Audit</button>
                             <button class="subtab-btn" data-subtab="volume">📋 Price Volume Dynamics</button>
                             <button class="subtab-btn" data-subtab="trades">🤝 Insider & Block Deals</button>
@@ -3036,6 +3037,121 @@
                                         <span id="fs-chat-send-spinner" class="spinner-loader" style="display: none; width: 10px; height: 10px; border: 1.5px solid rgba(255,255,255,0.3); border-top-color: #ffffff; border-radius: 50%; animation: spin 1s linear infinite;"></span>
                                         <span>Send</span>
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SECTION: MARGIN BRIDGE WATERFALL & CHATBOT -->
+                        <div class="card col-span-4 card-hidden" id="margin-bridge-card" data-subtab="margin-bridge" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; margin-bottom: 5px;">
+                                <div>
+                                    <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                                        <span>💸</span> MARGIN & EBITDA BRIDGE
+                                    </h3>
+                                    <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; display: block; margin-top: 2px;">Interactive Waterfall Margin Sandbox and Copilot Chatbot</span>
+                                </div>
+                                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                    <div style="display: flex; gap: 2px; background: rgba(0,0,0,0.15); border: 1px solid var(--border-glass); border-radius: 6px; padding: 2px;">
+                                        <button id="margin-toggle-yearly" style="font-size: 9px; padding: 4px 8px; border-radius: 4px; border: none; cursor: pointer; background: var(--color-primary); color: white; font-weight: 600; transition: all 0.2s;">Yearly P&L</button>
+                                        <button id="margin-toggle-quarterly" style="font-size: 9px; padding: 4px 8px; border-radius: 4px; border: none; cursor: pointer; background: transparent; color: var(--text-secondary); font-weight: 600; transition: all 0.2s;">Quarterly</button>
+                                    </div>
+                                    <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.015); padding: 3px; border-radius: 6px; border: 1px solid var(--border-glass);">
+                                        <span id="margin-bridge-period-label" style="font-size: 11px; padding: 4px 12px; font-weight: 600; color: var(--text-primary);">FY --</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Dual column grid wrapper -->
+                            <div class="margin-bridge-grid">
+                                
+                                <!-- Left Column: Sandbox Chart & Sliders -->
+                                <div class="margin-bridge-left" style="display: flex; flex-direction: column; gap: 15px;">
+                                    
+                                    <!-- Waterfall Chart Container -->
+                                    <div class="chart-container" style="position: relative; width: 100%; height: 260px; background: rgba(0,0,0,0.15); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; box-sizing: border-box;">
+                                        <canvas id="margin-waterfall-chart" style="width: 100%; height: 100%;"></canvas>
+                                    </div>
+
+                                    <!-- Comparison Stats HUD -->
+                                    <div class="margin-comparison-hud" style="display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px; background: rgba(59,130,246,0.03); border: 1px solid var(--border-glass); border-radius: 8px; box-sizing: border-box;">
+                                        <div style="flex: 1; min-width: 120px;">
+                                            <span style="font-size: 8px; text-transform: uppercase; color: var(--text-muted); display: block; font-weight: 600;">Actual Net Profit</span>
+                                            <span id="margin-hud-actual-pat" style="font-size: 15px; font-weight: 800; color: var(--text-primary);">Rs. -- Cr</span>
+                                        </div>
+                                        <div style="flex: 1; min-width: 120px; border-left: 1px solid var(--border-glass); padding-left: 10px;">
+                                            <span style="font-size: 8px; text-transform: uppercase; color: var(--text-muted); display: block; font-weight: 600;">Simulated Net Profit</span>
+                                            <span id="margin-hud-simulated-pat" style="font-size: 15px; font-weight: 800; color: var(--color-primary);">Rs. -- Cr</span>
+                                        </div>
+                                        <div style="flex: 1; min-width: 120px; border-left: 1px solid var(--border-glass); padding-left: 10px;">
+                                            <span style="font-size: 8px; text-transform: uppercase; color: var(--text-muted); display: block; font-weight: 600;">Impact / Change %</span>
+                                            <span id="margin-hud-pat-impact" style="font-size: 15px; font-weight: 800; color: var(--text-secondary);">--%</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dynamic Sandbox Sliders Panel -->
+                                    <div class="card" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 15px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; width: 100%;">
+                                        <h4 style="margin: 0 0 5px 0; font-family: 'Outfit', sans-serif; font-size: 12px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">🎛️ Margin Sandbox Sliders</h4>
+                                        
+                                        <!-- Sliders populated dynamically based on sector type -->
+                                        <div id="margin-sliders-container" style="display: flex; flex-direction: column; gap: 10px;">
+                                            <!-- Dynamically populated in app.js -->
+                                        </div>
+
+                                        <button id="margin-reset-sliders-btn" class="btn-secondary" style="font-size: 10px; align-self: flex-end; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-glass); cursor: pointer; background: none; color: var(--text-secondary); transition: all 0.2s;">Reset Sliders</button>
+                                    </div>
+                                </div>
+
+                                <!-- Right Column: Co-Pilot Chatbot -->
+                                <div class="margin-bridge-right" style="display: flex; flex-direction: column; gap: 15px;">
+                                    
+                                    <!-- Margin Co-Pilot Chatbot Box -->
+                                    <div id="margin-chatbot-box" style="padding: 15px; background: rgba(59, 130, 246, 0.03); border: 1px solid var(--border-glass); border-radius: 8px; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 520px; justify-content: space-between;">
+                                        
+                                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                                            <div class="fs-chat-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                                <div class="fs-chat-header-title" style="display: flex; align-items: center; gap: 6px;">
+                                                    <span style="font-size: 14px;">🤖</span>
+                                                    <span style="font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">Margin Co-Pilot</span>
+                                                    <span id="margin-chat-context-hud" class="context-hud-badge" style="display: none; background: var(--color-primary-transparent); color: var(--color-primary); font-size: 8px; padding: 2px 6px; border-radius: 12px; font-weight: bold; border: 1px solid var(--color-primary);">--</span>
+                                                </div>
+                                                <div class="fs-chat-header-actions" style="display: flex; gap: 8px;">
+                                                    <button id="margin-chatbot-clear-btn" style="background: none; border: none; cursor: pointer; font-size: 10px; color: var(--text-secondary); outline: none;">🧹 Clear</button>
+                                                    <button id="margin-chatbot-export-btn" style="background: none; border: none; cursor: pointer; font-size: 10px; color: var(--text-secondary); outline: none;">📥 Export</button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Predefined Chat Templates Group -->
+                                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                                <span style="font-size: 9.5px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.05em; font-weight: bold; margin-bottom: 2px;">⚡ Analysis Quick Templates</span>
+                                                <div id="margin-chatbot-templates" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box;">
+                                                    <button class="chat-prompt-pill" data-prompt="Perform an operating leverage audit. If Sales grow by 10%, by what percentage does Net Profit expand under these current cost margins?" style="padding: 5px 10px; border-radius: 12px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-secondary); font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">🔬 Operating Leverage</button>
+                                                    <button class="chat-prompt-pill" data-prompt="Analyze the impact of a 3% wage inflation spike (increase in Employee Salaries %) on the EBITDA margin and overall net margins." style="padding: 5px 10px; border-radius: 12px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-secondary); font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">📈 Wage Inflation Impact</button>
+                                                    <button class="chat-prompt-pill" data-prompt="Run a raw material price shock test. If COGS / Material Costs increase by 5% of sales, what is the resulting margin degradation?" style="padding: 5px 10px; border-radius: 12px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-secondary); font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">🚨 Material Price Shock</button>
+                                                    <button class="chat-prompt-pill" data-prompt="Audit the company's interest burden. If interest costs double, does the current EBITDA margin provide a sufficient solvency safety cushion?" style="padding: 5px 10px; border-radius: 12px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-secondary); font-size: 10px; cursor: pointer; transition: all 0.2s; white-space: nowrap;">🛡️ Interest & Debt Safety</button>
+                                                </div>
+                                            </div>
+
+                                            <!-- Chat Area Message Log -->
+                                            <div id="margin-chatbot-history" style="background: rgba(0,0,0,0.12); border-radius: 6px; border: 1px solid var(--border-glass); padding: 10px; height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0;">
+                                                <div style="font-size: 11px; color: var(--text-secondary); font-style: italic; text-align: center; margin: auto;">Select a quick template above or ask a custom question about the company's expenses, operating margins, or cash sensitivities.</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Input Box, Mic button, and Send button -->
+                                        <div class="fs-chat-input-row" style="display: flex; gap: 6px; align-items: center; margin-top: 10px;">
+                                            <!-- Mic Speech button -->
+                                            <button id="margin-chatbot-mic-btn" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 10px; cursor: pointer; transition: all 0.25s ease; font-size: 12px; display: flex; align-items: center; justify-content: center; height: 32px; box-sizing: border-box; outline: none;">🎙️</button>
+                                            
+                                            <!-- Input text -->
+                                            <input id="margin-chatbot-input" type="text" placeholder="Ask about margins, tax sensitivity, inflation..." style="flex: 1; height: 32px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-primary); font-size: 11.5px; font-family: 'Inter', sans-serif; box-sizing: border-box;" />
+                                            
+                                            <!-- Send button -->
+                                            <button id="margin-chatbot-send-btn" class="btn-primary" style="height: 32px; padding: 0 14px; font-size: 11.5px; border-radius: 6px; border: none; cursor: pointer; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 4px; box-sizing: border-box;">
+                                                <span id="margin-chatbot-send-spinner" class="spinner-loader" style="display: none; width: 10px; height: 10px; border: 1.5px solid rgba(255,255,255,0.3); border-top-color: #ffffff; border-radius: 50%; animation: spin 1s linear infinite;"></span>
+                                                <span>Send</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -7363,7 +7479,7 @@
 
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
-    <script src="app.js?v=1.5.1"></script>
+    <script src="app.js?v=1.5.2"></script>
 </body>
 </html>
 

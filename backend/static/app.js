@@ -129,6 +129,11 @@
             if (input) {
                 input.value = (input.value ? input.value + ' ' : '') + transcript;
             }
+        } else if (activeTarget === 'margin_chat') {
+            const input = document.getElementById('margin-chatbot-input');
+            if (input) {
+                input.value = (input.value ? input.value + ' ' : '') + transcript;
+            }
         } else {
             const input = document.getElementById('chat-user-input');
             if (input) {
@@ -5526,6 +5531,17 @@ function renderStockDashboard(p) {
     }
     if (typeof updateAuditChatContextHUD === 'function') {
         updateAuditChatContextHUD(p);
+    }
+
+    // Reset Margin Bridge Chatbot
+    if (typeof setupMarginChatbot === 'function') {
+        setupMarginChatbot();
+    }
+    if (typeof clearMarginChat === 'function') {
+        clearMarginChat();
+    }
+    if (typeof updateMarginChatContextHUD === 'function') {
+        updateMarginChatContextHUD(p);
     }
 
     const exportBtn = document.getElementById('export-pdf-btn');
@@ -18493,6 +18509,14 @@ function setupAnalyzerSubtabs() {
             if (activeSubtab === 'financials') {
                 if (activeStockProfile && activeStockProfile.ticker) {
                     loadFinancialStatements(activeStockProfile.ticker);
+                } else {
+                    showToast("Please load a stock analyzer profile first.", "warning");
+                }
+            }
+
+            if (activeSubtab === 'margin-bridge') {
+                if (activeStockProfile && activeStockProfile.ticker) {
+                    loadMarginBridge(activeStockProfile.ticker);
                 } else {
                     showToast("Please load a stock analyzer profile first.", "warning");
                 }
@@ -39914,6 +39938,7 @@ function setupAuditChatbot() {
                 if (input) {
                     input.value = prompt;
                     input.focus();
+                    triggerAuditChatQuery();
                 }
             }
         };
@@ -40244,9 +40269,861 @@ function exportAuditChatTranscript() {
 
 // Auto-run setup when DOM content is loaded
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupAuditChatbot);
+    document.addEventListener('DOMContentLoaded', () => {
+        setupAuditChatbot();
+        setupMarginChatbot();
+    });
 } else {
     setupAuditChatbot();
+    setupMarginChatbot();
 }
+
+/* ==========================================================================
+   MARGIN & EBITDA BRIDGE WATERFALL & CO-PILOT CHATBOT IMPLEMENTATION
+   ========================================================================== */
+
+let marginChatHistory = [];
+let marginWaterfallChartInstance = null;
+let marginBaseValues = null;
+let marginSimulatedValues = null;
+let marginBridgeSymbol = null;
+let marginIsFinancial = false;
+let marginCachedStatements = {};
+let marginViewPeriod = 'yearly'; // 'yearly' or 'quarterly'
+
+function setupMarginToggles() {
+    const btnYearly = document.getElementById('margin-toggle-yearly');
+    const btnQuarterly = document.getElementById('margin-toggle-quarterly');
+    
+    if (btnYearly && btnQuarterly) {
+        btnYearly.onclick = () => {
+            if (marginViewPeriod === 'yearly') return;
+            marginViewPeriod = 'yearly';
+            
+            btnYearly.style.background = 'var(--color-primary)';
+            btnYearly.style.color = 'white';
+            btnQuarterly.style.background = 'transparent';
+            btnQuarterly.style.color = 'var(--text-secondary)';
+            
+            if (marginBridgeSymbol) {
+                loadMarginBridge(marginBridgeSymbol);
+            }
+        };
+        
+        btnQuarterly.onclick = () => {
+            if (marginViewPeriod === 'quarterly') return;
+            marginViewPeriod = 'quarterly';
+            
+            btnQuarterly.style.background = 'var(--color-primary)';
+            btnQuarterly.style.color = 'white';
+            btnYearly.style.background = 'transparent';
+            btnYearly.style.color = 'var(--text-secondary)';
+            
+            if (marginBridgeSymbol) {
+                loadMarginBridge(marginBridgeSymbol);
+            }
+        };
+    }
+}
+
+async function loadMarginBridge(symbol) {
+    marginBridgeSymbol = symbol;
+    
+    // Set UI to loading state
+    const periodLabel = document.getElementById('margin-bridge-period-label');
+    if (periodLabel) periodLabel.innerText = "Loading...";
+
+    try {
+        let plData = null;
+        if (marginCachedStatements[symbol]) {
+            plData = marginCachedStatements[symbol];
+        } else {
+            const viewType = (typeof activeFsView !== 'undefined') ? activeFsView : 'consolidated';
+            const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/financial-statements?view=${viewType}`);
+            if (!response.ok) throw new Error("Failed to fetch statement data");
+            const data = await response.json();
+            marginCachedStatements[symbol] = data;
+            plData = data;
+        }
+
+        // Swapping table source based on yearly vs quarterly toggling selection
+        let tableSource = (marginViewPeriod === 'quarterly') ? plData.quarters : plData.profit_loss;
+        if (!tableSource) {
+            tableSource = plData.profit_loss || { headers: [], rows: [] };
+        }
+        
+        const headers = tableSource.headers || [];
+        const rows = tableSource.rows || [];
+
+        if (headers.length === 0 || rows.length === 0) {
+            throw new Error("No financial statement data available for this symbol.");
+        }
+
+        // Determine latest completed period (exclude TTM if possible or fallback)
+        let colIdx = headers.length - 1;
+        if (colIdx > 0 && headers[colIdx] === 'TTM') {
+            colIdx = colIdx - 1;
+        }
+        const period = headers[colIdx] || 'FY';
+        if (periodLabel) periodLabel.innerText = period;
+
+        // Check if financial stock (Interest Earned or Interest Income check)
+        marginIsFinancial = rows.some(r => {
+            const lbl = r.label.toLowerCase();
+            return lbl.includes('interest earned') || lbl.includes('interest income') || lbl.includes('financing revenue');
+        });
+
+        // Helper to grab values from table rows (fixing off-by-one matched index since values list lacks the label column)
+        const getVal = (labelKey) => {
+            const match = rows.find(r => r.label.toLowerCase().includes(labelKey.toLowerCase()));
+            if (match && match.values && match.values.length >= colIdx) {
+                return parseFloat(match.values[colIdx - 1]) || 0;
+            }
+            return 0;
+        };
+
+        if (!marginIsFinancial) {
+            // CORPORATE MAPPING
+            const sales = getVal('Sales') || getVal('Revenue') || 1000;
+            const otherIncome = getVal('Other Income') || 0;
+            
+            // Raw materials expense
+            const materialRaw = getVal('Material Cost') || getVal('Raw Material') || getVal('Materials') || 0;
+            // Employee cost expense
+            const employeeRaw = getVal('Employee Cost') || getVal('Staff Cost') || getVal('Employee Benefit') || 0;
+            // Other overhead expense
+            const otherRaw = getVal('Other Expenses') || getVal('Manufacturing Expenses') || getVal('Administrative') || 0;
+
+            let materialPct = 0;
+            let employeePct = 0;
+            let otherPct = 0;
+
+            // Self-healing expense fallback: aggregate total expenses if no sub-row breakdown is parsed
+            if (materialRaw === 0 && employeeRaw === 0 && otherRaw === 0) {
+                const totalExpenses = getVal('Expenses') || 0;
+                otherPct = sales !== 0 ? (totalExpenses / sales) * 100 : 0;
+            } else {
+                materialPct = materialRaw > 100 ? (materialRaw / sales) * 100 : materialRaw;
+                employeePct = employeeRaw > 100 ? (employeeRaw / sales) * 100 : employeeRaw;
+                otherPct = otherRaw > 100 ? (otherRaw / sales) * 100 : otherRaw;
+            }
+
+            const depreciation = getVal('Depreciation') || 0;
+            const interest = getVal('Interest') || getVal('Finance Costs') || 0;
+            
+            let taxRatePct = getVal('Tax Rate') || getVal('Tax %') || 25;
+            if (taxRatePct > 100) taxRatePct = 25; // standard fallback
+
+            marginBaseValues = {
+                sales: sales,
+                otherIncome: otherIncome,
+                materialCostPct: materialPct,
+                employeeCostPct: employeePct,
+                otherExpensesPct: otherPct,
+                depreciation: depreciation,
+                interest: interest,
+                taxRatePct: taxRatePct
+            };
+        } else {
+            // BANKING MAPPING
+            const interestEarned = getVal('Interest Earned') || getVal('Interest Income') || getVal('Revenue') || 1000;
+            const otherIncome = getVal('Other Income') || getVal('Other Operating Income') || 0;
+            const interestExpended = getVal('Interest Expended') || getVal('Interest Paid') || getVal('Finance Costs') || 0;
+            const operatingExp = getVal('Operating Expenses') || getVal('Employee Cost') || getVal('Overheads') || 0;
+            const provisions = getVal('Provisions') || getVal('Provisions and Contingencies') || 0;
+
+            let taxRatePct = getVal('Tax Rate') || getVal('Tax %') || 25;
+            if (taxRatePct > 100) taxRatePct = 25;
+
+            marginBaseValues = {
+                interestEarned: interestEarned,
+                otherIncome: otherIncome,
+                interestExpended: interestExpended,
+                operatingExp: operatingExp,
+                provisions: provisions,
+                taxRatePct: taxRatePct
+            };
+        }
+
+        // Initialize simulated parameters as duplicates of base
+        marginSimulatedValues = { ...marginBaseValues };
+
+        // Render Sandbox Controls
+        renderMarginSliders();
+
+        // Render Visualizer Waterfall Chart
+        updateMarginBridgeChart();
+
+        // Register event listener on global theme switch to redraw chart
+        const themeToggleBtn = document.getElementById('theme-toggle-btn') || document.querySelector('.theme-btn');
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => {
+                setTimeout(updateMarginBridgeChart, 150);
+            });
+        }
+
+    } catch (err) {
+        console.error("Margin bridge load error:", err);
+        showToast(err.message || "Failed to parse stock financials.", "danger");
+        if (periodLabel) periodLabel.innerText = "Error";
+    }
+}
+
+function renderMarginSliders() {
+    const container = document.getElementById('margin-sliders-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const createSliderHTML = (id, label, value, min, max, step, isPct = false) => {
+        const displayVal = isPct ? `${value.toFixed(1)}%` : `Rs. ${value.toFixed(0)} Cr`;
+        const pctIndicator = isPct ? '' : `<span class="margin-slider-pct-indicator" id="pct-ind-${id}">100%</span>`;
+        return `
+            <div class="margin-slider-item">
+                <div class="margin-slider-info">
+                    <span class="margin-slider-label">${label}</span>
+                    <span class="margin-slider-value" id="val-${id}">${displayVal}</span>
+                </div>
+                <div class="margin-slider-input-row">
+                    <input type="range" id="slide-${id}" min="${min}" max="${max}" step="${step}" value="${value}">
+                    ${pctIndicator}
+                </div>
+            </div>
+        `;
+    };
+
+    if (!marginIsFinancial) {
+        // Corporate Sliders
+        const s = marginBaseValues;
+        
+        container.innerHTML += createSliderHTML('sales', 'Sales / Revenue (Topline)', s.sales, s.sales * 0.5, s.sales * 2.0, Math.max(1, s.sales * 0.01), false);
+        container.innerHTML += createSliderHTML('otherIncome', 'Other Non-Operating Income', s.otherIncome, 0, Math.max(100, s.otherIncome * 3.0), Math.max(1, s.otherIncome * 0.02), false);
+        container.innerHTML += createSliderHTML('materialCostPct', 'Cost of Materials / COGS', s.materialCostPct, 0, 100, 0.5, true);
+        container.innerHTML += createSliderHTML('employeeCostPct', 'Employee Staff Cost', s.employeeCostPct, 0, 100, 0.5, true);
+        container.innerHTML += createSliderHTML('otherExpensesPct', 'Other Manufacturing Overhead', s.otherExpensesPct, 0, 100, 0.5, true);
+        container.innerHTML += createSliderHTML('depreciation', 'Depreciation & Amortization', s.depreciation, 0, s.depreciation * 3.0, Math.max(1, s.depreciation * 0.02), false);
+        container.innerHTML += createSliderHTML('interest', 'Interest Expense (Debt Costs)', s.interest, 0, s.interest * 3.0, Math.max(1, s.interest * 0.02), false);
+        container.innerHTML += createSliderHTML('taxRatePct', 'Effective Corporate Tax Rate', s.taxRatePct, 0, 50, 0.5, true);
+        
+    } else {
+        // Banking Sliders
+        const s = marginBaseValues;
+        
+        container.innerHTML += createSliderHTML('interestEarned', 'Interest Income (Lending Topline)', s.interestEarned, s.interestEarned * 0.5, s.interestEarned * 2.0, Math.max(1, s.interestEarned * 0.01), false);
+        container.innerHTML += createSliderHTML('otherIncome', 'Other Fee & Treasury Income', s.otherIncome, 0, s.otherIncome * 3.0, Math.max(1, s.otherIncome * 0.02), false);
+        container.innerHTML += createSliderHTML('interestExpended', 'Interest Expended (Deposit Cost)', s.interestExpended, s.interestExpended * 0.5, s.interestExpended * 2.0, Math.max(1, s.interestExpended * 0.01), false);
+        container.innerHTML += createSliderHTML('operatingExp', 'Operating overhead & Staff Cost', s.operatingExp, s.operatingExp * 0.5, s.operatingExp * 2.0, Math.max(1, s.operatingExp * 0.01), false);
+        container.innerHTML += createSliderHTML('provisions', 'Provisions (Bad Loans Write-offs)', s.provisions, 0, s.provisions * 4.0, Math.max(1, s.provisions * 0.02), false);
+        container.innerHTML += createSliderHTML('taxRatePct', 'Effective Bank Tax Rate', s.taxRatePct, 0, 50, 0.5, true);
+    }
+
+    // Attach Event Listeners to recalculate in real-time
+    const keys = Object.keys(marginBaseValues);
+    keys.forEach(key => {
+        const slide = document.getElementById(`slide-${key}`);
+        if (slide) {
+            slide.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                marginSimulatedValues[key] = val;
+                
+                // Update numerical values in DOM
+                const valEl = document.getElementById(`val-${key}`);
+                const isPct = key.endsWith('Pct');
+                if (valEl) {
+                    valEl.innerText = isPct ? `${val.toFixed(1)}%` : `Rs. ${val.toFixed(0)} Cr`;
+                }
+
+                // Update percentage indicator relative to base values for absolute parameters
+                if (!isPct) {
+                    const pctEl = document.getElementById(`pct-ind-${key}`);
+                    if (pctEl && marginBaseValues[key] !== 0) {
+                        const relPct = ((val / marginBaseValues[key]) * 100).toFixed(0);
+                        pctEl.innerText = `${relPct}%`;
+                    }
+                }
+
+                // Recalculate P&L waterfall chart
+                updateMarginBridgeChart();
+            });
+        }
+    });
+
+    // Reset button binding
+    const resetBtn = document.getElementById('margin-reset-sliders-btn');
+    if (resetBtn) {
+        resetBtn.onclick = () => {
+            marginSimulatedValues = { ...marginBaseValues };
+            renderMarginSliders();
+            updateMarginBridgeChart();
+        };
+    }
+}
+
+function updateMarginBridgeChart() {
+    // 1. Calculate Actual vs Simulated parameters
+    let actualPat = 0;
+    let simulatedPat = 0;
+
+    if (!marginIsFinancial) {
+        // Corporate actual calculation
+        const act = marginBaseValues;
+        const actMat = act.sales * (act.materialCostPct / 100);
+        const actEmp = act.sales * (act.employeeCostPct / 100);
+        const actOth = act.sales * (act.otherExpensesPct / 100);
+        const actEbitda = act.sales - actMat - actEmp - actOth;
+        const actPbt = actEbitda + act.otherIncome - act.depreciation - act.interest;
+        const actTax = actPbt > 0 ? actPbt * (act.taxRatePct / 100) : 0;
+        actualPat = actPbt - actTax;
+
+        // Corporate simulated calculation
+        const sim = marginSimulatedValues;
+        const simMat = sim.sales * (sim.materialCostPct / 100);
+        const simEmp = sim.sales * (sim.employeeCostPct / 100);
+        const simOth = sim.sales * (sim.otherExpensesPct / 100);
+        const simEbitda = sim.sales - simMat - simEmp - simOth;
+        const simPbt = simEbitda + sim.otherIncome - sim.depreciation - sim.interest;
+        const simTax = simPbt > 0 ? simPbt * (sim.taxRatePct / 100) : 0;
+        simulatedPat = simPbt - simTax;
+    } else {
+        // Banking actual calculation
+        const act = marginBaseValues;
+        const actTotal = act.interestEarned + act.otherIncome;
+        const actPbt = actTotal - act.interestExpended - act.operatingExp - act.provisions;
+        const actTax = actPbt > 0 ? actPbt * (act.taxRatePct / 100) : 0;
+        actualPat = actPbt - actTax;
+
+        // Banking simulated calculation
+        const sim = marginSimulatedValues;
+        const simTotal = sim.interestEarned + sim.otherIncome;
+        const simPbt = simTotal - sim.interestExpended - sim.operatingExp - sim.provisions;
+        const simTax = simPbt > 0 ? simPbt * (sim.taxRatePct / 100) : 0;
+        simulatedPat = simPbt - simTax;
+    }
+
+    // Update HUD metrics
+    const actPatEl = document.getElementById('margin-hud-actual-pat');
+    const simPatEl = document.getElementById('margin-hud-simulated-pat');
+    const impactEl = document.getElementById('margin-hud-pat-impact');
+
+    if (actPatEl) actPatEl.innerText = `Rs. ${actualPat.toFixed(1)} Cr`;
+    if (simPatEl) simPatEl.innerText = `Rs. ${simulatedPat.toFixed(1)} Cr`;
+    
+    if (impactEl) {
+        const changePct = actualPat !== 0 ? (((simulatedPat - actualPat) / Math.abs(actualPat)) * 100) : 0;
+        impactEl.innerText = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
+        if (changePct >= 0) {
+            impactEl.style.color = 'var(--color-emerald)';
+        } else {
+            impactEl.style.color = 'var(--color-crimson)';
+        }
+    }
+
+    // 2. Prepare Waterfall datasets for Chart.js
+    let labels = [];
+    let datasets = [];
+
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+    const textColor = isLight ? '#1f2937' : '#ffffff';
+    const gridColor = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.08)';
+
+    if (!marginIsFinancial) {
+        // Corporate Labels
+        labels = [
+            'Gross Sales',
+            'Material Cost',
+            'Employee Cost',
+            'Other Overhead',
+            'EBITDA',
+            'Other Income',
+            'Depreciation',
+            'Interest',
+            'Taxes',
+            'Net Profit (PAT)'
+        ];
+
+        const sim = marginSimulatedValues;
+        const mat = sim.sales * (sim.materialCostPct / 100);
+        const emp = sim.sales * (sim.employeeCostPct / 100);
+        const oth = sim.sales * (sim.otherExpensesPct / 100);
+        const ebitda = sim.sales - mat - emp - oth;
+        const otherInc = sim.otherIncome;
+        const dep = sim.depreciation;
+        const intr = sim.interest;
+        const pbt = ebitda + otherInc - dep - intr;
+        const tax = pbt > 0 ? pbt * (sim.taxRatePct / 100) : 0;
+        const pat = pbt - tax;
+
+        // Construct floating range bars [start, end]
+        datasets = [
+            [0, sim.sales], // Gross Sales
+            [sim.sales - mat, sim.sales], // Material Cost deduction
+            [sim.sales - mat - emp, sim.sales - mat], // Employee Cost deduction
+            [sim.sales - mat - emp - oth, sim.sales - mat - emp], // Other Overhead deduction
+            [0, ebitda], // EBITDA subtotal
+            [ebitda, ebitda + otherInc], // Other Income addition
+            [ebitda + otherInc - dep, ebitda + otherInc], // Depreciation deduction
+            [ebitda + otherInc - dep - intr, ebitda + otherInc - dep], // Interest deduction
+            [pat, ebitda + otherInc - dep - intr], // Taxes deduction (goes down to PAT)
+            [0, pat] // Final Net Profit
+        ];
+    } else {
+        // Banking Labels
+        labels = [
+            'Total Income',
+            'Interest Expended',
+            'Operating Expenses',
+            'Provisions',
+            'PBT',
+            'Taxes',
+            'Net Profit (PAT)'
+        ];
+
+        const sim = marginSimulatedValues;
+        const total = sim.interestEarned + sim.otherIncome;
+        const expended = sim.interestExpended;
+        const operating = sim.operatingExp;
+        const provisions = sim.provisions;
+        const pbt = total - expended - operating - provisions;
+        const tax = pbt > 0 ? pbt * (sim.taxRatePct / 100) : 0;
+        const pat = pbt - tax;
+
+        datasets = [
+            [0, total], // Total Income
+            [total - expended, total], // Interest Expended deduction
+            [total - expended - operating, total - expended], // Operating Expense deduction
+            [total - expended - operating - provisions, total - expended - operating], // Provisions deduction
+            [0, pbt], // PBT subtotal
+            [pat, pbt], // Taxes deduction
+            [0, pat] // Net Profit
+        ];
+    }
+
+    // Dynamic background colors matching status (Green = addition, Red = deduction, Blue/Gold = totals)
+    const baseColors = [
+        'rgba(16, 185, 129, 0.6)', // Green
+        'rgba(239, 68, 68, 0.6)',  // Red
+        'rgba(239, 68, 68, 0.6)',  // Red
+        'rgba(239, 68, 68, 0.6)',  // Red
+        'rgba(59, 130, 246, 0.6)', // Blue
+        'rgba(16, 185, 129, 0.6)', // Green Other Income
+        'rgba(239, 68, 68, 0.6)',  // Red
+        'rgba(239, 68, 68, 0.6)',  // Red
+        'rgba(239, 68, 68, 0.6)',  // Red
+        'rgba(245, 158, 11, 0.7)'  // Gold
+    ];
+    const borderColors = [
+        'rgba(16, 185, 129, 1)',
+        'rgba(239, 68, 68, 1)',
+        'rgba(239, 68, 68, 1)',
+        'rgba(239, 68, 68, 1)',
+        'rgba(59, 130, 246, 1)',
+        'rgba(16, 185, 129, 1)',
+        'rgba(239, 68, 68, 1)',
+        'rgba(239, 68, 68, 1)',
+        'rgba(239, 68, 68, 1)',
+        'rgba(245, 158, 11, 1)'
+    ];
+
+    const chartColors = baseColors.slice(0, datasets.length);
+    const chartBorders = borderColors.slice(0, datasets.length);
+
+    // 3. Render Chart via Chart.js
+    const canvas = document.getElementById('margin-waterfall-chart');
+    if (!canvas) return;
+
+    if (marginWaterfallChartInstance) {
+        marginWaterfallChartInstance.destroy();
+    }
+
+    marginWaterfallChartInstance = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: datasets,
+                backgroundColor: chartColors,
+                borderColor: chartBorders,
+                borderWidth: 1,
+                borderSkipped: false
+            }]
+        },
+        options: {
+            indexAxis: 'y', // horizontal waterfall chart
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            const valRange = context.raw;
+                            if (Array.isArray(valRange)) {
+                                const diff = Math.abs(valRange[1] - valRange[0]);
+                                return `Value: Rs. ${diff.toFixed(1)} Cr (Range: ${valRange[0].toFixed(0)} - ${valRange[1].toFixed(0)})`;
+                            }
+                            return `Value: Rs. ${valRange.toFixed(1)} Cr`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: gridColor },
+                    ticks: {
+                        color: textColor,
+                        font: { family: 'Inter', size: 9 },
+                        callback: (val) => `Rs. ${val} Cr`
+                    }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: {
+                        color: textColor,
+                        font: { family: 'Outfit', size: 10, weight: 'bold' }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function setupMarginChatbot() {
+    const input = document.getElementById('margin-chatbot-input');
+    const sendBtn = document.getElementById('margin-chatbot-send-btn');
+    const clearBtn = document.getElementById('margin-chatbot-clear-btn');
+    const exportBtn = document.getElementById('margin-chatbot-export-btn');
+
+    if (sendBtn && input) {
+        sendBtn.onclick = () => triggerMarginChatQuery();
+        input.onkeypress = (e) => {
+            if (e.key === 'Enter') triggerMarginChatQuery();
+        };
+    }
+
+    if (clearBtn) {
+        clearBtn.onclick = () => clearMarginChat();
+    }
+
+    if (exportBtn) {
+        exportBtn.onclick = () => exportMarginChatTranscript();
+    }
+
+    // Attach click events on preset prompt pills
+    const pills = document.querySelectorAll('#margin-chatbot-templates .chat-prompt-pill');
+    pills.forEach(pill => {
+        pill.onclick = () => {
+            const prompt = pill.getAttribute('data-prompt');
+            if (input) {
+                input.value = prompt;
+                triggerMarginChatQuery();
+            }
+        };
+    });
+
+    // Voice dictation mic button setup
+    const micBtn = document.getElementById('margin-chatbot-mic-btn');
+    if (micBtn) {
+        const isAndroidSpeech = window.AndroidSpeech && typeof window.AndroidSpeech.startListening === 'function';
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (isAndroidSpeech) {
+            micBtn.onclick = () => {
+                if (window.AndroidSpeechListening && window.activeSpeechRecognizerTarget === 'margin_chat') {
+                    window.AndroidSpeech.stopListening();
+                } else {
+                    window.activeSpeechRecognizerTarget = 'margin_chat';
+                    window.AndroidSpeech.startListening();
+                }
+            };
+        } else if (!SpeechRecognition) {
+            micBtn.style.display = 'none';
+        } else {
+            let marginRec = new SpeechRecognition();
+            marginRec.continuous = false;
+            marginRec.interimResults = false;
+            marginRec.lang = 'en-US';
+            let isMarginListening = false;
+
+            marginRec.onstart = () => {
+                isMarginListening = true;
+                micBtn.innerHTML = '🔴';
+                micBtn.classList.add('mic-listening');
+            };
+
+            marginRec.onend = () => {
+                isMarginListening = false;
+                micBtn.innerHTML = '🎙️';
+                micBtn.classList.remove('mic-listening');
+            };
+
+            marginRec.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                if (input) {
+                    input.value = (input.value ? input.value + ' ' : '') + transcript;
+                }
+            };
+
+            marginRec.onerror = (event) => {
+                console.error("Margin speech error:", event.error);
+            };
+
+            micBtn.onclick = () => {
+                if (isMarginListening) {
+                    marginRec.stop();
+                } else {
+                    marginRec.start();
+                }
+            };
+        }
+    }
+    setupMarginToggles();
+}
+
+async function triggerMarginChatQuery() {
+    const input = document.getElementById('margin-chatbot-input');
+    const history = document.getElementById('margin-chatbot-history');
+    const sendBtn = document.getElementById('margin-chatbot-send-btn');
+    const spinner = document.getElementById('margin-chatbot-send-spinner');
+
+    if (!input || !input.value.trim()) return;
+    const message = input.value.trim();
+    input.value = '';
+
+    // Append user message
+    appendMarginChatMessage('user', message);
+    marginChatHistory.push({ role: 'user', content: message });
+
+    if (sendBtn) sendBtn.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+
+    const botMsgId = 'margin-bot-' + Date.now();
+    appendMarginChatLoading(botMsgId);
+
+    const startTime = Date.now();
+
+    try {
+        const payload = {
+            history: marginChatHistory.slice(0, -1),
+            message: `[Margin Simulation Context: Sector: ${marginIsFinancial ? 'Bank' : 'Corporate'}. Simulated Sliders: ${JSON.stringify(marginSimulatedValues)}. Baseline Financials: ${JSON.stringify(marginBaseValues)}] User Question: ${message}`,
+            profile: activeStockProfile
+        };
+
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Failed to compile AI copilot answer");
+        const data = await res.json();
+
+        const latencySec = ((Date.now() - startTime) / 1000).toFixed(1);
+        removeMarginChatLoading(botMsgId);
+
+        const botResponse = data.response || "No response received from model.";
+        appendMarginChatMessage('bot', botResponse, latencySec);
+        marginChatHistory.push({ role: 'assistant', content: botResponse });
+
+    } catch (err) {
+        console.error("Margin Chatbot error:", err);
+        removeMarginChatLoading(botMsgId);
+        appendMarginChatMessage('bot', "❌ Error: Failed to compile real-time margin response.");
+    } finally {
+        if (sendBtn) sendBtn.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+    }
+}
+
+function appendMarginChatMessage(sender, text, latency) {
+    const history = document.getElementById('margin-chatbot-history');
+    if (!history) return;
+
+    // Clear initial state placeholder
+    if (history.children.length === 1 && history.children[0].style.fontStyle === 'italic') {
+        history.innerHTML = '';
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-self: ${sender === 'user' ? 'flex-end' : 'flex-start'};
+        max-width: 85%;
+        margin-bottom: 4px;
+    `;
+
+    const contentDiv = document.createElement('div');
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+
+    let bg = sender === 'user' 
+        ? 'var(--color-primary)' 
+        : (isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)');
+    let color = sender === 'user' ? '#ffffff' : 'var(--text-primary)';
+
+    contentDiv.style.cssText = `
+        background: ${bg};
+        color: ${color};
+        font-size: 11.5px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        line-height: 1.5;
+        word-break: break-word;
+        font-family: 'Inter', sans-serif;
+        white-space: pre-wrap;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    `;
+
+    const msgId = 'margin-msg-text-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+
+    if (sender === 'bot') {
+        const pTag = document.createElement('p');
+        pTag.id = msgId;
+        pTag.style.margin = '0';
+        pTag.innerHTML = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        contentDiv.appendChild(pTag);
+    } else {
+        contentDiv.innerText = text;
+    }
+
+    messageDiv.appendChild(contentDiv);
+
+    if (sender === 'bot') {
+        const actionsDiv = document.createElement('div');
+        actionsDiv.style.cssText = `
+            display: flex;
+            gap: 12px;
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            padding: 0 4px;
+            align-self: flex-start;
+            align-items: center;
+        `;
+
+        const speakBtn = document.createElement('button');
+        speakBtn.className = 'section-speak-btn';
+        speakBtn.setAttribute('data-target', msgId);
+        speakBtn.setAttribute('data-title', 'Margin Co-Pilot');
+        speakBtn.style.cssText = 'background: none; border: none; cursor: pointer; color: var(--text-secondary); padding: 0; outline: none; font-size: 10px; display: flex; align-items: center; gap: 2px;';
+        speakBtn.innerHTML = '🔊 Speak';
+        actionsDiv.appendChild(speakBtn);
+
+        if (latency) {
+            const latencyBadge = document.createElement('span');
+            latencyBadge.style.cssText = 'font-size: 9px; color: var(--text-muted); font-style: italic;';
+            latencyBadge.innerText = `⚡ Latency: ${latency}s`;
+            actionsDiv.appendChild(latencyBadge);
+        }
+
+        messageDiv.appendChild(actionsDiv);
+    }
+
+    history.appendChild(messageDiv);
+    history.scrollTop = history.scrollHeight;
+}
+
+function appendMarginChatLoading(botMsgId) {
+    const history = document.getElementById('margin-chatbot-history');
+    if (!history) return;
+
+    if (history.children.length === 1 && history.children[0].style.fontStyle === 'italic') {
+        history.innerHTML = '';
+    }
+
+    const messageDiv = document.createElement('div');
+    messageDiv.id = botMsgId;
+    messageDiv.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        align-self: flex-start;
+        max-width: 85%;
+        margin-bottom: 4px;
+    `;
+
+    const contentDiv = document.createElement('div');
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+    let bg = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.05)';
+
+    contentDiv.style.cssText = `
+        background: ${bg};
+        color: var(--text-secondary);
+        font-size: 11px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        line-height: 1.5;
+        font-family: 'Inter', sans-serif;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    `;
+
+    const spinner = document.createElement('div');
+    spinner.className = 'spinner';
+    spinner.style.cssText = 'width: 10px; height: 10px; border-width: 1.5px; border-top-color: var(--color-primary);';
+
+    const textSpan = document.createElement('span');
+    textSpan.innerText = 'Calculating margin sensitivities...';
+
+    contentDiv.appendChild(spinner);
+    contentDiv.appendChild(textSpan);
+    messageDiv.appendChild(contentDiv);
+    
+    history.appendChild(messageDiv);
+    history.scrollTop = history.scrollHeight;
+}
+
+function removeMarginChatLoading(botMsgId) {
+    const loader = document.getElementById(botMsgId);
+    if (loader) loader.remove();
+}
+
+function clearMarginChat() {
+    const history = document.getElementById('margin-chatbot-history');
+    if (history) {
+        history.innerHTML = '<div style="font-size: 11px; color: var(--text-secondary); font-style: italic; text-align: center; margin: auto;">Select a quick template above or ask a custom question about the company\'s expenses, operating margins, or cash sensitivities.</div>';
+    }
+    marginChatHistory = [];
+}
+
+function updateMarginChatContextHUD(profile) {
+    const hud = document.getElementById('margin-chat-context-hud');
+    if (hud && profile && profile.ticker) {
+        hud.innerText = profile.ticker;
+        hud.style.display = 'inline-block';
+    } else if (hud) {
+        hud.style.display = 'none';
+    }
+}
+
+function exportMarginChatTranscript() {
+    if (marginChatHistory.length === 0) {
+        showToast("No active conversation transcript to export.", "warning");
+        return;
+    }
+    let content = `=== MARGIN CO-PILOT CHAT TRANSCRIPT ===\n`;
+    content += `Symbol: ${marginBridgeSymbol}\n`;
+    content += `Date Exported: ${new Date().toLocaleString()}\n`;
+    content += `Sector Type: ${marginIsFinancial ? 'Banking & Financial Services' : 'Corporate Manufacturing'}\n`;
+    content += `Simulated Slider Values: ${JSON.stringify(marginSimulatedValues, null, 2)}\n`;
+    content += `========================================\n\n`;
+
+    marginChatHistory.forEach(msg => {
+        const sender = msg.role === 'user' ? 'USER' : 'CO-PILOT';
+        content += `[${sender}]: ${msg.content}\n\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `margin_copilot_${marginBridgeSymbol}_transcript.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 
 
