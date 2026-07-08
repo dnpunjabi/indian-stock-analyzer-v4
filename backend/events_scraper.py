@@ -210,7 +210,11 @@ def fetch_nse_board_meetings():
             print(f"[Events] NSE board meetings unexpected status: {r.status_code}")
             return []
 
-        data = r.json()
+        try:
+            data = r.json()
+        except Exception as e:
+            print(f"[Events] NSE board meetings JSON decode failed (might be HTML blocked response): {e}")
+            return []
         if not isinstance(data, list):
             print(f"[Events] NSE board meetings unexpected format: {type(data)}")
             return []
@@ -292,7 +296,11 @@ def fetch_nse_corporate_actions():
             print(f"[Events] NSE corporate actions unexpected status: {r.status_code}")
             return []
 
-        data = r.json()
+        try:
+            data = r.json()
+        except Exception as e:
+            print(f"[Events] NSE corporate actions JSON decode failed (might be HTML blocked response): {e}")
+            return []
         if not isinstance(data, list):
             print(f"[Events] NSE corporate actions unexpected format: {type(data)}")
             return []
