@@ -31011,14 +31011,13 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                 </div>
             `;
             tooltipEl.style.display = 'block';
-            tooltipEl.style.left = (window.scrollX + rect.left + 50) + 'px';
-            tooltipEl.style.top = (window.scrollY + rect.top - 80) + 'px';
+            tooltipEl.style.left = (e.pageX + 20) + 'px';
+            tooltipEl.style.top = (e.pageY - 40) + 'px';
         });
 
         tr.addEventListener('mousemove', (e) => {
-            const rect = tr.getBoundingClientRect();
-            tooltipEl.style.left = (window.scrollX + rect.left + 50) + 'px';
-            tooltipEl.style.top = (window.scrollY + rect.top - 80) + 'px';
+            tooltipEl.style.left = (e.pageX + 20) + 'px';
+            tooltipEl.style.top = (e.pageY - 40) + 'px';
         });
 
         tr.addEventListener('mouseleave', () => {

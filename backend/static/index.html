@@ -16,7 +16,7 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <!-- TradingView Advanced Widget -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <link rel="stylesheet" href="styles.css?v=1.5.6">
+    <link rel="stylesheet" href="styles.css?v=1.5.7">
     <link rel="stylesheet" href="modernizer.css">
 </head>
 <body>
@@ -380,6 +380,30 @@
                                 <div class="setting-row">
                                     <label>Portfolio Shield</label>
                                     <input type="checkbox" id="setting-security-shield-toggle" checked style="cursor:pointer; transform: scale(1.15);">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Catalyst AI Engine</label>
+                                    <select id="setting-catalyst-ai" style="background:#000; color:#fff; border:1px solid var(--border-glass); border-radius:4px; padding:2px 4px; font-size:10px; cursor: pointer;">
+                                        <option value="gemini" selected>♊ Gemini (Auto-Fallback)</option>
+                                        <option value="groq">🔥 Groq Llama 3.3</option>
+                                    </select>
+                                </div>
+                                <div class="setting-row">
+                                    <label>Search Horizon</label>
+                                    <select id="setting-search-horizon" style="background:#000; color:#fff; border:1px solid var(--border-glass); border-radius:4px; padding:2px 4px; font-size:10px; cursor: pointer;">
+                                        <option value="1d">Past 24 Hours</option>
+                                        <option value="7d" selected>Past 1 Week</option>
+                                        <option value="14d">Past 2 Weeks</option>
+                                        <option value="30d">Past 1 Month</option>
+                                    </select>
+                                </div>
+                                <div class="setting-row">
+                                    <label>Use Tavily Search</label>
+                                    <input type="checkbox" id="setting-tavily-search-toggle" style="cursor:pointer; transform: scale(1.15);" title="Enable Tavily search API (uses 1,000 free searches/month).">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Use SerpApi</label>
+                                    <input type="checkbox" id="setting-serpapi-toggle" style="cursor:pointer; transform: scale(1.15);" title="Enable SerpApi (Google Search & AI Overviews).">
                                 </div>
                                 <div class="setting-row">
                                     <label>SEBI Tier Mode</label>
@@ -1294,7 +1318,10 @@
                                 <!-- Live Price Section -->
                                 <div class="meta-stat-card" style="align-items: flex-end; min-width: 110px;" title="Current trading price and daily net change percentage.">
                                     <div class="meta-price" id="meta-price" style="font-size: 22px; font-weight: 800; font-family: 'Outfit', sans-serif; color: #fff;">Rs. --</div>
-                                    <div class="meta-change" id="meta-change" style="font-size: 11px; font-weight: 600;">--</div>
+                                    <div style="display: flex; align-items: center; gap: 6px; width: 100%; justify-content: flex-end; flex-wrap: wrap;">
+                                        <div class="meta-change" id="meta-change" style="font-size: 11px; font-weight: 600;">--</div>
+                                        <button id="explain-move-btn" class="no-print" title="Explain Price Movement" style="font-size: 9px; padding: 2px 5px; border-radius: 4px; border: 1px dashed var(--border-glass); background: rgba(var(--primary-rgb), 0.05); color: var(--color-primary-light); cursor: pointer; display: none; font-weight: 700; outline: none; transition: all 0.2s;">🔍 Why?</button>
+                                    </div>
                                 </div>
                                 
                                 <!-- Day Range -->
@@ -7484,9 +7511,82 @@
         </div>
     </div>
 
+    <!-- Catalyst Analysis Modal -->
+    <div id="catalyst-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(7, 10, 18, 0.75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 99999; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
+        <div class="card" style="width: 100%; max-width: 650px; display: flex; flex-direction: column; max-height: 85vh; background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); overflow: hidden; padding: 0;">
+            <!-- Modal Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.02);">
+                <h3 style="margin: 0; font-family: 'Outfit'; font-weight: 700; font-size: 15px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                    <span id="catalyst-modal-icon">⚡</span> <span id="catalyst-modal-title">Catalyst Price Action Analysis</span>
+                </h3>
+                <button id="catalyst-modal-close-btn" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; outline: none; padding: 0; line-height: 1; transition: all 0.2s;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div style="flex-grow: 1; overflow-y: auto; padding: 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
+                <!-- Audio Input/Speech Recognition Row -->
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div class="analyzer-input-wrap" style="position: relative; flex: 1; display: flex; align-items: center;">
+                        <input type="text" id="catalyst-voice-input" placeholder="Ask about a price move (e.g. 'Why is Reliance down today?')" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 6px; padding: 8px 40px 8px 12px; color: var(--text-primary); font-size: 12px; outline: none; font-family: 'Inter', sans-serif; box-sizing: border-box; height: 36px;">
+                        <button id="catalyst-mic-btn" style="position: absolute; right: 12px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; height: 24px; width: 24px; display: flex; align-items: center; justify-content: center; outline: none; transition: all 0.2s;" title="Voice Search via Mic">🎙️</button>
+                    </div>
+                    <button class="btn-primary" id="catalyst-query-btn" style="height: 36px; padding: 0 16px; font-size: 11px; font-weight: 700; font-family: 'Outfit'; white-space: nowrap;">Query</button>
+                </div>
+
+                <!-- Loader Indicator -->
+                <div id="catalyst-loader" style="display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px 20px;">
+                    <div class="chat-typing-bubble">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <span style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;">Crawl-searching Google News indexes...</span>
+                </div>
+
+                <!-- Catalyst Results Area -->
+                <div id="catalyst-results" style="display: none; flex-direction: column; gap: 15px;">
+                    <!-- Media / Speak controller HUD -->
+                    <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.02); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border-glass); flex-wrap: wrap;">
+                        <button id="catalyst-read-btn" class="btn-secondary" style="font-size: 10.5px; padding: 5px 12px; height: auto; font-family: 'Outfit'; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">🔊 Read Aloud</button>
+                        <button id="catalyst-pause-btn" class="btn-secondary" style="font-size: 10.5px; padding: 5px 12px; height: auto; font-family: 'Outfit'; font-weight: 700; display: none;">⏯️ Pause</button>
+                        <button id="catalyst-stop-btn" class="btn-secondary" style="font-size: 10.5px; padding: 5px 12px; height: auto; font-family: 'Outfit'; font-weight: 700; display: none; border-color: var(--color-crimson); color: var(--color-crimson);">⏹️ Stop</button>
+                        
+                        <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
+                            <span style="font-size: 9px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Volume:</span>
+                            <input type="range" id="catalyst-volume" min="0" max="1" step="0.1" value="0.8" style="width: 70px; height: 3px; cursor: pointer; accent-color: var(--color-primary);">
+                        </div>
+                    </div>
+
+                    <!-- Summary Card -->
+                    <div style="background: rgba(var(--primary-rgb), 0.03); border-left: 4px solid var(--color-primary); border-radius: 4px; padding: 14px 16px;">
+                        <h4 style="margin: 0 0 6px 0; font-size: 11px; font-family: 'Outfit'; color: var(--color-primary-light); text-transform: uppercase; letter-spacing: 0.04em;">Executive Move Summary</h4>
+                        <p id="catalyst-summary-text" style="margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-primary); font-family: 'Inter'; font-style: italic;"></p>
+                    </div>
+
+                    <!-- Drivers List -->
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <h4 style="margin: 5px 0 2px 0; font-size: 11px; font-family: 'Outfit'; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Attributed Value Drivers</h4>
+                        <div id="catalyst-drivers-list" style="display: flex; flex-direction: column; gap: 10px;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 22px; border-top: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.01);">
+                <div style="display: flex; gap: 16px; font-size: 10px; color: var(--text-muted); font-family: 'Inter', monospace;">
+                    <span>🔍 Scraper: <span id="catalyst-audit-scraper" style="color: var(--color-primary-light); font-weight: 700;">--</span></span>
+                    <span>🧠 Engine: <span id="catalyst-audit-engine" style="color: var(--color-primary-light); font-weight: 700;">--</span></span>
+                </div>
+                <button class="btn-secondary" id="catalyst-modal-close-btn-bottom" style="padding: 8px 18px; font-size: 11px;">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
-    <script src="app.js?v=1.5.2"></script>
+    <script src="app.js?v=1.6.0"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
@@ -7495,7 +7595,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modernization Custom Layer -->
-    <script src="modernizer.js"></script>
+    <script src="modernizer.js?v=5.4"></script>
 </body>
 </html>
 

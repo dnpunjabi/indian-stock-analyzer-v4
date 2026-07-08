@@ -1211,6 +1211,7 @@ button:disabled, .btn-secondary:disabled {
     flex-grow: 1;
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden; /* Prevent horizontal scroll leak from off-screen overlays */
     padding-bottom: 25px;
 }
 
@@ -1791,21 +1792,31 @@ input[type="text"]:focus {
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    margin: 0;
 }
 
 #watchlist-select {
-    padding: 4px 10px;
+    padding: 2px 24px 2px 10px !important;
     border-radius: 6px;
     font-size: 11px;
-    background: rgba(0, 0, 0, 0.35) !important;
+    background: rgba(15, 23, 42, 0.6) !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-glass) !important;
     cursor: pointer;
-    min-width: 125px;
+    min-width: 140px;
     height: 28px;
     outline: none;
     font-family: var(--font-body);
-    transition: border-color 0.2s ease;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+    vertical-align: middle;
+    line-height: normal;
+}
+
+#watchlist-select option {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
 }
 
 #watchlist-select:focus {
@@ -1826,6 +1837,9 @@ input[type="text"]:focus {
     background: linear-gradient(135deg, var(--color-primary) 0%, #4f46e5 100%);
     color: #fff;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 #add-to-watchlist-btn:hover {
@@ -2591,11 +2605,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
     z-index: 100;
     display: flex;
     flex-direction: column;
-    transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s;
+    visibility: hidden; /* Hide completely when closed to prevent horizontal scroll leaks */
 }
 
 .chat-drawer-container.open {
     right: 0;
+    visibility: visible;
 }
 
 .chat-drawer-header {

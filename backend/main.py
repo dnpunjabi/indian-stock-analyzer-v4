@@ -10794,6 +10794,287 @@ async def learning_ask(req: LearningAskRequest):
 app.include_router(angel_ws_router)
 
 
+@app.get("/api/stock-catalysts")
+def get_stock_catalysts(
+    symbol: str, 
+    sector: Optional[str] = None, 
+    is_sector: bool = Query(False),
+    use_tavily_search: bool = Query(False),
+    use_serpapi: bool = Query(False),
+    ai_engine: str = Query("gemini"),
+    timeframe: str = Query("7d"),
+    direction: Optional[str] = Query(None)
+):
+    try:
+        import requests
+        from backend.catalyst_scraper import fetch_latest_news_for_query
+        from backend.llm_config import call_llm, TASK_FAST
+        
+        # 1. Clean ticker symbol and resolve to human-readable company name
+        from backend.financial_utils import resolve_company_ticker
+        import re
+        clean_symbol = symbol.replace(".NS", "").strip()
+        try:
+            res = resolve_company_ticker(symbol)
+            raw_name = res.get("name", clean_symbol)
+            # Remove common corporate suffixes (Ltd, Limited, Corp, Co, Co., Corporation, Inc.)
+            company_name = re.sub(r'\s+(ltd|limited|corp|co|corporation|inc)\.?\s*$', '', raw_name, flags=re.IGNORECASE).strip()
+        except Exception:
+            company_name = clean_symbol
+        
+        # 2. Formulate dynamic search query based on price direction (surge/drop)
+        dir_text = ""
+        if direction == "up":
+            dir_text = "surge rise rally gains up climb"
+        elif direction == "down":
+            dir_text = "drop fall drop plunge crash down loss"
+            
+        is_sector_mode = is_sector or (sector and sector.strip().lower() == symbol.strip().lower())
+        if is_sector_mode:
+            # Sector mode
+            clean_sector = sector.strip() if sector else symbol.replace(".NS", "").strip()
+            action = "surge/rally" if direction == "up" else ("decline/drop" if direction == "down" else "performance")
+            # Map sector names to standard NSE index terms for maximum search relevance and localizing to Indian markets
+            index_hint = ""
+            sym_lower = clean_sector.lower()
+            if "information technology" in sym_lower or "it" == sym_lower:
+                index_hint = "Nifty IT index"
+            elif "bank" in sym_lower:
+                index_hint = "Bank Nifty index"
+            elif "realty" in sym_lower:
+                index_hint = "Nifty Realty index"
+            elif "auto" in sym_lower:
+                index_hint = "Nifty Auto index"
+            elif "infra" in sym_lower:
+                index_hint = "Nifty Infra index"
+            elif "metal" in sym_lower:
+                index_hint = "Nifty Metal index"
+            elif "pharma" in sym_lower or "health" in sym_lower:
+                index_hint = "Nifty Pharma index"
+            elif "fmcg" in sym_lower:
+                index_hint = "Nifty FMCG index"
+            
+            hint_str = f" {index_hint}" if index_hint else ""
+            query = f"Indian {clean_sector} sector{hint_str} {action} reasons news stock market"
+        else:
+            # Stock mode
+            action_suffix = f" {dir_text}" if dir_text else " drop rise price move reasons"
+            query = f"{company_name} stock news{action_suffix}"
+            
+        # 3. Fetch latest news snippets
+        news_snippets, search_provider = fetch_latest_news_for_query(
+            query, 
+            timeframe=timeframe,
+            use_tavily=use_tavily_search,
+            use_serpapi=use_serpapi
+        )
+        
+        # If no snippets found, search sector-specific trends as fallback
+        if not news_snippets and sector:
+            news_fallback_query = f"Indian {sector} sector news reasons"
+            if direction == "up":
+                news_fallback_query = f"Indian {sector} sector growth rally news reasons"
+            elif direction == "down":
+                news_fallback_query = f"Indian {sector} sector fall drop decline news reasons"
+                
+            news_snippets, search_provider = fetch_latest_news_for_query(
+                news_fallback_query,
+                timeframe=timeframe,
+                use_tavily=use_tavily_search,
+                use_serpapi=use_serpapi
+            )
+            
+        # If still no snippets, return a graceful fallback
+        if not news_snippets:
+            return {
+                "summary": f"No recent major news headlines detected for {symbol} on search channels. Today's movement is likely driven by overall market momentum, institutional flows, or profit-booking.",
+                "drivers": [
+                    {"category": "Technical", "title": "Market Flow", "desc": "Driven by broader index movements or routine sector rotations."},
+                    {"category": "Macro", "title": "Macro Sentiment", "desc": "Impacted by national indices or interest rate regimes."}
+                ],
+                "sentiment": "Neutral",
+                "search_provider": "None (No news found)",
+                "llm_provider": "Static Fallback Engine",
+                "status": "no_news"
+            }
+            
+        # 4. Formulate the LLM prompt
+        snippets_text = "\n\n".join(news_snippets)
+        
+        # Fetch current index stats for prompt injection
+        global _MARKET_MOVERS_CACHE
+        indices_list = []
+        try:
+            for idx in _MARKET_MOVERS_CACHE.get("indices", []):
+                change_sign = "+" if idx.get("change", 0) >= 0 else ""
+                indices_list.append(f"- {idx['name']}: {idx['price']} ({change_sign}{idx['change_pct']}%)")
+        except Exception:
+            pass
+        indices_str = "\n".join(indices_list) if indices_list else "Not available"
+
+        is_sector_final = is_sector or (sector and sector.strip().lower() == symbol.strip().lower())
+        target_type = "sector index" if is_sector_final else "company stock"
+ 
+        system_prompt = (
+            "You are an expert Indian stock market research analyst and financial attribution system.\n"
+            f"Your task is to analyze the provided news snippets and explain the key reasons behind the recent price movement of the {target_type}.\n"
+            "You must respond in clean JSON format matching the following schema:\n"
+            "{\n"
+            "  \"summary\": \"A concise 2-sentence summary explaining today's movement.\",\n"
+            "  \"drivers\": [\n"
+            "    {\n"
+            "      \"category\": \"Corporate|Sector/Policy|Technical|Macro\",\n"
+            "      \"title\": \"A short 3-5 word title of this specific driver.\",\n"
+            "      \"desc\": \"A detailed 1-2 sentence description explaining the impact.\"\n"
+            "    }\n"
+            "  ],\n"
+            "  \"sentiment\": \"Positive|Negative|Neutral\"\n"
+            "}\n"
+            "Guidelines:\n"
+            "1. Focus strictly and exclusively on the Indian stock market (NSE/BSE) and Indian corporate entities. "
+            "Under no circumstances mention global/US tech giants (e.g. Nvidia, Broadcom, Microsoft, Apple, AMD, or US chip stocks) in your drivers. "
+            "Ensure all discussed entities are Indian companies (e.g., TCS, Infosys, Wipro, HCL Tech, DLF, Lodha, etc.).\n"
+            "2. Synthesize multiple articles to isolate actual drivers.\n"
+            "3. Ensure category mappings strictly match: Corporate, Sector/Policy, Technical, or Macro.\n"
+            f"4. Refer to the target as a {target_type}. "
+        )
+        if is_sector_final:
+            system_prompt += (
+                "Do not refer to the sector index as 'the company stock' or 'the company's stock'. Focus on sector-wide index trends and general developments across the Indian constituent stocks.\n"
+            )
+        else:
+            system_prompt += (
+                "Ensure all drivers relate directly to this specific Indian company and do not confuse ratings/target prices belonging to other peer companies.\n"
+            )
+            
+        system_prompt += (
+            "5. Verify that any statistics, quarters, or years mentioned as active drivers are current (for the current year 2026) and not historical retrospectives (e.g. referencing 2023 or 2024 as current drivers). Frame old data strictly as historical context if mentioned at all.\n"
+            "6. Do not output any markdown code blocks, backticks, or planning reasoning logs. Only output the raw JSON."
+        )
+        
+        # Resolve a reader-friendly lookback label
+        lookback_labels = {
+            "1d": "1 Day",
+            "5d": "5 Days",
+            "7d": "7 Days",
+            "14d": "14 Days",
+            "30d": "30 Days",
+            "1m": "1 Month (20D)",
+            "3m": "3 Months",
+            "6m": "6 Months",
+            "1y": "1 Year",
+            "5y": "5 Years",
+            "ytd": "Year-To-Date (YTD)"
+        }
+        timeframe_label = lookback_labels.get(timeframe.lower().strip(), f"{timeframe} Lookback")
+        
+        # Translate direction to clear trend terminology
+        trend_term = "Neutral/Stable"
+        if direction == "up":
+            trend_term = f"Gaining/Rising/Outperforming over the past {timeframe_label}"
+        elif direction == "down":
+            trend_term = f"Declining/Falling/Underperforming over the past {timeframe_label}"
+
+        user_prompt = (
+            f"Analyze the recent price move for {target_type.capitalize()} Symbol: {symbol}.\n"
+            f"Sector: {sector or 'Not specified'}.\n"
+            f"Target Lookback Timeframe: {timeframe_label}.\n"
+            f"Trend over this Lookback Timeframe: {trend_term}.\n\n"
+            f"[GROUND-TRUTH TODAY'S MARKET INDEX PERFORMANCE (FOR CONTEXT)]\n{indices_str}\n\n"
+            f"Strict Ground-Truth & Lookback Rules:\n"
+            f"1. Do not claim that the overall market is in a rally today if today's index performance is down. "
+            f"However, explain why the target is a leader/gainer *over the specified {timeframe_label} lookback timeframe* even if today's single-day session is down.\n"
+            f"2. Frame your analysis around the lookback period of {timeframe_label} rather than just today's closing price. "
+            f"For example, explain the cumulative drivers (e.g. over the past week/month) that led to its outperformance or decline.\n\n"
+            f"Raw News snippets:\n{snippets_text}"
+        )
+        
+        gemini_key = os.environ.get("GEMINI_API_KEY", "")
+        gemini_success = False
+        llm_response = ""
+        llm_provider = "Gemini 1.5 Flash"
+        
+        if ai_engine.lower() == "gemini" and gemini_key:
+            models_to_try = [
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-3.5-flash",
+                "gemini-3.1-flash-lite",
+                "gemini-flash-latest",
+                "gemini-1.5-flash"
+            ]
+            for model_name in models_to_try:
+                try:
+                    print(f"[Catalyst API] Attempting Google Gemini model: {model_name}...")
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
+                    headers = {"Content-Type": "application/json"}
+                    payload = {
+                        "contents": [
+                            {
+                                "parts": [
+                                    {"text": f"{system_prompt}\n\n{user_prompt}"}
+                                ]
+                            }
+                        ]
+                    }
+                    r = requests.post(url, headers=headers, json=payload, timeout=12.0)
+                    if r.status_code == 200:
+                        response_data = r.json()
+                        try:
+                            text = response_data["candidates"][0]["content"]["parts"][0]["text"]
+                            llm_response = text
+                            gemini_success = True
+                            llm_provider = f"Gemini ({model_name})"
+                            print(f"[Catalyst API] Gemini model {model_name} succeeded!")
+                            break
+                        except (KeyError, IndexError) as parse_err:
+                            print(f"[Catalyst API] Failed parsing Gemini JSON structure for {model_name}: {parse_err}")
+                    else:
+                        print(f"[Catalyst API] Gemini model {model_name} returned status {r.status_code}: {r.text}")
+                except Exception as gem_ex:
+                    print(f"[Catalyst API] Gemini call for {model_name} failed: {gem_ex}")
+
+        # Fallback to Groq if Gemini failed/limited or was not selected
+        if not gemini_success:
+            print(f"[Catalyst API] Using Groq Llama 3.3 (Fallback or Direct choice)")
+            llm_response = call_llm(TASK_FAST, system_prompt, user_prompt)
+            llm_provider = "Groq Llama 3.3" + (" (Fallback)" if ai_engine.lower() == "gemini" else "")
+            
+        # Clean JSON wrappers if LLM returned them
+        clean_json = llm_response.strip()
+        if clean_json.startswith("```json"):
+            clean_json = clean_json[7:]
+        if clean_json.endswith("```"):
+            clean_json = clean_json[:-3]
+        clean_json = clean_json.strip()
+        
+        try:
+            parsed_data = json.loads(clean_json)
+            return {
+                **parsed_data, 
+                "search_provider": search_provider,
+                "llm_provider": llm_provider,
+                "status": "success"
+            }
+        except Exception as json_err:
+            print(f"[Catalyst API] JSON parsing failed: {json_err}. Raw response was: {clean_json}")
+            # Fallback return of raw text in structured summary
+            return {
+                "summary": "Attribution analysis completed successfully.",
+                "drivers": [
+                    {"category": "Macro", "title": "Attribution Summary", "desc": clean_json}
+                ],
+                "sentiment": "Neutral",
+                "search_provider": search_provider,
+                "llm_provider": llm_provider,
+                "status": "raw_text"
+            }
+            
+    except Exception as e:
+        print(f"[Catalyst API] Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 os.makedirs(static_dir, exist_ok=True)
 

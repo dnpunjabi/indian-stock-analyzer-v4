@@ -302,7 +302,7 @@
             }
         }
 
-        // Observe main header active stock price
+        // Observe main header active stock price and check for movement thresholds
         const metaPriceEl = document.getElementById('meta-price');
         if (metaPriceEl) {
             const metaPriceObserver = new MutationObserver(() => {
@@ -315,6 +315,24 @@
                     metaPriceObserver.disconnect();
                     animateValue(metaPriceEl, oldVal, newVal, 2);
                     metaPriceObserver.observe(metaPriceEl, { characterData: true, childList: true, subtree: true });
+                }
+                
+                // Show/hide explain button based on daily net change percentage
+                const changeText = document.getElementById('meta-change')?.textContent || "";
+                const match = changeText.match(/([+-]?\d+\.?\d*)\s*%/);
+                const explainBtn = document.getElementById('explain-move-btn');
+                if (explainBtn) {
+                    if (match) {
+                        const pct = Math.abs(parseFloat(match[1]));
+                        // Show "Why?" trigger for moves >= 1.5%
+                        if (pct >= 1.5) {
+                            explainBtn.style.display = 'inline-block';
+                        } else {
+                            explainBtn.style.display = 'none';
+                        }
+                    } else {
+                        explainBtn.style.display = 'none';
+                    }
                 }
             });
 
@@ -573,6 +591,541 @@
         console.log("APEX Modernizer: Magnetic button physics enabled.");
     }
 
+    // ==================== 12. DYNAMIC TABLE CATALYST TRIGGER INJECTION ====================
+    function setupTableCatalystTriggers() {
+        const observer = new MutationObserver(() => {
+            // 1. Gainers, Losers, and Watchlist rows
+            document.querySelectorAll('#top-gainers-tbody tr, #top-losers-tbody tr, #watchlist-table-body tr').forEach(row => {
+                // Skip if already parsed or if empty/loading placeholder row
+                if (row.querySelector('.catalyst-trigger-btn') || row.querySelector('td[colspan]')) return;
+
+                const symbolCell = row.querySelector('td:first-child');
+                if (symbolCell) {
+                    const text = symbolCell.textContent.trim().split('\n')[0].trim();
+                    // Basic validation to isolate symbols (e.g. TCS, RELIANCE)
+                    if (text && text.length > 1 && text.length <= 15 && !text.includes('Select') && !text.includes('No data')) {
+                        const trigger = document.createElement('span');
+                        trigger.className = 'catalyst-trigger-btn';
+                        trigger.setAttribute('data-symbol', text);
+                        trigger.setAttribute('title', 'Analyze price catalysts');
+                        trigger.style.marginLeft = '8px';
+                        trigger.innerHTML = '⚡';
+                        symbolCell.appendChild(trigger);
+                    }
+                }
+            });
+
+            // 2. Sector Radar Grid Tiles
+            document.querySelectorAll('.sector-heatmap-tile').forEach(tile => {
+                const header = tile.querySelector('.sector-heatmap-tile-header');
+                if (header && !header.querySelector('.catalyst-trigger-btn')) {
+                    const titleEl = header.querySelector('.sector-heatmap-tile-title');
+                    if (titleEl) {
+                        const sectorName = titleEl.textContent.trim();
+                        if (sectorName && sectorName.length > 2 && !sectorName.includes('Select')) {
+                            const trigger = document.createElement('span');
+                            trigger.className = 'catalyst-trigger-btn';
+                            trigger.setAttribute('data-symbol', sectorName);
+                            trigger.setAttribute('data-sector', sectorName);
+                            trigger.setAttribute('title', 'Analyze sector catalysts');
+                            trigger.style.marginLeft = '8px';
+                            trigger.style.cursor = 'pointer';
+                            trigger.innerHTML = '⚡';
+                            titleEl.appendChild(trigger);
+                        }
+                    }
+                }
+            });
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+        console.log("APEX Modernizer: Automated table and sector card catalyst trigger monitors active.");
+    }
+
+    // ==================== 13. SPEECH SYNTHESIS & RECOGNITION (CATALYST CONTROLS) ====================
+    let currentUtterance = null;
+    let ttsSpeaking = false;
+
+    function resetAudioControls() {
+        ttsSpeaking = false;
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        
+        const readBtn = document.getElementById('catalyst-read-btn');
+        const pauseBtn = document.getElementById('catalyst-pause-btn');
+        const stopBtn = document.getElementById('catalyst-stop-btn');
+        
+        if (readBtn) readBtn.style.display = 'inline-block';
+        if (pauseBtn) pauseBtn.style.display = 'none';
+        if (stopBtn) stopBtn.style.display = 'none';
+        
+        // Remove speaking indicators if they are inside the modal
+        const speakIcon = document.getElementById('catalyst-modal-icon');
+        if (speakIcon) speakIcon.textContent = '⚡';
+    }
+
+    function speakCatalystReport(text) {
+        if (!window.speechSynthesis) {
+            window.showToast("Speech synthesis not supported on this browser.", "warning");
+            return;
+        }
+
+        resetAudioControls();
+        ttsSpeaking = true;
+
+        // Clean out markdown characters for natural speech synthesis
+        const cleanedText = text.replace(/[*#`_\-]/g, '').replace(/\[.*?\]/g, '').trim();
+        const utterance = new SpeechSynthesisUtterance(cleanedText);
+        currentUtterance = utterance;
+
+        // Read dynamic volume slider
+        const volSlider = document.getElementById('catalyst-volume');
+        utterance.volume = volSlider ? parseFloat(volSlider.value) : 0.8;
+
+        utterance.onstart = () => {
+            document.getElementById('catalyst-read-btn').style.display = 'none';
+            document.getElementById('catalyst-pause-btn').style.display = 'inline-block';
+            document.getElementById('catalyst-stop-btn').style.display = 'inline-block';
+            
+            const speakIcon = document.getElementById('catalyst-modal-icon');
+            if (speakIcon) speakIcon.textContent = '🔊';
+        };
+
+        utterance.onend = () => resetAudioControls();
+        utterance.onerror = () => resetAudioControls();
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function setupCatalystAudioControls() {
+        const readBtn = document.getElementById('catalyst-read-btn');
+        const pauseBtn = document.getElementById('catalyst-pause-btn');
+        const stopBtn = document.getElementById('catalyst-stop-btn');
+        const volSlider = document.getElementById('catalyst-volume');
+
+        if (readBtn) {
+            readBtn.addEventListener('click', () => {
+                const summary = document.getElementById('catalyst-summary-text')?.innerText || "";
+                let driversText = "";
+                document.querySelectorAll('#catalyst-drivers-list .catalyst-driver-card').forEach(card => {
+                    driversText += " " + card.innerText;
+                });
+                speakCatalystReport(summary + " Details: " + driversText);
+            });
+        }
+
+        if (pauseBtn) {
+            pauseBtn.addEventListener('click', () => {
+                if (window.speechSynthesis.speaking) {
+                    if (window.speechSynthesis.paused) {
+                        window.speechSynthesis.resume();
+                        pauseBtn.textContent = '⏯️ Pause';
+                    } else {
+                        window.speechSynthesis.pause();
+                        pauseBtn.textContent = '⏯️ Resume';
+                    }
+                }
+            });
+        }
+
+        if (stopBtn) {
+            stopBtn.addEventListener('click', () => {
+                resetAudioControls();
+            });
+        }
+
+        if (volSlider) {
+            volSlider.addEventListener('input', () => {
+                if (currentUtterance) {
+                    currentUtterance.volume = parseFloat(volSlider.value);
+                }
+            });
+        }
+    }
+
+    // Web Speech Recognition (Mic Voice Input)
+    function setupSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const micBtn = document.getElementById('catalyst-mic-btn');
+        const inputEl = document.getElementById('catalyst-voice-input');
+
+        if (!SpeechRecognition) {
+            if (micBtn) micBtn.style.display = 'none';
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.lang = 'en-IN'; // Optimized for Indian English accents
+
+        if (micBtn) {
+            micBtn.addEventListener('click', () => {
+                if (micBtn.classList.contains('mic-active')) {
+                    recognition.stop();
+                } else {
+                    micBtn.classList.add('mic-active');
+                    inputEl.value = '';
+                    inputEl.setAttribute('placeholder', 'Listening... Ask me now...');
+                    recognition.start();
+                }
+            });
+        }
+
+        recognition.onresult = (e) => {
+            const transcript = e.results[0][0].transcript;
+            if (inputEl) {
+                inputEl.value = transcript;
+            }
+            if (micBtn) micBtn.classList.remove('mic-active');
+            inputEl.setAttribute('placeholder', "Ask about a price move...");
+            // Auto-trigger search query
+            document.getElementById('catalyst-query-btn')?.click();
+        };
+
+        recognition.onerror = () => {
+            if (micBtn) micBtn.classList.remove('mic-active');
+            if (inputEl) inputEl.setAttribute('placeholder', "Ask about a price move...");
+        };
+
+        recognition.onend = () => {
+            if (micBtn) micBtn.classList.remove('mic-active');
+            if (inputEl) inputEl.setAttribute('placeholder', "Ask about a price move...");
+        };
+    }
+
+    // ==================== 14. CATALYST MODAL API & UI RENDERING ====================
+    let activeCatalystTyped = null;
+    let currentCatalystSymbol = "";
+    let currentCatalystSector = "";
+    let currentCatalystIsSector = false;
+    let currentCatalystDirection = "";
+
+    function openCatalystAnalysis(symbolOrQuery, sector = "", isSectorOnly = false, direction = "") {
+        // Reset audio first
+        resetAudioControls();
+
+        const modal = document.getElementById('catalyst-modal');
+        const loader = document.getElementById('catalyst-loader');
+        const results = document.getElementById('catalyst-results');
+        const titleEl = document.getElementById('catalyst-modal-title');
+        const voiceInput = document.getElementById('catalyst-voice-input');
+
+        if (!modal) return;
+
+        // Display modal
+        modal.style.display = 'flex';
+        loader.style.display = 'none'; // Do not show loader yet
+        results.style.display = 'flex';  // Show results pane for instructions
+
+        const cleanSymbol = symbolOrQuery.replace(".NS", "").trim();
+
+        // Store state variables for execution
+        currentCatalystSymbol = symbolOrQuery;
+        currentCatalystSector = sector;
+        currentCatalystIsSector = isSectorOnly;
+        currentCatalystDirection = direction;
+
+        if (voiceInput) {
+            if (isSectorOnly) {
+                const actionWord = direction === "up" ? "gaining" : (direction === "down" ? "declining" : "moving");
+                voiceInput.value = `Why is the ${cleanSymbol} sector ${actionWord}?`;
+            } else {
+                const actionWord = direction === "up" ? "surging" : (direction === "down" ? "dropping" : "moving");
+                voiceInput.value = `Why is ${cleanSymbol} ${actionWord}?`;
+            }
+        }
+
+        titleEl.textContent = isSectorOnly 
+            ? `Sector Catalyst: ${cleanSymbol}`
+            : `Catalyst analysis: ${cleanSymbol}`;
+
+        // Stop previous typewriter typing instance
+        if (activeCatalystTyped) {
+            activeCatalystTyped.destroy();
+            activeCatalystTyped = null;
+        }
+
+        // Show instructional placeholder message in summary container
+        const summaryContainer = document.getElementById('catalyst-summary-text');
+        if (summaryContainer) {
+            summaryContainer.innerHTML = '<span style="color: var(--text-muted); font-size: 11.5px; font-style: italic;">Modify your query in the input box above, then click the <strong>Query</strong> button to fetch real-time catalysts and AI analysis.</span>';
+        }
+
+        // Clear previous catalyst driver cards
+        const listEl = document.getElementById('catalyst-drivers-list');
+        if (listEl) {
+            listEl.innerHTML = '';
+        }
+
+        // Reset audit metadata footers to pending
+        const auditScraperEl = document.getElementById('catalyst-audit-scraper');
+        const auditEngineEl = document.getElementById('catalyst-audit-engine');
+        if (auditScraperEl) auditScraperEl.textContent = 'Pending...';
+        if (auditEngineEl) auditEngineEl.textContent = 'Pending...';
+    }
+
+    function executeCatalystAnalysis() {
+        const modal = document.getElementById('catalyst-modal');
+        const loader = document.getElementById('catalyst-loader');
+        const results = document.getElementById('catalyst-results');
+        const voiceInput = document.getElementById('catalyst-voice-input');
+
+        if (!modal) return;
+
+        // Read query text
+        const queryText = voiceInput ? voiceInput.value.trim() : "";
+        if (!queryText) {
+            window.showToast("Please enter a valid query.", "warning");
+            return;
+        }
+
+        // Update active symbol to custom query text
+        currentCatalystSymbol = queryText;
+
+        // Display loader and hide results pane
+        loader.style.display = 'flex';
+        results.style.display = 'none';
+
+        // Stop previous typewriter typing instance
+        if (activeCatalystTyped) {
+            activeCatalystTyped.destroy();
+            activeCatalystTyped = null;
+        }
+
+        const aiEngine = localStorage.getItem('catalyst_ai_engine') || 'gemini';
+        let searchHorizon = localStorage.getItem('search_horizon') || '7d';
+        const sectorRadarLookback = document.getElementById('sector-radar-lookback');
+        if (currentCatalystIsSector && sectorRadarLookback) {
+            searchHorizon = sectorRadarLookback.value || '7d';
+        }
+        const useTavily = localStorage.getItem('use_tavily_search') === 'true';
+        const useSerpApi = localStorage.getItem('use_serpapi') !== 'false'; // default to true
+        const url = `/api/stock-catalysts?symbol=${encodeURIComponent(currentCatalystSymbol)}&sector=${encodeURIComponent(currentCatalystSector)}&is_sector=${currentCatalystIsSector}&ai_engine=${aiEngine}&timeframe=${searchHorizon}&use_tavily_search=${useTavily}&use_serpapi=${useSerpApi}&direction=${currentCatalystDirection}`;
+
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                loader.style.display = 'none';
+                results.style.display = 'flex';
+
+                // Update audit diagnostics footer fields
+                const auditScraperEl = document.getElementById('catalyst-audit-scraper');
+                const auditEngineEl = document.getElementById('catalyst-audit-engine');
+                if (auditScraperEl) {
+                    auditScraperEl.textContent = data.search_provider || 'None';
+                }
+                if (auditEngineEl) {
+                    auditEngineEl.textContent = data.llm_provider || 'None';
+                }
+
+                // Display summary text using Typed.js
+                const summaryContainer = document.getElementById('catalyst-summary-text');
+                if (summaryContainer) {
+                    summaryContainer.innerHTML = '';
+                    const textSpan = document.createElement('span');
+                    summaryContainer.appendChild(textSpan);
+
+                    activeCatalystTyped = new Typed(textSpan, {
+                        strings: [data.summary || "No catalysts parsed."],
+                        typeSpeed: 3,
+                        showCursor: false,
+                        contentType: 'html'
+                    });
+                }
+
+                // Render catalyst driver list cards
+                const listEl = document.getElementById('catalyst-drivers-list');
+                if (listEl) {
+                    listEl.innerHTML = '';
+                    const drivers = data.drivers || [];
+                    
+                    drivers.forEach(d => {
+                        const card = document.createElement('div');
+                        card.className = `catalyst-driver-card ${d.category.replace('/', '-')}`;
+                        
+                        // Map category indicators to Lucide icons
+                        let icon = '⚡';
+                        if (d.category === 'Corporate') icon = '🏢';
+                        else if (d.category.includes('Policy')) icon = '⚖️';
+                        else if (d.category === 'Macro') icon = '🌍';
+                        
+                        card.innerHTML = `
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span class="catalyst-driver-badge ${d.category.replace('/', '-')}">${icon} ${d.category}</span>
+                                <strong style="font-size: 11.5px; color: var(--text-primary); font-family: 'Outfit'; flex-grow: 1; text-align: left; margin-left: 5px;">${d.title}</strong>
+                            </div>
+                            <p style="margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--text-secondary); font-family: 'Inter';">${d.desc}</p>
+                        `;
+                        listEl.appendChild(card);
+                    });
+                }
+            })
+            .catch(err => {
+                console.error("[Catalyst UI] Fetch failed:", err);
+                loader.style.display = 'none';
+                window.showToast("Failed to fetch price action reasons. Please try again.", "error");
+            });
+    }
+
+    function setupCatalystModalListeners() {
+        const modal = document.getElementById('catalyst-modal');
+        const closeBtn = document.getElementById('catalyst-modal-close-btn');
+        const closeBtnBottom = document.getElementById('catalyst-modal-close-btn-bottom');
+        const queryBtn = document.getElementById('catalyst-query-btn');
+        const explainMoveBtn = document.getElementById('explain-move-btn');
+        const voiceInput = document.getElementById('catalyst-voice-input');
+
+        const closeModal = () => {
+            resetAudioControls();
+            if (modal) modal.style.display = 'none';
+            if (activeCatalystTyped) {
+                activeCatalystTyped.destroy();
+                activeCatalystTyped = null;
+            }
+        };
+
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (closeBtnBottom) closeBtnBottom.addEventListener('click', closeModal);
+
+        if (explainMoveBtn) {
+            explainMoveBtn.addEventListener('click', () => {
+                const ticker = document.getElementById('meta-ticker')?.textContent || "";
+                if (ticker) {
+                    const pctEl = document.getElementById('meta-change');
+                    const pctText = pctEl ? pctEl.textContent.trim() : "";
+                    const direction = pctText.includes('-') ? "down" : (pctText.includes('+') ? "up" : "");
+                    const targetSector = document.getElementById('meta-sector')?.textContent || "";
+                    openCatalystAnalysis(ticker, targetSector, false, direction);
+                }
+            });
+        }
+
+        // Trigger manual voice text queries
+        if (queryBtn) {
+            queryBtn.addEventListener('click', () => {
+                executeCatalystAnalysis();
+            });
+        }
+
+        if (voiceInput) {
+            voiceInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    queryBtn?.click();
+                }
+            });
+        }
+
+        // Delegate trigger clicks inside tables (Watchlist, Movers, Sectors)
+        document.addEventListener('click', (e) => {
+            const trigger = e.target.closest('.catalyst-trigger-btn');
+            if (trigger) {
+                const symbol = trigger.getAttribute('data-symbol');
+                const sector = trigger.getAttribute('data-sector') || '';
+                
+                // Extract direction
+                let direction = "";
+                const row = trigger.closest('tr');
+                if (row) {
+                    const isGainer = trigger.closest('#top-gainers-tbody') !== null;
+                    const isLoser = trigger.closest('#top-losers-tbody') !== null;
+                    if (isGainer) {
+                        direction = "up";
+                    } else if (isLoser) {
+                        direction = "down";
+                    } else {
+                        // Check watchlist columns for positive/negative change Indicators
+                        const cells = row.querySelectorAll('td');
+                        for (let cell of cells) {
+                            const cellText = cell.textContent.trim();
+                            if (cell.classList.contains('text-green') || cellText.includes('+')) {
+                                direction = "up";
+                                break;
+                            } else if (cell.classList.contains('text-danger') || cell.classList.contains('text-red') || cellText.includes('-')) {
+                                direction = "down";
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    // Check if it is inside a Sector heatmap tile
+                    const heatmapTile = trigger.closest('.sector-heatmap-tile');
+                    if (heatmapTile) {
+                        const pctEl = heatmapTile.querySelector('.sector-heatmap-tile-pct');
+                        const pctText = pctEl ? pctEl.textContent.trim() : "";
+                        direction = pctText.includes('-') ? "down" : (pctText.includes('+') ? "up" : "");
+                    }
+                }
+                
+                // Determine isSectorOnly based on the data attributes
+                const isSector = trigger.hasAttribute('data-sector') || trigger.closest('.sector-heatmap-tile') !== null;
+                openCatalystAnalysis(symbol, sector, isSector, direction);
+                return;
+            }
+
+            // Clicking any sector standings block or row in Sector Momentum Radar
+            const sectorRow = e.target.closest('#tab-sector-radar .sector-row, #tab-sector-radar .sector-card, #tab-sector-radar [data-sector]');
+            if (sectorRow && !e.target.closest('button') && !e.target.closest('input')) {
+                const sectorName = sectorRow.getAttribute('data-sector') || sectorRow.querySelector('h4')?.textContent || sectorRow.textContent.trim();
+                const cleanSector = sectorName.replace(/^[▲▼]?\s*[\d.-]+%\s*/, '').trim();
+                
+                let direction = "";
+                if (sectorName.includes('▲') || sectorName.includes('+')) {
+                    direction = "up";
+                } else if (sectorName.includes('▼') || sectorName.includes('-')) {
+                    direction = "down";
+                }
+                
+                if (cleanSector && cleanSector.length > 2 && cleanSector.length < 35 && !cleanSector.includes('Sync') && !cleanSector.includes('Interpretation')) {
+                    openCatalystAnalysis(cleanSector, "", true, direction);
+                }
+            }
+        });
+    }
+
+    // ==================== 15. SETTINGS SEARCH TOGGLE COCKPIT ====================
+    function setupSettingsSearchToggle() {
+        const aiSelect = document.getElementById('setting-catalyst-ai');
+        const horizonSelect = document.getElementById('setting-search-horizon');
+        const tavilyToggle = document.getElementById('setting-tavily-search-toggle');
+        const serpapiToggle = document.getElementById('setting-serpapi-toggle');
+
+        // Initialize state from localStorage
+        if (aiSelect) {
+            aiSelect.value = localStorage.getItem('catalyst_ai_engine') || 'gemini';
+            aiSelect.addEventListener('change', (e) => {
+                localStorage.setItem('catalyst_ai_engine', e.target.value);
+                AudioCueManager.playTick();
+                window.showToast(`AI Engine set to: ${e.target.value === 'gemini' ? 'Gemini 1.5' : 'Groq Llama 3.3'}`, 'success');
+            });
+        }
+
+        if (horizonSelect) {
+            horizonSelect.value = localStorage.getItem('search_horizon') || '7d';
+            horizonSelect.addEventListener('change', (e) => {
+                localStorage.setItem('search_horizon', e.target.value);
+                AudioCueManager.playTick();
+                window.showToast(`Search Horizon set to: ${horizonSelect.options[horizonSelect.selectedIndex].text}`, 'success');
+            });
+        }
+
+        if (tavilyToggle) {
+            tavilyToggle.checked = localStorage.getItem('use_tavily_search') === 'true';
+            tavilyToggle.addEventListener('change', (e) => {
+                localStorage.setItem('use_tavily_search', e.target.checked);
+                AudioCueManager.playTick();
+                window.showToast(`Tavily API ${e.target.checked ? 'Enabled' : 'Disabled'}`, 'success');
+            });
+        }
+
+        if (serpapiToggle) {
+            serpapiToggle.checked = localStorage.getItem('use_serpapi') !== 'false'; // default to true
+            serpapiToggle.addEventListener('change', (e) => {
+                localStorage.setItem('use_serpapi', e.target.checked);
+                AudioCueManager.playTick();
+                window.showToast(`SerpApi ${e.target.checked ? 'Enabled' : 'Disabled'}`, 'success');
+            });
+        }
+    }
+
     // Initialize all visual modernization layers on load
     document.addEventListener('DOMContentLoaded', () => {
         setupLucideIcons();
@@ -585,7 +1138,15 @@
         setupToastAudioHook();
         setupTTSEqualizer();
         setupMagneticButtons();
-        console.log("APEX Modernizer: All modernization hooks active.");
+        
+        // Extended Catalyst Features
+        setupTableCatalystTriggers();
+        setupSpeechRecognition();
+        setupCatalystAudioControls();
+        setupCatalystModalListeners();
+        setupSettingsSearchToggle();
+
+        console.log("APEX Modernizer: All core and extended modernization hooks active.");
     });
 
 })();

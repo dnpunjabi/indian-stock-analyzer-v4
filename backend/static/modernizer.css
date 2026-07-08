@@ -510,6 +510,104 @@ table tbody tr:hover {
     vertical-align: middle;
 }
 
+/* ==================== 20. CATALYST DRIVER OVERLAYS ==================== */
+.catalyst-driver-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.catalyst-driver-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.catalyst-driver-card.Corporate {
+    border-left: 4px solid var(--color-primary, #3b82f6) !important;
+}
+
+.catalyst-driver-card.Sector-Policy,
+.catalyst-driver-card.Sector\/Policy {
+    border-left: 4px solid #f59e0b !important;
+}
+
+.catalyst-driver-card.Technical {
+    border-left: 4px solid #ec4899 !important;
+}
+
+.catalyst-driver-card.Macro {
+    border-left: 4px solid #8b5cf6 !important;
+}
+
+.catalyst-driver-badge {
+    font-family: 'Outfit', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-right: 8px;
+    display: inline-block;
+    width: fit-content;
+}
+
+.catalyst-driver-badge.Corporate {
+    background: rgba(59, 130, 246, 0.12) !important;
+    color: #60a5fa !important;
+}
+
+.catalyst-driver-badge.Sector-Policy,
+.catalyst-driver-badge.Sector\/Policy {
+    background: rgba(245, 158, 11, 0.12) !important;
+    color: #fbbf24 !important;
+}
+
+.catalyst-driver-badge.Technical {
+    background: rgba(236, 72, 153, 0.12) !important;
+    color: #f472b6 !important;
+}
+
+.catalyst-driver-badge.Macro {
+    background: rgba(139, 92, 246, 0.12) !important;
+    color: #a78bfa !important;
+}
+
+.mic-active {
+    animation: mic-glow-active 1.5s infinite;
+    color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.12) !important;
+    border-radius: 50%;
+}
+
+@keyframes mic-glow-active {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    70% { transform: scale(1.15); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+.catalyst-trigger-btn {
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+}
+
+.catalyst-trigger-btn:hover {
+    opacity: 1;
+    color: var(--color-primary) !important;
+    transform: scale(1.15);
+}
+
+
 /* Mobile optimizations to disable filter/shimmer/reveal bloat */
 @media (max-width: 768px) {
     body::before {
