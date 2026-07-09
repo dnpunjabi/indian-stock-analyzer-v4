@@ -643,100 +643,30 @@
     }
 
     // ==================== 13. SPEECH SYNTHESIS & RECOGNITION (CATALYST CONTROLS) ====================
-    let currentUtterance = null;
-    let ttsSpeaking = false;
-
-    function resetAudioControls() {
-        ttsSpeaking = false;
-        if (window.speechSynthesis) window.speechSynthesis.cancel();
-        
-        const readBtn = document.getElementById('catalyst-read-btn');
-        const pauseBtn = document.getElementById('catalyst-pause-btn');
-        const stopBtn = document.getElementById('catalyst-stop-btn');
-        
-        if (readBtn) readBtn.style.display = 'inline-block';
-        if (pauseBtn) pauseBtn.style.display = 'none';
-        if (stopBtn) stopBtn.style.display = 'none';
-        
-        // Remove speaking indicators if they are inside the modal
-        const speakIcon = document.getElementById('catalyst-modal-icon');
-        if (speakIcon) speakIcon.textContent = '⚡';
-    }
-
-    function speakCatalystReport(text) {
-        if (!window.speechSynthesis) {
-            window.showToast("Speech synthesis not supported on this browser.", "warning");
-            return;
+    // ==================== 13. SPEECH SYNTHESIS & RECOGNITION (CATALYST CONTROLS) ====================
+    function stopCatalystSpeech() {
+        if (window.SpeechPlayer && window.SpeechPlayer.isPlaying) {
+            window.SpeechPlayer.stop();
         }
-
-        resetAudioControls();
-        ttsSpeaking = true;
-
-        // Clean out markdown characters for natural speech synthesis
-        const cleanedText = text.replace(/[*#`_\-]/g, '').replace(/\[.*?\]/g, '').trim();
-        const utterance = new SpeechSynthesisUtterance(cleanedText);
-        currentUtterance = utterance;
-
-        // Read dynamic volume slider
-        const volSlider = document.getElementById('catalyst-volume');
-        utterance.volume = volSlider ? parseFloat(volSlider.value) : 0.8;
-
-        utterance.onstart = () => {
-            document.getElementById('catalyst-read-btn').style.display = 'none';
-            document.getElementById('catalyst-pause-btn').style.display = 'inline-block';
-            document.getElementById('catalyst-stop-btn').style.display = 'inline-block';
-            
-            const speakIcon = document.getElementById('catalyst-modal-icon');
-            if (speakIcon) speakIcon.textContent = '🔊';
-        };
-
-        utterance.onend = () => resetAudioControls();
-        utterance.onerror = () => resetAudioControls();
-
-        window.speechSynthesis.speak(utterance);
     }
 
     function setupCatalystAudioControls() {
         const readBtn = document.getElementById('catalyst-read-btn');
-        const pauseBtn = document.getElementById('catalyst-pause-btn');
-        const stopBtn = document.getElementById('catalyst-stop-btn');
-        const volSlider = document.getElementById('catalyst-volume');
-
         if (readBtn) {
             readBtn.addEventListener('click', () => {
-                const summary = document.getElementById('catalyst-summary-text')?.innerText || "";
-                let driversText = "";
-                document.querySelectorAll('#catalyst-drivers-list .catalyst-driver-card').forEach(card => {
-                    driversText += " " + card.innerText;
-                });
-                speakCatalystReport(summary + " Details: " + driversText);
-            });
-        }
-
-        if (pauseBtn) {
-            pauseBtn.addEventListener('click', () => {
-                if (window.speechSynthesis.speaking) {
-                    if (window.speechSynthesis.paused) {
-                        window.speechSynthesis.resume();
-                        pauseBtn.textContent = '⏯️ Pause';
-                    } else {
-                        window.speechSynthesis.pause();
-                        pauseBtn.textContent = '⏯️ Resume';
-                    }
-                }
-            });
-        }
-
-        if (stopBtn) {
-            stopBtn.addEventListener('click', () => {
-                resetAudioControls();
-            });
-        }
-
-        if (volSlider) {
-            volSlider.addEventListener('input', () => {
-                if (currentUtterance) {
-                    currentUtterance.volume = parseFloat(volSlider.value);
+                if (window.SpeechPlayer) {
+                    const summary = document.getElementById('catalyst-summary-text')?.innerText || "";
+                    let driversText = "";
+                    document.querySelectorAll('#catalyst-drivers-list .catalyst-driver-card').forEach(card => {
+                        // Extract text cleanly, excluding html structures
+                        const textContent = card.innerText.replace(/\n/g, " ").trim();
+                        if (textContent) driversText += ". " + textContent;
+                    });
+                    
+                    const fullSpeechText = summary + driversText;
+                    window.SpeechPlayer.startSpeakingSection(fullSpeechText, "Catalyst AI News Analysis", true);
+                } else {
+                    window.showToast("Speech narration player not active on this device.", "warning");
                 }
             });
         }
@@ -801,7 +731,7 @@
 
     function openCatalystAnalysis(symbolOrQuery, sector = "", isSectorOnly = false, direction = "") {
         // Reset audio first
-        resetAudioControls();
+        stopCatalystSpeech();
 
         const modal = document.getElementById('catalyst-modal');
         const loader = document.getElementById('catalyst-loader');
@@ -811,8 +741,16 @@
 
         if (!modal) return;
 
-        // Display modal
-        modal.style.display = 'flex';
+        // Reset custom transform offsets from drag gestures
+        const card = modal.querySelector('.catalyst-modal-card');
+        if (card) {
+            card.style.transform = '';
+            card.style.transition = '';
+        }
+        modal.style.background = '';
+
+        // Display modal using class
+        modal.classList.add('active');
         loader.style.display = 'none'; // Do not show loader yet
         results.style.display = 'flex';  // Show results pane for instructions
 
@@ -856,6 +794,23 @@
             listEl.innerHTML = '';
         }
 
+        // Reset sentiment ring display
+        const ring = document.getElementById('catalyst-sentiment-ring');
+        if (ring) {
+            ring.style.strokeDashoffset = '100';
+        }
+        const sTitle = document.getElementById('catalyst-sentiment-title');
+        if (sTitle) {
+            sTitle.textContent = 'Awaiting Query...';
+            sTitle.style.color = '';
+        }
+
+        // Clear prompts list
+        const promptsContainer = document.getElementById('catalyst-prompts-container');
+        if (promptsContainer) {
+            promptsContainer.innerHTML = '';
+        }
+
         // Reset audit metadata footers to pending
         const auditScraperEl = document.getElementById('catalyst-audit-scraper');
         const auditEngineEl = document.getElementById('catalyst-audit-engine');
@@ -877,6 +832,9 @@
             window.showToast("Please enter a valid query.", "warning");
             return;
         }
+
+        // Blur input to dismiss mobile soft keyboard
+        if (voiceInput) voiceInput.blur();
 
         // Update active symbol to custom query text
         currentCatalystSymbol = queryText;
@@ -900,9 +858,16 @@
         const useTavily = localStorage.getItem('use_tavily_search') === 'true';
         const useSerpApi = localStorage.getItem('use_serpapi') !== 'false'; // default to true
         const useBrave = localStorage.getItem('use_brave_search') !== 'false'; // default to true
+        const serpapiKey = localStorage.getItem('serpapi_api_key') || '';
+        const tavilyKey = localStorage.getItem('tavily_api_key') || '';
+        
+        const headers = {};
+        if (serpapiKey) headers['X-SerpApi-Key'] = serpapiKey;
+        if (tavilyKey) headers['X-Tavily-Key'] = tavilyKey;
+
         const url = `/api/stock-catalysts?symbol=${encodeURIComponent(currentCatalystSymbol)}&sector=${encodeURIComponent(currentCatalystSector)}&is_sector=${currentCatalystIsSector}&ai_engine=${aiEngine}&timeframe=${searchHorizon}&use_tavily_search=${useTavily}&use_serpapi=${useSerpApi}&use_brave=${useBrave}&direction=${currentCatalystDirection}`;
 
-        fetch(url)
+        fetch(url, { headers })
             .then(res => res.json())
             .then(data => {
                 loader.style.display = 'none';
@@ -916,6 +881,48 @@
                 }
                 if (auditEngineEl) {
                     auditEngineEl.textContent = data.llm_provider || 'None';
+                }
+
+                // Render dynamic Sentiment ring
+                const ring = document.getElementById('catalyst-sentiment-ring');
+                const sTitle = document.getElementById('catalyst-sentiment-title');
+                const sentimentValue = (data.sentiment || 'Neutral').toLowerCase();
+                
+                let percent = 50;
+                let strokeColor = 'var(--color-primary-light)';
+                let glowColor = 'rgba(59, 130, 246, 0.4)';
+                let titleText = '50% NEUTRAL SENTIMENT';
+                let titleColor = 'var(--text-primary)';
+
+                if (sentimentValue === 'positive') {
+                    percent = 85;
+                    strokeColor = 'var(--color-emerald)';
+                    glowColor = 'rgba(16, 185, 129, 0.5)';
+                    titleText = '85% BULLISH OUTLOOK';
+                    titleColor = 'var(--color-emerald)';
+                } else if (sentimentValue === 'negative') {
+                    percent = 85;
+                    strokeColor = 'var(--color-crimson)';
+                    glowColor = 'rgba(239, 68, 68, 0.5)';
+                    titleText = '85% BEARISH OUTLOOK';
+                    titleColor = 'var(--color-crimson)';
+                }
+
+                if (ring) {
+                    const offset = 100 - percent;
+                    ring.style.stroke = strokeColor;
+                    ring.style.strokeDashoffset = offset;
+                    // Add glow in dark mode
+                    const isDark = document.documentElement.getAttribute('data-theme') !== 'light' && document.body.getAttribute('data-theme') !== 'light';
+                    if (isDark) {
+                        ring.style.filter = `drop-shadow(0 0 4px ${glowColor})`;
+                    } else {
+                        ring.style.filter = '';
+                    }
+                }
+                if (sTitle) {
+                    sTitle.textContent = titleText;
+                    sTitle.style.color = titleColor;
                 }
 
                 // Display summary text using Typed.js
@@ -941,22 +948,71 @@
                     
                     drivers.forEach(d => {
                         const card = document.createElement('div');
-                        card.className = `catalyst-driver-card ${d.category.replace('/', '-')}`;
+                        
+                        // Map categorisation to colors and badges
+                        const isDriverBullish = sentimentValue === 'positive' || d.desc.toLowerCase().includes('surge') || d.desc.toLowerCase().includes('gain') || d.desc.toLowerCase().includes('profit') || d.desc.toLowerCase().includes('growth');
+                        const isDriverBearish = sentimentValue === 'negative' || d.desc.toLowerCase().includes('decline') || d.desc.toLowerCase().includes('drop') || d.desc.toLowerCase().includes('pledge') || d.desc.toLowerCase().includes('threat');
+                        
+                        let sentimentClass = '';
+                        let badgeSentimentClass = '';
+                        let badgeText = 'Neutral';
+
+                        if (isDriverBullish) {
+                            sentimentClass = 'bullish';
+                            badgeSentimentClass = 'bullish';
+                            badgeText = 'Bullish';
+                        } else if (isDriverBearish) {
+                            sentimentClass = 'bearish';
+                            badgeSentimentClass = 'bearish';
+                            badgeText = 'Bearish';
+                        }
+
+                        card.className = `catalyst-driver-card ${sentimentClass}`;
                         
                         // Map category indicators to Lucide icons
                         let icon = '⚡';
                         if (d.category === 'Corporate') icon = '🏢';
-                        else if (d.category.includes('Policy')) icon = '⚖️';
+                        else if (d.category.includes('Policy') || d.category.includes('Sector')) icon = '⚖️';
                         else if (d.category === 'Macro') icon = '🌍';
+                        else if (d.category === 'Technical') icon = '📉';
                         
                         card.innerHTML = `
-                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                <span class="catalyst-driver-badge ${d.category.replace('/', '-')}">${icon} ${d.category}</span>
-                                <strong style="font-size: 11.5px; color: var(--text-primary); font-family: 'Outfit'; flex-grow: 1; text-align: left; margin-left: 5px;">${d.title}</strong>
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 4px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span class="catalyst-driver-badge ${badgeSentimentClass}">${icon} ${d.category}</span>
+                                    <span class="catalyst-driver-badge ${badgeSentimentClass}" style="opacity: 0.85;">${badgeText}</span>
+                                </div>
+                                <strong style="font-size: 12px; color: var(--text-primary); font-family: 'Outfit'; flex: 1; min-width: 150px; text-align: left;">${d.title}</strong>
                             </div>
-                            <p style="margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--text-secondary); font-family: 'Inter';">${d.desc}</p>
+                            <p style="margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--text-secondary); font-family: 'Inter';">${d.desc}</p>
                         `;
                         listEl.appendChild(card);
+                    });
+                }
+
+                // Render dynamic suggestion pills
+                const promptsContainer = document.getElementById('catalyst-prompts-container');
+                if (promptsContainer) {
+                    promptsContainer.innerHTML = '';
+                    
+                    const cleanSymbol = currentCatalystSymbol.replace(".NS", "").trim();
+                    const prompts = [
+                        `Revenue impact of ${cleanSymbol}?`,
+                        `Competitors of ${cleanSymbol}?`,
+                        `Timeline risks of ${cleanSymbol}?`
+                    ];
+
+                    prompts.forEach(pText => {
+                        const pill = document.createElement('button');
+                        pill.className = 'catalyst-prompt-pill';
+                        pill.innerHTML = `💡 <span>${pText}</span>`;
+                        pill.onclick = () => {
+                            if (voiceInput) {
+                                voiceInput.value = pText;
+                                document.getElementById('catalyst-query-btn')?.click();
+                            }
+                        };
+                        promptsContainer.appendChild(pill);
                     });
                 }
             })
@@ -976,8 +1032,8 @@
         const voiceInput = document.getElementById('catalyst-voice-input');
 
         const closeModal = () => {
-            resetAudioControls();
-            if (modal) modal.style.display = 'none';
+            stopCatalystSpeech();
+            if (modal) modal.classList.remove('active');
             if (activeCatalystTyped) {
                 activeCatalystTyped.destroy();
                 activeCatalystTyped = null;
@@ -986,6 +1042,83 @@
 
         if (closeBtn) closeBtn.addEventListener('click', closeModal);
         if (closeBtnBottom) closeBtnBottom.addEventListener('click', closeModal);
+
+        // Click away dismiss listener
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+
+            // Swipe down to dismiss gesture handlers for mobile
+            const card = modal.querySelector('.catalyst-modal-card');
+            const dragHandle = document.getElementById('catalyst-drag-handle');
+            
+            if (card && dragHandle) {
+                let startY = 0;
+                let currentY = 0;
+                let isDragging = false;
+
+                const handleStart = (clientY) => {
+                    startY = clientY;
+                    isDragging = true;
+                    card.style.transition = 'none';
+                };
+
+                const handleMove = (clientY) => {
+                    if (!isDragging) return;
+                    currentY = clientY;
+                    const diffY = currentY - startY;
+                    
+                    if (diffY > 0) {
+                        card.style.transform = `translateY(${diffY}px)`;
+                        // Fade backdrop opacity proportionally
+                        const opacity = 0.55 - (diffY / 600) * 0.55;
+                        modal.style.background = `rgba(7, 10, 18, ${Math.max(0.1, opacity)})`;
+                    }
+                };
+
+                const handleEnd = () => {
+                    if (!isDragging) return;
+                    isDragging = false;
+                    const diffY = currentY - startY;
+                    
+                    card.style.transition = 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+                    modal.style.transition = 'background 0.3s ease';
+
+                    if (diffY > 80) {
+                        // Slide fully down and close
+                        card.style.transform = 'translateY(100%)';
+                        modal.style.background = 'rgba(7, 10, 18, 0)';
+                        setTimeout(() => {
+                            closeModal();
+                        }, 250);
+                    } else {
+                        // Spring back up
+                        card.style.transform = '';
+                        modal.style.background = '';
+                    }
+                    
+                    // Reset transitions after snap back
+                    setTimeout(() => {
+                        if (modal.classList.contains('active')) {
+                            card.style.transition = '';
+                            modal.style.transition = '';
+                        }
+                    }, 350);
+                };
+
+                dragHandle.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientY));
+                document.addEventListener('touchmove', (e) => {
+                    if (isDragging) {
+                        e.preventDefault(); // Prevent double scrolling page bounce
+                        handleMove(e.touches[0].clientY);
+                    }
+                }, { passive: false });
+                document.addEventListener('touchend', handleEnd);
+            }
+        }
 
         if (explainMoveBtn) {
             explainMoveBtn.addEventListener('click', () => {
@@ -1117,7 +1250,7 @@
                 fetch('/api/llm-config')
                     .then(res => res.json())
                     .then(config => {
-                        tavilyToggle.checked = !!config.has_tavily_key;
+                        tavilyToggle.checked = !!config.has_tavily_key || !!localStorage.getItem('tavily_api_key');
                         localStorage.setItem('use_tavily_search', tavilyToggle.checked);
                     })
                     .catch(() => {
@@ -1139,7 +1272,7 @@
                 fetch('/api/llm-config')
                     .then(res => res.json())
                     .then(config => {
-                        serpapiToggle.checked = !!config.has_serpapi_key;
+                        serpapiToggle.checked = !!config.has_serpapi_key || !!localStorage.getItem('serpapi_api_key');
                         localStorage.setItem('use_serpapi', serpapiToggle.checked);
                     })
                     .catch(() => {
@@ -1174,29 +1307,64 @@
                 window.showToast(`Brave Search ${e.target.checked ? 'Enabled' : 'Disabled'}`, 'success');
             });
         }
+
+        // SerpApi & Tavily dynamic keys setup
+        const serpapiKeyInput = document.getElementById('setting-serpapi-key');
+        const tavilyKeyInput = document.getElementById('setting-tavily-key');
+
+        if (serpapiKeyInput) {
+            serpapiKeyInput.value = localStorage.getItem('serpapi_api_key') || '';
+            serpapiKeyInput.addEventListener('input', (e) => {
+                localStorage.setItem('serpapi_api_key', e.target.value.trim());
+            });
+        }
+
+        if (tavilyKeyInput) {
+            tavilyKeyInput.value = localStorage.getItem('tavily_api_key') || '';
+            tavilyKeyInput.addEventListener('input', (e) => {
+                localStorage.setItem('tavily_api_key', e.target.value.trim());
+            });
+        }
     }
 
-    // Initialize all visual modernization layers on load
-    document.addEventListener('DOMContentLoaded', () => {
-        setupLucideIcons();
-        setupGSAPTransitions();
-        setupChatUpgrades();
-        setupCountUpObservers();
-        setupSpotlightAnd3DTilt();
-        setupViewTransitions();
-        setupBullishSparkles();
-        setupToastAudioHook();
-        setupTTSEqualizer();
-        setupMagneticButtons();
+    // Initialize all visual modernization layers safely
+    const initModernizer = () => {
+        const safeCall = (name, fn) => {
+            try {
+                if (typeof fn === 'function') {
+                    fn();
+                    console.log(`[APEX Modernizer] ${name} initialized successfully.`);
+                } else {
+                    console.warn(`[APEX Modernizer] ${name} is not a valid function.`);
+                }
+            } catch (err) {
+                console.error(`[APEX Modernizer] Error in ${name}:`, err);
+            }
+        };
+
+        safeCall('setupLucideIcons', setupLucideIcons);
+        safeCall('setupGSAPTransitions', setupGSAPTransitions);
+        safeCall('setupChatUpgrades', setupChatUpgrades);
+        safeCall('setupCountUpObservers', setupCountUpObservers);
+        safeCall('setupSpotlightAnd3DTilt', setupSpotlightAnd3DTilt);
+        safeCall('setupViewTransitions', setupViewTransitions);
+        safeCall('setupBullishSparkles', setupBullishSparkles);
+        safeCall('setupToastAudioHook', setupToastAudioHook);
+        safeCall('setupTTSEqualizer', setupTTSEqualizer);
+        safeCall('setupMagneticButtons', setupMagneticButtons);
         
         // Extended Catalyst Features
-        setupTableCatalystTriggers();
-        setupSpeechRecognition();
-        setupCatalystAudioControls();
-        setupCatalystModalListeners();
-        setupSettingsSearchToggle();
+        safeCall('setupTableCatalystTriggers', setupTableCatalystTriggers);
+        safeCall('setupSpeechRecognition', setupSpeechRecognition);
+        safeCall('setupCatalystAudioControls', setupCatalystAudioControls);
+        safeCall('setupCatalystModalListeners', setupCatalystModalListeners);
+        safeCall('setupSettingsSearchToggle', setupSettingsSearchToggle);
+    };
 
-        console.log("APEX Modernizer: All core and extended modernization hooks active.");
-    });
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initModernizer);
+    } else {
+        initModernizer();
+    }
 
 })();

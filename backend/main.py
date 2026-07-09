@@ -11,7 +11,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 import math
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -10804,12 +10804,18 @@ def get_stock_catalysts(
     use_brave: bool = Query(True),
     ai_engine: str = Query("gemini"),
     timeframe: str = Query("7d"),
-    direction: Optional[str] = Query(None)
+    direction: Optional[str] = Query(None),
+    x_serpapi_key: Optional[str] = Header(None, alias="X-SerpApi-Key"),
+    x_tavily_key: Optional[str] = Header(None, alias="X-Tavily-Key")
 ):
     try:
         import requests
         from backend.catalyst_scraper import fetch_latest_news_for_query
         from backend.llm_config import call_llm, TASK_FAST
+        
+        # Diagnostic print for incoming headers
+        print(f"[Catalyst API] Headers received: X-SerpApi-Key={x_serpapi_key[:10] + '...' if x_serpapi_key else 'None'}, X-Tavily-Key={x_tavily_key[:10] + '...' if x_tavily_key else 'None'}")
+        print(f"[Catalyst API] Query params: use_serpapi={use_serpapi}, use_tavily={use_tavily_search}, use_brave={use_brave}")
         
         # 1. Clean ticker symbol and resolve to human-readable company name
         from backend.financial_utils import resolve_company_ticker
@@ -10868,7 +10874,9 @@ def get_stock_catalysts(
             timeframe=timeframe,
             use_tavily=use_tavily_search,
             use_serpapi=use_serpapi,
-            use_brave=use_brave
+            use_brave=use_brave,
+            serpapi_api_key=x_serpapi_key or "",
+            tavily_api_key=x_tavily_key or ""
         )
         
         # If no snippets found, search sector-specific trends as fallback
@@ -10884,7 +10892,9 @@ def get_stock_catalysts(
                 timeframe=timeframe,
                 use_tavily=use_tavily_search,
                 use_serpapi=use_serpapi,
-                use_brave=use_brave
+                use_brave=use_brave,
+                serpapi_api_key=x_serpapi_key or "",
+                tavily_api_key=x_tavily_key or ""
             )
             
         # If still no snippets, return a graceful fallback

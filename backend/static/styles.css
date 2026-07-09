@@ -5131,6 +5131,304 @@ input[type="range"]::-webkit-slider-thumb:hover {
     border-color: rgba(59, 130, 246, 0.3);
 }
 
+/* --- ENTERPRISE CATALYST ADAPTIVE BOTTOM-SHEET SYSTEM --- */
+.catalyst-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(7, 10, 18, 0.55);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.catalyst-modal-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+[data-theme="light"] .catalyst-modal-overlay {
+    background: rgba(241, 245, 249, 0.65);
+}
+
+.catalyst-modal-card {
+    width: 100%;
+    max-width: 650px;
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+    overflow: hidden;
+    padding: 0;
+    transform: translateY(30px) scale(0.97);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box;
+}
+
+.catalyst-modal-overlay.active .catalyst-modal-card {
+    transform: translateY(0) scale(1);
+}
+
+[data-theme="light"] .catalyst-modal-card {
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+}
+
+.catalyst-drag-handle {
+    display: none;
+    width: 40px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
+    margin: 10px auto 4px auto;
+    cursor: grab;
+}
+
+[data-theme="light"] .catalyst-drag-handle {
+    background: rgba(0, 0, 0, 0.12);
+}
+
+/* Scroll wrapper layout */
+.catalyst-scroll-pane {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 22px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Micro-animations: Mic Active pulse */
+#catalyst-mic-btn.mic-active {
+    animation: mic-glow-ring-pulse 1.5s infinite ease-in-out;
+    color: var(--color-crimson) !important;
+}
+
+@keyframes mic-glow-ring-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.35); background: rgba(239, 68, 68, 0.1); }
+    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); background: rgba(239, 68, 68, 0.02); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); background: transparent; }
+}
+
+/* Visual drivers list cards formatting */
+.catalyst-driver-card {
+    display: flex;
+    flex-direction: column;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-glass);
+    background: rgba(255, 255, 255, 0.015);
+    border-left: 4px solid var(--border-glass);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    word-break: break-word;
+    overflow-wrap: break-word;
+}
+
+.catalyst-driver-card:hover {
+    background: rgba(255, 255, 255, 0.035);
+    transform: translateX(4px);
+}
+
+[data-theme="light"] .catalyst-driver-card:hover {
+    background: rgba(0, 0, 0, 0.015);
+}
+
+.catalyst-driver-card.bullish {
+    border-left-color: var(--color-emerald) !important;
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.04) 0%, transparent 100%);
+}
+
+.catalyst-driver-card.bearish {
+    border-left-color: var(--color-crimson) !important;
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.04) 0%, transparent 100%);
+}
+
+/* Responsive Catalyst Modal Footer elements */
+.catalyst-modal-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 22px;
+    border-top: 1px solid var(--border-glass);
+    background: rgba(255, 255, 255, 0.01);
+}
+
+.catalyst-audit-info {
+    display: flex;
+    gap: 16px;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: 'Inter', monospace;
+}
+
+@media (max-width: 576px) {
+    .catalyst-modal-footer {
+        flex-direction: column-reverse;
+        gap: 10px;
+        align-items: stretch;
+        padding: 12px 16px;
+    }
+    .catalyst-audit-info {
+        justify-content: center;
+        font-size: 9px;
+        gap: 12px;
+    }
+    #catalyst-modal-close-btn-bottom {
+        width: 100%;
+        padding: 10px;
+        font-size: 12px;
+        height: auto;
+    }
+}
+
+.catalyst-driver-badge {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    margin-bottom: 6px;
+}
+
+.catalyst-driver-badge.bullish {
+    color: var(--color-emerald);
+    background: rgba(16, 185, 129, 0.12);
+}
+
+.catalyst-driver-badge.bearish {
+    color: var(--color-crimson);
+    background: rgba(239, 68, 68, 0.12);
+}
+
+/* Suggestion pills */
+.catalyst-prompt-pill {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border-glass);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 10px;
+    font-family: var(--font-body);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 6px;
+    margin-bottom: 6px;
+}
+
+.catalyst-prompt-pill:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: var(--color-primary-light);
+    transform: translateY(-1px);
+}
+
+[data-theme="light"] .catalyst-prompt-pill {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .catalyst-prompt-pill:hover {
+    background: rgba(59, 130, 246, 0.08);
+    color: var(--color-primary);
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+/* Sentiment Radial ring components */
+.catalyst-sentiment-box {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(255,255,255,0.01);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 12px 18px;
+}
+
+.sentiment-gauge-svg {
+    transform: rotate(-90deg);
+}
+
+.sentiment-gauge-bg {
+    fill: none;
+    stroke: rgba(255,255,255,0.05);
+    stroke-width: 4;
+}
+
+[data-theme="light"] .sentiment-gauge-bg {
+    stroke: rgba(0,0,0,0.06);
+}
+
+.sentiment-gauge-fill {
+    fill: none;
+    stroke-width: 4;
+    stroke-linecap: round;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.3s ease;
+}
+
+/* Active Highlight sentence marker */
+.speech-highlight-fs {
+    background: rgba(239, 68, 68, 0.18);
+    border-bottom: 1px dashed var(--color-crimson);
+    transition: background-color 0.2s ease;
+    border-radius: 2px;
+}
+
+/* --- MOBILE SPECIFIC BOTTOM-SHEET INTERFACES --- */
+@media (max-width: 768px) {
+    .catalyst-modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .catalyst-modal-card {
+        max-width: 100%;
+        max-height: 92vh;
+        border-radius: 20px 20px 0 0;
+        border-bottom: none;
+        transform: translateY(100%);
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    .catalyst-drag-handle {
+        display: block;
+    }
+    
+    .catalyst-scroll-pane {
+        padding: 15px 18px;
+        gap: 15px;
+    }
+    
+    .catalyst-sentiment-box {
+        padding: 10px 14px;
+        gap: 12px;
+    }
+}
+
 /* Card visibility utilities */
 .card-hidden {
     display: none !important;
@@ -14527,7 +14825,7 @@ details[open] .academy-hud-arrow {
     position: fixed;
     bottom: 20px;
     right: 20px;
-    z-index: 10000;
+    z-index: 100000;
     width: 340px;
     background: rgba(17, 24, 39, 0.85);
     backdrop-filter: blur(16px);
@@ -14672,7 +14970,8 @@ details[open] .academy-hud-arrow {
         width: calc(100% - 24px) !important;
         right: 12px !important;
         left: 12px !important;
-        bottom: 12px !important;
+        bottom: auto !important;
+        top: 12px !important;
         padding: 10px 12px !important;
     }
     .speech-controls-row {

@@ -8,7 +8,9 @@ def fetch_latest_news_for_query(
     timeframe: str = "7d", 
     use_tavily: bool = False, 
     use_serpapi: bool = False,
-    use_brave: bool = False
+    use_brave: bool = False,
+    serpapi_api_key: str = "",
+    tavily_api_key: str = ""
 ) -> tuple[list[str], str]:
     """
     Fetch news snippets from multiple search endpoints in priority order,
@@ -32,8 +34,8 @@ def fetch_latest_news_for_query(
     qdr = timeframe_map_qdr.get(timeframe.lower().strip(), "w")
     
     # Get all configured API keys
-    serpapi_key = os.environ.get("SERPAPI_API_KEY", "")
-    tavily_key = os.environ.get("TAVILY_API_KEY", "")
+    serpapi_key = serpapi_api_key or os.environ.get("SERPAPI_API_KEY", "")
+    tavily_key = tavily_api_key or os.environ.get("TAVILY_API_KEY", "")
     brave_key = os.environ.get("BRAVE_API_KEY", "")
 
     # 1. TIER 1: SerpApi (If toggled ON and Key configured)

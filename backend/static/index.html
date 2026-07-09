@@ -16,7 +16,7 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <!-- TradingView Advanced Widget -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <link rel="stylesheet" href="styles.css?v=1.6.1">
+    <link rel="stylesheet" href="styles.css?v=1.6.3">
     <link rel="stylesheet" href="modernizer.css">
 </head>
 <body>
@@ -419,6 +419,14 @@
                                         <input type="password" id="screener-session-cookie" placeholder="sessionid cookie value" style="flex-grow: 1; background: var(--bg-glass-input); color: var(--text-primary); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 8px; font-size: 10px; outline: none; box-sizing: border-box; height: 26px;">
                                         <button id="save-screener-cookie-btn" style="background: var(--color-primary); color: white; border: none; border-radius: 4px; padding: 0 10px; font-size: 10px; font-weight: 700; cursor: pointer; height: 26px;">Save</button>
                                     </div>
+                                </div>
+                                <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 6px; border-top: 1px solid var(--border-glass); padding-top: 10px; margin-top: 10px;">
+                                    <label style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">SerpApi Key</label>
+                                    <input type="password" id="setting-serpapi-key" placeholder="Enter SerpApi Key" style="width: 100%; background: var(--bg-glass-input); color: var(--text-primary); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 8px; font-size: 10px; outline: none; box-sizing: border-box; height: 26px;">
+                                </div>
+                                <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 6px; border-top: 1px solid var(--border-glass); padding-top: 10px; margin-top: 10px;">
+                                    <label style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em;">Tavily API Key</label>
+                                    <input type="password" id="setting-tavily-key" placeholder="Enter Tavily API Key" style="width: 100%; background: var(--bg-glass-input); color: var(--text-primary); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 8px; font-size: 10px; outline: none; box-sizing: border-box; height: 26px;">
                                 </div>
                             </div>
                         </div>
@@ -7516,25 +7524,28 @@
     </div>
 
     <!-- Catalyst Analysis Modal -->
-    <div id="catalyst-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(7, 10, 18, 0.75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 99999; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box;">
-        <div class="card" style="width: 100%; max-width: 650px; display: flex; flex-direction: column; max-height: 85vh; background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); overflow: hidden; padding: 0;">
+    <div id="catalyst-modal" class="catalyst-modal-overlay">
+        <div class="catalyst-modal-card">
+            <!-- Mobile pull-down drag handle -->
+            <div class="catalyst-drag-handle no-print" id="catalyst-drag-handle"></div>
+
             <!-- Modal Header -->
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.02);">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.02);">
                 <h3 style="margin: 0; font-family: 'Outfit'; font-weight: 700; font-size: 15px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                     <span id="catalyst-modal-icon">⚡</span> <span id="catalyst-modal-title">Catalyst Price Action Analysis</span>
                 </h3>
-                <button id="catalyst-modal-close-btn" style="background: none; border: none; font-size: 20px; color: var(--text-muted); cursor: pointer; outline: none; padding: 0; line-height: 1; transition: all 0.2s;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
+                <button id="catalyst-modal-close-btn" style="background: none; border: none; font-size: 22px; color: var(--text-muted); cursor: pointer; outline: none; padding: 0; line-height: 1; transition: all 0.2s;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-muted)'">&times;</button>
             </div>
             
             <!-- Modal Body -->
-            <div style="flex-grow: 1; overflow-y: auto; padding: 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
+            <div class="catalyst-scroll-pane">
                 <!-- Audio Input/Speech Recognition Row -->
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <div class="analyzer-input-wrap" style="position: relative; flex: 1; display: flex; align-items: center;">
-                        <input type="text" id="catalyst-voice-input" placeholder="Ask about a price move (e.g. 'Why is Reliance down today?')" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 6px; padding: 8px 40px 8px 12px; color: var(--text-primary); font-size: 12px; outline: none; font-family: 'Inter', sans-serif; box-sizing: border-box; height: 36px;">
-                        <button id="catalyst-mic-btn" style="position: absolute; right: 12px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; height: 24px; width: 24px; display: flex; align-items: center; justify-content: center; outline: none; transition: all 0.2s;" title="Voice Search via Mic">🎙️</button>
+                <div style="display: flex; gap: 10px; align-items: center; width: 100%;">
+                    <div class="analyzer-input-wrap" style="position: relative; flex: 1; display: flex; align-items: center; min-height: 44px;">
+                        <input type="text" id="catalyst-voice-input" placeholder="Ask about a price move (e.g. 'Why is Reliance down today?')" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 6px; padding: 8px 40px 8px 12px; color: var(--text-primary); font-size: 12.5px; outline: none; font-family: 'Inter', sans-serif; box-sizing: border-box; height: 38px;">
+                        <button id="catalyst-mic-btn" style="position: absolute; right: 8px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 16px; height: 30px; width: 30px; display: flex; align-items: center; justify-content: center; border-radius: 50%; outline: none; transition: all 0.2s;" title="Voice Search via Mic">🎙️</button>
                     </div>
-                    <button class="btn-primary" id="catalyst-query-btn" style="height: 36px; padding: 0 16px; font-size: 11px; font-weight: 700; font-family: 'Outfit'; white-space: nowrap;">Query</button>
+                    <button class="btn-primary" id="catalyst-query-btn" style="height: 38px; padding: 0 18px; font-size: 11.5px; font-weight: 700; font-family: 'Outfit'; white-space: nowrap;">Query</button>
                 </div>
 
                 <!-- Loader Indicator -->
@@ -7549,22 +7560,24 @@
 
                 <!-- Catalyst Results Area -->
                 <div id="catalyst-results" style="display: none; flex-direction: column; gap: 15px;">
-                    <!-- Media / Speak controller HUD -->
-                    <div style="display: flex; align-items: center; gap: 15px; background: rgba(255,255,255,0.02); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border-glass); flex-wrap: wrap;">
-                        <button id="catalyst-read-btn" class="btn-secondary" style="font-size: 10.5px; padding: 5px 12px; height: auto; font-family: 'Outfit'; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">🔊 Read Aloud</button>
-                        <button id="catalyst-pause-btn" class="btn-secondary" style="font-size: 10.5px; padding: 5px 12px; height: auto; font-family: 'Outfit'; font-weight: 700; display: none;">⏯️ Pause</button>
-                        <button id="catalyst-stop-btn" class="btn-secondary" style="font-size: 10.5px; padding: 5px 12px; height: auto; font-family: 'Outfit'; font-weight: 700; display: none; border-color: var(--color-crimson); color: var(--color-crimson);">⏹️ Stop</button>
-                        
-                        <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
-                            <span style="font-size: 9px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Volume:</span>
-                            <input type="range" id="catalyst-volume" min="0" max="1" step="0.1" value="0.8" style="width: 70px; height: 3px; cursor: pointer; accent-color: var(--color-primary);">
+                    
+                    <!-- Sentiment Gauge and Title Summary Row -->
+                    <div class="catalyst-sentiment-box">
+                        <svg class="sentiment-gauge-svg" width="46" height="46" viewBox="0 0 36 36">
+                            <path class="sentiment-gauge-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
+                            <path class="sentiment-gauge-fill" id="catalyst-sentiment-ring" stroke="var(--color-primary-light)" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"></path>
+                        </svg>
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <span id="catalyst-sentiment-title" style="font-size: 12px; font-weight: 700; font-family: 'Outfit'; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-primary);">Analyzing Sentiment...</span>
+                            <span id="catalyst-sentiment-subtitle" style="font-size: 9.5px; color: var(--text-secondary); font-family: 'Inter'; font-weight: 500;">Attributed news index calculation</span>
                         </div>
+                        <button id="catalyst-read-btn" class="btn-secondary" style="font-size: 10px; padding: 6px 14px; height: 32px; font-family: 'Outfit'; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; margin-left: auto;">🔊 Narrate Analysis</button>
                     </div>
 
                     <!-- Summary Card -->
                     <div style="background: rgba(var(--primary-rgb), 0.03); border-left: 4px solid var(--color-primary); border-radius: 4px; padding: 14px 16px;">
                         <h4 style="margin: 0 0 6px 0; font-size: 11px; font-family: 'Outfit'; color: var(--color-primary-light); text-transform: uppercase; letter-spacing: 0.04em;">Executive Move Summary</h4>
-                        <p id="catalyst-summary-text" style="margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-primary); font-family: 'Inter'; font-style: italic;"></p>
+                        <p id="catalyst-summary-text" style="margin: 0; font-size: 12px; line-height: 1.6; color: var(--text-primary); font-family: 'Inter'; font-style: italic; word-break: break-word; overflow-wrap: break-word;"></p>
                     </div>
 
                     <!-- Drivers List -->
@@ -7574,16 +7587,24 @@
                             <!-- Populated dynamically -->
                         </div>
                     </div>
+
+                    <!-- Conversational Suggestion Prompts -->
+                    <div style="margin-top: 5px; display: flex; flex-direction: column; gap: 8px;">
+                        <h4 style="margin: 0; font-size: 10px; font-family: 'Outfit'; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">Suggested Follow-Ups</h4>
+                        <div id="catalyst-prompts-container" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
                 </div>
             </div>
             
             <!-- Modal Footer -->
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px 22px; border-top: 1px solid var(--border-glass); background: rgba(255, 255, 255, 0.01);">
-                <div style="display: flex; gap: 16px; font-size: 10px; color: var(--text-muted); font-family: 'Inter', monospace;">
+            <div class="catalyst-modal-footer">
+                <div class="catalyst-audit-info">
                     <span>🔍 Scraper: <span id="catalyst-audit-scraper" style="color: var(--color-primary-light); font-weight: 700;">--</span></span>
                     <span>🧠 Engine: <span id="catalyst-audit-engine" style="color: var(--color-primary-light); font-weight: 700;">--</span></span>
                 </div>
-                <button class="btn-secondary" id="catalyst-modal-close-btn-bottom" style="padding: 8px 18px; font-size: 11px;">Close</button>
+                <button class="btn-secondary" id="catalyst-modal-close-btn-bottom">Close</button>
             </div>
         </div>
     </div>
@@ -7599,7 +7620,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modernization Custom Layer -->
-    <script src="modernizer.js?v=5.5"></script>
+    <script src="modernizer.js?v=6.3"></script>
 </body>
 </html>
 
