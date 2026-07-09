@@ -7,7 +7,8 @@ def fetch_latest_news_for_query(
     query: str, 
     timeframe: str = "7d", 
     use_tavily: bool = False, 
-    use_serpapi: bool = False
+    use_serpapi: bool = False,
+    use_brave: bool = False
 ) -> tuple[list[str], str]:
     """
     Fetch news snippets from multiple search endpoints in priority order,
@@ -33,6 +34,7 @@ def fetch_latest_news_for_query(
     # Get all configured API keys
     serpapi_key = os.environ.get("SERPAPI_API_KEY", "")
     tavily_key = os.environ.get("TAVILY_API_KEY", "")
+    brave_key = os.environ.get("BRAVE_API_KEY", "")
 
     # 1. TIER 1: SerpApi (If toggled ON and Key configured)
     if use_serpapi and serpapi_key:
@@ -66,7 +68,62 @@ def fetch_latest_news_for_query(
         except Exception as e:
             print(f"[Catalyst Scraper] SerpApi query failed: {e}. Moving to next tier.")
 
-    # 2. TIER 2: Tavily Search API (If toggled ON and Key configured)
+    # 2. TIER 2: Brave Search API (If toggled ON and Key configured)
+    if use_brave and brave_key:
+        try:
+            print(f"[Catalyst Scraper] Querying Brave Search for: {query}")
+            headers = {
+                "Accept": "application/json",
+                "X-Subscription-Token": brave_key
+            }
+            # Map timeframe to freshness codes
+            freshness_map = {
+                "1d": "pd",
+                "5d": "pw",
+                "7d": "pw",
+                "14d": "pw",
+                "30d": "pm",
+                "1m": "pm"
+            }
+            freshness = freshness_map.get(timeframe.lower().strip(), "pw")
+            params = {
+                "q": query,
+                "count": 8,
+                "freshness": freshness,
+                "extra_snippets": 1,
+                "summary": 1
+            }
+            r = requests.get("https://api.search.brave.com/res/v1/web/search", headers=headers, params=params, timeout=8.0)
+            if r.status_code == 200:
+                data = r.json()
+                snippets = []
+                
+                # Check for Brave AI Answer/Summarizer
+                summarizer = data.get("summarizer", {})
+                if summarizer:
+                    answer = summarizer.get("answer") or summarizer.get("text") or ""
+                    if answer:
+                        snippets.append(f"Brave AI Summary: {answer}")
+                
+                # Parse organic results
+                web = data.get("web", {})
+                results = web.get("results", [])
+                for item in results:
+                    title = item.get("title", "")
+                    description = item.get("description", "")
+                    url = item.get("url", "")
+                    extra = " ".join(item.get("extra_snippets", []) or [])
+                    full_desc = f"{description} {extra}".strip()
+                    if title or full_desc:
+                        snippets.append(f"Title: {title}\nSnippet: {full_desc}\nLink: {url}")
+                
+                if snippets:
+                    print(f"[Catalyst Scraper] Brave Search successfully returned {len(snippets)} snippets.")
+                    return snippets, "Brave Search"
+        except Exception as e:
+            print(f"[Catalyst Scraper] Brave Search failed: {e}. Moving to next tier.")
+
+    # 3. TIER 3: Tavily Search API (If toggled ON and Key configured)
     if use_tavily and tavily_key:
         try:
             print(f"[Catalyst Scraper] Querying Tavily AI Search for: {query}")

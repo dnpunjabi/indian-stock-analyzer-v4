@@ -229,6 +229,7 @@ def is_llm_available() -> bool:
 
 def get_llm_config() -> dict:
     """Return active LLM configuration for the frontend API endpoint."""
+    import os
     config = _get_config()
     available = is_llm_available()
     return {
@@ -239,4 +240,7 @@ def get_llm_config() -> dict:
         "fast_label": config["fast_label"],
         "status": "connected" if available else "disconnected",
         "base_url": config["base_url"] or "(default provider endpoint)",
+        "has_brave_key": bool(os.environ.get("BRAVE_API_KEY", "")),
+        "has_serpapi_key": bool(os.environ.get("SERPAPI_API_KEY", "")),
+        "has_tavily_key": bool(os.environ.get("TAVILY_API_KEY", ""))
     }

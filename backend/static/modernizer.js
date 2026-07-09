@@ -899,7 +899,8 @@
         }
         const useTavily = localStorage.getItem('use_tavily_search') === 'true';
         const useSerpApi = localStorage.getItem('use_serpapi') !== 'false'; // default to true
-        const url = `/api/stock-catalysts?symbol=${encodeURIComponent(currentCatalystSymbol)}&sector=${encodeURIComponent(currentCatalystSector)}&is_sector=${currentCatalystIsSector}&ai_engine=${aiEngine}&timeframe=${searchHorizon}&use_tavily_search=${useTavily}&use_serpapi=${useSerpApi}&direction=${currentCatalystDirection}`;
+        const useBrave = localStorage.getItem('use_brave_search') !== 'false'; // default to true
+        const url = `/api/stock-catalysts?symbol=${encodeURIComponent(currentCatalystSymbol)}&sector=${encodeURIComponent(currentCatalystSector)}&is_sector=${currentCatalystIsSector}&ai_engine=${aiEngine}&timeframe=${searchHorizon}&use_tavily_search=${useTavily}&use_serpapi=${useSerpApi}&use_brave=${useBrave}&direction=${currentCatalystDirection}`;
 
         fetch(url)
             .then(res => res.json())
@@ -1085,6 +1086,7 @@
     function setupSettingsSearchToggle() {
         const aiSelect = document.getElementById('setting-catalyst-ai');
         const horizonSelect = document.getElementById('setting-search-horizon');
+        const braveToggle = document.getElementById('setting-brave-toggle');
         const tavilyToggle = document.getElementById('setting-tavily-search-toggle');
         const serpapiToggle = document.getElementById('setting-serpapi-toggle');
 
@@ -1108,7 +1110,20 @@
         }
 
         if (tavilyToggle) {
-            tavilyToggle.checked = localStorage.getItem('use_tavily_search') === 'true';
+            const storedTavily = localStorage.getItem('use_tavily_search');
+            if (storedTavily !== null) {
+                tavilyToggle.checked = storedTavily === 'true';
+            } else {
+                fetch('/api/llm-config')
+                    .then(res => res.json())
+                    .then(config => {
+                        tavilyToggle.checked = !!config.has_tavily_key;
+                        localStorage.setItem('use_tavily_search', tavilyToggle.checked);
+                    })
+                    .catch(() => {
+                        tavilyToggle.checked = false;
+                    });
+            }
             tavilyToggle.addEventListener('change', (e) => {
                 localStorage.setItem('use_tavily_search', e.target.checked);
                 AudioCueManager.playTick();
@@ -1117,11 +1132,46 @@
         }
 
         if (serpapiToggle) {
-            serpapiToggle.checked = localStorage.getItem('use_serpapi') !== 'false'; // default to true
+            const storedSerp = localStorage.getItem('use_serpapi');
+            if (storedSerp !== null) {
+                serpapiToggle.checked = storedSerp === 'true';
+            } else {
+                fetch('/api/llm-config')
+                    .then(res => res.json())
+                    .then(config => {
+                        serpapiToggle.checked = !!config.has_serpapi_key;
+                        localStorage.setItem('use_serpapi', serpapiToggle.checked);
+                    })
+                    .catch(() => {
+                        serpapiToggle.checked = false;
+                    });
+            }
             serpapiToggle.addEventListener('change', (e) => {
                 localStorage.setItem('use_serpapi', e.target.checked);
                 AudioCueManager.playTick();
                 window.showToast(`SerpApi ${e.target.checked ? 'Enabled' : 'Disabled'}`, 'success');
+            });
+        }
+
+        if (braveToggle) {
+            const storedBrave = localStorage.getItem('use_brave_search');
+            if (storedBrave !== null) {
+                braveToggle.checked = storedBrave === 'true';
+            } else {
+                fetch('/api/llm-config')
+                    .then(res => res.json())
+                    .then(config => {
+                        braveToggle.checked = !!config.has_brave_key;
+                        localStorage.setItem('use_brave_search', braveToggle.checked);
+                    })
+                    .catch(() => {
+                        braveToggle.checked = false;
+                    });
+            }
+            braveToggle.addEventListener('change', (e) => {
+                localStorage.setItem('use_brave_search', e.target.checked);
+                AudioCueManager.playTick();
+                window.showToast(`Brave Search ${e.target.checked ? 'Enabled' : 'Disabled'}`, 'success');
             });
         }
     }

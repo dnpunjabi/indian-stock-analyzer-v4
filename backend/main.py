@@ -10801,6 +10801,7 @@ def get_stock_catalysts(
     is_sector: bool = Query(False),
     use_tavily_search: bool = Query(False),
     use_serpapi: bool = Query(False),
+    use_brave: bool = Query(True),
     ai_engine: str = Query("gemini"),
     timeframe: str = Query("7d"),
     direction: Optional[str] = Query(None)
@@ -10866,7 +10867,8 @@ def get_stock_catalysts(
             query, 
             timeframe=timeframe,
             use_tavily=use_tavily_search,
-            use_serpapi=use_serpapi
+            use_serpapi=use_serpapi,
+            use_brave=use_brave
         )
         
         # If no snippets found, search sector-specific trends as fallback
@@ -10881,7 +10883,8 @@ def get_stock_catalysts(
                 news_fallback_query,
                 timeframe=timeframe,
                 use_tavily=use_tavily_search,
-                use_serpapi=use_serpapi
+                use_serpapi=use_serpapi,
+                use_brave=use_brave
             )
             
         # If still no snippets, return a graceful fallback
