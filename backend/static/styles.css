@@ -732,6 +732,26 @@ select option {
     color: var(--text-primary);
 }
 
+/* Central style override for pagination select boxes to ensure vertical alignment and clear visibility */
+select[id$="-pagesize-select"] {
+    background: #0f172a !important; /* Force a solid dark background to prevent native white-on-white rendering */
+    color: #ffffff !important;
+    border: 1px solid var(--border-glass) !important;
+    border-radius: 6px !important;
+    padding: 0 24px 0 8px !important; /* Extra right padding for the select dropdown arrow */
+    font-size: 10.5px !important;
+    cursor: pointer !important;
+    outline: none !important;
+    height: 24px !important;
+    line-height: normal !important;
+    vertical-align: middle !important;
+}
+
+select[id$="-pagesize-select"] option {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+}
+
 /* Global scrollbar adaptive styles */
 ::-webkit-scrollbar {
     width: 6px !important;
