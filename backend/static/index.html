@@ -3009,17 +3009,17 @@
                                 </div>
                                 <!-- Toggle Standalone vs Consolidated -->
                                 <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.015); padding: 3px; border-radius: 6px; border: 1px solid var(--border-glass);">
-                                    <button id="fs-view-consolidated-btn" class="btn-primary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; transition: all 0.25s ease;">Consolidated</button>
-                                    <button id="fs-view-standalone-btn" class="btn-secondary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; background: none; color: var(--text-secondary); transition: all 0.25s ease;">Standalone</button>
+                                    <button id="fs-view-consolidated-btn" class="btn-secondary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; background: none; color: var(--text-secondary); transition: all 0.25s ease;">Consolidated</button>
+                                    <button id="fs-view-standalone-btn" class="btn-primary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; transition: all 0.25s ease;">Standalone</button>
                                 </div>
                             </div>
 
                             <!-- Statements selector sub-tabs -->
-                            <div style="display: flex; gap: 12px; border-bottom: 1px solid var(--border-glass); padding-bottom: 4px; margin-bottom: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;">
-                                <button class="fs-statement-tab active" data-statement="quarters" style="background: none; border: none; color: var(--text-primary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 12px; border-bottom: 2px solid var(--color-primary); transition: all 0.2s; white-space: nowrap;">Quarterly Results</button>
-                                <button class="fs-statement-tab" data-statement="profit_loss" style="background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 12px; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap;">Profit & Loss</button>
-                                <button class="fs-statement-tab" data-statement="balance_sheet" style="background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 12px; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap;">Balance Sheet</button>
-                                <button class="fs-statement-tab" data-statement="peers" style="background: none; border: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; padding: 6px 12px; border-bottom: 2px solid transparent; transition: all 0.2s; white-space: nowrap;">👥 Peer Comparison</button>
+                            <div style="display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding: 2px 0;">
+                                <button class="fs-statement-tab fs-subtab-btn active" data-statement="quarters">📅 Quarterly Results</button>
+                                <button class="fs-statement-tab fs-subtab-btn" data-statement="profit_loss">📈 Profit & Loss</button>
+                                <button class="fs-statement-tab fs-subtab-btn" data-statement="balance_sheet">⚖️ Balance Sheet</button>
+                                <button class="fs-statement-tab fs-subtab-btn" data-statement="peers">👥 Peer Comparison</button>
                             </div>
 
                             <!-- Table container with horizontal scrolling -->

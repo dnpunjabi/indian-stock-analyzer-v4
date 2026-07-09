@@ -752,6 +752,86 @@ select[id$="-pagesize-select"] option {
     color: #ffffff !important;
 }
 
+/* Light theme overrides for pagesize select boxes */
+[data-theme="light"] select[id$="-pagesize-select"] {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] select[id$="-pagesize-select"] option {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+}
+
+/* Stock Return Calculator light theme visibility overrides */
+[data-theme="light"] #return-calculator-card input[type="number"],
+[data-theme="light"] #return-calculator-card input[type="text"] {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] #return-calculator-card .period-quick-btn {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] #return-calculator-card .period-quick-btn:hover {
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+/* Specific active state selector for compounding period buttons in return calculator */
+#return-calculator-card .period-quick-btn.active,
+[data-theme="light"] #return-calculator-card .period-quick-btn.active {
+    background: var(--color-primary) !important;
+    color: #ffffff !important;
+    border-color: var(--color-primary) !important;
+    font-weight: 700 !important;
+}
+
+/* Predefined quick amount buttons styling */
+.calc-amount-btn {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.calc-amount-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.calc-amount-btn.active,
+#return-calculator-card .calc-amount-btn.active {
+    background: var(--color-primary) !important;
+    color: #ffffff !important;
+    border-color: var(--color-primary) !important;
+    font-weight: 700 !important;
+}
+
+/* Predefined quick amount buttons light theme styling */
+[data-theme="light"] #return-calculator-card .calc-amount-btn {
+    background: #f8fafc !important;
+    color: #475569 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] #return-calculator-card .calc-amount-btn:hover {
+    background: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+
+[data-theme="light"] #return-calculator-card .calc-amount-btn.active {
+    background: var(--color-primary) !important;
+    color: #ffffff !important;
+    border-color: var(--color-primary) !important;
+}
+
+
 /* Global scrollbar adaptive styles */
 ::-webkit-scrollbar {
     width: 6px !important;
@@ -5004,6 +5084,49 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 [data-theme="light"] .subtab-btn.active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(147, 51, 234, 0.05));
+    border-color: rgba(59, 130, 246, 0.3);
+}
+
+.fs-subtab-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-family: var(--font-heading);
+    font-size: 11.5px;
+    font-weight: 700;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    opacity: 0.85;
+}
+
+.fs-subtab-btn:hover {
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-primary);
+    border-color: var(--border-glass);
+    transform: translateY(-1px);
+    opacity: 1;
+}
+
+.fs-subtab-btn.active {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(147, 51, 234, 0.1));
+    color: var(--color-primary-light);
+    border-color: rgba(59, 130, 246, 0.45);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.15);
+    font-weight: 700;
+    opacity: 1;
+}
+
+[data-theme="light"] .fs-subtab-btn.active {
     background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(147, 51, 234, 0.05));
     border-color: rgba(59, 130, 246, 0.3);
 }

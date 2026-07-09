@@ -18015,29 +18015,46 @@ function setupReturnCalculator() {
     const cagrQuickList = [10000, 50000, 100000, 250000, 500000];
     const sipQuickList = [1000, 2000, 5000, 10000, 20000];
 
+    function syncQuickAmountActiveState(val) {
+        if (!quickAmountsDiv) return;
+        const btns = quickAmountsDiv.querySelectorAll('.calc-amount-btn');
+        const numVal = parseInt(val) || 0;
+        btns.forEach(btn => {
+            const btnAmt = parseInt(btn.getAttribute('data-amount')) || 0;
+            if (btnAmt === numVal) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
     function renderQuickAmounts(amounts) {
         if (!quickAmountsDiv) return;
         quickAmountsDiv.innerHTML = '';
         amounts.forEach(amt => {
             const btn = document.createElement('button');
             btn.type = 'button';
+            btn.className = 'calc-amount-btn';
+            btn.setAttribute('data-amount', amt);
             btn.style.flex = '1';
             btn.style.padding = '4px 2px';
             btn.style.fontSize = '10px';
-            btn.style.background = 'rgba(255,255,255,0.03)';
-            btn.style.border = '1px solid var(--border-glass)';
             btn.style.borderRadius = '4px';
-            btn.style.color = 'var(--text-secondary)';
             btn.style.cursor = 'pointer';
             btn.innerText = amt >= 100000 ? `₹${amt/100000}L` : `₹${amt/1000}K`;
 
             btn.onclick = () => {
                 if (amountInput) amountInput.value = amt;
                 if (amountSlider) amountSlider.value = amt;
+                syncQuickAmountActiveState(amt);
                 triggerLiveCompoundingCalculation();
             };
             quickAmountsDiv.appendChild(btn);
         });
+        if (amountInput) {
+            syncQuickAmountActiveState(amountInput.value);
+        }
     }
 
     function setCalculatorMode(type) {
@@ -18094,6 +18111,7 @@ function setupReturnCalculator() {
     if (amountSlider && amountInput) {
         amountSlider.oninput = (e) => {
             amountInput.value = e.target.value;
+            syncQuickAmountActiveState(e.target.value);
             triggerLiveCompoundingCalculation();
         };
         amountInput.onchange = (e) => {
@@ -18104,6 +18122,7 @@ function setupReturnCalculator() {
             if (val > max) val = max;
             amountInput.value = val;
             amountSlider.value = val;
+            syncQuickAmountActiveState(val);
             triggerLiveCompoundingCalculation();
         };
     }
@@ -18290,6 +18309,11 @@ function setupReturnCalculator() {
     const periodButtons = document.querySelectorAll('.period-quick-btn');
     periodButtons.forEach(btn => {
         btn.onclick = () => {
+            // Remove active state from other period buttons
+            periodButtons.forEach(b => b.classList.remove('active'));
+            // Add active state to clicked button
+            btn.classList.add('active');
+
             const yearsAttr = btn.getAttribute('data-years');
             const dateInput = document.getElementById('calc-date-input');
             if (!dateInput) return;
@@ -38360,12 +38384,12 @@ function showToastNotification(message) {
 }
 
 // Financial Statements UI Controller & Scraper Client
-let activeFsView = 'consolidated';
+let activeFsView = 'standalone';
 let activeFsStatement = 'quarters';
 let activeFsData = null;
 
 function resetFinancialStatementsUI() {
-    activeFsView = 'consolidated';
+    activeFsView = 'standalone';
     activeFsStatement = 'quarters';
     activeFsData = null;
     
@@ -38373,14 +38397,14 @@ function resetFinancialStatementsUI() {
     const consBtn = document.getElementById('fs-view-consolidated-btn');
     const standBtn = document.getElementById('fs-view-standalone-btn');
     if (consBtn) {
-        consBtn.className = 'btn-primary';
-        consBtn.style.background = '';
-        consBtn.style.color = '';
+        consBtn.className = 'btn-secondary';
+        consBtn.style.background = 'none';
+        consBtn.style.color = 'var(--text-secondary)';
     }
     if (standBtn) {
-        standBtn.className = 'btn-secondary';
-        standBtn.style.background = 'none';
-        standBtn.style.color = 'var(--text-secondary)';
+        standBtn.className = 'btn-primary';
+        standBtn.style.background = '';
+        standBtn.style.color = '';
     }
     
     // Reset statement tab buttons
@@ -38388,12 +38412,8 @@ function resetFinancialStatementsUI() {
     tabs.forEach(t => {
         if (t.getAttribute('data-statement') === 'quarters') {
             t.classList.add('active');
-            t.style.borderBottomColor = 'var(--color-primary)';
-            t.style.color = 'var(--text-primary)';
         } else {
             t.classList.remove('active');
-            t.style.borderBottomColor = 'transparent';
-            t.style.color = 'var(--text-secondary)';
         }
     });
     
@@ -38692,14 +38712,8 @@ function setupFinancialStatementsEvents() {
             
             tabs.forEach(t => {
                 t.classList.remove('active');
-                t.style.borderBottomColor = 'transparent';
-                t.style.color = 'var(--text-secondary)';
             });
             tab.classList.add('active');
-            tab.style.borderBottomColor = 'var(--color-primary)';
-            tab.style.color = 'var(--text-primary)';
-            
-            activeFsStatement = statement;
             
             activeFsStatement = statement;
             
