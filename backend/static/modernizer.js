@@ -212,7 +212,7 @@
     function setupChatUpgrades() {
         const originalAppendChatMessage = window.appendChatMessage;
         if (originalAppendChatMessage && typeof Typed !== 'undefined') {
-            window.appendChatMessage = function(role, content) {
+            window.appendChatMessage = function(role, content, useTypewriter = false) {
                 // If this is the loading state, override elements with three bouncing dots
                 if (role === 'assistant' && content === 'Consulting AI stock advisor...') {
                     const box = document.getElementById('chat-messages');
@@ -234,39 +234,15 @@
                 }
 
                 // Call original logic for regular assistant & user messages
-                const msgId = originalAppendChatMessage(role, content);
+                const msgId = originalAppendChatMessage(role, content, useTypewriter);
 
-                // Run typewriter reveal on final assistant answer
+                // Play success synth chime on assistant response
                 if (role === 'assistant') {
                     AudioCueManager.playChime(); // Play success synth chime
-                    const msgEl = document.getElementById(msgId);
-                    if (msgEl) {
-                        const pEl = msgEl.querySelector('p');
-                        if (pEl) {
-                            const originalHTML = pEl.innerHTML;
-                            pEl.innerHTML = ''; // Clear for streaming Typed.js execution
-
-                            const typeContainer = document.createElement('span');
-                            pEl.appendChild(typeContainer);
-
-                            new Typed(typeContainer, {
-                                strings: [originalHTML],
-                                typeSpeed: 3, // slightly faster typing
-                                showCursor: false,
-                                contentType: 'html',
-                                onComplete: () => {
-                                    const box = document.getElementById('chat-messages');
-                                    if (box) {
-                                        box.scrollTop = box.scrollHeight;
-                                    }
-                                }
-                            });
-                        }
-                    }
                 }
                 return msgId;
             };
-            console.log("APEX Modernizer: Chat typewriter and bouncing dots configured.");
+            console.log("APEX Modernizer: Chat typewriter delegation and bouncing dots configured.");
         }
     }
 

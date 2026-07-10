@@ -1892,6 +1892,47 @@ class ChartChatRequest(BaseModel):
     custom_prompt: str
     chat_history: list = []
 
+# In-memory store for prepared file downloads (bypasses local sandbox filename issues via GET downloads)
+PREPARED_DOWNLOADS = {}
+
+class PrepareDownloadRequest(BaseModel):
+    filename: str
+    content: str
+
+@app.post("/api/export/prepare")
+async def export_prepare(req: PrepareDownloadRequest):
+    import uuid
+    download_id = str(uuid.uuid4())
+    PREPARED_DOWNLOADS[download_id] = {
+        "filename": req.filename,
+        "content": req.content,
+        "timestamp": time.time()
+    }
+    # Keep store size bounded by cleaning up old entries (> 5 minutes old)
+    now = time.time()
+    for k in list(PREPARED_DOWNLOADS.keys()):
+        if now - PREPARED_DOWNLOADS[k]["timestamp"] > 300:
+            PREPARED_DOWNLOADS.pop(k, None)
+            
+    return {"download_id": download_id}
+
+@app.get("/api/export/download")
+async def export_download(id: str = Query(...)):
+    if id not in PREPARED_DOWNLOADS:
+        raise HTTPException(status_code=404, detail="Download expired or not found.")
+        
+    data = PREPARED_DOWNLOADS.pop(id)  # Consume one-time
+    headers = {
+        "Content-Disposition": f'attachment; filename="{data["filename"]}"',
+        "Access-Control-Expose-Headers": "Content-Disposition"
+    }
+    from fastapi.responses import Response
+    return Response(
+        content=data["content"],
+        media_type="application/octet-stream",
+        headers=headers
+    )
+
 @app.get("/api/search")
 async def search_ticker(q: str):
     """Resolves conversational company queries into NSE tickers."""
@@ -1930,6 +1971,135 @@ async def analyze_stock(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Orchestration Analysis error: {str(e)}")
+
+@app.get("/api/analyze/upgrade")
+async def upgrade_prospectus(
+    query: str,
+    horizon: str = "Long-term (3+ years)",
+    risk: str = "Moderate"
+):
+    """Upgrades the simulated stock profile to a deep AI prospectus without re-scraping financials."""
+    if not query:
+        raise HTTPException(status_code=400, detail="Stock query is required.")
+    try:
+        # 1. Fetch cached quantitative profile from DB
+        with get_db() as conn:
+            row = conn.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (query.upper(),)).fetchone()
+            if not row:
+                row = conn.execute("SELECT profile_json FROM cached_profiles WHERE symbol LIKE ?", (f"{query.upper()}%",)).fetchone()
+        
+        if not row:
+            # If not in cache, fallback to normal run_cio_parent_agent
+            profile = await run_cio_parent_agent(query, horizon, risk, force_llm=True)
+        else:
+            profile = json.loads(row[0])
+            # Check if LLM is available and force running LLM subagents on this profile
+            from backend.agent import run_fundamental_subagent, run_technical_subagent, run_sentiment_subagent, call_llm, TASK_HEAVY
+            import asyncio
+            import os
+            
+            fundamental_report = ""
+            technical_report = ""
+            sentiment_report = ""
+            
+            # Run the subagent functions using executor to prevent blocking
+            loop = asyncio.get_event_loop()
+            f_sub = loop.run_in_executor(None, run_fundamental_subagent, profile)
+            t_sub = loop.run_in_executor(None, run_technical_subagent, profile)
+            s_sub = loop.run_in_executor(None, run_sentiment_subagent, profile)
+            
+            fundamental_report, technical_report, sentiment_report = await asyncio.gather(f_sub, t_sub, s_sub)
+            
+            system_prompt = (
+                "You are the Chief Investment Officer (CIO) of a top-tier Indian mutual fund.\n"
+                "Your task is to synthesize the reports of your specialized subagents (Fundamentals, Technicals, Sentiment) "
+                "and formulate a definitive BUY/SELL/HOLD decision and target price ranges for the client.\n"
+                "You MUST integrate the user's specific Investor Persona:\n"
+                f"- Investment Horizon: {horizon}\n"
+                f"- Risk Tolerance: {risk}\n\n"
+                "Your output MUST be structured as a valid JSON object matching the following keys strictly:\n"
+                "{\n"
+                '  "recommendation": "BUY" or "STRONG BUY" or "HOLD" or "SELL" or "STRONG SELL",\n'
+                '  "valuation_score": 8, // Integer 1-10\n'
+                '  "growth_score": 7, // Integer 1-10\n'
+                '  "suggested_buy_price_range": "Rs. X - Rs. Y",\n'
+                '  "suggested_sell_price_range": "Rs. A - Rs. B",\n'
+                '  "investment_thesis": "...",\n'
+                '  "fundamental_summary": "...",\n'
+                '  "technical_summary": "...",\n'
+                '  "governance_summary": "...",\n'
+                '  "key_growth_drivers": ["...", "..."],\n'
+                '  "major_risks": ["...", "..."]\n'
+                "}\n"
+                "Ensure the price ranges are mathematically sound compared to the current stock price. Avoid markdown formatting inside the JSON itself."
+            )
+            
+            user_prompt = f"""
+            Company: {profile['company_name']} ({profile['ticker']})
+            Current Price: Rs. {profile['fundamentals']['current_price']}
+            
+            Subagent 1: CFA Fundamental Report:
+            {fundamental_report}
+            
+            Subagent 2: Technical Charting Report:
+            {technical_report}
+            
+            Subagent 3: Sentiment & Governance Audit Report:
+            {sentiment_report}
+            
+            Street Analyst Consensus:
+            - Broker Count: {profile['consensus']['analyst_count']}
+            - Recommendation: {profile['consensus']['recommendation']}
+            - Median Target Price: Rs. {profile['consensus']['target_median']}
+            """
+            
+            response_text = call_llm(TASK_HEAVY, system_prompt, user_prompt, max_tokens=1500)
+            
+            clean_json = response_text.strip()
+            if clean_json.startswith("```json"):
+                clean_json = clean_json[7:]
+            if clean_json.endswith("```"):
+                clean_json = clean_json[:-3]
+            clean_json = clean_json.strip()
+            decision = json.loads(clean_json)
+            decision["is_simulated"] = False
+            
+            # Blended recommendation logic
+            scoring = profile.get("score_metrics", {})
+            comp_score = scoring.get("final_score", 50)
+            risk_lower_cio = risk.lower()
+            if "conservative" in risk_lower_cio:
+                buy_threshold, strong_buy_threshold = 75, 88
+            elif "aggressive" in risk_lower_cio:
+                buy_threshold, strong_buy_threshold = 55, 72
+            else:
+                buy_threshold, strong_buy_threshold = 65, 80
+            
+            if comp_score >= strong_buy_threshold:
+                blended_rec = "STRONG BUY"
+            elif comp_score >= buy_threshold:
+                blended_rec = "BUY"
+            elif comp_score >= 45:
+                blended_rec = "HOLD"
+            else:
+                blended_rec = "SELL"
+                
+            decision["recommendation"] = blended_rec
+            profile["analysis"] = decision
+            
+            # Save updated profile with full analysis back to cache
+            with get_db() as conn:
+                conn.execute(
+                    "INSERT OR REPLACE INTO cached_profiles (symbol, profile_json, updated_at) VALUES (?, ?, ?)",
+                    (profile["ticker"], json.dumps(profile), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                )
+                conn.commit()
+                
+        return profile
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Prospectus upgrade error: {str(e)}")
 
 @app.post("/api/analyze-custom")
 async def analyze_custom_dcf(data: DCFOverrideRequest):

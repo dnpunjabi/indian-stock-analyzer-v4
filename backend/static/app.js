@@ -5138,7 +5138,41 @@ async function loadStockAnalyzer(query, force_llm = false) {
                 const newBtn = upgradeBtn.cloneNode(true);
                 upgradeBtn.parentNode.replaceChild(newBtn, upgradeBtn);
                 newBtn.addEventListener('click', () => {
-                    loadStockAnalyzer(profile.ticker, true);
+                    newBtn.disabled = true;
+                    newBtn.style.opacity = '0.7';
+                    newBtn.innerHTML = '⏳ Orchestrating Multi-Agent Swarm...';
+                    
+                    const horizon = document.getElementById('profile-horizon').value;
+                    const risk = document.getElementById('profile-risk').value;
+                    
+                    fetch(`/api/analyze/upgrade?query=${encodeURIComponent(profile.ticker)}&horizon=${encodeURIComponent(horizon)}&risk=${encodeURIComponent(risk)}`)
+                        .then(res => {
+                            if (!res.ok) throw new Error("Upgrade failed.");
+                            return res.json();
+                        })
+                        .then(updatedProfile => {
+                            activeStockProfile = updatedProfile;
+                            if (typeof updateCoPilotActiveContext === 'function') {
+                                updateCoPilotActiveContext(updatedProfile);
+                            }
+                            if (typeof updateChatHeaderStockCard === 'function') {
+                                updateChatHeaderStockCard(updatedProfile);
+                            }
+                            
+                            // Re-render the dashboard to apply the newly synthesized LLM values
+                            renderStockDashboard(updatedProfile);
+                            
+                            // Hide the upgrade banner
+                            upgradeContainer.style.display = 'none';
+                            showToast("✨ APEX AI Prospectus successfully synthesized!");
+                        })
+                        .catch(err => {
+                            console.error("Prospectus upgrade failed: ", err);
+                            newBtn.disabled = false;
+                            newBtn.style.opacity = '1';
+                            newBtn.innerHTML = '⚡ Generate Deep AI Prospectus';
+                            showToast("❌ Multi-agent synthesis failed.", "danger");
+                        });
                 });
             } else {
                 upgradeContainer.style.display = 'none';
@@ -10833,7 +10867,11 @@ function setupDailyWrapupListeners() {
                 const previewContainer = document.getElementById('wrapup-preview-container');
                 const previewText = document.getElementById('wrapup-preview-text');
                 if (previewContainer && previewText) {
-                    typewriteElement(previewText, data.message_body);
+                    typewriteElement(previewText, data.message_body, () => {
+                        if (window.AIExportManager) {
+                            window.AIExportManager.decorate(previewText, 'report', { module: 'DAILY_WRAPUP' });
+                        }
+                    });
                     previewContainer.style.display = 'block';
                 }
 
@@ -11327,7 +11365,11 @@ async function deploySentinelTelemetry(item) {
                     });
                     if (!synthRes.ok) throw new Error("Synthesis failed");
                     const synthData = await synthRes.json();
-                    typewriteElement(aiSummaryBox, `🧠 <strong>AI Audit:</strong> ${synthData.synthesis}`);
+                    typewriteElement(aiSummaryBox, `🧠 <strong>AI Audit:</strong> ${synthData.synthesis}`, () => {
+                        if (window.AIExportManager) {
+                            window.AIExportManager.decorate(aiSummaryBox, 'report', { module: 'TELEMETRY_AUDIT' });
+                        }
+                    });
                 } catch (err) {
                     aiSummaryBox.innerHTML = `⚠️ <em>Unable to generate AI telemetry synthesis at this time.</em>`;
                 }
@@ -11490,6 +11532,10 @@ function setupChatDrawer() {
 
     openBtn.addEventListener('click', openChatDrawer);
     closeBtn.addEventListener('click', closeChatDrawer);
+
+    if (window.AIExportManager) {
+        window.AIExportManager.decorate('chat-messages', 'chat', { module: 'COPILOT_CHAT' });
+    }
 
     document.getElementById('send-chat-btn').addEventListener('click', sendUserChatMessage);
     document.getElementById('chat-user-input').addEventListener('keypress', (e) => {
@@ -12512,7 +12558,10 @@ function displaySynthesisData(data) {
     data.formattedHtml = formattedHtml;
     
     if (reportTextEl) {
-        typewriteElement(reportTextEl, formattedHtml);
+        reportTextEl.innerHTML = formattedHtml;
+        if (window.AIExportManager) {
+            window.AIExportManager.decorate(reportTextEl, 'report', { module: 'CONVICTION' });
+        }
     }
 }
 
@@ -12932,23 +12981,7 @@ function appendChatMessage(role, content, useTypewriter = false) {
     msg.className = `chat-message ${role}`;
 
     if (role === 'assistant') {
-        // Escape HTML to prevent XSS but allow specific markdown formatting
-        let escaped = content
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
-
-        let formatted = escaped
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/### (.*?)(?:\n|$)/g, '<h3>$1</h3>')
-            .replace(/\* (.*?)(?:\n|$)/g, '<li>$1</li>')
-            .replace(/\n\n/g, '</p><p>')
-            .replace(/\n/g, '<br>');
-
-        if (formatted.includes('<li>')) {
-            formatted = formatted.replace(/(<li>.*?<\/li>)/gs, '<ul>$1</ul>');
-        }
-
+        let formatted = typeof formatMarkdownToHTML === 'function' ? formatMarkdownToHTML(content) : content;
         if (typeof parseMarkdownTables === 'function') {
             formatted = parseMarkdownTables(formatted);
         }
@@ -12993,6 +13026,10 @@ function appendChatMessage(role, content, useTypewriter = false) {
         top: box.scrollHeight,
         behavior: 'smooth'
     });
+
+    if (window.AIExportManager) {
+        window.AIExportManager.decorate(box, 'chat', { module: 'COPILOT_CHAT' });
+    }
 
     return msgId;
 }
@@ -14935,7 +14972,9 @@ async function loadPriceVolumeDynamics(symbol, generateAi = false) {
                     });
                 }
             } else {
-                aiSummaryTextEl.innerHTML = data.ai_summary || "No analysis available.";
+                aiSummaryTextEl.innerHTML = `<div></div>`;
+                const innerDiv = aiSummaryTextEl.querySelector('div');
+                typewriteElement(innerDiv, formatMarkdownToHTML(data.ai_summary || "No analysis available."));
             }
         }
 
@@ -16159,9 +16198,9 @@ function renderAIDebate(p) {
 
                 // Explicitly render the debate blocks in the dialogueContainer directly from cache!
                 if (window.synthesisCache[cleanSymbol] && window.synthesisCache[cleanSymbol].formattedHtml) {
-                    dialogueContainer.innerHTML = window.synthesisCache[cleanSymbol].formattedHtml;
+                    typewriteElement(dialogueContainer, window.synthesisCache[cleanSymbol].formattedHtml);
                 } else if (data.synthesis_text) {
-                    dialogueContainer.innerHTML = data.synthesis_text;
+                    typewriteElement(dialogueContainer, formatMarkdownToHTML(data.synthesis_text));
                 } else {
                     throw new Error("No synthesis text returned from backend.");
                 }
@@ -18588,8 +18627,17 @@ function setupAnalyzerSubtabs() {
             // Add active state to clicked button
             btn.classList.add('active');
 
-            // Programmatically center the selected tab
-            btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            // Programmatically center the selected tab inside the container scrollbar (prevents parent layout shifts)
+            if (container) {
+                const containerWidth = container.clientWidth;
+                const btnOffsetLeft = btn.offsetLeft;
+                const btnWidth = btn.clientWidth;
+                const targetScrollLeft = btnOffsetLeft - (containerWidth / 2) + (btnWidth / 2);
+                container.scrollTo({
+                    left: targetScrollLeft,
+                    behavior: 'smooth'
+                });
+            }
 
             const activeSubtab = btn.getAttribute('data-subtab');
 
@@ -19946,6 +19994,9 @@ async function runPortfolioDoctorAnalysis() {
                 .replace(/\n/g, '<br>');
 
             prescriptionContent.innerHTML = html;
+            if (window.AIExportManager) {
+                window.AIExportManager.decorate(prescriptionContent, 'report', { module: 'PORTFOLIO_DOCTOR' });
+            }
         }
 
         showToast("Portfolio health report compiled successfully!", "success");
@@ -21975,10 +22026,11 @@ async function runPortfolioBacktest() {
 
                     if (synthResponse.ok) {
                         const synthData = await synthResponse.json();
-                        summaryText.innerHTML = synthData.synthesis
-                            .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary);">$1</strong>')
-                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                            .replace(/\n/g, '<br>');
+                        typewriteElement(summaryText, formatMarkdownToHTML(synthData.synthesis), () => {
+                            if (window.AIExportManager) {
+                                window.AIExportManager.decorate(summaryText, 'report', { module: 'BACKTEST_REVIEW' });
+                            }
+                        });
                     } else {
                         throw new Error("Synthesis API failed.");
                     }
@@ -22477,7 +22529,11 @@ function setupRiskAnalytics() {
                 const data = await response.json();
 
                 if (textEl) {
-                    textEl.innerHTML = data.synthesis;
+                    typewriteElement(textEl, formatMarkdownToHTML(data.synthesis), () => {
+                        if (window.AIExportManager) {
+                            window.AIExportManager.decorate(textEl, 'report', { module: 'RISK_SYNTHESIS' });
+                        }
+                    });
                 }
             } catch (e) {
                 showToast("AI Risk Synthesis error: " + e.message, 'error');
@@ -24053,14 +24109,13 @@ async function generateSwingAiSummary() {
         if (!res.ok) throw new Error("Synthesis route failed.");
         const data = await res.json();
 
-        let formattedText = data.synthesis;
-        formattedText = formattedText
-            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-            .replace(/### (.*?)\n/g, '<h3 style="font-size:12px; color:var(--text-primary); border-bottom: 1px dashed var(--border-glass); padding-bottom: 4px; margin-top: 15px; text-transform:uppercase;">$1</h3>')
-            .replace(/\* (.*?)\n/g, '<li style="margin-left: 14px;">$1</li>')
-            .replace(/\n\n/g, '</p><p>');
-
-        summaryBox.innerHTML = `<div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.6;">${formattedText}</div>`;
+        summaryBox.innerHTML = `<div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.6;"></div>`;
+        const innerDiv = summaryBox.querySelector('div');
+        typewriteElement(innerDiv, formatMarkdownToHTML(data.synthesis), () => {
+            if (window.AIExportManager) {
+                window.AIExportManager.decorate(summaryBox, 'report', { module: 'SWING_THESIS' });
+            }
+        });
     } catch (err) {
         summaryBox.innerHTML = `<span style="color:#ef4444; font-size: 11.5px;">Failed to generate swing trade thesis: ${err.message}</span>`;
     } finally {
@@ -24839,7 +24894,11 @@ async function requestRuleScanSynthesis(results, conditionDesc) {
             });
             const data = await res.json();
             if (data.status === 'success') {
-                textEl.textContent = data.synthesis || 'No synthesis generated.';
+                typewriteElement(textEl, formatMarkdownToHTML(data.synthesis || 'No synthesis generated.'), () => {
+                    if (window.AIExportManager) {
+                        window.AIExportManager.decorate(textEl, 'report', { module: 'SCREENER_SCAN' });
+                    }
+                });
             } else {
                 textEl.textContent = 'Synthesis generation encountered an error.';
             }
@@ -25477,7 +25536,11 @@ async function explainCurrentFormula() {
         }
 
         if (data.status === 'success') {
-            textEl.textContent = data.explanation || 'No explanation generated.';
+            typewriteElement(textEl, formatMarkdownToHTML(data.explanation || 'No explanation generated.'), () => {
+                if (window.AIExportManager) {
+                    window.AIExportManager.decorate(textEl, 'report', { module: 'SCREENER_EXPLAIN_FORMULA' });
+                }
+            });
         } else {
             textEl.textContent = 'Explanation generation failed: ' + (data.detail || 'Unknown error');
         }
@@ -26768,6 +26831,10 @@ function appendSolvencyChatMessage(role, text, useTypewriter = false) {
     msg.appendChild(bubble);
     history.appendChild(msg);
     history.scrollTop = history.scrollHeight;
+
+    if (window.AIExportManager) {
+        window.AIExportManager.decorate(history, 'chat', { module: 'SOLVENCY_CHAT' });
+    }
 }
 
 function appendSolvencyChatLoading(id) {
@@ -29134,6 +29201,10 @@ function appendTvChatMessage(role, content, useTypewriter = false) {
     }
     
     history.scrollTop = history.scrollHeight;
+
+    if (window.AIExportManager) {
+        window.AIExportManager.decorate(history, 'chat', { module: 'TECHNICAL_CHAT' });
+    }
 }
 
 function appendTvChatLoading(id) {
@@ -29786,7 +29857,11 @@ async function triggerTVIndicatorSynthesis() {
         if (!res.ok) throw new Error("Server returned error status.");
         const data = await res.json();
 
-        content.innerHTML = formatMarkdownToHTML(data.synthesis);
+        typewriteElement(content, formatMarkdownToHTML(data.synthesis), () => {
+            if (window.AIExportManager) {
+                window.AIExportManager.decorate(content, 'report', { module: 'TECHNICAL_INDICATORS' });
+            }
+        });
     } catch (e) {
         console.error("AI indicator synthesis error: ", e);
         content.innerHTML = `<span style="color: #ef4444;">Failed to compile AI insights: ${e.message}. Please verify the backend LLM configurations.</span>`;
@@ -30722,7 +30797,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                                      </div>`;
                     }
 
-                    aiContent.innerHTML = `
+                    const compiledHtml = `
                         <div style="display: flex; flex-direction: column; gap: 10px;">
                             <div>
                                 <strong style="color: #a5b4fc;">💡 Rotation Commentary:</strong> ${data.commentary}
@@ -30735,13 +30810,18 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                         </div>
                     `;
 
-                    // Bind chat ticker clicks
-                    aiContent.querySelectorAll('.chat-ticker-btn').forEach(btn => {
-                        btn.onclick = () => {
-                            const ticker = btn.getAttribute('data-ticker');
-                            if (window.switchTab) window.switchTab('analyzer');
-                            if (window.loadStockAnalyzer) window.loadStockAnalyzer(ticker);
-                        };
+                    typewriteElement(aiContent, compiledHtml, () => {
+                        // Bind chat ticker clicks
+                        aiContent.querySelectorAll('.chat-ticker-btn').forEach(btn => {
+                            btn.onclick = () => {
+                                const ticker = btn.getAttribute('data-ticker');
+                                if (window.switchTab) window.switchTab('analyzer');
+                                if (window.loadStockAnalyzer) window.loadStockAnalyzer(ticker);
+                            };
+                        });
+                        if (window.AIExportManager) {
+                            window.AIExportManager.decorate(aiContent, 'report', { module: 'SECTOR_REGIME' });
+                        }
                     });
 
                     // Reveal Chat Co-Pilot Interface
@@ -30760,6 +30840,9 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                             chatHistory = [
                                 { role: "assistant", content: welcomeMsg }
                             ];
+                            if (window.AIExportManager) {
+                                window.AIExportManager.decorate(chatStream, 'chat', { module: 'SECTOR_REGIME' });
+                            }
                         }
                     }
 
@@ -30831,24 +30914,35 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                     });
 
                     const replyId = `rotation-msg-${Date.now()}`;
-                    chatStream.innerHTML += `
-                        <div style="margin-top: 6px;">
-                            <span style="color: var(--color-primary); font-weight: 700;">[Co-Pilot]</span>
-                            <button class="section-speak-btn" data-target="${replyId}" data-title="Rotation Co-Pilot" style="margin-left: 2px;">🔊</button>
-                            <span id="${replyId}">${formattedReply}</span>
-                        </div>
+                    const replyWrapper = document.createElement('div');
+                    replyWrapper.style.marginTop = '6px';
+                    replyWrapper.innerHTML = `
+                        <span style="color: var(--color-primary); font-weight: 700;">[Co-Pilot]</span>
+                        <button class="section-speak-btn" data-target="${replyId}" data-title="Rotation Co-Pilot" style="margin-left: 2px; display: none;">🔊</button>
+                        <span id="${replyId}"></span>
                     `;
-                    chatHistory.push({ role: "assistant", content: reply });
-                    chatStream.scrollTop = chatStream.scrollHeight;
+                    chatStream.appendChild(replyWrapper);
 
-                    // Bind inline ticker clicks
-                    chatStream.querySelectorAll('.chat-inline-ticker').forEach(btn => {
-                        btn.onclick = () => {
-                            const ticker = btn.getAttribute('data-ticker');
-                            if (window.switchTab) window.switchTab('analyzer');
-                            if (window.loadStockAnalyzer) window.loadStockAnalyzer(ticker);
-                        };
-                    });
+                    const textEl = replyWrapper.querySelector(`#${replyId}`);
+                    const speakBtn = replyWrapper.querySelector('.section-speak-btn');
+
+                    typewriteElement(textEl, formattedReply, () => {
+                        speakBtn.style.display = 'inline-block';
+                        
+                        // Bind inline ticker clicks
+                        chatStream.querySelectorAll('.chat-inline-ticker').forEach(btn => {
+                            btn.onclick = () => {
+                                const ticker = btn.getAttribute('data-ticker');
+                                if (window.switchTab) window.switchTab('analyzer');
+                                if (window.loadStockAnalyzer) window.loadStockAnalyzer(ticker);
+                            };
+                        });
+                        if (window.AIExportManager) {
+                            window.AIExportManager.decorate(chatStream, 'chat', { module: 'SECTOR_REGIME' });
+                        }
+                    }, chatStream);
+
+                    chatHistory.push({ role: "assistant", content: reply });
 
                 } catch (err) {
                     console.error("Co-Pilot Chat response failed:", err);
@@ -32008,7 +32102,13 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                 
                 if (data.synthesis) {
                     if (aiResult) {
-                        aiResult.innerHTML = `<div style="line-height: 1.7; font-family: 'Inter', sans-serif; color: var(--text-secondary);">${data.synthesis}</div>`;
+                        aiResult.innerHTML = `<div style="line-height: 1.7; font-family: 'Inter', sans-serif; color: var(--text-secondary);"></div>`;
+                        const innerDiv = aiResult.querySelector('div');
+                        typewriteElement(innerDiv, formatMarkdownToHTML(data.synthesis), () => {
+                            if (window.AIExportManager) {
+                                window.AIExportManager.decorate(aiResult, 'report', { module: 'PORTFOLIO_OPTIMIZATION' });
+                            }
+                        });
                     }
                 } else {
                     throw new Error("Empty AI synthesis response.");
@@ -32409,15 +32509,37 @@ async function loadGlobalMarketNews(forceRefresh = false, runLLM = false) {
         if (data.has_ai_report && data.ai_report) {
             if (aiBriefingWrap) aiBriefingWrap.style.display = 'block';
             if (aiPlaceholder) aiPlaceholder.style.display = 'none';
-            if (aiSynthesis) aiSynthesis.innerText = data.ai_report.synthesis_report;
-            if (aiDrivers) {
-                aiDrivers.innerHTML = (data.ai_report.top_drivers || []).map(driver => `
-                    <li style="list-style-type: square; margin-left: 15px;">${driver}</li>
-                `).join('');
-            }
+            
             if (aiTimeBadge) {
                 const timePart = data.updated_at ? data.updated_at.split(' ')[1] : 'Just Now';
                 aiTimeBadge.innerText = `Audited: ${timePart}`;
+            }
+
+            if (runLLM) {
+                if (aiDrivers) aiDrivers.innerHTML = '';
+                if (aiSynthesis) {
+                    aiSynthesis.innerHTML = '';
+                    typewriteElement(aiSynthesis, data.ai_report.synthesis_report, () => {
+                        if (aiDrivers) {
+                            aiDrivers.innerHTML = (data.ai_report.top_drivers || []).map(driver => `
+                                <li style="list-style-type: square; margin-left: 15px;">${driver}</li>
+                            `).join('');
+                        }
+                        if (window.AIExportManager) {
+                            window.AIExportManager.decorate(aiBriefingWrap, 'report', { module: 'NEWS_SENTIMENT' });
+                        }
+                    });
+                }
+            } else {
+                if (aiSynthesis) aiSynthesis.innerText = data.ai_report.synthesis_report;
+                if (aiDrivers) {
+                    aiDrivers.innerHTML = (data.ai_report.top_drivers || []).map(driver => `
+                        <li style="list-style-type: square; margin-left: 15px;">${driver}</li>
+                    `).join('');
+                }
+                if (window.AIExportManager) {
+                    window.AIExportManager.decorate(aiBriefingWrap, 'report', { module: 'NEWS_SENTIMENT' });
+                }
             }
         } else {
             if (aiBriefingWrap) aiBriefingWrap.style.display = 'none';
@@ -36635,10 +36757,16 @@ function setupAcademyAICoach() {
                     </span>
                 </div>
             `;
+            if (window.AIExportManager) {
+                window.AIExportManager.decorate(messagesEl, 'chat', { module: 'ACADEMY_CHAT' });
+            }
         } catch (err) {
             const loading = document.getElementById('academy-ai-loading');
             if (loading) loading.remove();
             messagesEl.innerHTML += `<div class="academy-ai-msg assistant"><span>⚠️ Error connecting to AI Coach. Please try again.</span></div>`;
+            if (window.AIExportManager) {
+                window.AIExportManager.decorate(messagesEl, 'chat', { module: 'ACADEMY_CHAT' });
+            }
         }
         messagesEl.scrollTop = messagesEl.scrollHeight;
     };
@@ -39187,6 +39315,10 @@ function appendFsChatMessage(sender, text, useTypewriter = false) {
     }
     
     history.scrollTop = history.scrollHeight;
+
+    if (window.AIExportManager) {
+        window.AIExportManager.decorate(history, 'chat', { module: 'FINANCIALS_CHAT' });
+    }
 }
 
 function formatMarkdownText(text) {
@@ -40294,20 +40426,24 @@ function appendAuditChatMessage(sender, text, latency, useTypewriter = false) {
 
         messageDiv.appendChild(actionsDiv);
 
-        if (useTypewriter) {
-            const formatted = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+         if (useTypewriter) {
+            const formatted = typeof formatMarkdownToHTML === 'function' ? formatMarkdownToHTML(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             history.appendChild(messageDiv);
             typewriteElement(pTag, formatted, () => {
                 actionsDiv.style.display = 'flex';
             }, history);
         } else {
-            pTag.innerHTML = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            pTag.innerHTML = typeof formatMarkdownToHTML === 'function' ? formatMarkdownToHTML(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             history.appendChild(messageDiv);
         }
     } else {
         history.appendChild(messageDiv);
     }
     history.scrollTop = history.scrollHeight;
+
+    if (window.AIExportManager) {
+        window.AIExportManager.decorate(history, 'chat', { module: 'AUDIT_CHAT' });
+    }
 }
 
 function appendAuditChatLoading(botMsgId) {
@@ -41163,6 +41299,10 @@ function appendMarginChatMessage(sender, text, latency, useTypewriter = false) {
         history.appendChild(messageDiv);
     }
     history.scrollTop = history.scrollHeight;
+
+    if (window.AIExportManager) {
+        window.AIExportManager.decorate(history, 'chat', { module: 'MARGIN_CHAT' });
+    }
 }
 
 function appendMarginChatLoading(botMsgId) {

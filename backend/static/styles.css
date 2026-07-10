@@ -16917,5 +16917,91 @@ html[data-mode="light"] .clickable-price-level:hover {
     }
 }
 
+/* ==================== AI EXPORT ACTION BAR & BUTTONS ==================== */
+.ai-export-action-bar {
+    display: inline-flex;
+    gap: 6px;
+    padding: 3px 6px;
+    background: rgba(15, 23, 42, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    z-index: 10;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Float at the top-right of report cards */
+.ai-export-action-bar.report-floating-bar {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+}
+
+/* Headers of chatbots or lists */
+.ai-export-action-bar.chat-header-bar {
+    margin-bottom: 10px;
+    align-self: flex-end;
+    display: flex;
+}
+
+.ai-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.ai-export-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.03);
+}
+
+.ai-export-btn:active {
+    transform: scale(0.95);
+}
+
+.ai-export-btn .btn-icon {
+    font-size: 12px;
+}
+
+/* Light Theme overrides */
+[data-theme="light"] .ai-export-action-bar {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .ai-export-btn {
+    color: #475569;
+}
+[data-theme="light"] .ai-export-btn:hover {
+    color: #0f172a;
+    background: rgba(0, 0, 0, 0.04);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 480px) {
+    .ai-export-btn .btn-lbl {
+        display: none; /* Hide labels on mobile to save space */
+    }
+    .ai-export-action-bar {
+        padding: 2px 4px;
+        gap: 2px;
+    }
+    .ai-export-btn {
+        padding: 4px 6px;
+    }
+}
+
+
 
 

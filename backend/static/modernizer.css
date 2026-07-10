@@ -645,3 +645,97 @@ table tbody tr:hover {
         opacity: 1 !important;
     }
 }
+
+/* Unified AI Export Action Bar & Buttons CSS */
+.ai-export-action-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 100;
+}
+
+/* For Chat Header: stays static, sticky or top right of chat screen */
+.ai-export-action-bar.chat-header-bar {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-glass);
+    padding: 6px 12px;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+    justify-content: flex-end;
+}
+
+/* For floating bar inside synthesis reports or other output elements */
+.ai-export-action-bar.report-floating-bar {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    opacity: 0.85;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    background: rgba(var(--bg-main), 0.8);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid var(--border-glass);
+}
+
+.ai-export-action-bar.report-floating-bar:hover {
+    opacity: 1;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.ai-export-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-glass);
+    color: var(--text-secondary);
+    font-size: 10.5px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+    line-height: 1;
+}
+
+.ai-export-btn:hover {
+    background: var(--color-primary-glow);
+    border-color: var(--color-primary);
+    color: var(--text-primary);
+    transform: scale(1.02);
+}
+
+.ai-export-btn:active {
+    transform: scale(0.98);
+}
+
+.ai-export-btn .btn-icon {
+    font-size: 11px;
+}
+
+.ai-export-btn .btn-lbl {
+    font-family: 'Inter', sans-serif;
+}
+
+/* In light mode (if there's a light mode active selector) */
+[data-theme="light"] .ai-export-action-bar.report-floating-bar {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="light"] .ai-export-btn {
+    background: rgba(0, 0, 0, 0.04);
+    color: #475569;
+}
+
+[data-theme="light"] .ai-export-btn:hover {
+    background: var(--color-primary-glow);
+    color: var(--color-primary);
+}
+
