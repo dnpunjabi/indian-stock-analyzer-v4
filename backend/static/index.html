@@ -309,6 +309,11 @@
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- AI Advisory Chat Trigger -->
+                    <div class="header-chat-wrapper" id="trigger-chat-btn" title="Open AI Advisory Chat">
+                        <span class="chat-icon">💬</span>
+                    </div>
 
                     <!-- Help / Control Panel -->
                     <div class="header-settings-wrapper" id="header-settings-btn" title="System Settings Center">
@@ -1320,6 +1325,19 @@
                                 <span id="meta-sector">Technology (IT)</span>
                                 <span id="meta-industry">Software Services</span>
                                 <span id="meta-trend" class="badge-rec rec-buy" style="font-size: 9px; font-weight: 700; border-radius: 3px; padding: 1px 5px;">BULLISH</span>
+                                
+                                <!-- AI Score Pill -->
+                                <div id="meta-ai-conviction-trigger" class="conviction-pill-trigger" title="Click to view full AI Executive prospectus synthesis!" style="margin-left: 0; padding: 2px 8px; font-size: 9.5px; border-radius: 4px; height: 18px; line-height: 1.1; display: inline-flex; align-items: center;">
+                                    <span class="pulse-ring" style="border-radius: 6px; inset: -1.5px;"></span>
+                                    <span class="pill-icon" style="font-size: 10px; margin-right: 3px;">🤖</span>
+                                    <span id="meta-ai-conviction-text">Score: --/100</span>
+                                </div>
+                                
+                                <!-- Export Pitchbook Button -->
+                                <button id="export-pitchbook-btn" class="header-action-btn" style="display: none; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); font-size: 9.5px; font-weight: bold; color: var(--color-primary-light); cursor: pointer; height: 18px; line-height: 1.1; margin-left: 0; outline: none; border-radius: 99px;">
+                                    📄 Pitchbook
+                                </button>
+
                                 <button id="meta-banner-toggle-btn" style="font-size: 9px; padding: 2px 6px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-secondary); display: inline-flex; align-items: center; gap: 3px; font-weight: 600; outline: none; transition: all 0.2s;">
                                     <span id="meta-banner-toggle-icon">▲</span> <span id="meta-banner-toggle-text">Collapse Banner</span>
                                 </button>
@@ -1523,14 +1541,6 @@
                                     </div>
                                 </div>
                             </div>
-                            <div id="meta-ai-conviction-trigger" class="conviction-pill-trigger" title="Click to view full AI Executive prospectus synthesis!" style="margin-left: 0;">
-                                <span class="pulse-ring"></span>
-                                <span class="pill-icon">🤖</span>
-                                <span id="meta-ai-conviction-text">Score: --/100</span>
-                            </div>
-                            <button id="export-pitchbook-btn" class="header-action-btn" style="display: none; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 4px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); font-size: 11px; font-weight: bold; color: var(--color-primary-light); cursor: pointer; margin-left: 10px; height: 26px; border-radius: 99px;">
-                                📄 Export Pitchbook
-                            </button>
                         </div>
                     </div>
 
@@ -3699,7 +3709,7 @@
 
                         <!-- ===== Stock Events Calendar Card ===== -->
                         <!-- ═══ Per-Stock Upcoming Events Card (Stock Profile — Events Tab) ═══ -->
-                        <div class="card col-span-4 no-print" id="stock-events-profile-card" data-subtab="events" style="display: flex; flex-direction: column; gap: 0; margin-top: 15px;">
+                        <div class="card col-span-4 card-hidden no-print" id="stock-events-profile-card" data-subtab="events" style="display: flex; flex-direction: column; gap: 0; margin-top: 15px; padding: 0;">
                             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 18px 20px; border-bottom: 1px solid var(--border-glass);">
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px;">
@@ -4304,10 +4314,6 @@
                         </div>
                     </div>
 
-                    <!-- Floating chat button -->
-                    <button class="floating-chat-trigger no-print" id="trigger-chat-btn">
-                        💬 Chat Advisor
-                    </button>
                 </div>
             </section>
 
@@ -7611,7 +7617,7 @@
 
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
-    <script src="app.js?v=1.6.1"></script>
+    <script src="app.js?v=1.6.2"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
@@ -7620,7 +7626,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modernization Custom Layer -->
-    <script src="modernizer.js?v=6.3"></script>
+    <script src="modernizer.js?v=6.6"></script>
 </body>
 </html>
 

@@ -241,6 +241,65 @@
 })();
 
 
+// ==================== TYPEWRITER TEXT STREAMING HELPER ====================
+function typewriteElement(element, htmlContent, onCompleteCallback = null, scrollContainer = null) {
+    if (!element) return;
+    // Destroy any active Typed instances attached to this element to prevent overlap
+    if (element._typedInstance) {
+        element._typedInstance.destroy();
+        element._typedInstance = null;
+    }
+    if (element._scrollInterval) {
+        clearInterval(element._scrollInterval);
+        element._scrollInterval = null;
+    }
+
+    const startScrolling = () => {
+        if (scrollContainer) {
+            element._scrollInterval = setInterval(() => {
+                scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }, 50);
+        }
+    };
+
+    const stopScrolling = () => {
+        if (element._scrollInterval) {
+            clearInterval(element._scrollInterval);
+            element._scrollInterval = null;
+        }
+        if (scrollContainer) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+    };
+    
+    if (typeof Typed !== 'undefined') {
+        element.innerHTML = '';
+        const typeContainer = document.createElement('span');
+        element.appendChild(typeContainer);
+        
+        startScrolling();
+        element._typedInstance = new Typed(typeContainer, {
+            strings: [htmlContent],
+            typeSpeed: 3,
+            showCursor: false,
+            contentType: 'html',
+            onComplete: () => {
+                element._typedInstance = null;
+                stopScrolling();
+                if (onCompleteCallback) onCompleteCallback();
+            },
+            onDestroy: () => {
+                stopScrolling();
+            }
+        });
+    } else {
+        element.innerHTML = htmlContent;
+        stopScrolling();
+        if (onCompleteCallback) onCompleteCallback();
+    }
+}
+
+
 // ==================== LIVE TICKS WEBSOCKET MANAGER ====================
 let liveTicksWS = null;
 let liveTicksReconnectTimer = null;
@@ -10774,7 +10833,7 @@ function setupDailyWrapupListeners() {
                 const previewContainer = document.getElementById('wrapup-preview-container');
                 const previewText = document.getElementById('wrapup-preview-text');
                 if (previewContainer && previewText) {
-                    previewText.textContent = data.message_body;
+                    typewriteElement(previewText, data.message_body);
                     previewContainer.style.display = 'block';
                 }
 
@@ -11268,7 +11327,7 @@ async function deploySentinelTelemetry(item) {
                     });
                     if (!synthRes.ok) throw new Error("Synthesis failed");
                     const synthData = await synthRes.json();
-                    aiSummaryBox.innerHTML = `🧠 <strong>AI Audit:</strong> ${synthData.synthesis}`;
+                    typewriteElement(aiSummaryBox, `🧠 <strong>AI Audit:</strong> ${synthData.synthesis}`);
                 } catch (err) {
                     aiSummaryBox.innerHTML = `⚠️ <em>Unable to generate AI telemetry synthesis at this time.</em>`;
                 }
@@ -11413,16 +11472,24 @@ function setupChatDrawer() {
     const openBtn = document.getElementById('trigger-chat-btn');
     const closeBtn = document.getElementById('close-chat-btn');
 
-    openBtn.addEventListener('click', () => drawer.classList.add('open'));
-    closeBtn.addEventListener('click', () => {
+    const openChatDrawer = () => {
+        drawer.classList.add('open');
+        document.body.classList.add('chat-drawer-active');
+    };
+
+    const closeChatDrawer = () => {
         drawer.classList.remove('open');
+        document.body.classList.remove('chat-drawer-active');
         if (typeof pauseAudioPlayback === 'function') {
             pauseAudioPlayback();
         }
         if (window.speechSynthesis) {
             window.speechSynthesis.cancel();
         }
-    });
+    };
+
+    openBtn.addEventListener('click', openChatDrawer);
+    closeBtn.addEventListener('click', closeChatDrawer);
 
     document.getElementById('send-chat-btn').addEventListener('click', sendUserChatMessage);
     document.getElementById('chat-user-input').addEventListener('keypress', (e) => {
@@ -11587,12 +11654,9 @@ function setupChatDrawer() {
         convictionTrigger.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent immediate click-outside handler trigger
             if (drawer.classList.contains('open')) {
-                drawer.classList.remove('open');
-                if (typeof pauseAudioPlayback === 'function') {
-                    pauseAudioPlayback();
-                }
+                closeChatDrawer();
             } else {
-                drawer.classList.add('open');
+                openChatDrawer();
                 if (tabSynthesis) {
                     tabSynthesis.click();
                 }
@@ -11624,10 +11688,7 @@ function setupChatDrawer() {
         const isClickOnOpenBtn = openBtn && openBtn.contains(e.target);
 
         if (!isClickOnPill && !isClickOnOpenBtn) {
-            drawer.classList.remove('open');
-            if (typeof pauseAudioPlayback === 'function') {
-                pauseAudioPlayback();
-            }
+            closeChatDrawer();
         }
     });
 
@@ -12451,7 +12512,7 @@ function displaySynthesisData(data) {
     data.formattedHtml = formattedHtml;
     
     if (reportTextEl) {
-        reportTextEl.innerHTML = formattedHtml;
+        typewriteElement(reportTextEl, formattedHtml);
     }
 }
 
@@ -12788,7 +12849,7 @@ async function sendUserChatMessage() {
 
         const chatReplyText = data.response || "No response received from Equities Advisor.";
         document.getElementById(typingId).remove();
-        appendChatMessage('assistant', chatReplyText);
+        appendChatMessage('assistant', chatReplyText, true);
         chatHistory.push({ role: 'assistant', content: chatReplyText });
 
         // Execute workspace actions parsed from the LLM
@@ -12862,7 +12923,7 @@ async function sendUserChatMessage() {
     }
 }
 
-function appendChatMessage(role, content) {
+function appendChatMessage(role, content, useTypewriter = false) {
     const box = document.getElementById('chat-messages');
     const msg = document.createElement('div');
     const msgId = 'msg-' + Math.random().toString(36).substr(2, 9);
@@ -12892,10 +12953,28 @@ function appendChatMessage(role, content) {
             formatted = parseMarkdownTables(formatted);
         }
 
-        msg.innerHTML = `
-            <p>${formatted}</p>
-            <button class="chat-speech-btn" title="Speak Response" style="background: transparent; border: none; cursor: pointer; font-size: 11px; padding: 2px 4px; display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); opacity: 0.6; transition: all 0.2s; margin-top: 6px;">🔊 Read Aloud</button>
-        `;
+        if (useTypewriter) {
+            msg.innerHTML = `
+                <div class="chat-text-container"></div>
+                <button class="chat-speech-btn" title="Speak Response" style="background: transparent; border: none; cursor: pointer; font-size: 11px; padding: 2px 4px; display: none; align-items: center; gap: 4px; color: var(--text-muted); opacity: 0.6; transition: all 0.2s; margin-top: 6px;">🔊 Read Aloud</button>
+            `;
+            box.appendChild(msg);
+
+            const textContainer = msg.querySelector('.chat-text-container');
+            const speechBtn = msg.querySelector('.chat-speech-btn');
+
+            typewriteElement(textContainer, `<p>${formatted}</p>`, () => {
+                if (speechBtn) {
+                    speechBtn.style.display = 'inline-flex';
+                }
+            }, box);
+        } else {
+            msg.innerHTML = `
+                <p>${formatted}</p>
+                <button class="chat-speech-btn" title="Speak Response" style="background: transparent; border: none; cursor: pointer; font-size: 11px; padding: 2px 4px; display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); opacity: 0.6; transition: all 0.2s; margin-top: 6px;">🔊 Read Aloud</button>
+            `;
+            box.appendChild(msg);
+        }
 
         const speechBtn = msg.querySelector('.chat-speech-btn');
         if (speechBtn) {
@@ -12907,9 +12986,9 @@ function appendChatMessage(role, content) {
         }
     } else {
         msg.innerText = content;
+        box.appendChild(msg);
     }
 
-    box.appendChild(msg);
     box.scrollTo({
         top: box.scrollHeight,
         behavior: 'smooth'
@@ -19973,7 +20052,7 @@ Keep the response professional, mathematically grounded, and extremely concise. 
                     .replace(/\*(.*?)\*/g, '<em>$1</em>')
                     .replace(/\n/g, '<br>');
 
-                summaryText.innerHTML = html;
+                typewriteElement(summaryText, html);
                 summaryBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
             } catch (err) {
@@ -20112,7 +20191,7 @@ Keep the response professional, mathematically grounded, and extremely concise. 
                     .replace(/\*(.*?)\*/g, '<em>$1</em>')
                     .replace(/\n/g, '<br>');
 
-                summaryText.innerHTML = html;
+                typewriteElement(summaryText, html);
                 summaryBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
             } catch (err) {
@@ -26578,7 +26657,7 @@ async function triggerSolvencyChatQuery() {
         removeSolvencyChatLoading(botMsgId);
         
         const responseText = data.response || "No response received.";
-        appendSolvencyChatMessage('bot', responseText);
+        appendSolvencyChatMessage('bot', responseText, true);
         solvencyChatHistoryList.push({ role: 'user', content: promptText });
         solvencyChatHistoryList.push({ role: 'assistant', content: responseText });
 
@@ -26592,7 +26671,7 @@ async function triggerSolvencyChatQuery() {
     }
 }
 
-function appendSolvencyChatMessage(role, text) {
+function appendSolvencyChatMessage(role, text, useTypewriter = false) {
     const history = document.getElementById('solvency-chat-history');
     if (!history) return;
 
@@ -26641,8 +26720,6 @@ function appendSolvencyChatMessage(role, text) {
             return match;
         });
 
-        bubble.innerHTML = `<span>${formattedText}</span>`;
-        
         const speakBtn = document.createElement('button');
         speakBtn.style.background = 'none';
         speakBtn.style.border = 'none';
@@ -26652,7 +26729,7 @@ function appendSolvencyChatMessage(role, text) {
         speakBtn.style.marginTop = '4px';
         speakBtn.style.alignSelf = 'flex-start';
         speakBtn.style.outline = 'none';
-        speakBtn.style.display = 'inline-flex';
+        speakBtn.style.display = useTypewriter ? 'none' : 'inline-flex';
         speakBtn.style.alignItems = 'center';
         speakBtn.style.gap = '3px';
         speakBtn.innerHTML = '🔊 Read Aloud';
@@ -26674,7 +26751,18 @@ function appendSolvencyChatMessage(role, text) {
                 window.speechSynthesis.speak(utterance);
             }
         });
-        bubble.appendChild(speakBtn);
+
+        if (useTypewriter) {
+            const textContainer = document.createElement('span');
+            bubble.appendChild(textContainer);
+            bubble.appendChild(speakBtn);
+            typewriteElement(textContainer, formattedText, () => {
+                speakBtn.style.display = 'inline-flex';
+            }, history);
+        } else {
+            bubble.innerHTML = `<span>${formattedText}</span>`;
+            bubble.appendChild(speakBtn);
+        }
     }
 
     msg.appendChild(bubble);
@@ -28915,7 +29003,7 @@ async function triggerTvChatQuery() {
         const data = await res.json();
         
         removeTvChatLoading(botMsgId);
-        appendTvChatMessage('bot', data.analysis || "No response received.");
+        appendTvChatMessage('bot', data.analysis || "No response received.", true);
         tvChatHistoryList.push({ role: 'user', content: promptText });
         tvChatHistoryList.push({ role: 'assistant', content: data.analysis || "" });
         
@@ -28977,7 +29065,7 @@ function makePricesClickable(htmlText) {
     });
 }
 
-function appendTvChatMessage(role, content) {
+function appendTvChatMessage(role, content, useTypewriter = false) {
     const history = document.getElementById('tv-chart-chat-history');
     if (!history) return;
     
@@ -29008,7 +29096,7 @@ function appendTvChatMessage(role, content) {
         html = makePricesClickable(html);
         
         const speechContainer = document.createElement('div');
-        speechContainer.style.cssText = 'display: flex; gap: 8px; margin-top: 6px; font-size: 10px;';
+        speechContainer.style.cssText = `display: ${useTypewriter ? 'none' : 'flex'}; gap: 8px; margin-top: 6px; font-size: 10px;`;
         
         const speakBtn = document.createElement('button');
         speakBtn.className = 'tv-chat-speak-btn';
@@ -29031,12 +29119,20 @@ function appendTvChatMessage(role, content) {
         speechContainer.appendChild(speakBtn);
         
         const contentDiv = document.createElement('div');
-        contentDiv.innerHTML = html;
         div.appendChild(contentDiv);
         div.appendChild(speechContainer);
+
+        if (useTypewriter) {
+            history.appendChild(div);
+            typewriteElement(contentDiv, html, () => {
+                speechContainer.style.display = 'flex';
+            }, history);
+        } else {
+            contentDiv.innerHTML = html;
+            history.appendChild(div);
+        }
     }
     
-    history.appendChild(div);
     history.scrollTop = history.scrollHeight;
 }
 
@@ -38940,7 +39036,7 @@ async function triggerFsChatQuery() {
         
         // Remove loading message and append actual response
         removeFsChatLoading(botMsgId);
-        appendFsChatMessage('bot', data.analysis || "No response received.");
+        appendFsChatMessage('bot', data.analysis || "No response received.", true);
     } catch (err) {
         console.error("AI Chat error:", err);
         removeFsChatLoading(botMsgId);
@@ -38990,7 +39086,7 @@ async function triggerFsFullAudit() {
         const data = await response.json();
         
         removeFsChatLoading(botMsgId);
-        appendFsChatMessage('bot', data.analysis || "No audit response received.");
+        appendFsChatMessage('bot', data.analysis || "No audit response received.", true);
     } catch (err) {
         console.error("AI Audit error:", err);
         showToast("Failed to compile AI audit: " + err.message, "error");
@@ -39001,7 +39097,7 @@ async function triggerFsFullAudit() {
     }
 }
 
-function appendFsChatMessage(sender, text) {
+function appendFsChatMessage(sender, text, useTypewriter = false) {
     const history = document.getElementById('fs-chat-history');
     if (!history) return;
     
@@ -39043,9 +39139,10 @@ function appendFsChatMessage(sender, text) {
         box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     `;
     
+    let html = '';
     // Parse simple markdown headings/bullets/tables for bot response
     if (sender === 'bot') {
-        contentDiv.innerHTML = formatMarkdownText(text);
+        html = formatMarkdownText(text);
     } else {
         contentDiv.innerText = text;
     }
@@ -39056,7 +39153,7 @@ function appendFsChatMessage(sender, text) {
     if (sender === 'bot') {
         const actionsDiv = document.createElement('div');
         actionsDiv.style.cssText = `
-            display: flex;
+            display: ${useTypewriter ? 'none' : 'flex'};
             gap: 12px;
             font-size: 10px;
             color: var(--text-secondary);
@@ -39075,9 +39172,20 @@ function appendFsChatMessage(sender, text) {
         
         actionsDiv.appendChild(speakBtn);
         messageDiv.appendChild(actionsDiv);
+        
+        if (useTypewriter) {
+            history.appendChild(messageDiv);
+            typewriteElement(contentDiv, html, () => {
+                actionsDiv.style.display = 'flex';
+            }, history);
+        } else {
+            contentDiv.innerHTML = html;
+            history.appendChild(messageDiv);
+        }
+    } else {
+        history.appendChild(messageDiv);
     }
     
-    history.appendChild(messageDiv);
     history.scrollTop = history.scrollHeight;
 }
 
@@ -40086,7 +40194,7 @@ async function triggerAuditChatQuery() {
 
         removeAuditChatLoading(botMsgId);
         const botResponse = data.response || "No response received.";
-        appendAuditChatMessage('bot', botResponse, latencySec);
+        appendAuditChatMessage('bot', botResponse, latencySec, true);
 
         // Save to local history
         auditChatHistory.push({ role: 'assistant', content: botResponse });
@@ -40100,7 +40208,7 @@ async function triggerAuditChatQuery() {
     }
 }
 
-function appendAuditChatMessage(sender, text, latency) {
+function appendAuditChatMessage(sender, text, latency, useTypewriter = false) {
     const history = document.getElementById('audit-chatbot-history');
     if (!history) return;
 
@@ -40144,11 +40252,11 @@ function appendAuditChatMessage(sender, text, latency) {
 
     const msgId = 'audit-msg-text-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 
+    const pTag = document.createElement('p');
+    pTag.id = msgId;
+    pTag.style.margin = '0';
+
     if (sender === 'bot') {
-        const pTag = document.createElement('p');
-        pTag.id = msgId;
-        pTag.style.margin = '0';
-        pTag.innerHTML = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         contentDiv.appendChild(pTag);
     } else {
         contentDiv.innerText = text;
@@ -40159,7 +40267,7 @@ function appendAuditChatMessage(sender, text, latency) {
     if (sender === 'bot') {
         const actionsDiv = document.createElement('div');
         actionsDiv.style.cssText = `
-            display: flex;
+            display: ${useTypewriter ? 'none' : 'flex'};
             gap: 12px;
             font-size: 10px;
             color: var(--text-secondary);
@@ -40185,9 +40293,20 @@ function appendAuditChatMessage(sender, text, latency) {
         }
 
         messageDiv.appendChild(actionsDiv);
-    }
 
-    history.appendChild(messageDiv);
+        if (useTypewriter) {
+            const formatted = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            history.appendChild(messageDiv);
+            typewriteElement(pTag, formatted, () => {
+                actionsDiv.style.display = 'flex';
+            }, history);
+        } else {
+            pTag.innerHTML = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            history.appendChild(messageDiv);
+        }
+    } else {
+        history.appendChild(messageDiv);
+    }
     history.scrollTop = history.scrollHeight;
 }
 
@@ -40933,7 +41052,7 @@ async function triggerMarginChatQuery() {
         removeMarginChatLoading(botMsgId);
 
         const botResponse = data.response || "No response received from model.";
-        appendMarginChatMessage('bot', botResponse, latencySec);
+        appendMarginChatMessage('bot', botResponse, latencySec, true);
         marginChatHistory.push({ role: 'assistant', content: botResponse });
 
     } catch (err) {
@@ -40946,7 +41065,7 @@ async function triggerMarginChatQuery() {
     }
 }
 
-function appendMarginChatMessage(sender, text, latency) {
+function appendMarginChatMessage(sender, text, latency, useTypewriter = false) {
     const history = document.getElementById('margin-chatbot-history');
     if (!history) return;
 
@@ -40988,11 +41107,11 @@ function appendMarginChatMessage(sender, text, latency) {
 
     const msgId = 'margin-msg-text-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 
+    const pTag = document.createElement('p');
+    pTag.id = msgId;
+    pTag.style.margin = '0';
+
     if (sender === 'bot') {
-        const pTag = document.createElement('p');
-        pTag.id = msgId;
-        pTag.style.margin = '0';
-        pTag.innerHTML = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         contentDiv.appendChild(pTag);
     } else {
         contentDiv.innerText = text;
@@ -41003,7 +41122,7 @@ function appendMarginChatMessage(sender, text, latency) {
     if (sender === 'bot') {
         const actionsDiv = document.createElement('div');
         actionsDiv.style.cssText = `
-            display: flex;
+            display: ${useTypewriter ? 'none' : 'flex'};
             gap: 12px;
             font-size: 10px;
             color: var(--text-secondary);
@@ -41029,9 +41148,20 @@ function appendMarginChatMessage(sender, text, latency) {
         }
 
         messageDiv.appendChild(actionsDiv);
-    }
 
-    history.appendChild(messageDiv);
+        if (useTypewriter) {
+            const formatted = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            history.appendChild(messageDiv);
+            typewriteElement(pTag, formatted, () => {
+                actionsDiv.style.display = 'flex';
+            }, history);
+        } else {
+            pTag.innerHTML = typeof formatMarkdownText === 'function' ? formatMarkdownText(text) : text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            history.appendChild(messageDiv);
+        }
+    } else {
+        history.appendChild(messageDiv);
+    }
     history.scrollTop = history.scrollHeight;
 }
 

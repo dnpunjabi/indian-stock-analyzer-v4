@@ -2691,6 +2691,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 /* Slide-out Q&A Advisor Chat Drawer */
+body.chat-drawer-active {
+    overflow: hidden !important;
+}
+
 .chat-drawer-container {
     position: fixed;
     top: 0;
@@ -2707,6 +2711,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     flex-direction: column;
     transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.4s;
     visibility: hidden; /* Hide completely when closed to prevent horizontal scroll leaks */
+    overscroll-behavior: contain;
 }
 
 .chat-drawer-container.open {
@@ -2802,6 +2807,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     overflow-y: hidden !important;
     height: calc(100% - 92px);
     box-sizing: border-box;
+    overscroll-behavior: contain;
 }
 
 .drawer-tab-content.active {
@@ -4014,9 +4020,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
     }
 
     body, html {
-        overflow: auto !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
         height: auto !important;
         display: block !important;
+    }
+
+    .subtabs-nav-btn {
+        display: none !important;
     }
 
     .app-container {
@@ -4091,12 +4102,14 @@ input[type="range"]::-webkit-slider-thumb:hover {
         height: 100vh !important;
         max-height: 100vh !important;
         overflow: hidden !important;
+        overscroll-behavior: contain !important;
     }
     
     .drawer-tab-content {
         height: calc(100% - 92px) !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
+        overscroll-behavior: contain !important;
     }
     
     .synthesis-report-container {
@@ -4577,10 +4590,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
     transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: 0 0 10px rgba(147, 51, 234, 0.15);
     user-select: none;
-    margin-left: 15px;
     height: fit-content;
     align-self: center;
 }
+
 
 .conviction-pill-trigger:hover {
     transform: scale(1.04);
@@ -4786,7 +4799,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     gap: 12px;
 }
 
-.header-bell-wrapper, .header-settings-wrapper, .header-links-wrapper {
+.header-bell-wrapper, .header-settings-wrapper, .header-links-wrapper, .header-chat-wrapper {
     position: relative;
     width: 32px;
     height: 32px;
@@ -4802,7 +4815,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     user-select: none;
 }
 
-.header-bell-wrapper:hover, .header-settings-wrapper:hover, .header-links-wrapper:hover {
+.header-bell-wrapper:hover, .header-settings-wrapper:hover, .header-links-wrapper:hover, .header-chat-wrapper:hover {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.15);
     transform: translateY(-1px);
@@ -7140,6 +7153,7 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .stock-meta-banner .conviction-pill-trigger {
         margin-left: 0 !important;
     }
+
     
     .tech-metrics-grid {
         grid-template-columns: repeat(2, 1fr) !important;
@@ -14666,7 +14680,8 @@ details[open] .academy-hud-arrow {
 
     body, html {
         height: auto !important;
-        overflow: visible !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
     }
 
     .main-content {
@@ -14756,7 +14771,7 @@ details[open] .academy-hud-arrow {
 
 @media (max-width: 600px) {
     /* Optimize Touch Targets for Utilities Bar */
-    .header-bell-wrapper, .header-settings-wrapper, .header-links-wrapper {
+    .header-bell-wrapper, .header-settings-wrapper, .header-links-wrapper, .header-chat-wrapper {
         width: 40px !important;
         height: 40px !important;
         font-size: 16px !important;
@@ -14764,7 +14779,7 @@ details[open] .academy-hud-arrow {
     }
     
     /* Disable Hover transform on mobile to prevent containing block constraints */
-    .header-bell-wrapper:hover, .header-settings-wrapper:hover, .header-links-wrapper:hover {
+    .header-bell-wrapper:hover, .header-settings-wrapper:hover, .header-links-wrapper:hover, .header-chat-wrapper:hover {
         transform: none !important;
     }
     
