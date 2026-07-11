@@ -697,7 +697,9 @@ def calculate_technical_indicators(ticker_symbol: str, stock_obj=None) -> dict:
     result = {
         "current_price": 0.0,
         "price_change_pct": 0.0,
+        "sma_20": 0.0,
         "sma_50": 0.0,
+        "sma_100": 0.0,
         "sma_200": 0.0,
         "rsi": 50.0,
         "high_52w": 0.0,
@@ -773,14 +775,18 @@ def calculate_technical_indicators(ticker_symbol: str, stock_obj=None) -> dict:
             pass
             
         df['EMA_5'] = df['Close'].ewm(span=5, adjust=False).mean()
+        df['SMA_20'] = df['Close'].rolling(window=20).mean()
         df['SMA_50'] = df['Close'].rolling(window=50).mean()
+        df['SMA_100'] = df['Close'].rolling(window=100).mean()
         df['SMA_200'] = df['Close'].rolling(window=200).mean()
         df['EMA_20'] = df['Close'].ewm(span=20, adjust=False).mean()
         df['EMA_50'] = df['Close'].ewm(span=50, adjust=False).mean()
         df['EMA_200'] = df['Close'].ewm(span=200, adjust=False).mean()
         df['SMA_150'] = df['Close'].rolling(window=150).mean()
         
+        result["sma_20"] = float(df['SMA_20'].iloc[-1]) if not pd.isna(df['SMA_20'].iloc[-1]) else current_price
         result["sma_50"] = float(info_sma_50) if info_sma_50 else (float(df['SMA_50'].iloc[-1]) if not pd.isna(df['SMA_50'].iloc[-1]) else current_price)
+        result["sma_100"] = float(df['SMA_100'].iloc[-1]) if not pd.isna(df['SMA_100'].iloc[-1]) else current_price
         result["sma_200"] = float(info_sma_200) if info_sma_200 else (float(df['SMA_200'].iloc[-1]) if not pd.isna(df['SMA_200'].iloc[-1]) else current_price)
         result["ema_5"] = float(df['EMA_5'].iloc[-1]) if not pd.isna(df['EMA_5'].iloc[-1]) else current_price
         result["ema_20"] = float(df['EMA_20'].iloc[-1]) if not pd.isna(df['EMA_20'].iloc[-1]) else current_price
@@ -1725,14 +1731,20 @@ def calculate_composite_score(p: dict) -> dict:
     
     # C. Valuation (max 20)
     v_score = 0.0
-    pe_ratio_vs_sector = pe / sector_pe if sector_pe > 0 else 1.0
-    if pe_ratio_vs_sector <= 1.0: v_score += 5.0
-    elif pe_ratio_vs_sector <= 1.2: v_score += 3.0
-    else: v_score += 1.0
-    
-    if peg <= 1.0: v_score += 5.0
-    elif peg <= 1.5: v_score += 3.0
-    else: v_score += 0.5
+    if pe > 0 and sector_pe > 0:
+        pe_ratio_vs_sector = pe / sector_pe
+        if pe_ratio_vs_sector <= 1.0: v_score += 5.0
+        elif pe_ratio_vs_sector <= 1.2: v_score += 3.0
+        else: v_score += 1.0
+    else:
+        v_score += 0.0
+        
+    if pe > 0 and peg > 0:
+        if peg <= 1.0: v_score += 5.0
+        elif peg <= 1.5: v_score += 3.0
+        else: v_score += 0.5
+    else:
+        v_score += 0.0
     
     if ev_ebitda <= 15.0: v_score += 5.0
     elif ev_ebitda <= 20.0: v_score += 3.0
@@ -1903,36 +1915,44 @@ def calculate_earnings_quality_scores(stock_obj, base_symbol: str = None) -> dic
                     if passed: f_score += 1
                     details.append({"test": "Positive Operating Cash Flow", "passed": passed, "category": "Profitability"})
                     
+                    has_history = len(fin.columns) >= 2 and len(bs.columns) >= 2
+                    
                     roa_current = net_income / total_assets if total_assets > 0 else 0
                     roa_prev = net_income_prev / total_assets_prev if total_assets_prev > 0 else 0
-                    passed = roa_current > roa_prev
+                    passed = (roa_current > roa_prev) if has_history else False
                     if passed: f_score += 1
                     details.append({"test": "ROA Improving YoY", "passed": passed, "category": "Profitability"})
                     
-                    passed = ocf > net_income
+                    passed = ocf > 0 and ocf > net_income
                     if passed: f_score += 1
                     details.append({"test": "Cash Flow > Net Income", "passed": passed, "category": "Profitability"})
                     
                     leverage_current = total_debt / total_assets if total_assets > 0 else 0
                     leverage_prev = total_debt_prev / total_assets_prev if total_assets_prev > 0 else 0
-                    passed = leverage_current <= leverage_prev
+                    passed = (leverage_current <= leverage_prev) if has_history else False
                     if passed: f_score += 1
                     details.append({"test": "Leverage Decreasing", "passed": passed, "category": "Leverage"})
                     
                     cr_current = current_assets / current_liabilities if current_liabilities > 0 else 1.0
                     cr_prev = current_assets_prev / current_liabilities_prev if current_liabilities_prev > 0 else 1.0
-                    passed = cr_current > cr_prev
+                    passed = (cr_current > cr_prev) if has_history else False
                     if passed: f_score += 1
                     details.append({"test": "Current Ratio Improving", "passed": passed, "category": "Leverage"})
                     
                     shares_data = info.get("floatShares") or shares_outstanding
+                    # Check dilution YoY if history available
                     passed = True
+                    if has_history:
+                        sh_prev = safe_get(bs, "Share Capital", 1) or safe_get(bs, "Ordinary Shares Number", 1)
+                        sh_curr = safe_get(bs, "Share Capital", 0) or safe_get(bs, "Ordinary Shares Number", 0)
+                        if sh_prev > 0 and sh_curr > sh_prev * 1.02:
+                            passed = False
                     if passed: f_score += 1
                     details.append({"test": "No Share Dilution", "passed": passed, "category": "Leverage"})
                     
                     gm_current = gross_profit / revenue if revenue > 0 else 0
                     gm_prev = gross_profit_prev / revenue_prev if revenue_prev > 0 else 0
-                    passed = gm_current >= gm_prev
+                    passed = (gm_current >= gm_prev) if has_history else False
                     if passed: f_score += 1
                     details.append({"test": "Gross Margin Improving", "passed": passed, "category": "Efficiency"})
                     
@@ -1961,11 +1981,11 @@ def calculate_earnings_quality_scores(stock_obj, base_symbol: str = None) -> dic
                         A = working_capital / total_assets
                         B = retained_earnings / total_assets
                         C = ebit / total_assets
-                        D = market_cap / total_liabilities if total_liabilities > 0 else 3.0
+                        D = min(market_cap / total_liabilities, 12.0) if total_liabilities > 0 else 3.0
                         E = revenue / total_assets
                         
                         z_score = 1.2 * A + 1.4 * B + 3.3 * C + 0.6 * D + 1.0 * E
-                        z_score = float(max(-2.0, z_score))
+                        z_score = float(max(-2.0, min(15.0, z_score)))
                         
                         result["altman_z_score"] = round(z_score, 2)
                         result["altman_components"] = {
@@ -2032,6 +2052,8 @@ def calculate_earnings_quality_scores(stock_obj, base_symbol: str = None) -> dic
                 prev_ta = total_assets_history[-2] if len(total_assets_history) >= 2 else latest_ta
                 prev_ta = prev_ta or 1.0
                 
+                has_history = len(net_profit_history) >= 2 and len(total_assets_history) >= 2
+                
                 latest_depr = depreciation_history[-1] if depreciation_history else 0.0
                 latest_interest = interest_history[-1] if interest_history else 0.0
                 latest_cfo = latest_np + latest_depr + latest_interest
@@ -2041,15 +2063,15 @@ def calculate_earnings_quality_scores(stock_obj, base_symbol: str = None) -> dic
                 
                 roa_curr = latest_np / latest_ta
                 roa_prev = prev_np / prev_ta
-                pass3 = roa_curr > roa_prev
+                pass3 = (roa_curr > roa_prev) if has_history else False
                 
-                pass4 = latest_cfo > latest_np
+                pass4 = latest_cfo > latest_np and latest_cfo > 0
                 
                 latest_debt = borrowings_history[-1] if borrowings_history else 0.0
                 prev_debt = borrowings_history[-2] if (borrowings_history and len(borrowings_history) >= 2) else latest_debt
                 lev_curr = latest_debt / latest_ta
                 lev_prev = prev_debt / prev_ta
-                pass5 = lev_curr <= lev_prev
+                pass5 = (lev_curr <= lev_prev) if has_history else False
                 
                 latest_oa = other_assets_history[-1] if other_assets_history else 1.0
                 prev_oa = other_assets_history[-2] if (other_assets_history and len(other_assets_history) >= 2) else latest_oa
@@ -2059,21 +2081,21 @@ def calculate_earnings_quality_scores(stock_obj, base_symbol: str = None) -> dic
                 prev_ol = prev_ol or 1.0
                 cr_curr = latest_oa / latest_ol
                 cr_prev = prev_oa / prev_ol
-                pass6 = cr_curr > cr_prev
+                pass6 = (cr_curr > cr_prev) if has_history else False
                 
                 latest_eq = equity_cap_history[-1] if equity_cap_history else 100.0
                 prev_eq = equity_cap_history[-2] if (equity_cap_history and len(equity_cap_history) >= 2) else latest_eq
-                pass7 = latest_eq <= prev_eq
+                pass7 = (latest_eq <= prev_eq) if has_history else False
                 
                 latest_opm = opm_history[-1] if opm_history else 0.0
                 prev_opm = opm_history[-2] if (opm_history and len(opm_history) >= 2) else latest_opm
-                pass8 = latest_opm >= prev_opm
+                pass8 = (latest_opm >= prev_opm) if has_history else False
                 
                 latest_sales = sales_history[-1] if sales_history else 0.0
                 prev_sales = sales_history[-2] if (sales_history and len(sales_history) >= 2) else latest_sales
                 at_curr = latest_sales / latest_ta
                 at_prev = prev_sales / prev_ta
-                pass9 = at_curr >= at_prev
+                pass9 = (at_curr >= at_prev) if has_history else False
                 
                 f_score = sum([pass1, pass2, pass3, pass4, pass5, pass6, pass7, pass8, pass9])
                 
@@ -2112,11 +2134,11 @@ def calculate_earnings_quality_scores(stock_obj, base_symbol: str = None) -> dic
                 A = working_capital / latest_ta
                 B = retained_earnings / latest_ta
                 C = ebit / latest_ta
-                D = mcap_crores / total_liab if total_liab > 0 else 3.0
+                D = min(mcap_crores / total_liab, 12.0) if total_liab > 0 else 3.0
                 E = latest_sales / latest_ta
                 
                 z_score = 1.2 * A + 1.4 * B + 3.3 * C + 0.6 * D + 1.0 * E
-                z_score = float(max(-2.0, z_score))
+                z_score = float(max(-2.0, min(15.0, z_score)))
                 
                 result["altman_z_score"] = round(z_score, 2)
                 result["altman_components"] = {

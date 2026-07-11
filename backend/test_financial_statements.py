@@ -149,7 +149,7 @@ class TestFinancialStatements(unittest.TestCase):
             c = conn.cursor()
             c.execute(
                 "INSERT OR REPLACE INTO cached_financial_statements (symbol, view, data_json, last_updated) VALUES (?, ?, ?, datetime('now'))",
-                ("INFY", "consolidated", json.dumps({"symbol": "INFY", "is_consolidated": True, "quarters": {"headers": ["", "Dec 2023"], "rows": []}}))
+                ("INFY", "consolidated", json.dumps({"symbol": "INFY", "is_consolidated": True, "quarters": {"headers": ["", "Dec 2023"], "rows": []}, "cash_flow": {"headers": ["", "Dec 2023"], "rows": []}}))
             )
             conn.commit()
             

@@ -17002,6 +17002,309 @@ html[data-mode="light"] .clickable-price-level:hover {
     }
 }
 
+/* Bloomberg/Reuters-style dark/light glass theme table rules */
+.column-hover-highlight {
+    background-color: rgba(59, 130, 246, 0.04) !important;
+    position: relative;
+}
 
+[data-theme="light"] .column-hover-highlight {
+    background-color: rgba(59, 130, 246, 0.06) !important;
+}
 
+/* Category header accordion groups styles */
+.fs-cat-header-row {
+    transition: background-color 0.2s ease;
+}
 
+.fs-cat-header-row:hover {
+    background-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+[data-theme="light"] .fs-cat-header-row:hover {
+    background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.fs-cat-chevron {
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Glass theme styles for sticky metric column */
+.fs-sticky-col {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    border-right: 1px solid var(--border-glass) !important;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.04);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Financial Statements: Anomaly Badge Pulse & Row Hover
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes fsAnomalyPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Interactive row hover effect for click-to-chart */
+#financial-statements-table tbody tr:not(.fs-cat-header-row):hover {
+    background: rgba(59, 130, 246, 0.04) !important;
+    transition: background 0.15s ease;
+}
+
+[data-theme="light"] #financial-statements-table tbody tr:not(.fs-cat-header-row):hover,
+[data-mode="light"] #financial-statements-table tbody tr:not(.fs-cat-header-row):hover {
+    background: rgba(59, 130, 246, 0.06) !important;
+}
+
+#financial-statements-table tbody tr:not(.fs-cat-header-row):hover td:first-child {
+    background: rgba(59, 130, 246, 0.06) !important;
+}
+
+/* Column hover highlight */
+.column-hover-highlight {
+    background: rgba(59, 130, 246, 0.03) !important;
+    transition: background 0.1s ease;
+}
+
+/* Chart modal responsive adjustments */
+.fs-trend-modal-card,
+.fs-compare-modal-card {
+    width: 90%;
+    max-width: 600px;
+    padding: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    box-shadow: var(--shadow-glow);
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    position: relative;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+    transform: translateY(30px) scale(0.97);
+    opacity: 0;
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fs-compare-modal-card {
+    max-width: 700px;
+}
+
+.catalyst-modal-overlay.active .fs-trend-modal-card,
+.catalyst-modal-overlay.active .fs-compare-modal-card {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.fs-trend-canvas-container {
+    position: relative;
+    width: 100%;
+    height: 280px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    border: 1px solid var(--border-glass);
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+.fs-compare-canvas-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+    border: 1px solid var(--border-glass);
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+    .catalyst-modal-overlay {
+        align-items: flex-end !important;
+        padding: 0 !important;
+    }
+
+    .fs-trend-modal-card,
+    .fs-compare-modal-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 92vh !important;
+        border-radius: 20px 20px 0 0 !important;
+        border-bottom: none !important;
+        padding: 16px 14px 24px 14px !important;
+        gap: 12px !important;
+        transform: translateY(100%) scale(1) !important;
+        opacity: 0;
+    }
+
+    .catalyst-modal-overlay.active .fs-trend-modal-card,
+    .catalyst-modal-overlay.active .fs-compare-modal-card {
+        transform: translateY(0) scale(1) !important;
+        opacity: 1 !important;
+    }
+
+    .fs-trend-canvas-container {
+        height: 200px !important;
+    }
+
+    .fs-compare-canvas-container {
+        height: 220px !important;
+    }
+}
+
+@media (max-height: 600px) {
+    .fs-trend-canvas-container {
+        height: 160px !important;
+    }
+    .fs-compare-canvas-container {
+        height: 180px !important;
+    }
+}
+
+/* ==========================================================================
+   ENTERPRISE GRADE RESPONSIVE OVERRIDES FOR FINANCIALS TAB
+   ========================================================================== */
+
+/* Main Table Sticky Column & Layout adjustments */
+@media (max-width: 768px) {
+    .table-scroll .data-table {
+        min-width: 750px !important;
+    }
+    .table-scroll .data-table th:first-child,
+    .table-scroll .data-table td:first-child {
+        position: sticky !important;
+        left: 0 !important;
+        background: var(--bg-sidebar) !important;
+        z-index: 10 !important;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.18) !important;
+    }
+    /* Set custom colors for sticky headers based on data-theme */
+    .table-scroll .data-table th:first-child {
+        background: var(--bg-sidebar) !important;
+    }
+    
+    /* Responsive Worthiness Index HUD layout */
+    #fs-worthiness-hud {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        text-align: center;
+    }
+    #fs-worthiness-hud > div:last-child {
+        justify-content: center !important;
+        margin-top: 5px;
+    }
+    
+    /* Responsive Key Ratio Cards */
+    #fs-health-dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 8px;
+    }
+    
+    /* Responsive Segment Breakdown Layout */
+    #fs-segment-content {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 16px !important;
+    }
+    #fs-segment-charts {
+        width: 100% !important;
+    }
+    #fs-segment-table {
+        width: 100% !important;
+    }
+}
+
+/* DuPont Tree Vertical Stack reflow */
+@media (max-width: 640px) {
+    #fs-dupont-chart-container .dupont-tree-container,
+    .dupont-tree-container {
+        flex-direction: column !important;
+        gap: 12px !important;
+        align-items: center !important;
+    }
+    #fs-dupont-chart-container .dupont-row,
+    .dupont-row {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 12px !important;
+        width: 100% !important;
+    }
+    #fs-dupont-chart-container .dupont-operator,
+    .dupont-operator {
+        margin: 4px 0 !important;
+        transform: rotate(90deg) !important;
+        font-size: 16px !important;
+        align-self: center !important;
+    }
+    #fs-dupont-chart-container .dupont-node,
+    .dupont-node {
+        min-width: 150px !important;
+        padding: 8px 12px !important;
+    }
+}
+
+/* Scroll Affordance visual shadow overlay */
+.table-scroll {
+    position: relative;
+}
+.table-scroll::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 20px;
+    height: 100%;
+    background: linear-gradient(to right, transparent, rgba(0,0,0,0.12));
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+    z-index: 5;
+}
+[data-theme="light"] .table-scroll::after,
+[data-mode="light"] .table-scroll::after {
+    background: linear-gradient(to right, transparent, rgba(0,0,0,0.06));
+}
+.table-scroll.scrolled-end::after {
+    opacity: 0 !important;
+}
+
+/* Interactive Tapped Column Highlight */
+.column-highlighted {
+    background: rgba(59, 130, 246, 0.08) !important;
+}
+[data-theme="light"] .column-highlighted,
+[data-mode="light"] .column-highlighted {
+    background: rgba(59, 130, 246, 0.06) !important;
+}
+
+/* Micro-interaction Pulsing Animation for Mic Speech Trigger */
+@keyframes mic-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+    70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+.mic-active {
+    animation: mic-pulse 1.5s infinite !important;
+    border-color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #ef4444 !important;
+}
+
+/* Utility class for hiding financials dashboard/elements */
+.fs-hidden {
+    display: none !important;
+}
+
+#fs-health-dashboard {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 5px;
+    width: 100%;
+    box-sizing: border-box;
+}

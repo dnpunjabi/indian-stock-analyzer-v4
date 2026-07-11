@@ -2830,7 +2830,7 @@
                                                 <h4 style="font-family: 'Outfit', sans-serif; font-size: 10.5px; font-weight: 700; text-transform: uppercase; margin-top: 0; margin-bottom: 0;">
                                                     <span>⚡ Metric Position Spectrum</span>
                                                 </h4>
-                                                <select id="peer-spectrum-metric-select" style="background: rgba(0,0,0,0.3); color: var(--text-primary); border: 1px solid var(--border-glass); font-size: 10px; padding: 2px 4px; border-radius: 4px; cursor: pointer; outline: none;">
+                                                <select id="peer-spectrum-metric-select" style="background: var(--bg-glass-input); color: var(--text-primary); border: 1px solid var(--border-glass); font-size: 10px; padding: 2px 4px; border-radius: 4px; cursor: pointer; outline: none;">
                                                     <option value="pe" selected>P/E Ratio</option>
                                                     <option value="roce">ROCE %</option>
                                                     <option value="roe">ROE %</option>
@@ -2904,7 +2904,7 @@
                                 <h3>PEER HISTORICAL PERFORMANCE COMPARISON</h3>
                                 <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                                     <span style="font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Normalized Base = 100.0</span>
-                                    <select id="peer-chart-period" style="background: rgba(0,0,0,0.4); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; outline: none; font-weight: 500;">
+                                    <select id="peer-chart-period" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; outline: none; font-weight: 500;">
                                         <option value="3mo">3 Months</option>
                                         <option value="6mo">6 Months</option>
                                         <option value="1y" selected>1 Year</option>
@@ -3023,12 +3023,99 @@
                                     <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 0.03em; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
                                         <span>📊</span> FINANCIAL STATEMENTS
                                     </h3>
-                                    <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; display: block; margin-top: 2px;">Quarterly Results, annual Profit & Loss, and Balance Sheet statements</span>
+                                    <span style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; display: block; margin-top: 2px;">Quarterly Results, Profit & Loss, Balance Sheet, and Cash Flow statements</span>
                                 </div>
-                                <!-- Toggle Standalone vs Consolidated -->
-                                <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.015); padding: 3px; border-radius: 6px; border: 1px solid var(--border-glass);">
-                                    <button id="fs-view-consolidated-btn" class="btn-secondary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; background: none; color: var(--text-secondary); transition: all 0.25s ease;">Consolidated</button>
-                                    <button id="fs-view-standalone-btn" class="btn-primary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; transition: all 0.25s ease;">Standalone</button>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                                    <!-- Toggle Standalone vs Consolidated -->
+                                    <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.015); padding: 3px; border-radius: 6px; border: 1px solid var(--border-glass);">
+                                        <button id="fs-view-consolidated-btn" class="btn-secondary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; background: none; color: var(--text-secondary); transition: all 0.25s ease;">Consolidated</button>
+                                        <button id="fs-view-standalone-btn" class="btn-primary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; transition: all 0.25s ease;">Standalone</button>
+                                    </div>
+                                    <!-- Toggle Absolute vs Common-Size (%) -->
+                                    <div style="display: flex; gap: 4px; background: rgba(255,255,255,0.015); padding: 3px; border-radius: 6px; border: 1px solid var(--border-glass);">
+                                        <button id="fs-mode-absolute-btn" class="btn-primary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; transition: all 0.25s ease;">Absolute</button>
+                                        <button id="fs-mode-percentage-btn" class="btn-secondary" style="font-size: 11px; padding: 4px 12px; border-radius: 4px; border: none; cursor: pointer; background: none; color: var(--text-secondary); transition: all 0.25s ease;">Common-Size (%)</button>
+                                    </div>
+                                    <!-- Export Buttons -->
+                                    <div style="display: flex; gap: 4px; margin-left: auto;">
+                                        <button id="fs-export-csv-btn" onclick="exportFsTableCSV()" style="font-size: 10px; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-glass); cursor: pointer; background: rgba(255,255,255,0.03); color: var(--text-secondary); transition: all 0.25s ease; white-space: nowrap;" onmouseover="this.style.background='rgba(59,130,246,0.15)';this.style.color='var(--color-primary-light)';this.style.borderColor='rgba(59,130,246,0.4)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.color='var(--text-secondary)';this.style.borderColor='var(--border-glass)'" aria-label="Export table as CSV">📥 CSV</button>
+                                        <button id="fs-export-excel-btn" onclick="exportFsTableExcel()" style="font-size: 10px; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-glass); cursor: pointer; background: rgba(255,255,255,0.03); color: var(--text-secondary); transition: all 0.25s ease; white-space: nowrap;" onmouseover="this.style.background='rgba(16,185,129,0.15)';this.style.color='var(--color-emerald)';this.style.borderColor='rgba(16,185,129,0.4)'" onmouseout="this.style.background='rgba(255,255,255,0.03)';this.style.color='var(--text-secondary)';this.style.borderColor='var(--border-glass)'" aria-label="Export table as Excel">📊 Excel</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Worthiness Index Score HUD -->
+                            <div id="fs-worthiness-hud" style="display: none; grid-template-columns: 1fr auto; gap: 15px; align-items: center; padding: 12px 16px; background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; margin-bottom: 5px; box-sizing: border-box; width: 100%;">
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span style="font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em;">APEX Investment Worthiness Index</span>
+                                        <span id="fs-worthiness-badge" class="badge-rec" style="font-size: 9.5px; padding: 2px 8px; border-radius: 4px;">--</span>
+                                    </div>
+                                    <div style="font-size: 10.5px; color: var(--text-secondary); line-height: 1.4;">
+                                        Multi-statement score evaluating Revenue/Profit CAGR, OPM margins, Debt gearing, FCF cash generation, and Altman Z solvency triggers.
+                                    </div>
+                                    <ul id="fs-reasons-list" style="margin: 8px 0 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px;"></ul>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                                    <div style="text-align: right;">
+                                        <span style="font-size: 8px; color: var(--text-secondary); display: block; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Composite Score</span>
+                                        <strong id="fs-worthiness-score-val" style="font-size: 22px; font-family: 'Outfit', sans-serif; font-weight: 800; color: var(--neon-green);">--%</strong>
+                                    </div>
+                                    <div style="position: relative; width: 42px; height: 42px;">
+                                        <svg viewBox="0 0 36 36" style="width: 100%; height: 100%; transform: rotate(-90deg);">
+                                            <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--border-glass)" stroke-width="3" />
+                                            <path id="fs-worthiness-circle-fill" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="var(--neon-green)" stroke-width="3" stroke-dasharray="0, 100" stroke-linecap="round" style="transition: stroke-dasharray 0.8s ease;" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <script>
+                             function toggleDupontAccordion() {
+                                 console.log("DuPont toggle button clicked!");
+                                 var content = document.getElementById('fs-dupont-content');
+                                 var chevron = document.getElementById('fs-dupont-chevron');
+                                 if (!content) {
+                                     console.error("DuPont content element not found!");
+                                     return;
+                                 }
+                                 if (content.style.display === 'none' || content.style.display === '') {
+                                     content.style.display = 'flex';
+                                     if (chevron) chevron.textContent = '▲';
+                                     console.log("DuPont content opened (flex)");
+                                 } else {
+                                     content.style.display = 'none';
+                                     if (chevron) chevron.textContent = '▼';
+                                     console.log("DuPont content closed (none)");
+                                 }
+                             }
+                             </script>
+
+                             <!-- DuPont ROE Breakdown Analysis Accordion -->
+                             <div id="fs-dupont-accordion" style="display: none; flex-direction: column; border: 1px solid var(--border-glass); border-radius: 8px; overflow: hidden; margin-bottom: 5px; box-sizing: border-box; width: 100%;">
+                                <button id="fs-dupont-toggle-btn" onclick="toggleDupontAccordion()" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 16px; background: rgba(255,255,255,0.015); border: none; cursor: pointer; color: var(--text-primary); font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; outline: none; transition: background 0.2s;">
+                                    <span>🔍 DuPont ROE Breakdown Analysis</span>
+                                    <span id="fs-dupont-chevron" style="transition: transform 0.2s ease;">▼</span>
+                                </button>
+                                <div id="fs-dupont-content" style="display: none; padding: 12px 16px; background: rgba(0,0,0,0.1); border-top: 1px solid var(--border-glass); flex-direction: column; gap: 10px;">
+                                    <div style="font-size: 10px; color: var(--text-secondary); line-height: 1.4; border-bottom: 1px dashed var(--border-glass); padding-bottom: 8px; margin-bottom: 4px;">
+                                        Deconstructs Return on Equity (ROE) into operational efficiency (Asset Turnover), profit margin (Net Margin), and capital structure multiplier (Leverage).
+                                    </div>
+                                    <div id="fs-dupont-chart-container" style="width: 100%;"></div>
+                                </div>
+                            </div>
+
+                            <!-- ═══ FINANCIAL HEALTH DASHBOARD — Key Ratio Cards ═══ -->
+                            <div id="fs-health-dashboard" class="fs-hidden"></div>
+
+                            <!-- ═══ VISUAL INSIGHT PANEL — Heatmap / Waterfall ═══ -->
+                            <div id="fs-visual-insight-panel" class="fs-hidden">
+                                <button id="fs-visual-insight-toggle" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 16px; background: rgba(255,255,255,0.015); border: none; cursor: pointer; color: var(--text-primary); font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; outline: none; transition: background 0.2s;">
+                                    <span id="fs-visual-insight-title">📊 Quarterly Performance Heatmap</span>
+                                    <span id="fs-visual-insight-chevron" style="transition: transform 0.2s ease;">▼</span>
+                                </button>
+                                <div id="fs-visual-insight-content" style="display: none; padding: 12px 16px; background: rgba(0,0,0,0.1); border-top: 1px solid var(--border-glass); overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                                    <canvas id="fs-visual-insight-canvas" style="width: 100%;"></canvas>
                                 </div>
                             </div>
 
@@ -3037,7 +3124,41 @@
                                 <button class="fs-statement-tab fs-subtab-btn active" data-statement="quarters">📅 Quarterly Results</button>
                                 <button class="fs-statement-tab fs-subtab-btn" data-statement="profit_loss">📈 Profit & Loss</button>
                                 <button class="fs-statement-tab fs-subtab-btn" data-statement="balance_sheet">⚖️ Balance Sheet</button>
+                                <button class="fs-statement-tab fs-subtab-btn" data-statement="cash_flow">💸 Cash Flow</button>
                                 <button class="fs-statement-tab fs-subtab-btn" data-statement="peers">👥 Peer Comparison</button>
+                            </div>
+
+                            <!-- Row Search / Filter + Compare Mode + Period Compare -->
+                            <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; width: 100%;">
+                                <div style="flex: 1; min-width: 180px; position: relative;">
+                                    <input id="fs-row-search-input" type="text" placeholder="🔍 Filter rows… (e.g. interest, profit, eps)" style="width: 100%; height: 30px; padding: 4px 12px 4px 10px; border-radius: 6px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-primary); font-size: 11px; font-family: 'Inter', sans-serif; box-sizing: border-box; outline: none; transition: border-color 0.2s;" />
+                                    <button id="fs-row-search-clear" style="display: none; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 13px; padding: 0 4px; line-height: 1;">✕</button>
+                                </div>
+                                <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-left: auto;">
+                                    <select id="fs-column-filter-select" style="display: none; height: 30px; padding: 0 10px; font-size: 10px; font-family: 'Outfit', sans-serif; font-weight: 600; border-radius: 6px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-primary); cursor: pointer; outline: none; transition: all 0.2s;">
+                                        <option value="all">📅 All Periods</option>
+                                        <option value="3">📅 Latest 3 Periods</option>
+                                        <option value="5">📅 Latest 5 Periods</option>
+                                    </select>
+                                    <button id="fs-compare-mode-btn" style="display: none; height: 30px; padding: 0 12px; font-size: 10px; font-family: 'Outfit', sans-serif; font-weight: 600; border-radius: 6px; border: 1px solid rgba(139,92,246,0.3); background: rgba(139,92,246,0.1); color: #a78bfa; cursor: pointer; white-space: nowrap; transition: all 0.2s; letter-spacing: 0.03em;">⚡ COMPARE MODE</button>
+                                    <button id="fs-compare-selected-btn" style="display: none; height: 30px; padding: 0 14px; font-size: 10px; font-family: 'Outfit', sans-serif; font-weight: 700; border-radius: 6px; border: none; background: linear-gradient(135deg, #8b5cf6, #6366f1); color: #fff; cursor: pointer; white-space: nowrap; transition: all 0.2s; box-shadow: 0 2px 8px rgba(139,92,246,0.3);">📊 Compare Selected (0)</button>
+                                    <button id="fs-period-compare-btn" style="display: none; height: 30px; padding: 0 12px; font-size: 10px; font-family: 'Outfit', sans-serif; font-weight: 600; border-radius: 6px; border: 1px solid rgba(16,185,129,0.3); background: rgba(16,185,129,0.1); color: #34d399; cursor: pointer; white-space: nowrap; transition: all 0.2s; letter-spacing: 0.03em;">📅 PERIOD vs PERIOD</button>
+                                    <button id="fs-alert-manage-btn" style="display: none; height: 30px; padding: 0 12px; font-size: 10px; font-family: 'Outfit', sans-serif; font-weight: 600; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.1); color: #fbbf24; cursor: pointer; white-space: nowrap; transition: all 0.2s; letter-spacing: 0.03em;">🔔 ALERTS</button>
+                                </div>
+                            </div>
+
+                            <!-- ═══ PERIOD-OVER-PERIOD COMPARISON PANEL ═══ -->
+                            <div id="fs-period-comparison-panel" style="display: none; flex-direction: column; border: 1px solid var(--border-glass); border-radius: 8px; overflow: hidden; margin-bottom: 8px; box-sizing: border-box; width: 100%; background: rgba(0,0,0,0.1);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: rgba(16,185,129,0.05); border-bottom: 1px solid var(--border-glass);">
+                                    <span style="font-size: 11px; font-weight: 700; color: var(--text-primary); font-family: 'Outfit', sans-serif; text-transform: uppercase; letter-spacing: 0.05em;">📅 Period-over-Period Comparison</span>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <select id="fs-pop-period-a" style="height: 28px; padding: 0 8px; border-radius: 5px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-primary); font-size: 10px; font-family: 'Inter', sans-serif; outline: none;"></select>
+                                        <span style="font-size: 10px; color: var(--text-muted); font-weight: 700;">vs</span>
+                                        <select id="fs-pop-period-b" style="height: 28px; padding: 0 8px; border-radius: 5px; border: 1px solid var(--border-glass); background: var(--bg-glass-input); color: var(--text-primary); font-size: 10px; font-family: 'Inter', sans-serif; outline: none;"></select>
+                                        <button id="fs-pop-close-btn" style="background: none; border: 1px solid var(--border-glass); border-radius: 5px; color: var(--text-secondary); cursor: pointer; font-size: 12px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.15)'" onmouseout="this.style.background='none'">✕</button>
+                                    </div>
+                                </div>
+                                <div id="fs-pop-table-container" style="padding: 8px 12px; overflow-x: auto; max-height: 350px; overflow-y: auto;"></div>
                             </div>
 
                             <!-- Table container with horizontal scrolling -->
@@ -3050,6 +3171,18 @@
                             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; color: var(--text-secondary); font-style: italic; flex-wrap: wrap; gap: 8px; margin-top: -5px;">
                                 <span id="fs-reporting-basis" style="font-weight: 600; text-transform: uppercase;">Reporting Basis: --</span>
                                 <span>Data sourced from Screener.in integration (no cookie required).</span>
+                            </div>
+
+                            <!-- ═══ SEGMENT-LEVEL BREAKDOWN PANEL ═══ -->
+                            <div id="fs-segment-breakdown-panel" style="display: none; flex-direction: column; border: 1px solid var(--border-glass); border-radius: 8px; overflow: hidden; margin-top: 8px; box-sizing: border-box; width: 100%;">
+                                <button id="fs-segment-toggle-btn" style="display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 8px 16px; background: rgba(255,255,255,0.015); border: none; cursor: pointer; color: var(--text-primary); font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; outline: none; transition: background 0.2s;">
+                                    <span>🏢 Segment-Level Breakdown</span>
+                                    <span id="fs-segment-chevron" style="transition: transform 0.2s ease;">▼</span>
+                                </button>
+                                <div id="fs-segment-content" style="display: none; padding: 12px 16px; background: rgba(0,0,0,0.1); border-top: 1px solid var(--border-glass); flex-direction: column; gap: 12px;">
+                                    <div id="fs-segment-charts" style="display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;"></div>
+                                    <div id="fs-segment-table" style="overflow-x: auto;"></div>
+                                </div>
                             </div>
 
                             <!-- AI Financial Analyst Diagnostic Card -->
@@ -7615,10 +7748,50 @@
         </div>
     </div>
 
+    <!-- Financial Statement Trend Chart Overlay Modal -->
+    <div id="fs-chart-modal" class="catalyst-modal-overlay" style="display: none; z-index: 10000;">
+        <div class="fs-trend-modal-card">
+            <button id="fs-chart-close-btn" onclick="window.closeFsChartModal()" style="position: absolute; top: 15px; right: 15px; background: transparent; border: none; font-size: 16px; cursor: pointer; color: var(--text-secondary); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--border-glass);">&times;</button>
+            <div>
+                <h3 id="fs-chart-title" style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-primary);">Metric Trend Visualization</h3>
+                <span id="fs-chart-subtitle" style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: bold; display: block; margin-top: 2px;">historical trend & YoY growth analysis</span>
+            </div>
+            <div class="fs-trend-canvas-container">
+                <canvas id="fs-trend-canvas"></canvas>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; background: rgba(255,255,255,0.01); border-radius: 6px; padding: 8px 12px; border: 1px solid var(--border-glass);">
+                <div><span style="color: var(--text-muted);">Starting Period:</span> <strong id="fs-chart-start-val">--</strong></div>
+                <div><span style="color: var(--text-muted);">Ending Period:</span> <strong id="fs-chart-end-val">--</strong></div>
+                <div><span style="color: var(--text-muted);">Average Value:</span> <strong id="fs-chart-avg-val">--</strong></div>
+                <div><span style="color: var(--text-muted);">Overall CAGR:</span> <strong id="fs-chart-cagr-val">--</strong></div>
+            </div>
+            <div id="fs-chart-yoy-legend" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 10px; color: var(--text-secondary); padding: 0 4px;">
+                <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: rgba(59,130,246,0.6); border-radius: 2px; display: inline-block;"></span> Absolute Value (Area)</span>
+                <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 10px; background: rgba(16,185,129,0.5); border-radius: 2px; display: inline-block;"></span> YoY Growth % (Bars)</span>
+                <span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 2px; background: rgba(192,132,252,0.8); display: inline-block; border-top: 1px dashed rgba(192,132,252,0.8);"></span> Regression Trend</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multi-Metric Comparison Overlay Modal -->
+    <div id="fs-compare-modal" class="catalyst-modal-overlay" style="display: none; z-index: 10000;">
+        <div class="fs-compare-modal-card">
+            <button id="fs-compare-close-btn" style="position: absolute; top: 15px; right: 15px; background: transparent; border: none; font-size: 16px; cursor: pointer; color: var(--text-secondary); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--border-glass);">&times;</button>
+            <div>
+                <h3 id="fs-compare-title" style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-primary);">Multi-Metric Comparison</h3>
+                <span style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-weight: bold; display: block; margin-top: 2px;">normalized % change from base period</span>
+            </div>
+            <div id="fs-compare-legend" style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 10px;"></div>
+            <div class="fs-compare-canvas-container">
+                <canvas id="fs-compare-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
     <script src="export_manager.js?v=1.1.7"></script>
-    <script src="app.js?v=1.6.5"></script>
+    <script src="app.js?v=1.6.6"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>

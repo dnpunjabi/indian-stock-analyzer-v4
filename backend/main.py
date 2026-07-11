@@ -5154,9 +5154,12 @@ async def get_stock_shareholding(symbol: str):
         if row:
             try:
                 last_updated = datetime.strptime(row["last_updated"], "%Y-%m-%d %H:%M:%S")
-                # If cache is valid (under 30 days old), return it instantly
+                # If cache is valid (under 30 days old), verify complete keys
                 if datetime.now() - last_updated < timedelta(days=30):
-                    return json.loads(row["data_json"])
+                    parsed_data = json.loads(row["data_json"])
+                    # If cash_flow or peers is missing or incomplete, force a cache miss to re-scrape
+                    if isinstance(parsed_data, dict) and "cash_flow" in parsed_data and parsed_data["cash_flow"]:
+                        return parsed_data
             except Exception:
                 pass
                 
@@ -5214,9 +5217,12 @@ async def get_stock_financial_statements(symbol: str, view: str = "consolidated"
         if row:
             try:
                 last_updated = datetime.strptime(row["last_updated"], "%Y-%m-%d %H:%M:%S")
-                # If cache is valid (under 30 days old), return it instantly
+                # If cache is valid (under 30 days old), verify complete keys
                 if datetime.now() - last_updated < timedelta(days=30):
-                    return json.loads(row["data_json"])
+                    parsed_data = json.loads(row["data_json"])
+                    # If cash_flow or peers is missing or incomplete, force a cache miss to re-scrape
+                    if isinstance(parsed_data, dict) and "cash_flow" in parsed_data and parsed_data["cash_flow"]:
+                        return parsed_data
             except Exception:
                 pass
                 

@@ -12132,7 +12132,7 @@ function setupChatDrawer() {
 
         <div class="metric-card">
             <div class="meta-label">Z-Score / Piotroski</div>
-            <div style="font-size: 10.5pt; font-weight: 700; margin-top: 6px; color: #1f2937; line-height: 1.3;">
+            <div style="font-size: 10.5pt; font-weight: 700; margin-top: 6px; color: var(--text-primary); line-height: 1.3;">
                 Z: ${altman.split(' ')[0]}<br>
                 F-Score: ${piotroski.split(' ')[0]}
             </div>
@@ -12915,7 +12915,13 @@ async function sendUserChatMessage() {
                 } else if (act.type === 'load_stock') {
                     const symbol = act.symbol || '';
                     if (symbol) {
-                        loadStockAnalyzer(symbol);
+                        const cleanSym = symbol.toUpperCase().replace('.NS', '').replace('.BO', '');
+                        const cleanActive = activeStockProfile && activeStockProfile.ticker ? activeStockProfile.ticker.toUpperCase().replace('.NS', '').replace('.BO', '') : '';
+                        if (cleanSym !== cleanActive) {
+                            loadStockAnalyzer(symbol);
+                        } else {
+                            console.log(`[Copilot] Symbol ${symbol} is already active. Bypassing redundant reload.`);
+                        }
                     }
                 } else if (act.type === 'add_to_watchlist') {
                     const symbol = act.symbol || '';
@@ -36609,9 +36615,9 @@ function setupAcademyDrawCanvas() {
         .dupont-row { display: flex; justify-content: space-around; width: 100%; }
         .dupont-node { border: 1px solid ${borderColor}; border-radius: 6px; padding: 10px 15px; min-width: 120px; text-align: center; background: ${bgColor}; }
         .dupont-node.primary { border-color: #8b5cf6; background: rgba(139, 92, 246, 0.05); }
-        .dupont-node-title { font-size: 10px; color: #9ca3af; text-transform: uppercase; }
+        .dupont-node-title { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; }
         .dupont-node-value { font-size: 16px; font-weight: bold; }
-        .dupont-operator { font-size: 20px; align-self: center; color: #9ca3af; }
+        .dupont-operator { font-size: 20px; align-self: center; color: var(--text-muted); }
         .custom-metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; }
         .custom-metric-card { border: 1px solid ${borderColor}; border-radius: 6px; padding: 15px; text-align: center; background: ${bgColor}; }
         .custom-metric-title { font-size: 12px; color: #9ca3af; }
@@ -38611,11 +38617,34 @@ function showToastNotification(message) {
 let activeFsView = 'standalone';
 let activeFsStatement = 'quarters';
 let activeFsData = null;
+let activeFsMode = 'absolute'; // absolute or percentage
+let activeFsChartInstance = null;
 
 function resetFinancialStatementsUI() {
     activeFsView = 'standalone';
     activeFsStatement = 'quarters';
     activeFsData = null;
+    activeFsMode = 'absolute';
+    
+    // Hide HUD panels
+    const hud = document.getElementById('fs-worthiness-hud');
+    if (hud) hud.style.display = 'none';
+    const dupont = document.getElementById('fs-dupont-accordion');
+    if (dupont) dupont.style.display = 'none';
+    const dupontContent = document.getElementById('fs-dupont-content');
+    if (dupontContent) dupontContent.style.display = 'none';
+    
+    // Reset Mode buttons
+    const absBtn = document.getElementById('fs-mode-absolute-btn');
+    const pctBtn = document.getElementById('fs-mode-percentage-btn');
+    if (absBtn && pctBtn) {
+        absBtn.className = 'btn-primary';
+        absBtn.style.background = '';
+        absBtn.style.color = '';
+        pctBtn.className = 'btn-secondary';
+        pctBtn.style.background = 'none';
+        pctBtn.style.color = 'var(--text-secondary)';
+    }
     
     // Reset toggle buttons
     const consBtn = document.getElementById('fs-view-consolidated-btn');
@@ -38756,7 +38785,695 @@ function formatFsValue(val, isPercent) {
     return val.toLocaleString('en-IN');
 }
 
+function getFsLatestValue(statementKey, possibleLabels) {
+    if (!activeFsData || !activeFsData[statementKey]) return null;
+    const rows = activeFsData[statementKey].rows || [];
+    for (const label of possibleLabels) {
+        const matchingRow = rows.find(r => {
+            const cleanLabel = r.label.toLowerCase();
+            return cleanLabel === label.toLowerCase() || 
+                   cleanLabel.startsWith(label.toLowerCase() + " ") || 
+                   cleanLabel.endsWith(" " + label.toLowerCase()) ||
+                   cleanLabel.includes(" " + label.toLowerCase() + " ");
+        });
+        if (matchingRow && matchingRow.values && matchingRow.values.length > 0) {
+            for (let i = matchingRow.values.length - 1; i >= 0; i--) {
+                const val = matchingRow.values[i];
+                if (typeof val === 'number') {
+                    return { value: val, index: i, allValues: matchingRow.values, label: matchingRow.label };
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function calculateRowCAGR(values, statementType) {
+    if (!values || values.length < 2) return null;
+    const numericValues = values.map(v => typeof v === 'number' ? v : null);
+    
+    let firstIdx = -1;
+    for (let i = 0; i < numericValues.length; i++) {
+        if (numericValues[i] !== null && numericValues[i] > 0) {
+            firstIdx = i;
+            break;
+        }
+    }
+    
+    let lastIdx = -1;
+    for (let i = numericValues.length - 1; i >= 0; i--) {
+        if (numericValues[i] !== null && numericValues[i] > 0) {
+            lastIdx = i;
+            break;
+        }
+    }
+    
+    if (firstIdx === -1 || lastIdx === -1 || firstIdx >= lastIdx) return null;
+    
+    const firstVal = numericValues[firstIdx];
+    const lastVal = numericValues[lastIdx];
+    const numPeriods = lastIdx - firstIdx;
+    
+    if (numPeriods <= 0) return null;
+    
+    if (statementType === 'quarters') {
+        return Math.pow(lastVal / firstVal, 4 / numPeriods) - 1;
+    } else {
+        return Math.pow(lastVal / firstVal, 1 / numPeriods) - 1;
+    }
+}
+
+function renderDuPontTreeChart(npm, turn, leverage, roe) {
+    const container = document.getElementById('fs-dupont-chart-container');
+    if (!container) return;
+    
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || 
+                    document.documentElement.getAttribute('data-mode') === 'light' || 
+                    document.body.getAttribute('data-theme') === 'light' || 
+                    document.body.getAttribute('data-mode') === 'light';
+    const lineColor = isLight ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.15)';
+    const nodeBg = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.02)';
+    
+    const isMobile = window.innerWidth < 640;
+    const bottomFlexDir = isMobile ? 'column' : 'row';
+    const bottomAlign = isMobile ? 'center' : 'stretch';
+    const nodeStyle = isMobile ? 'width: 100%; max-width: 280px; margin: 4px 0;' : 'flex: 1;';
+
+    container.innerHTML = `
+        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; font-family: 'Outfit', sans-serif; padding: 10px 0; gap: 12px;">
+            <!-- Top Node: ROE -->
+            <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: 1px solid var(--border-glass); border-radius: 8px; padding: 8px 16px; text-align: center; box-shadow: var(--shadow-glass); min-width: 140px; position: relative;">
+                <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.85);">Return on Equity (ROE)</div>
+                <div style="font-size: 18px; font-weight: bold; color: #ffffff; margin-top: 2px;">${roe.toFixed(2)}%</div>
+            </div>
+            
+            <!-- Connection Lines -->
+            ${isMobile ? `
+            <div style="width: 1px; height: 16px; background: ${lineColor};"></div>
+            ` : `
+            <div style="display: flex; justify-content: space-around; width: 80%; height: 16px; position: relative;">
+                <div style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 1px; height: 8px; background: ${lineColor};"></div>
+                <div style="position: absolute; top: 8px; left: 16%; right: 16%; height: 1px; background: ${lineColor};"></div>
+                <div style="position: absolute; top: 8px; left: 16%; width: 1px; height: 8px; background: ${lineColor};"></div>
+                <div style="position: absolute; top: 8px; left: 50%; width: 1px; height: 8px; background: ${lineColor};"></div>
+                <div style="position: absolute; top: 8px; right: 16%; width: 1px; height: 8px; background: ${lineColor};"></div>
+            </div>
+            `}
+            
+            <!-- 3 Bottom Nodes: NPM, Asset Turnover, Leverage -->
+            <div style="display: flex; flex-direction: ${bottomFlexDir}; align-items: ${bottomAlign}; justify-content: space-between; width: 100%; gap: 10px;">
+                <!-- Node 1: Profit Margin -->
+                <div style="${nodeStyle} background: ${nodeBg}; border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 4px; text-align: center; box-shadow: var(--shadow-glass);">
+                    <div style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.02em;">Net Profit Margin</div>
+                    <div style="font-size: 12px; font-weight: bold; color: var(--color-primary); margin-top: 2px;">${npm.toFixed(2)}%</div>
+                    <div style="font-size: 7px; color: var(--text-muted); margin-top: 2px; font-style: italic;">Net Profit ÷ Sales</div>
+                </div>
+                
+                ${isMobile ? `
+                <div style="font-size: 12px; font-weight: bold; color: var(--text-muted); margin: 2px 0;">×</div>
+                ` : `
+                <div style="align-self: center; font-size: 12px; font-weight: bold; color: var(--text-muted);">×</div>
+                `}
+                
+                <!-- Node 2: Asset Turnover -->
+                <div style="${nodeStyle} background: ${nodeBg}; border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 4px; text-align: center; box-shadow: var(--shadow-glass);">
+                    <div style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.02em;">Asset Turnover</div>
+                    <div style="font-size: 12px; font-weight: bold; color: var(--color-emerald); margin-top: 2px;">${turn.toFixed(2)}x</div>
+                    <div style="font-size: 7px; color: var(--text-muted); margin-top: 2px; font-style: italic;">Sales ÷ Total Assets</div>
+                </div>
+                
+                ${isMobile ? `
+                <div style="font-size: 12px; font-weight: bold; color: var(--text-muted); margin: 2px 0;">×</div>
+                ` : `
+                <div style="align-self: center; font-size: 12px; font-weight: bold; color: var(--text-muted);">×</div>
+                `}
+                
+                <!-- Node 3: Financial Leverage -->
+                <div style="${nodeStyle} background: ${nodeBg}; border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 4px; text-align: center; box-shadow: var(--shadow-glass);">
+                    <div style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.02em;">Equity Multiplier</div>
+                    <div style="font-size: 12px; font-weight: bold; color: var(--color-amber); margin-top: 2px;">${leverage.toFixed(2)}x</div>
+                    <div style="font-size: 7px; color: var(--text-muted); margin-top: 2px; font-style: italic;">Assets ÷ Equity</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function calculateWorthinessAndDupont() {
+    const hud = document.getElementById('fs-worthiness-hud');
+    const dupontPanel = document.getElementById('fs-dupont-accordion');
+    
+    if (!activeFsData) {
+        if (hud) hud.style.display = 'none';
+        if (dupontPanel) dupontPanel.style.display = 'none';
+        return;
+    }
+    
+    if (!activeFsData.profit_loss || !activeFsData.balance_sheet) {
+        if (hud) hud.style.display = 'none';
+        if (dupontPanel) dupontPanel.style.display = 'none';
+        return;
+    }
+    
+    if (hud) hud.style.display = 'block';
+    if (dupontPanel) dupontPanel.style.display = 'block';
+    
+    const salesObj = getFsLatestValue('profit_loss', ['sales', 'revenue', 'interest earned']);
+    const netProfitObj = getFsLatestValue('profit_loss', ['net profit', 'profit after tax', 'pat']);
+    const borrowingsObj = getFsLatestValue('balance_sheet', ['borrowings', 'secured loans', 'unsecured loans']);
+    const reservesObj = getFsLatestValue('balance_sheet', ['reserves', 'retained earnings']);
+    const shareCapitalObj = getFsLatestValue('balance_sheet', ['share capital', 'equity share capital']);
+    const totalAssetsObj = getFsLatestValue('balance_sheet', ['total assets', 'total liabilities']);
+    const ocfObj = getFsLatestValue('cash_flow', ['cash from operating activity', 'operating cash flow', 'net cash from operating activities']);
+    
+    const sales = salesObj ? salesObj.value : 0;
+    const netProfit = netProfitObj ? netProfitObj.value : 0;
+    const borrowings = borrowingsObj ? borrowingsObj.value : 0;
+    const reserves = reservesObj ? reservesObj.value : 0;
+    const shareCapital = shareCapitalObj ? shareCapitalObj.value : 0;
+    const totalAssets = totalAssetsObj ? totalAssetsObj.value : 0;
+    const ocf = ocfObj ? ocfObj.value : null;
+    
+    const equity = shareCapital + reserves;
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // APEX WEIGHTED FACTOR MODEL v2.0
+    // Pure weighted average — NO base score. Each factor scores 0-10
+    // with a weight. Final = Σ(score × weight) / Σ(weight) × 10 → 0-100
+    // All 10 factors always produce a score (no dead zones).
+    // Piotroski F-Score & Altman Z' computed directly from FS data.
+    // ═══════════════════════════════════════════════════════════════════
+    
+    const factors = [];
+    const TOTAL_FACTORS = 10;
+    
+    // Helper: get numeric values array from a FS row
+    function _getNumericVals(obj) {
+        if (!obj || !obj.allValues) return [];
+        return obj.allValues.filter(v => typeof v === 'number');
+    }
+    
+    // Helper: find a row directly from statement rows
+    function _findFsRow(statementKey, keywords) {
+        if (!activeFsData || !activeFsData[statementKey] || !activeFsData[statementKey].rows) return null;
+        return activeFsData[statementKey].rows.find(r => {
+            const lbl = (r.label || '').toLowerCase();
+            return keywords.some(k => lbl.includes(k));
+        });
+    }
+    
+    // ── Factor 1: Revenue Growth CAGR (weight: 12) ──────────────────
+    if (salesObj && salesObj.allValues) {
+        const numVals = _getNumericVals(salesObj).filter(v => v > 0);
+        if (numVals.length >= 2) {
+            const periods = Math.min(numVals.length - 1, 5);
+            const startVal = numVals[numVals.length - 1 - periods];
+            const endVal = numVals[numVals.length - 1];
+            if (startVal > 0) {
+                const cagr = Math.pow(endVal / startVal, 1 / periods) - 1;
+                let s;
+                if (cagr >= 0.25) s = 10;
+                else if (cagr >= 0.15) s = 9;
+                else if (cagr >= 0.10) s = 8;
+                else if (cagr >= 0.05) s = 6;
+                else if (cagr >= 0) s = 5;
+                else if (cagr >= -0.05) s = 3;
+                else s = 1;
+                const pText = (cagr * 100).toFixed(1) + '% ' + (periods > 1 ? periods + 'Y CAGR' : 'YoY');
+                factors.push({ name: 'Revenue Growth', score: s, weight: 12,
+                    reason: pText,
+                    sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+            }
+        }
+    }
+    
+    // ── Factor 2: Profitability — Net Profit Margin (weight: 10) ────
+    if (sales > 0) {
+        const npm = netProfit / sales;
+        let s;
+        if (npm >= 0.25) s = 10;
+        else if (npm >= 0.18) s = 9;
+        else if (npm >= 0.12) s = 8;
+        else if (npm >= 0.08) s = 6;
+        else if (npm >= 0.05) s = 5;
+        else if (npm >= 0.02) s = 4;
+        else if (npm >= 0) s = 2;
+        else s = 1;
+        factors.push({ name: 'Profitability', score: s, weight: 10,
+            reason: 'NPM ' + (npm * 100).toFixed(1) + '%',
+            sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+    }
+    
+    // ── Factor 3: Leverage — Debt/Equity (weight: 10) ───────────────
+    if (equity > 0) {
+        const de = borrowings / equity;
+        let s;
+        if (de <= 0.05) s = 10;
+        else if (de <= 0.2) s = 9;
+        else if (de <= 0.4) s = 8;
+        else if (de <= 0.6) s = 7;
+        else if (de <= 0.8) s = 5;
+        else if (de <= 1.0) s = 4;
+        else if (de <= 1.5) s = 3;
+        else s = 1;
+        factors.push({ name: 'Leverage', score: s, weight: 10,
+            reason: 'D/E ' + de.toFixed(2) + 'x',
+            sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+    }
+    
+    // ── Factor 4: Return on Equity (weight: 12) ─────────────────────
+    if (equity > 0 && netProfit !== 0) {
+        const roe = netProfit / equity;
+        let s;
+        if (roe >= 0.25) s = 10;
+        else if (roe >= 0.20) s = 9;
+        else if (roe >= 0.15) s = 8;
+        else if (roe >= 0.12) s = 7;
+        else if (roe >= 0.08) s = 5;
+        else if (roe >= 0.04) s = 4;
+        else if (roe >= 0) s = 2;
+        else s = 1;
+        factors.push({ name: 'Return on Equity', score: s, weight: 12,
+            reason: 'ROE ' + (roe * 100).toFixed(1) + '%',
+            sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+    }
+    
+    // ── Factor 5: Earnings Quality — OCF/PAT (weight: 10) ──────────
+    if (ocf !== null && netProfit > 0) {
+        const ratio = ocf / netProfit;
+        let s;
+        if (ratio >= 1.3) s = 10;
+        else if (ratio >= 1.0) s = 9;
+        else if (ratio >= 0.8) s = 7;
+        else if (ratio >= 0.6) s = 5;
+        else if (ratio >= 0.4) s = 4;
+        else if (ratio >= 0.2) s = 2;
+        else s = 1;
+        factors.push({ name: 'Earnings Quality', score: s, weight: 10,
+            reason: 'OCF/PAT ' + ratio.toFixed(2) + 'x',
+            sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+    }
+    
+    // ── Factor 6: Margin Stability — OPM trend (weight: 8) ─────────
+    if (activeFsData && activeFsData.profit_loss && activeFsData.profit_loss.rows) {
+        const opmRow = activeFsData.profit_loss.rows.find(r => {
+            const label = (r.label || '').toLowerCase();
+            return label.includes('opm') || label.includes('operating profit margin');
+        });
+        if (opmRow && opmRow.values) {
+            const vals = opmRow.values.filter(v => typeof v === 'number');
+            if (vals.length >= 2) {
+                const latest = vals[vals.length - 1];
+                const lookback = vals[Math.max(0, vals.length - 4)];
+                const diff = latest - lookback;
+                let s;
+                if (diff >= 4) s = 10;
+                else if (diff >= 2) s = 9;
+                else if (diff >= 0) s = 7;
+                else if (diff >= -1) s = 6;
+                else if (diff >= -3) s = 4;
+                else if (diff >= -5) s = 3;
+                else s = 1;
+                const diffSign = diff >= 0 ? '+' : '';
+                factors.push({ name: 'Margin Stability', score: s, weight: 8,
+                    reason: 'OPM ' + latest.toFixed(1) + '% vs ' + lookback.toFixed(1) + '% (' + diffSign + diff.toFixed(1) + 'pp)',
+                    sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+            }
+        }
+    }
+    
+    // ── Factor 7: Piotroski F-Score — COMPUTED from FS data (weight: 8)
+    {
+        let fScore = 0;
+        let fMax = 0;
+        
+        // Criterion 1: Positive net income
+        fMax++;
+        if (netProfit > 0) fScore++;
+        
+        // Criterion 2: Positive ROA (net profit / total assets)
+        if (totalAssets > 0) {
+            fMax++;
+            if (netProfit / totalAssets > 0) fScore++;
+        }
+        
+        // Criterion 3: Positive operating cash flow
+        if (ocf !== null) {
+            fMax++;
+            if (ocf > 0) fScore++;
+        }
+        
+        // Criterion 4: OCF > Net Income (accrual quality) and OCF > 0
+        if (ocf !== null && netProfit !== 0) {
+            fMax++;
+            if (ocf > netProfit && ocf > 0) fScore++;
+        }
+        
+        // Criterion 5: Leverage ratio declining (borrowings/total assets)
+        if (borrowingsObj && borrowingsObj.allValues && totalAssetsObj && totalAssetsObj.allValues) {
+            const bVals = _getNumericVals(borrowingsObj);
+            const taVals = _getNumericVals(totalAssetsObj);
+            if (bVals.length >= 2 && taVals.length >= 2) {
+                fMax++;
+                const latestLev = bVals[bVals.length - 1] / (taVals[taVals.length - 1] || 1);
+                const prevLev = bVals[bVals.length - 2] / (taVals[taVals.length - 2] || 1);
+                if (latestLev <= prevLev) fScore++;
+            }
+        }
+        
+        // Criterion 6: No equity dilution (share capital not increasing)
+        if (shareCapitalObj && shareCapitalObj.allValues) {
+            const scVals = _getNumericVals(shareCapitalObj);
+            if (scVals.length >= 2) {
+                fMax++;
+                if (scVals[scVals.length - 1] <= scVals[scVals.length - 2] * 1.02) fScore++;
+            }
+        }
+        
+        // Criterion 7: OPM improving
+        const _opmRow = _findFsRow('profit_loss', ['opm', 'operating profit margin']);
+        if (_opmRow && _opmRow.values) {
+            const opmVals = _opmRow.values.filter(v => typeof v === 'number');
+            if (opmVals.length >= 2) {
+                fMax++;
+                if (opmVals[opmVals.length - 1] >= opmVals[opmVals.length - 2]) fScore++;
+            }
+        }
+        
+        // Criterion 8: Asset turnover improving (sales/totalAssets)
+        if (salesObj && salesObj.allValues && totalAssetsObj && totalAssetsObj.allValues) {
+            const sVals = _getNumericVals(salesObj);
+            const taVals = _getNumericVals(totalAssetsObj);
+            if (sVals.length >= 2 && taVals.length >= 2) {
+                fMax++;
+                const latestTurn = sVals[sVals.length - 1] / (taVals[taVals.length - 1] || 1);
+                const prevTurn = sVals[sVals.length - 2] / (taVals[taVals.length - 2] || 1);
+                if (latestTurn >= prevTurn) fScore++;
+            }
+        }
+        
+        // Criterion 9: Current ratio improving (Working Capital / Liquidity)
+        const currentAssetsObj = getFsLatestValue('balance_sheet', ['other assets', 'current assets']);
+        const currentLiabilitiesObj = getFsLatestValue('balance_sheet', ['other liabilities', 'current liabilities']);
+        if (currentAssetsObj && currentAssetsObj.allValues && currentLiabilitiesObj && currentLiabilitiesObj.allValues) {
+            const caVals = _getNumericVals(currentAssetsObj);
+            const clVals = _getNumericVals(currentLiabilitiesObj);
+            if (caVals.length >= 2 && clVals.length >= 2) {
+                fMax++;
+                const latestCR = caVals[caVals.length - 1] / (clVals[clVals.length - 1] || 1);
+                const prevCR = caVals[caVals.length - 2] / (clVals[clVals.length - 2] || 1);
+                if (latestCR > prevCR) fScore++;
+            }
+        }
+        
+        if (fMax >= 4) {
+            const normalized = fScore / fMax;
+            let s;
+            if (normalized >= 0.88) s = 10;
+            else if (normalized >= 0.75) s = 8;
+            else if (normalized >= 0.60) s = 6;
+            else if (normalized >= 0.45) s = 4;
+            else if (normalized >= 0.30) s = 3;
+            else s = 1;
+            factors.push({ name: 'Piotroski F-Score', score: s, weight: 8,
+                reason: fScore + '/' + fMax + ' criteria met',
+                sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+        }
+    }
+    
+    // ── Factor 8: Solvency — Altman Z-Score COMPUTED (weight: 8) ───
+    {
+        // Public company Altman Z-Score:
+        // Z = 1.2*X1 + 1.4*X2 + 3.3*X3 + 0.6*X4 + 1.0*X5
+        // X1 = Working Capital / Total Assets (proxy: other assets − other liabilities)
+        // X2 = Retained Earnings / Total Assets (reserves / TA)
+        // X3 = EBIT / Total Assets (operating profit / TA)
+        // X4 = Market Capitalization / Total Liabilities
+        // X5 = Sales / Total Assets
+        
+        const opProfitObj = getFsLatestValue('profit_loss', ['operating profit', 'ebit', 'pbit']);
+        const otherAssetsObj = getFsLatestValue('balance_sheet', ['other assets', 'current assets']);
+        const otherLiabObj = getFsLatestValue('balance_sheet', ['other liabilities', 'current liabilities']);
+        
+        if (totalAssets > 0 && sales > 0) {
+            const X2 = reserves / totalAssets;
+            const X3 = opProfitObj ? opProfitObj.value / totalAssets : 0;
+            const totalLiabilities = Math.max(totalAssets - equity, 1);
+            
+            const mcap = (typeof activeStockProfile !== 'undefined' && activeStockProfile.fundamentals) ? (activeStockProfile.fundamentals.market_cap_cr || 0) : 0;
+            const X4 = Math.min(mcap > 0 ? mcap / totalLiabilities : equity / totalLiabilities, 12.0);
+            const X5 = sales / totalAssets;
+            
+            let X1 = 0;
+            if (otherAssetsObj && otherLiabObj) {
+                X1 = (otherAssetsObj.value - otherLiabObj.value) / totalAssets;
+            }
+            
+            const zScore = Math.min(15.0, 1.2 * X1 + 1.4 * X2 + 3.3 * X3 + 0.6 * X4 + 1.0 * X5);
+            
+            let s;
+            if (zScore > 2.99) s = 10;
+            else if (zScore >= 1.81) s = 7;
+            else if (zScore > 1.2) s = 4;
+            else s = 1;
+            
+            const zoneText = zScore > 2.99 ? 'Safe Zone' : zScore >= 1.81 ? 'Grey Zone' : 'Distress Zone';
+            factors.push({ name: 'Solvency', score: s, weight: 8,
+                reason: "Z " + zScore.toFixed(2) + ' — ' + zoneText,
+                sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+        }
+    }
+    
+    // ── Factor 9: Cash Generation — FCF (weight: 10) ────────────────
+    if (activeFsData && activeFsData.cash_flow && activeFsData.cash_flow.rows) {
+        const cfRows = activeFsData.cash_flow.rows;
+        const ocfRow = cfRows.find(r => {
+            const l = (r.label || '').toLowerCase();
+            return l.includes('cash from operating') || l.includes('operating cash flow');
+        });
+        const capexRow = cfRows.find(r => {
+            const l = (r.label || '').toLowerCase();
+            return l.includes('purchase of fixed assets') || l.includes('capital expenditure') || l.includes('capex');
+        });
+        if (ocfRow && ocfRow.values) {
+            const ocfVals = ocfRow.values.filter(v => typeof v === 'number');
+            const latestOCF = ocfVals.length > 0 ? ocfVals[ocfVals.length - 1] : null;
+            if (latestOCF !== null) {
+                let capex = 0;
+                if (capexRow && capexRow.values) {
+                    const capexVals = capexRow.values.filter(v => typeof v === 'number');
+                    capex = capexVals.length > 0 ? Math.abs(capexVals[capexVals.length - 1]) : 0;
+                }
+                const fcf = latestOCF - capex;
+                let s;
+                if (fcf > 0 && sales > 0) {
+                    const fcfMargin = fcf / sales;
+                    if (fcfMargin >= 0.15) s = 10;
+                    else if (fcfMargin >= 0.10) s = 9;
+                    else if (fcfMargin >= 0.05) s = 7;
+                    else if (fcfMargin >= 0.02) s = 6;
+                    else s = 5;
+                } else if (fcf > 0) {
+                    s = 6;
+                } else {
+                    s = 2;
+                }
+                const fcfText = '₹' + Math.round(Math.abs(fcf)).toLocaleString('en-IN') + ' Cr';
+                factors.push({ name: 'Cash Generation', score: s, weight: 10,
+                    reason: (fcf >= 0 ? '+' : '-') + fcfText + (sales > 0 && fcf > 0 ? ' (' + (fcf / sales * 100).toFixed(1) + '% margin)' : ''),
+                    sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+            }
+        }
+    }
+    
+    // ── Factor 10: Technical Momentum — SMA Stack (weight: 8) ───────
+    if (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.technicals) {
+        const tech = activeStockProfile.technicals;
+        const currentPrice = tech.current_price || 0;
+        const smas = [
+            { name: 'SMA20', value: tech.sma_20 },
+            { name: 'SMA50', value: tech.sma_50 },
+            { name: 'SMA100', value: tech.sma_100 },
+            { name: 'SMA200', value: tech.sma_200 }
+        ].filter(x => x.value && x.value > 0);
+        
+        if (smas.length > 0 && currentPrice > 0) {
+            const aboveCount = smas.filter(x => currentPrice > x.value).length;
+            let s;
+            if (aboveCount === smas.length) s = 10;
+            else if (aboveCount >= 3) s = 8;
+            else if (aboveCount === 2) s = 5;
+            else if (aboveCount === 1) s = 3;
+            else s = 1;
+            const aboveNames = smas.filter(x => currentPrice > x.value).map(x => x.name).join(', ');
+            factors.push({ name: 'Tech Momentum', score: s, weight: 8,
+                reason: 'Above ' + aboveCount + '/' + smas.length + ' SMAs' + (aboveNames ? ' (' + aboveNames + ')' : ''),
+                sentiment: s >= 7 ? 'bullish' : s >= 4 ? 'neutral' : 'bearish' });
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // FINAL WEIGHTED SCORE CALCULATION (no base — pure data-driven)
+    // ═══════════════════════════════════════════════════════════════════
+    const totalWeight = factors.reduce((sum, f) => sum + f.weight, 0);
+    const weightedSum = factors.reduce((sum, f) => sum + f.score * f.weight, 0);
+    const score = totalWeight > 0 ? Math.min(100, Math.max(0, Math.round((weightedSum / totalWeight) * 10))) : 0;
+    
+    const bullishCount = factors.filter(f => f.sentiment === 'bullish').length;
+    const neutralCount = factors.filter(f => f.sentiment === 'neutral').length;
+    const bearishCount = factors.filter(f => f.sentiment === 'bearish').length;
+    const missingCount = TOTAL_FACTORS - factors.length;
+    
+    // ── UI Rendering ────────────────────────────────────────────────
+    const scoreValEl = document.getElementById('fs-worthiness-score-val');
+    const scoreCircleEl = document.getElementById('fs-worthiness-circle-fill');
+    const scoreBadgeEl = document.getElementById('fs-worthiness-badge');
+    const reasonsListEl = document.getElementById('fs-reasons-list');
+    
+    // Animated score counter
+    if (scoreValEl) {
+        let currentVal = parseInt(scoreValEl.textContent) || 0;
+        const targetVal = score;
+        const duration = 800;
+        const startTime = performance.now();
+        const animateCounter = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const displayVal = Math.round(currentVal + (targetVal - currentVal) * eased);
+            scoreValEl.textContent = displayVal + "%";
+            if (progress < 1) requestAnimationFrame(animateCounter);
+        };
+        requestAnimationFrame(animateCounter);
+    }
+    if (scoreCircleEl) scoreCircleEl.setAttribute('stroke-dasharray', score + ', 100');
+    
+    // Grade & color (calibrated for 0-based scoring)
+    let color = "var(--color-crimson)";
+    let grade = "HIGH RISK";
+    if (score >= 80) {
+        color = "var(--color-emerald)";
+        grade = "STRONG BUY-GRADE";
+    } else if (score >= 65) {
+        color = "#22c55e";
+        grade = "BUY-GRADE";
+    } else if (score >= 50) {
+        color = "var(--color-amber)";
+        grade = "WATCHLIST-GRADE";
+    } else if (score >= 35) {
+        color = "#f97316";
+        grade = "CAUTION-GRADE";
+    }
+    
+    if (scoreBadgeEl) {
+        scoreBadgeEl.textContent = grade;
+        scoreBadgeEl.style.color = color;
+        scoreBadgeEl.style.background = color + "15";
+    }
+    
+    // Factors breakdown rendering
+    if (reasonsListEl) {
+        if (factors.length === 0) {
+            reasonsListEl.innerHTML = '<li style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">Insufficient data to analyze worthiness metrics.</li>';
+        } else {
+            // Sort: bullish first, then neutral, then bearish
+            const sortedFactors = [...factors].sort((a, b) => {
+                const order = { bullish: 0, neutral: 1, bearish: 2 };
+                return (order[a.sentiment] || 1) - (order[b.sentiment] || 1);
+            });
+            
+            let headerHtml = '<li style="font-size: 10px; color: var(--text-muted); margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border-glass); font-weight: 600; letter-spacing: 0.03em;">'
+                + factors.length + ' OF ' + TOTAL_FACTORS + ' FACTORS EVALUATED';
+            if (bullishCount > 0) headerHtml += ' · ' + bullishCount + ' BULLISH';
+            if (neutralCount > 0) headerHtml += ' · ' + neutralCount + ' NEUTRAL';
+            if (bearishCount > 0) headerHtml += ' · ' + bearishCount + ' BEARISH';
+            headerHtml += '</li>';
+            
+            const factorsHtml = sortedFactors.map(f => {
+                const sentimentIcon = f.sentiment === 'bullish' ? '✓' : f.sentiment === 'bearish' ? '⚠️' : '●';
+                const sentimentColor = f.sentiment === 'bullish' ? 'var(--color-emerald)' : f.sentiment === 'bearish' ? 'var(--color-crimson)' : 'var(--color-amber)';
+                const scoreBg = f.sentiment === 'bullish' ? 'rgba(16,185,129,0.1)' : f.sentiment === 'bearish' ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)';
+                const scoreBorder = f.sentiment === 'bullish' ? 'rgba(16,185,129,0.25)' : f.sentiment === 'bearish' ? 'rgba(239,68,68,0.25)' : 'rgba(245,158,11,0.25)';
+                
+                return '<li style="font-size: 11.5px; color: var(--text-primary); margin-bottom: 3px; display: flex; align-items: center; gap: 6px; padding: 3px 0;">'
+                    + '<span style="color: ' + sentimentColor + '; font-weight: bold; flex-shrink: 0; width: 16px; text-align: center;">' + sentimentIcon + '</span>'
+                    + '<span style="flex: 1; display: flex; align-items: center; gap: 6px;">'
+                    + '<strong style="min-width: 110px; font-weight: 600;">' + f.name + '</strong>'
+                    + '<span style="font-size: 9px; background: ' + scoreBg + '; color: ' + sentimentColor + '; padding: 1px 5px; border-radius: 3px; border: 1px solid ' + scoreBorder + '; font-weight: 700; white-space: nowrap;">' + f.score + '/10</span>'
+                    + '<span style="color: var(--text-secondary); font-size: 11px;">— ' + f.reason + '</span>'
+                    + '</span>'
+                    + '</li>';
+            }).join('');
+            
+            // Add missing factors info
+            let missingHtml = '';
+            if (missingCount > 0) {
+                missingHtml = '<li style="font-size: 10px; color: var(--text-muted); margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border-glass); font-style: italic;">'
+                    + '⊘ ' + missingCount + ' factor' + (missingCount > 1 ? 's' : '') + ' skipped (insufficient data)'
+                    + '</li>';
+            }
+            
+            reasonsListEl.innerHTML = headerHtml + factorsHtml + missingHtml;
+        }
+    }
+    
+    const npmVal = sales > 0 ? (netProfit / sales) : 0;
+    const assetTurn = totalAssets > 0 ? (sales / totalAssets) : 0;
+    const levVal = equity > 0 ? (totalAssets / equity) : 0;
+    const calcRoe = npmVal * assetTurn * levVal * 100;
+    
+    const npmValEl = document.getElementById('fs-dupont-margin');
+    const turnValEl = document.getElementById('fs-dupont-turnover');
+    const levValEl = document.getElementById('fs-dupont-leverage');
+    const roeValEl = document.getElementById('fs-dupont-roe');
+    const roeStatusEl = document.getElementById('fs-dupont-roe-status');
+    
+    if (npmValEl) npmValEl.textContent = (npmVal * 100).toFixed(2) + "%";
+    if (turnValEl) turnValEl.textContent = assetTurn.toFixed(2) + "x";
+    if (levValEl) levValEl.textContent = levVal.toFixed(2) + "x";
+    if (roeValEl) roeValEl.textContent = calcRoe.toFixed(2) + "%";
+    
+    if (roeStatusEl) {
+        if (calcRoe >= 20) {
+            roeStatusEl.textContent = "Stellar Return";
+            roeStatusEl.style.color = "var(--color-emerald)";
+        } else if (calcRoe >= 12) {
+            roeStatusEl.textContent = "Healthy Return";
+            roeStatusEl.style.color = "var(--color-primary-light)";
+        } else if (calcRoe < 6 && calcRoe !== 0) {
+            roeStatusEl.textContent = "Sub-optimal Return";
+            roeStatusEl.style.color = "var(--color-crimson)";
+        } else if (calcRoe === 0) {
+            roeStatusEl.textContent = "--";
+            roeStatusEl.style.color = "var(--text-muted)";
+        } else {
+            roeStatusEl.textContent = "Moderate Return";
+            roeStatusEl.style.color = "var(--color-amber)";
+        }
+    }
+    
+    renderDuPontTreeChart(npmVal * 100, assetTurn, levVal, calcRoe);
+}
+
 function renderActiveStatementTable() {
+    // Automatically trigger worthiness evaluation when statement renders
+    calculateWorthinessAndDupont();
+    
+    // Calculate anomaly flags BEFORE rendering so badges are available during row HTML generation
+    if (typeof calculateAnomalyFlags === 'function') {
+        calculateAnomalyFlags();
+    }
+    
+    // ── Enhancement hooks ──
+    if (typeof renderFinancialHealthDashboard === 'function') renderFinancialHealthDashboard();
+    if (typeof updateVisualInsightPanel === 'function') updateVisualInsightPanel();
+    
+    // Show/hide compare mode button (not for peers)
+    const compareModeBtn = document.getElementById('fs-compare-mode-btn');
+    if (compareModeBtn) {
+        compareModeBtn.style.display = (activeFsStatement !== 'peers') ? 'inline-flex' : 'none';
+    }
+    
     const tableEl = document.getElementById('financial-statements-table');
     if (!tableEl || !activeFsData) return;
     
@@ -38769,6 +39486,69 @@ function renderActiveStatementTable() {
     const headers = statement.headers;
     const rows = statement.rows;
     const isPeers = (activeFsStatement === 'peers');
+    
+    if (!window.collapsedFsCategories) {
+        window.collapsedFsCategories = {};
+    }
+
+    const categoryMap = {
+        quarters: {
+            "Revenue & Topline": ["sales", "revenue", "interest earned", "other income"],
+            "Operating Expenses": ["expenses", "material cost", "employee cost", "manufacturing cost"],
+            "Operating Margins": ["operating profit", "opm"],
+            "Finance & Depreciation": ["depreciation", "interest", "finance cost"],
+            "Earnings & Bottomline": ["profit before tax", "tax", "net profit", "pat", "eps", "profit after tax"]
+        },
+        profit_loss: {
+            "Revenue & Topline": ["sales", "revenue", "interest earned", "other income"],
+            "Operating Expenses": ["expenses", "material cost", "employee cost", "manufacturing cost"],
+            "Operating Margins": ["operating profit", "opm"],
+            "Finance & Depreciation": ["depreciation", "interest", "finance cost"],
+            "Earnings & Bottomline": ["profit before tax", "tax", "net profit", "pat", "eps", "profit after tax"]
+        },
+        balance_sheet: {
+            "Equity Capital": ["share capital", "equity capital", "reserves"],
+            "Liabilities & Debt": ["borrowings", "other liabilities", "total liabilities"],
+            "Assets & Investments": ["fixed assets", "cwip", "investments", "other assets", "total assets"]
+        },
+        cash_flow: {
+            "Operating Cash Flow": ["operating activity", "operating activities", "operating cash flow"],
+            "Investing Cash Flow": ["investing activity", "investing activities"],
+            "Financing Cash Flow": ["financing activity", "financing activities"],
+            "Net Cash Movement": ["net cash flow", "net increase", "net decrease"]
+        }
+    };
+
+    // Find base row values for common-size percentage calculation
+    let baseValues = null;
+    if (activeFsMode === 'percentage' && !isPeers) {
+        let baseKeywords = [];
+        if (activeFsStatement === 'quarters' || activeFsStatement === 'profit_loss') {
+            baseKeywords = ['sales', 'revenue', 'interest earned'];
+        } else if (activeFsStatement === 'balance_sheet') {
+            baseKeywords = ['total assets', 'total liabilities'];
+        }
+        
+        if (baseKeywords.length > 0) {
+            const baseRow = rows.find(r => {
+                const cl = r.label.toLowerCase();
+                return baseKeywords.some(kw => cl === kw || cl.includes(kw));
+            });
+            if (baseRow && baseRow.values) {
+                baseValues = baseRow.values;
+            }
+        }
+    }
+    // Limit rendered columns for responsive layout
+    const limitSelect = document.getElementById('fs-column-filter-select');
+    const limitVal = limitSelect ? limitSelect.value : 'all';
+    let startIndex = 1;
+    if (!isPeers && limitVal !== 'all') {
+        const numCols = parseInt(limitVal, 10);
+        if (headers.length - 1 > numCols) {
+            startIndex = headers.length - numCols;
+        }
+    }
     
     let html = '';
     
@@ -38784,8 +39564,8 @@ function renderActiveStatementTable() {
     }
     
     // Remaining Date/Year or ratio columns
-    for (let i = 1; i < headers.length; i++) {
-        html += `<th style="border-bottom: 2px solid var(--border-glass); font-family: 'Outfit', sans-serif; padding: 8px 12px; white-space: nowrap; text-align: right;">${headers[i]}</th>`;
+    for (let i = startIndex; i < headers.length; i++) {
+        html += `<th style="border-bottom: 2px solid var(--border-glass); font-family: 'Outfit', sans-serif; padding: 8px 12px; white-space: nowrap; text-align: right; cursor: pointer;" title="Click to highlight column">${headers[i]}</th>`;
     }
     html += '</tr></thead>';
     
@@ -38797,8 +39577,8 @@ function renderActiveStatementTable() {
         "reserves", "borrowings", "total liabilities", "fixed assets", "total assets", 
         "operating cash flow", "profit before tax", "other income"
     ];
-    
-    rows.forEach(r => {
+
+    function renderRowHtml(r, isCollapsed = false) {
         const label = r.label;
         const values = r.values;
         const cleanLabelLower = label.toLowerCase();
@@ -38806,28 +39586,69 @@ function renderActiveStatementTable() {
         const isBold = !isPeers && boldLabels.some(b => cleanLabelLower.includes(b));
         const isPercent = cleanLabelLower.includes('%');
         
-        let rowStyle = '';
+        let rowStyle = isCollapsed ? 'display: none;' : '';
         let cellBg = 'var(--bg-card)';
         if (isBold) {
-            rowStyle = 'font-weight: 700; background: rgba(255,255,255,0.015);';
+            rowStyle += 'font-weight: 700; background: rgba(255,255,255,0.015);';
         }
         
         // Highlight analyzed stock row in peers table
         if (isPeers && activeStockProfile && (cleanLabelLower.includes(activeStockProfile.ticker.toLowerCase().replace('.ns', '')) || cleanLabelLower.includes((activeStockProfile.name || '').toLowerCase()))) {
             const isLightMode = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-mode') === 'light';
-            rowStyle = 'font-weight: 700; background: rgba(59, 130, 246, 0.15);';
+            rowStyle += 'font-weight: 700; background: rgba(59, 130, 246, 0.15);';
             cellBg = isLightMode ? '#e0f2fe' : 'rgba(30, 41, 59, 0.95)';
         }
         
-        // Render Row
-        html += `<tr style="${rowStyle}">`;
+        // Render Row — add cursor pointer for click-to-chart behavior
+        html += `<tr style="${rowStyle} cursor: pointer;" title="Click to view trend chart" role="button" tabindex="0">`;
+        
+        // Compute CAGR
+        const cagrVal = isPeers ? null : calculateRowCAGR(values, activeFsStatement);
+        let cagrBadge = '';
+        if (cagrVal !== null) {
+            cagrBadge = `<span style="font-size: 8px; color: var(--color-primary-light); background: rgba(59,130,246,0.1); padding: 1px 4px; border-radius: 3px; font-weight: 500; margin-left: 5px; border: 1px solid rgba(59,130,246,0.15); white-space: nowrap;">CAGR: ${cagrVal >= 0 ? '+' : ''}${(cagrVal * 100).toFixed(1)}%</span>`;
+        }
+        
+        // Anomaly badge injection
+        let anomalyBadge = '';
+        if (!isPeers && window._fsAnomalyFlags) {
+            const matchedFlags = Object.entries(window._fsAnomalyFlags).filter(([key]) => {
+                return cleanLabelLower.includes(key);
+            });
+            if (matchedFlags.length > 0) {
+                anomalyBadge = matchedFlags.map(([, flags]) => {
+                    return flags.map(f => {
+                        const bgColor = f.type === 'warning' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)';
+                        const borderColor = f.type === 'warning' ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)';
+                        const textColor = f.type === 'warning' ? 'var(--color-crimson)' : 'var(--color-emerald)';
+                        return `<span title="${f.detail || ''}" style="font-size: 8px; color: ${textColor}; background: ${bgColor}; padding: 1px 5px; border-radius: 3px; font-weight: 600; margin-left: 4px; border: 1px solid ${borderColor}; white-space: nowrap; cursor: help; animation: fsAnomalyPulse 2s ease-in-out infinite;">${f.text}</span>`;
+                    }).join('');
+                }).join('');
+            }
+        }
+        
+        // Compare mode checkbox
+        let compareCheckbox = '';
+        if (window._fsCompareMode && !isPeers) {
+            const isSelected = window._fsSelectedRows.some(sr => sr.label === label);
+            const cbStyle = isSelected 
+                ? 'width:14px;height:14px;border-radius:3px;border:1.5px solid rgba(139,92,246,0.8);background:rgba(139,92,246,0.35);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;'
+                : 'width:14px;height:14px;border-radius:3px;border:1.5px solid rgba(255,255,255,0.2);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+            const checkMark = isSelected ? '<span style="color:#a78bfa;font-size:10px;line-height:1;">✓</span>' : '';
+            compareCheckbox = `<span class="fs-compare-cb" onclick="event.stopPropagation();toggleFsRowSelection('${label.replace(/'/g, "\\'")}')" style="${cbStyle}">${checkMark}</span>`;
+        }
         
         // Metric/Company Name cell (sticky left)
         const sparkline = isPeers ? '' : generateSparklineSvg(values);
         html += `
             <td style="position: sticky; left: 0; z-index: 5; background: ${cellBg}; border-right: 1px solid var(--border-glass); text-align: left; white-space: nowrap; padding: 8px 12px; font-family: 'Outfit', sans-serif; box-shadow: 2px 0 5px rgba(0,0,0,0.04);">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                    <span>${label}</span>
+                    <div style="display: flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis;">
+                        ${compareCheckbox}
+                        <span style="font-weight: inherit;">${label}</span>
+                        ${cagrBadge}
+                        ${anomalyBadge}
+                    </div>
                     ${sparkline}
                 </div>
             </td>
@@ -38873,17 +39694,1340 @@ function renderActiveStatementTable() {
         }
         
         // Values cells
-        for (let i = 0; i < values.length; i++) {
+        const valStart = startIndex - 1;
+        for (let i = valStart; i < values.length; i++) {
             const isColPercent = isPeers ? (headers[i + 1] && headers[i + 1].toLowerCase().includes('%')) : isPercent;
-            const formatted = formatFsValue(values[i], isColPercent);
+            let formatted = '';
+            
+            if (baseValues && baseValues[i] && typeof values[i] === 'number' && typeof baseValues[i] === 'number') {
+                if (isColPercent) {
+                    formatted = formatFsValue(values[i], true);
+                } else if (cleanLabelLower.includes('sales') || cleanLabelLower.includes('revenue') || cleanLabelLower.includes('total assets') || cleanLabelLower.includes('total liabilities')) {
+                    formatted = '100.0%';
+                } else {
+                    const ratio = (values[i] / baseValues[i]) * 100;
+                    formatted = ratio.toFixed(1) + '%';
+                }
+            } else {
+                formatted = formatFsValue(values[i], isColPercent);
+            }
+            
             html += `<td style="padding: 8px 12px; white-space: nowrap; font-family: 'Inter', sans-serif; text-align: right;">${formatted}</td>`;
         }
         
         html += '</tr>';
-    });
+    }
+
+    // Group rows by categories
+    const categories = categoryMap[activeFsStatement];
+    const grouped = {};
+    const uncategorized = [];
+    
+    if (categories) {
+        // Initialize groups
+        for (const catName of Object.keys(categories)) {
+            grouped[catName] = [];
+        }
+        
+        rows.forEach(r => {
+            const cleanLabel = r.label.toLowerCase();
+            let matched = false;
+            for (const [catName, keywords] of Object.entries(categories)) {
+                if (keywords.some(kw => cleanLabel.includes(kw))) {
+                    grouped[catName].push(r);
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                uncategorized.push(r);
+            }
+        });
+    }
+
+    if (isPeers || !categories) {
+        rows.forEach(r => {
+            renderRowHtml(r, false);
+        });
+    } else {
+        // Render categorized rows
+        for (const [catName, catRows] of Object.entries(grouped)) {
+            if (catRows.length === 0) continue;
+            
+            const isCollapsed = window.collapsedFsCategories[catName] || false;
+            
+            html += `
+                <tr class="fs-cat-header-row" data-category="${catName}" style="cursor: pointer; background: rgba(255, 255, 255, 0.035); font-weight: 700; border-bottom: 1px solid var(--border-glass);">
+                    <td colspan="${headers.length + (isPeers ? 0 : 1)}" style="text-align: left; padding: 8px 12px; font-family: 'Outfit', sans-serif; font-size: 11.5px; color: var(--text-secondary);">
+                        <span class="fs-cat-chevron" style="display: inline-block; width: 10px; margin-right: 6px; transition: transform 0.2s; transform: ${isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'}; font-size: 9px;">▼</span>
+                        ${catName}
+                    </td>
+                </tr>
+            `;
+            
+            catRows.forEach(r => {
+                renderRowHtml(r, isCollapsed);
+            });
+        }
+        
+        if (uncategorized.length > 0) {
+            const isCollapsed = window.collapsedFsCategories["Other Metrics"] || false;
+            html += `
+                <tr class="fs-cat-header-row" data-category="Other Metrics" style="cursor: pointer; background: rgba(255, 255, 255, 0.035); font-weight: 700; border-bottom: 1px solid var(--border-glass);">
+                    <td colspan="${headers.length + (isPeers ? 0 : 1)}" style="text-align: left; padding: 8px 12px; font-family: 'Outfit', sans-serif; font-size: 11.5px; color: var(--text-secondary);">
+                        <span class="fs-cat-chevron" style="display: inline-block; width: 10px; margin-right: 6px; transition: transform 0.2s; transform: ${isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)'}; font-size: 9px;">▼</span>
+                        Other Metrics
+                    </td>
+                </tr>
+            `;
+            uncategorized.forEach(r => {
+                renderRowHtml(r, isCollapsed);
+            });
+        }
+    }
     
     html += '</tbody>';
     tableEl.innerHTML = html;
+
+    // Bind click events on category headers
+    tableEl.querySelectorAll('.fs-cat-header-row').forEach(row => {
+        row.addEventListener('click', () => {
+            const catName = row.getAttribute('data-category');
+            window.collapsedFsCategories[catName] = !window.collapsedFsCategories[catName];
+            renderActiveStatementTable();
+        });
+    });
+
+    // Setup translucent column hover highlighting via event delegation
+    if (!tableEl.dataset.hoverBound) {
+        tableEl.dataset.hoverBound = "true";
+        tableEl.addEventListener('mouseover', (e) => {
+            const cell = e.target.closest('td, th');
+            if (!cell) return;
+            const colIndex = cell.cellIndex;
+            if (colIndex === undefined || colIndex === 0) {
+                tableEl.querySelectorAll('.column-hover-highlight').forEach(c => c.classList.remove('column-hover-highlight'));
+                return;
+            }
+            // Add highlights to cells at colIndex
+            const rows = tableEl.querySelectorAll('tr');
+            rows.forEach(tr => {
+                const c = tr.cells[colIndex];
+                if (c) c.classList.add('column-hover-highlight');
+            });
+        });
+        
+        tableEl.addEventListener('mouseout', (e) => {
+            const cell = e.target.closest('td, th');
+            if (!cell) return;
+            const colIndex = cell.cellIndex;
+            if (colIndex !== undefined) {
+                const rows = tableEl.querySelectorAll('tr');
+                rows.forEach(tr => {
+                    const c = tr.cells[colIndex];
+                    if (c) c.classList.remove('column-hover-highlight');
+                });
+            }
+        });
+    }
+    
+    // ── Row-click-to-chart-modal event delegation ──
+    if (!tableEl.dataset.rowClickBound) {
+        tableEl.dataset.rowClickBound = "true";
+        tableEl.addEventListener('click', (e) => {
+            const tr = e.target.closest('tr');
+            if (!tr || tr.classList.contains('fs-cat-header-row') || tr.closest('thead')) return;
+            
+            // Find the label & values
+            const labelCell = tr.cells[0];
+            if (!labelCell) return;
+            const labelText = labelCell.textContent.trim().split('CAGR:')[0].trim();
+            
+            // Find the matching row data from activeFsData
+            const statement = activeFsData[activeFsStatement];
+            if (!statement || !statement.rows) return;
+            const matchedRow = statement.rows.find(r => {
+                const rowLabel = (r.label || '').trim();
+                return rowLabel.toLowerCase().startsWith(labelText.toLowerCase().slice(0, 10));
+            });
+            
+            if (matchedRow && matchedRow.values && matchedRow.values.length > 1) {
+                const chartHeaders = statement.headers.slice(1);
+                openFsChartModal(matchedRow.label, matchedRow.values, chartHeaders);
+            }
+        });
+        
+        // Keyboard support — Enter/Space on focused rows
+        tableEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                const tr = e.target.closest('tr');
+                if (tr && !tr.classList.contains('fs-cat-header-row') && !tr.closest('thead')) {
+                    e.preventDefault();
+                    tr.click();
+                }
+            }
+        });
+    }
+
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 6B: Anomaly Scanner + Trend Chart Modal
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * calculateAnomalyFlags()
+ * Scans activeFsData for financial anomalies and stores them in window._fsAnomalyFlags.
+ * Badge injection in renderRowHtml reads from this object to display inline warnings/insights.
+ *
+ * Detects:
+ *  1. OPM/Sales divergence (growing sales but shrinking OPM)
+ *  2. Earnings quality (PAT growing faster than operating cash flow)
+ *  3. High leverage (increasing debt-to-equity trends)
+ *  4. Exceptional growth streaks
+ */
+function calculateAnomalyFlags() {
+    window._fsAnomalyFlags = {};
+    if (!activeFsData) return;
+
+    // Helper: extract numeric values from a row matching keywords
+    function findRowValues(statement, keywords) {
+        if (!statement || !statement.rows) return null;
+        const row = statement.rows.find(r => {
+            const lbl = (r.label || '').toLowerCase();
+            return keywords.some(k => lbl.includes(k));
+        });
+        return row ? row.values : null;
+    }
+
+    // Helper: calculate CAGR from array of numbers
+    function cagr(vals) {
+        const nums = vals.filter(v => typeof v === 'number' && v > 0);
+        if (nums.length < 2) return null;
+        const n = nums.length - 1;
+        return Math.pow(nums[nums.length - 1] / nums[0], 1 / n) - 1;
+    }
+
+    // Helper: get latest YoY change
+    function latestYoY(vals) {
+        const nums = vals.filter(v => typeof v === 'number');
+        if (nums.length < 2) return null;
+        const last = nums[nums.length - 1];
+        const prev = nums[nums.length - 2];
+        if (prev === 0) return null;
+        return (last - prev) / Math.abs(prev);
+    }
+
+    // Determine which statement to scan (prefer P&L / quarters)
+    const stmtKey = activeFsData['profit_loss'] ? 'profit_loss' : activeFsData['quarters'] ? 'quarters' : null;
+    const bsKey = activeFsData['balance_sheet'] ? 'balance_sheet' : null;
+    const cfKey = activeFsData['cash_flow'] ? 'cash_flow' : null;
+
+    if (stmtKey) {
+        const stmt = activeFsData[stmtKey];
+
+        // 1. OPM/Sales divergence
+        const salesVals = findRowValues(stmt, ['sales', 'revenue']);
+        const opmVals = findRowValues(stmt, ['opm']);
+        if (salesVals && opmVals) {
+            const salesYoY = latestYoY(salesVals);
+            const opmYoY = latestYoY(opmVals);
+            if (salesYoY !== null && opmYoY !== null) {
+                if (salesYoY > 0.05 && opmYoY < -0.02) {
+                    window._fsAnomalyFlags['opm'] = [{
+                        type: 'warning',
+                        text: '⚠ OPM Divergence',
+                        detail: `Sales growing ${(salesYoY * 100).toFixed(1)}% but OPM contracting ${(opmYoY * 100).toFixed(1)}% — margin pressure detected`
+                    }];
+                }
+            }
+        }
+
+        // 2. PAT / Net Profit anomalies
+        const patVals = findRowValues(stmt, ['net profit', 'profit after tax', 'pat']);
+        if (patVals) {
+            const patYoY = latestYoY(patVals);
+            if (patYoY !== null) {
+                if (patYoY > 0.30) {
+                    const key = patVals === findRowValues(stmt, ['net profit']) ? 'net profit' : 'pat';
+                    window._fsAnomalyFlags[key] = [{
+                        type: 'positive',
+                        text: '🚀 Strong Growth',
+                        detail: `PAT surged ${(patYoY * 100).toFixed(1)}% YoY — exceptional earnings momentum`
+                    }];
+                } else if (patYoY < -0.25) {
+                    const key = patVals === findRowValues(stmt, ['net profit']) ? 'net profit' : 'pat';
+                    window._fsAnomalyFlags[key] = [{
+                        type: 'warning',
+                        text: '⚠ Earnings Decline',
+                        detail: `PAT dropped ${(patYoY * 100).toFixed(1)}% YoY — investigate underlying causes`
+                    }];
+                }
+            }
+        }
+
+        // 3. Earnings quality check (compare PAT growth to CFO)
+        if (cfKey && patVals) {
+            const cfStmt = activeFsData[cfKey];
+            const cfoVals = findRowValues(cfStmt, ['cash from operating', 'operating activity']);
+            if (cfoVals) {
+                const patCAGR = cagr(patVals);
+                const cfoCAGR = cagr(cfoVals);
+                if (patCAGR !== null && cfoCAGR !== null && patCAGR > 0.15 && cfoCAGR < patCAGR * 0.3) {
+                    window._fsAnomalyFlags['cash from operating'] = [{
+                        type: 'warning',
+                        text: '⚠ Earnings Quality',
+                        detail: `PAT CAGR ${(patCAGR * 100).toFixed(1)}% but Cash from Operations CAGR only ${(cfoCAGR * 100).toFixed(1)}% — accrual-based earnings may not be backed by cash`
+                    }];
+                }
+            }
+        }
+
+        // 4. Revenue CAGR badge
+        if (salesVals) {
+            const salesCAGR = cagr(salesVals);
+            if (salesCAGR !== null && salesCAGR > 0.15) {
+                window._fsAnomalyFlags['sales'] = window._fsAnomalyFlags['sales'] || [];
+                window._fsAnomalyFlags['sales'].push({
+                    type: 'positive',
+                    text: '📈 Compounder',
+                    detail: `Revenue CAGR of ${(salesCAGR * 100).toFixed(1)}% — consistent topline compounder`
+                });
+            }
+        }
+    }
+
+    // 5. Balance sheet: leverage check
+    if (bsKey) {
+        const bsStmt = activeFsData[bsKey];
+        const debtVals = findRowValues(bsStmt, ['borrowings', 'total debt']);
+        const equityVals = findRowValues(bsStmt, ['equity', 'share capital', 'total equity']);
+        if (debtVals && equityVals) {
+            const latestDebt = debtVals.filter(v => typeof v === 'number').pop() || 0;
+            const latestEquity = equityVals.filter(v => typeof v === 'number').pop() || 1;
+            const deRatio = latestDebt / Math.abs(latestEquity);
+            if (deRatio > 1.5) {
+                window._fsAnomalyFlags['borrowings'] = [{
+                    type: 'warning',
+                    text: '⚠ High Leverage',
+                    detail: `Debt-to-Equity ratio of ${deRatio.toFixed(2)}x — elevated financial risk`
+                }];
+            }
+        }
+    }
+}
+
+/**
+ * openFsChartModal(label, values, headers)
+ * Opens the FS trend chart overlay modal, populates stats, and renders the canvas chart.
+ */
+function openFsChartModal(label, values, headers) {
+    window.closeFsChartModal = closeFsChartModal;
+    window._activeTrendData = { label, values, headers };
+    const modal = document.getElementById('fs-chart-modal');
+    if (!modal) return;
+
+    // Set title
+    const titleEl = document.getElementById('fs-chart-title');
+    if (titleEl) titleEl.textContent = label || 'Metric Trend';
+
+    // Populate stats
+    const numericVals = values.filter(v => typeof v === 'number');
+    const startVal = numericVals.length > 0 ? numericVals[0] : null;
+    const endVal = numericVals.length > 0 ? numericVals[numericVals.length - 1] : null;
+    const avg = numericVals.length > 0 ? numericVals.reduce((s, v) => s + v, 0) / numericVals.length : null;
+
+    const fmt = (v) => v !== null ? `₹${v.toLocaleString('en-IN')}` : '--';
+
+    const startEl = document.getElementById('fs-chart-start-val');
+    const endEl = document.getElementById('fs-chart-end-val');
+    const avgEl = document.getElementById('fs-chart-avg-val');
+    const cagrEl = document.getElementById('fs-chart-cagr-val');
+
+    if (startEl) startEl.textContent = fmt(startVal);
+    if (endEl) endEl.textContent = fmt(endVal);
+    if (avgEl) avgEl.textContent = fmt(avg !== null ? Math.round(avg) : null);
+
+    // Calculate CAGR
+    if (cagrEl) {
+        if (startVal && endVal && startVal > 0 && numericVals.length > 1) {
+            const n = numericVals.length - 1;
+            const cagrPct = (Math.pow(endVal / startVal, 1 / n) - 1) * 100;
+            cagrEl.textContent = `${cagrPct >= 0 ? '+' : ''}${cagrPct.toFixed(1)}%`;
+            cagrEl.style.color = cagrPct >= 0 ? 'var(--color-emerald)' : 'var(--color-crimson)';
+        } else {
+            cagrEl.textContent = '--';
+            cagrEl.style.color = '';
+        }
+    }
+
+    // Show modal with animation
+    modal.style.display = 'flex';
+    requestAnimationFrame(() => {
+        modal.classList.add('active');
+    });
+
+    const canvas = document.getElementById('fs-trend-canvas');
+    if (canvas) {
+        const container = canvas.parentElement;
+        if (container && !container._resizeObserverAttached) {
+            container._resizeObserverAttached = true;
+            const ro = new ResizeObserver((entries) => {
+                const entry = entries[0];
+                if (entry && window._activeTrendData) {
+                    const newW = entry.contentRect.width - 20;
+                    const newH = entry.contentRect.height - 20;
+                    renderFsTrendCanvas(window._activeTrendData.values, window._activeTrendData.headers, window._activeTrendData.label, newW, newH);
+                }
+            });
+            ro.observe(container);
+        } else {
+            requestAnimationFrame(() => {
+                renderFsTrendCanvas(values, headers, label);
+            });
+        }
+    }
+
+    // Bind close button
+    const closeBtn = document.getElementById('fs-chart-close-btn');
+    if (closeBtn) {
+        closeBtn.onclick = closeFsChartModal;
+    }
+
+    // Close on overlay click
+    modal.onclick = (e) => {
+        if (e.target === modal) closeFsChartModal();
+    };
+
+    // Close on Escape
+    document.addEventListener('keydown', window._fsChartEscHandler = (e) => {
+        if (e.key === 'Escape') closeFsChartModal();
+    });
+}
+
+/**
+ * closeFsChartModal()
+ * Closes the trend chart overlay with a smooth fade-out.
+ */
+function closeFsChartModal() {
+    const modal = document.getElementById('fs-chart-modal');
+    if (!modal) return;
+
+    modal.classList.remove('active');
+    window._activeTrendData = null;
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+
+    // Remove Escape listener
+    if (window._fsChartEscHandler) {
+        document.removeEventListener('keydown', window._fsChartEscHandler);
+        window._fsChartEscHandler = null;
+    }
+}
+
+/**
+ * renderFsTrendCanvas(values, headers, label)
+ * Draws a premium area chart with gradient fill, data points, and interactive tooltips
+ * on the #fs-trend-canvas element. Fully HiDPI-aware with Canvas 2D API.
+ */
+function renderFsTrendCanvas(values, headers, label, explicitW, explicitH) {
+    const canvas = document.getElementById('fs-trend-canvas');
+    if (!canvas) return;
+
+    const container = canvas.parentElement;
+    const W = typeof explicitW === 'number' ? explicitW : (container.clientWidth - 20);  // account for parent padding
+    const H = typeof explicitH === 'number' ? explicitH : (container.clientHeight - 20);
+
+    // HiDPI setup
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // Theme detection
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' ||
+                    document.body.getAttribute('data-theme') === 'light' ||
+                    document.body.getAttribute('data-mode') === 'light';
+
+    // Colors
+    const colors = {
+        line: isLight ? '#3b82f6' : '#60a5fa',
+        gradientTop: isLight ? 'rgba(59,130,246,0.25)' : 'rgba(96,165,250,0.2)',
+        gradientBottom: isLight ? 'rgba(59,130,246,0.01)' : 'rgba(96,165,250,0.01)',
+        gridLine: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+        axisText: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.45)',
+        dotBorder: isLight ? '#ffffff' : '#1e293b',
+        negLine: '#ef4444',
+        negGradientTop: isLight ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)',
+        negGradientBottom: 'rgba(239,68,68,0.01)'
+    };
+
+    // Filter numeric values and pair with headers
+    const dataPoints = [];
+    for (let i = 0; i < values.length; i++) {
+        if (typeof values[i] === 'number') {
+            dataPoints.push({
+                value: values[i],
+                label: headers[i] || `P${i + 1}`
+            });
+        }
+    }
+
+    if (dataPoints.length < 2) {
+        ctx.fillStyle = colors.axisText;
+        ctx.font = '12px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Insufficient data for trend chart', W / 2, H / 2);
+        return;
+    }
+
+    // Determine trend direction
+    const isNegativeTrend = dataPoints[dataPoints.length - 1].value < dataPoints[0].value;
+    const primaryColor = isNegativeTrend ? colors.negLine : colors.line;
+    const gradTop = isNegativeTrend ? colors.negGradientTop : colors.gradientTop;
+    const gradBot = isNegativeTrend ? colors.negGradientBottom : colors.gradientBottom;
+
+    // Layout
+    const padding = { top: 20, right: 20, bottom: 35, left: 55 };
+    const chartW = W - padding.left - padding.right;
+    const chartH = H - padding.top - padding.bottom;
+
+    // Scale data
+    const vals = dataPoints.map(d => d.value);
+    const minVal = Math.min(...vals);
+    const maxVal = Math.max(...vals);
+    const range = maxVal - minVal || 1;
+    const yPadding = range * 0.1;
+    const scaledMin = minVal - yPadding;
+    const scaledMax = maxVal + yPadding;
+    const scaledRange = scaledMax - scaledMin;
+
+    // Map data to pixels
+    const points = dataPoints.map((d, i) => ({
+        x: padding.left + (i / (dataPoints.length - 1)) * chartW,
+        y: padding.top + chartH - ((d.value - scaledMin) / scaledRange) * chartH,
+        value: d.value,
+        label: d.label
+    }));
+
+    // Clear canvas
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw horizontal grid lines (5 lines)
+    ctx.strokeStyle = colors.gridLine;
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+        const y = padding.top + (i / 4) * chartH;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(W - padding.right, y);
+        ctx.stroke();
+
+        // Y-axis labels
+        const val = scaledMax - (i / 4) * scaledRange;
+        ctx.fillStyle = colors.axisText;
+        ctx.font = '9px Inter, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        const displayVal = Math.abs(val) >= 10000000
+            ? (val / 10000000).toFixed(1) + 'Cr'
+            : Math.abs(val) >= 100000
+            ? (val / 100000).toFixed(1) + 'L'
+            : val.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        ctx.fillText(displayVal, padding.left - 8, y);
+    }
+
+    // X-axis labels
+    ctx.fillStyle = colors.axisText;
+    ctx.font = '9px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const maxLabels = Math.min(dataPoints.length, 8);
+    const labelStep = Math.max(1, Math.floor(dataPoints.length / maxLabels));
+    for (let i = 0; i < dataPoints.length; i += labelStep) {
+        const shortLabel = dataPoints[i].label.replace(/\s+/g, '').slice(-7);
+        ctx.fillText(shortLabel, points[i].x, padding.top + chartH + 8);
+    }
+    // Always show last label
+    if (dataPoints.length > 1) {
+        const lastLabel = dataPoints[dataPoints.length - 1].label.replace(/\s+/g, '').slice(-7);
+        ctx.fillText(lastLabel, points[points.length - 1].x, padding.top + chartH + 8);
+    }
+
+    // ── Draw gradient fill ──
+    const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+    gradient.addColorStop(0, gradTop);
+    gradient.addColorStop(1, gradBot);
+
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, padding.top + chartH);
+    points.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(points[points.length - 1].x, padding.top + chartH);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // ── Draw line (smooth bezier) ──
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1];
+        const curr = points[i];
+        const cpx = (prev.x + curr.x) / 2;
+        ctx.bezierCurveTo(cpx, prev.y, cpx, curr.y, curr.x, curr.y);
+    }
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // ── Draw data points ──
+    points.forEach((p, i) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = primaryColor;
+        ctx.fill();
+        ctx.strokeStyle = colors.dotBorder;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    });
+
+    // ── YoY Growth Bars (below the main chart area) ──
+    if (dataPoints.length >= 3) {
+        const barAreaTop = padding.top + chartH + 22; // just below x-axis labels
+        const barMaxH = 18;
+        const yoyValues = [];
+        for (let i = 1; i < dataPoints.length; i++) {
+            const prev = dataPoints[i - 1].value;
+            if (prev !== 0 && typeof prev === 'number') {
+                yoyValues.push(((dataPoints[i].value - prev) / Math.abs(prev)) * 100);
+            } else {
+                yoyValues.push(0);
+            }
+        }
+        const absMax = Math.max(...yoyValues.map(v => Math.abs(v)), 1);
+        const barW = Math.max(4, Math.min(16, chartW / (dataPoints.length * 2.5)));
+        
+        // Only draw if canvas has enough height
+        if (H > 100) {
+            yoyValues.forEach((yoy, idx) => {
+                const xPos = points[idx + 1].x;
+                const barH = Math.min((Math.abs(yoy) / absMax) * barMaxH, barMaxH);
+                const barColor = yoy >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.6)';
+                ctx.fillStyle = barColor;
+                // Draw bar going down from barAreaTop
+                ctx.fillRect(xPos - barW / 2, barAreaTop, barW, barH);
+                
+                // Small percentage label
+                if (barW >= 6 && Math.abs(yoy) > 1) {
+                    ctx.fillStyle = yoy >= 0 ? 'rgba(16,185,129,0.8)' : 'rgba(239,68,68,0.8)';
+                    ctx.font = '7px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText((yoy >= 0 ? '+' : '') + yoy.toFixed(0) + '%', xPos, barAreaTop + barH + 1);
+                }
+            });
+        }
+    }
+
+    // ── Linear Regression Trendline ──
+    if (dataPoints.length >= 3) {
+        const n = dataPoints.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        for (let i = 0; i < n; i++) {
+            sumX += i;
+            sumY += dataPoints[i].value;
+            sumXY += i * dataPoints[i].value;
+            sumX2 += i * i;
+        }
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / n;
+        
+        const regStart = intercept;
+        const regEnd = intercept + slope * (n - 1);
+        
+        const y0 = padding.top + chartH - ((regStart - scaledMin) / scaledRange) * chartH;
+        const y1 = padding.top + chartH - ((regEnd - scaledMin) / scaledRange) * chartH;
+        
+        ctx.save();
+        ctx.strokeStyle = 'rgba(192,132,252,0.8)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, y0);
+        ctx.lineTo(points[n - 1].x, y1);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+    }
+
+    // ── Tooltip on hover (non-recursive snapshot approach) ──
+    // Save a snapshot of the base chart to restore on each hover frame
+    const baseSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+
+    function handleCanvasHover(e) {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+
+        // Find nearest point
+        let closest = null;
+        let closestDist = Infinity;
+        points.forEach((p, i) => {
+            const dist = Math.abs(mouseX - p.x);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = { ...p, index: i };
+            }
+        });
+
+        // Restore base chart
+        ctx.putImageData(baseSnapshot, 0, 0);
+
+        if (!closest || closestDist > 30) {
+            canvas.style.cursor = 'default';
+            return;
+        }
+
+        canvas.style.cursor = 'crosshair';
+
+        // Re-apply scale after putImageData resets transform
+        ctx.save();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Draw vertical guideline
+        ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(closest.x, padding.top);
+        ctx.lineTo(closest.x, padding.top + chartH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Highlight dot with glow
+        ctx.shadowColor = primaryColor;
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(closest.x, closest.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = primaryColor;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = colors.dotBorder;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Build tooltip text
+        const tooltipText = `${dataPoints[closest.index].label}: ₹${closest.value.toLocaleString('en-IN')}`;
+        let yoyText = '';
+        if (closest.index > 0) {
+            const prev = dataPoints[closest.index - 1].value;
+            if (prev !== 0 && typeof prev === 'number') {
+                const yoyPct = ((closest.value - prev) / Math.abs(prev)) * 100;
+                yoyText = `  YoY: ${yoyPct >= 0 ? '+' : ''}${yoyPct.toFixed(1)}%`;
+            }
+        }
+        const fullText = tooltipText + yoyText;
+
+        ctx.font = 'bold 11px Inter, sans-serif';
+        const textWidth = ctx.measureText(fullText).width;
+        const boxW = textWidth + 20;
+        const boxH = 28;
+        let boxX = closest.x - boxW / 2;
+        let boxY = closest.y - boxH - 14;
+
+        // Keep tooltip in bounds
+        if (boxX < 5) boxX = 5;
+        if (boxX + boxW > W - 5) boxX = W - 5 - boxW;
+        if (boxY < 5) boxY = closest.y + 14;
+
+        // Draw tooltip background with rounded corners
+        ctx.fillStyle = isLight ? 'rgba(15, 23, 42, 0.92)' : 'rgba(30, 41, 59, 0.95)';
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetY = 2;
+        ctx.beginPath();
+        const r = 6;
+        ctx.moveTo(boxX + r, boxY);
+        ctx.lineTo(boxX + boxW - r, boxY);
+        ctx.quadraticCurveTo(boxX + boxW, boxY, boxX + boxW, boxY + r);
+        ctx.lineTo(boxX + boxW, boxY + boxH - r);
+        ctx.quadraticCurveTo(boxX + boxW, boxY + boxH, boxX + boxW - r, boxY + boxH);
+        ctx.lineTo(boxX + r, boxY + boxH);
+        ctx.quadraticCurveTo(boxX, boxY + boxH, boxX, boxY + boxH - r);
+        ctx.lineTo(boxX, boxY + r);
+        ctx.quadraticCurveTo(boxX, boxY, boxX + r, boxY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetY = 0;
+
+        // Tooltip text
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(fullText, boxX + boxW / 2, boxY + boxH / 2);
+
+        ctx.restore();
+    }
+
+    // Remove previous listener and re-attach
+    if (canvas._fsHoverHandler) {
+        canvas.removeEventListener('mousemove', canvas._fsHoverHandler);
+    }
+    canvas._fsHoverHandler = handleCanvasHover;
+    canvas.addEventListener('mousemove', handleCanvasHover);
+
+    // Touch interaction support
+    function handleTouchInteraction(e) {
+        if (e.touches.length > 0) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleCanvasHover(touch);
+        }
+    }
+    
+    if (canvas._fsTouchStartHandler) {
+        canvas.removeEventListener('touchstart', canvas._fsTouchStartHandler);
+    }
+    canvas._fsTouchStartHandler = handleTouchInteraction;
+    canvas.addEventListener('touchstart', handleTouchInteraction, { passive: false });
+    
+    if (canvas._fsTouchMoveHandler) {
+        canvas.removeEventListener('touchmove', canvas._fsTouchMoveHandler);
+    }
+    canvas._fsTouchMoveHandler = handleTouchInteraction;
+    canvas.addEventListener('touchmove', handleTouchInteraction, { passive: false });
+
+    // Also handle mouse leave / touch end to clear tooltip
+    if (canvas._fsLeaveHandler) {
+        canvas.removeEventListener('mouseleave', canvas._fsLeaveHandler);
+    }
+    canvas._fsLeaveHandler = () => {
+        ctx.putImageData(baseSnapshot, 0, 0);
+        canvas.style.cursor = 'default';
+    };
+    canvas.addEventListener('mouseleave', canvas._fsLeaveHandler);
+
+    if (canvas._fsTouchEndHandler) {
+        canvas.removeEventListener('touchend', canvas._fsTouchEndHandler);
+    }
+    canvas._fsTouchEndHandler = () => {
+        ctx.putImageData(baseSnapshot, 0, 0);
+        canvas.style.cursor = 'default';
+    };
+    canvas.addEventListener('touchend', canvas._fsTouchEndHandler);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 7: CSV & Excel Table Export
+// ═══════════════════════════════════════════════════════════════════
+
+
+function exportFsTableCSV() {
+    if (!activeFsData || !activeFsData[activeFsStatement]) {
+        alert('No financial data loaded. Please analyze a stock first.');
+        return;
+    }
+    const stmt = activeFsData[activeFsStatement];
+    const headers = stmt.headers || [];
+    const rows = stmt.rows || [];
+    const symbol = activeFsData.symbol || 'STOCK';
+    
+    let csv = '';
+    // Header row
+    csv += ['Metric', ...headers.slice(1)].map(h => `"${(h || '').replace(/"/g, '""')}"`).join(',') + '\n';
+    // Data rows
+    rows.forEach(r => {
+        const label = (r.label || '').replace(/"/g, '""');
+        const vals = r.values.map(v => v === null || v === undefined ? '' : v);
+        csv += [`"${label}"`, ...vals].join(',') + '\n';
+    });
+    
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${symbol}_${activeFsStatement}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    // Visual feedback on button
+    const btn = document.getElementById('fs-export-csv-btn');
+    if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✅ Downloaded';
+        btn.style.color = 'var(--color-emerald)';
+        setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+    }
+}
+
+function exportFsTableExcel() {
+    if (!activeFsData || !activeFsData[activeFsStatement]) {
+        alert('No financial data loaded. Please analyze a stock first.');
+        return;
+    }
+    const stmt = activeFsData[activeFsStatement];
+    const headers = stmt.headers || [];
+    const rows = stmt.rows || [];
+    const symbol = activeFsData.symbol || 'STOCK';
+    const statementName = activeFsStatement.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    
+    let tableHtml = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+        <head><meta charset="UTF-8">
+        <style>
+            table { border-collapse: collapse; font-family: Calibri, sans-serif; font-size: 11pt; }
+            th { background: #1e3a5f; color: white; padding: 8px 12px; border: 1px solid #ccc; font-weight: bold; text-align: center; }
+            td { padding: 6px 12px; border: 1px solid #ddd; text-align: right; }
+            td:first-child { text-align: left; font-weight: 600; }
+            tr:nth-child(even) { background: #f5f7fa; }
+            .title { font-size: 14pt; font-weight: bold; padding: 10px; }
+        </style></head>
+        <body>
+        <div class="title">${symbol} — ${statementName}</div>
+        <table>
+        <thead><tr>`;
+    
+    tableHtml += '<th>Metric</th>';
+    headers.slice(1).forEach(h => { tableHtml += `<th>${h || ''}</th>`; });
+    tableHtml += '</tr></thead><tbody>';
+    
+    rows.forEach(r => {
+        tableHtml += '<tr>';
+        tableHtml += `<td>${r.label || ''}</td>`;
+        r.values.forEach(v => {
+            tableHtml += `<td>${v === null || v === undefined ? '' : v}</td>`;
+        });
+        tableHtml += '</tr>';
+    });
+    
+    tableHtml += '</tbody></table></body></html>';
+    
+    const blob = new Blob([tableHtml], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${symbol}_${statementName.replace(/ /g, '_')}_${new Date().toISOString().slice(0, 10)}.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    const btn = document.getElementById('fs-export-excel-btn');
+    if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '✅ Downloaded';
+        btn.style.color = 'var(--color-emerald)';
+        setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 8: Anomaly & Trend Scanner
+// ═══════════════════════════════════════════════════════════════════
+
+function calculateAnomalyFlags(fsData) {
+    const flags = {}; // key: lowercase label → array of badge objects {text, type: 'warning'|'success'}
+    if (!fsData) return flags;
+    
+    const getRowValues = (statement, keywords) => {
+        const stmt = fsData[statement];
+        if (!stmt || !stmt.rows) return null;
+        for (const r of stmt.rows) {
+            const label = (r.label || '').toLowerCase();
+            if (keywords.some(k => label.includes(k))) return r.values;
+        }
+        return null;
+    };
+    
+    const calcCAGR = (values, periods) => {
+        if (!values || values.length < 2) return null;
+        const len = values.length;
+        const latest = values[len - 1];
+        const lookbackIdx = Math.max(0, len - 1 - periods);
+        const prev = values[lookbackIdx];
+        const actualPeriods = len - 1 - lookbackIdx;
+        if (!prev || prev <= 0 || !latest || latest <= 0 || actualPeriods <= 0) return null;
+        return Math.pow(latest / prev, 1 / actualPeriods) - 1;
+    };
+    
+    // 1. Sales vs OPM Divergence
+    const salesVals = getRowValues('profit_loss', ['sales', 'revenue', 'interest earned']);
+    const opmVals = getRowValues('profit_loss', ['opm', 'operating profit margin']);
+    if (salesVals && opmVals) {
+        const salesCAGR = calcCAGR(salesVals, 3);
+        const len = opmVals.length;
+        if (salesCAGR !== null && salesCAGR > 0.05 && len >= 2) {
+            const latestOPM = opmVals[len - 1];
+            const prevOPM = opmVals[Math.max(0, len - 4)];
+            if (typeof latestOPM === 'number' && typeof prevOPM === 'number' && latestOPM < prevOPM - 2) {
+                const salesLabel = 'sales';
+                if (!flags[salesLabel]) flags[salesLabel] = [];
+                flags[salesLabel].push({ text: '⚠️ Profitless Growth', type: 'warning', detail: `Sales growing ${(salesCAGR*100).toFixed(1)}% CAGR but OPM declined from ${prevOPM.toFixed(1)}% to ${latestOPM.toFixed(1)}%` });
+            }
+        }
+    }
+    
+    // 2. Earnings Quality Flag
+    const netProfitVals = getRowValues('profit_loss', ['net profit', 'profit after tax', 'pat']);
+    const ocfVals = getRowValues('cash_flow', ['cash from operating', 'operating cash flow', 'net cash from operating']);
+    if (netProfitVals && ocfVals) {
+        const npLen = netProfitVals.length;
+        const ocfLen = ocfVals.length;
+        if (npLen >= 2 && ocfLen >= 1) {
+            const latestNP = netProfitVals[npLen - 1];
+            const prevNP = netProfitVals[Math.max(0, npLen - 2)];
+            const latestOCF = ocfVals[ocfLen - 1];
+            if (typeof latestNP === 'number' && typeof prevNP === 'number' && typeof latestOCF === 'number') {
+                if (latestNP > prevNP && latestOCF < 0) {
+                    const npLabel = 'net profit';
+                    if (!flags[npLabel]) flags[npLabel] = [];
+                    flags[npLabel].push({ text: '⚠️ Accrual Earnings', type: 'warning', detail: 'Net Profit growing but Operating Cash Flow is negative' });
+                }
+            }
+        }
+    }
+    
+    // 3. Leverage Warning
+    const borrowVals = getRowValues('balance_sheet', ['borrowings', 'secured loans', 'unsecured loans']);
+    if (salesVals && borrowVals) {
+        const salesCAGR = calcCAGR(salesVals, 3);
+        const borrowCAGR = calcCAGR(borrowVals, 3);
+        if (salesCAGR !== null && borrowCAGR !== null && borrowCAGR > salesCAGR && borrowCAGR > 0.05) {
+            const borrowLabel = 'borrowings';
+            if (!flags[borrowLabel]) flags[borrowLabel] = [];
+            flags[borrowLabel].push({ text: '⚠️ Debt Rising Faster', type: 'warning', detail: `Borrowings CAGR ${(borrowCAGR*100).toFixed(1)}% > Sales CAGR ${(salesCAGR*100).toFixed(1)}%` });
+        }
+    }
+    
+    // 4. FCF Generation
+    if (ocfVals) {
+        const capexVals = getRowValues('cash_flow', ['purchase of fixed assets', 'capital expenditure', 'capex', 'cash from investing']);
+        const ocfLen = ocfVals.length;
+        const latestOCF = ocfLen > 0 ? ocfVals[ocfLen - 1] : null;
+        let fcf = null;
+        if (typeof latestOCF === 'number') {
+            if (capexVals && capexVals.length > 0) {
+                const latestCapex = capexVals[capexVals.length - 1];
+                if (typeof latestCapex === 'number') {
+                    fcf = latestOCF - Math.abs(latestCapex);
+                }
+            } else {
+                fcf = latestOCF;
+            }
+        }
+        if (fcf !== null) {
+            const ocfLabel = 'cash from operating activity';
+            if (!flags[ocfLabel]) flags[ocfLabel] = [];
+            if (fcf > 0) {
+                flags[ocfLabel].push({ text: '✅ +FCF', type: 'success', detail: `Free Cash Flow is positive: ₹${(fcf).toLocaleString('en-IN')} Cr` });
+            } else {
+                flags[ocfLabel].push({ text: '⚠️ −FCF', type: 'warning', detail: `Free Cash Flow is negative: ₹${(fcf).toLocaleString('en-IN')} Cr` });
+            }
+        }
+    }
+    
+    return flags;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE 3: Interactive Trend Chart Modal
+// ═══════════════════════════════════════════════════════════════════
+
+let _fsTrendChartInstance = null;
+let _fsTrendChartData = []; // store all rendered rows for keyboard navigation
+let _fsTrendChartCurrentIndex = -1;
+
+function openFsTrendChart(label, headers, values) {
+    const modal = document.getElementById('fs-chart-modal');
+    if (!modal) return;
+    
+    const isLightMode = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+    
+    // Build modal content dynamically
+    const numericValues = values.map(v => typeof v === 'number' ? v : null);
+    const cleanHeaders = headers.filter((_, i) => i > 0); // Skip first header (it's the "Metric" column label)
+    
+    // CAGR calculation
+    let cagrText = '';
+    const firstValid = numericValues.find(v => v !== null && v > 0);
+    const lastValid = [...numericValues].reverse().find(v => v !== null && v > 0);
+    const firstIdx = numericValues.indexOf(firstValid);
+    const lastIdx = numericValues.lastIndexOf(lastValid);
+    if (firstValid && lastValid && lastIdx > firstIdx) {
+        const periods = lastIdx - firstIdx;
+        const cagr = Math.pow(lastValid / firstValid, 1 / periods) - 1;
+        cagrText = `CAGR: ${cagr >= 0 ? '+' : ''}${(cagr * 100).toFixed(1)}%`;
+    }
+    
+    modal.innerHTML = `
+        <div id="fs-chart-modal-content" style="
+            width: 90%; max-width: 720px; max-height: 85vh;
+            background: ${isLightMode ? 'rgba(255,255,255,0.97)' : 'rgba(15,20,35,0.97)'};
+            backdrop-filter: blur(20px) saturate(1.5);
+            -webkit-backdrop-filter: blur(20px) saturate(1.5);
+            border-radius: 16px;
+            border: 1px solid ${isLightMode ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'};
+            box-shadow: 0 25px 60px rgba(0,0,0,${isLightMode ? '0.15' : '0.6'}), 0 0 1px rgba(255,255,255,0.1);
+            padding: 24px 28px;
+            position: relative;
+            animation: fsTrendModalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow-y: auto;
+        " role="dialog" aria-label="Trend chart for ${label}">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <div>
+                    <h3 style="margin: 0; font-size: 16px; font-family: 'Outfit', sans-serif; font-weight: 700; color: var(--text-primary);">${label}</h3>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px;">
+                        ${cagrText ? `<span style="font-size: 11px; background: rgba(59,130,246,0.12); color: var(--color-primary-light); padding: 2px 8px; border-radius: 4px; font-weight: 600; border: 1px solid rgba(59,130,246,0.2);">${cagrText}</span>` : ''}
+                        <span style="font-size: 10px; color: var(--text-muted);">${cleanHeaders.length} periods · Click row to switch · ←→ keyboard nav</span>
+                    </div>
+                </div>
+                <button id="fs-chart-modal-close" aria-label="Close trend chart" style="
+                    width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border-glass);
+                    background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer;
+                    font-size: 16px; display: flex; align-items: center; justify-content: center;
+                    transition: all 0.2s ease;
+                " onmouseover="this.style.background='rgba(239,68,68,0.15)';this.style.color='var(--color-crimson)'" onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.color='var(--text-secondary)'">&times;</button>
+            </div>
+            <div style="position: relative; width: 100%; height: 320px;">
+                <canvas id="fs-trend-chart-canvas"></canvas>
+            </div>
+            <div id="fs-trend-chart-stats" style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-glass);"></div>
+        </div>
+    `;
+    
+    if (modal.style.display !== 'flex') {
+        modal.style.display = 'flex';
+        modal.style.opacity = '0';
+        requestAnimationFrame(() => { modal.style.opacity = '1'; });
+    }
+    
+    // Close handlers
+    const closeBtn = document.getElementById('fs-chart-modal-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeFsTrendChart);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeFsTrendChart();
+    });
+    
+    // Keyboard handler
+    document.addEventListener('keydown', _fsTrendChartKeyHandler);
+    
+    // Render Chart.js
+    const ctx = document.getElementById('fs-trend-chart-canvas');
+    if (!ctx) return;
+    
+    if (_fsTrendChartInstance) {
+        _fsTrendChartInstance.destroy();
+        _fsTrendChartInstance = null;
+    }
+    
+    const gridColor = isLightMode ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+    const tickColor = isLightMode ? '#64748b' : '#94a3b8';
+    const tooltipBg = isLightMode ? '#ffffff' : '#1e293b';
+    const tooltipBorder = isLightMode ? '#e2e8f0' : '#334155';
+    const tooltipColor = isLightMode ? '#0f172a' : '#f1f5f9';
+    
+    const isPercentMetric = label.toLowerCase().includes('%');
+    const gradientFill = ctx.getContext('2d').createLinearGradient(0, 0, 0, 300);
+    gradientFill.addColorStop(0, 'rgba(59, 130, 246, 0.25)');
+    gradientFill.addColorStop(1, 'rgba(59, 130, 246, 0.02)');
+    
+    // Calculate period-over-period growth for bar colors
+    const growthColors = numericValues.map((v, i) => {
+        if (i === 0 || v === null || numericValues[i-1] === null) return 'rgba(148, 163, 184, 0.4)';
+        return v >= numericValues[i-1] ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)';
+    });
+    
+    _fsTrendChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: cleanHeaders,
+            datasets: [
+                {
+                    type: 'line',
+                    label: label,
+                    data: numericValues,
+                    borderColor: '#3b82f6',
+                    backgroundColor: gradientFill,
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#3b82f6',
+                    pointBorderColor: isLightMode ? '#ffffff' : '#0f172a',
+                    pointBorderWidth: 2,
+                    fill: true,
+                    tension: 0.35,
+                    order: 0,
+                    spanGaps: true
+                },
+                {
+                    type: 'bar',
+                    label: 'Value',
+                    data: numericValues,
+                    backgroundColor: growthColors,
+                    borderRadius: 3,
+                    barPercentage: 0.5,
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 800,
+                easing: 'easeOutQuart',
+                delay: (context) => context.dataIndex * 50
+            },
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: tooltipBg,
+                    titleColor: tooltipColor,
+                    bodyColor: tooltipColor,
+                    borderColor: tooltipBorder,
+                    borderWidth: 1,
+                    padding: 12,
+                    cornerRadius: 8,
+                    titleFont: { family: "'Outfit', sans-serif", size: 12, weight: 600 },
+                    bodyFont: { family: "'Inter', sans-serif", size: 11 },
+                    callbacks: {
+                        label: function(ctx) {
+                            if (ctx.datasetIndex === 1) return null; // Hide bar tooltip
+                            const val = ctx.parsed.y;
+                            if (val === null) return 'N/A';
+                            const formatted = isPercentMetric ? val.toFixed(1) + '%' : '₹ ' + val.toLocaleString('en-IN');
+                            let growth = '';
+                            const idx = ctx.dataIndex;
+                            if (idx > 0 && numericValues[idx-1] && numericValues[idx-1] !== 0) {
+                                const pct = ((val - numericValues[idx-1]) / Math.abs(numericValues[idx-1])) * 100;
+                                growth = ` (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% vs prev)`;
+                            }
+                            return `${formatted}${growth}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: gridColor, drawBorder: false },
+                    ticks: { color: tickColor, font: { family: "'Inter', sans-serif", size: 10 }, maxRotation: 45 }
+                },
+                y: {
+                    grid: { color: gridColor, drawBorder: false },
+                    ticks: {
+                        color: tickColor,
+                        font: { family: "'Inter', sans-serif", size: 10 },
+                        callback: function(value) {
+                            if (isPercentMetric) return value.toFixed(0) + '%';
+                            if (Math.abs(value) >= 10000) return '₹' + (value / 1000).toFixed(0) + 'K';
+                            return '₹' + value.toLocaleString('en-IN');
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Stats bar
+    const statsEl = document.getElementById('fs-trend-chart-stats');
+    if (statsEl) {
+        const validNums = numericValues.filter(v => v !== null);
+        const minVal = validNums.length ? Math.min(...validNums) : 0;
+        const maxVal = validNums.length ? Math.max(...validNums) : 0;
+        const avgVal = validNums.length ? validNums.reduce((a, b) => a + b, 0) / validNums.length : 0;
+        const latestVal = validNums.length ? validNums[validNums.length - 1] : 0;
+        
+        const fmt = v => isPercentMetric ? v.toFixed(1) + '%' : '₹' + v.toLocaleString('en-IN', {maximumFractionDigits: 0});
+        
+        statsEl.innerHTML = [
+            { label: 'Latest', value: fmt(latestVal), color: 'var(--color-primary-light)' },
+            { label: 'Min', value: fmt(minVal), color: 'var(--color-crimson)' },
+            { label: 'Max', value: fmt(maxVal), color: 'var(--color-emerald)' },
+            { label: 'Avg', value: fmt(avgVal), color: 'var(--text-secondary)' }
+        ].map(s => `
+            <div style="flex: 1; min-width: 80px; text-align: center; padding: 6px 8px; background: rgba(255,255,255,0.02); border-radius: 6px; border: 1px solid var(--border-glass);">
+                <div style="font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">${s.label}</div>
+                <div style="font-size: 13px; font-weight: 700; color: ${s.color}; font-family: 'Outfit', sans-serif;">${s.value}</div>
+            </div>
+        `).join('');
+    }
+}
+
+function closeFsTrendChart() {
+    const modal = document.getElementById('fs-chart-modal');
+    if (modal) {
+        modal.style.opacity = '0';
+        setTimeout(() => {
+            modal.style.display = 'none';
+            if (_fsTrendChartInstance) {
+                _fsTrendChartInstance.destroy();
+                _fsTrendChartInstance = null;
+            }
+        }, 250);
+    }
+    document.removeEventListener('keydown', _fsTrendChartKeyHandler);
+}
+
+function _fsTrendChartKeyHandler(e) {
+    if (e.key === 'Escape') {
+        closeFsTrendChart();
+        return;
+    }
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && _fsTrendChartData.length > 0) {
+        e.preventDefault();
+        if (e.key === 'ArrowRight') {
+            _fsTrendChartCurrentIndex = Math.min(_fsTrendChartData.length - 1, _fsTrendChartCurrentIndex + 1);
+        } else {
+            _fsTrendChartCurrentIndex = Math.max(0, _fsTrendChartCurrentIndex - 1);
+        }
+        const item = _fsTrendChartData[_fsTrendChartCurrentIndex];
+        if (item) {
+            openFsTrendChart(item.label, item.headers, item.values);
+        }
+    }
+}
+
+function setupFsRowClickListeners() {
+    const tableEl = document.getElementById('financial-statements-table');
+    if (!tableEl || tableEl.dataset.rowClickBound === 'true') return;
+    tableEl.dataset.rowClickBound = 'true';
+    
+    tableEl.addEventListener('click', (e) => {
+        const row = e.target.closest('tr');
+        if (!row) return;
+        // Skip category header rows
+        if (row.querySelector('[data-category-toggle]')) return;
+        
+        const firstCell = row.cells[0];
+        if (!firstCell) return;
+        const label = firstCell.textContent.replace(/CAGR:[\s\S]*$/, '').replace(/⚠️|✅|▲|▼/g, '').trim();
+        if (!label) return;
+        
+        // Find matching row in data
+        const stmt = activeFsData && activeFsData[activeFsStatement];
+        if (!stmt || !stmt.rows) return;
+        
+        const matchedRow = stmt.rows.find(r => r.label.trim() === label);
+        if (!matchedRow) return;
+        
+        // Build chart data list for keyboard nav
+        _fsTrendChartData = stmt.rows.map(r => ({
+            label: r.label,
+            headers: stmt.headers,
+            values: r.values
+        }));
+        _fsTrendChartCurrentIndex = stmt.rows.indexOf(matchedRow);
+        
+        openFsTrendChart(matchedRow.label, stmt.headers, matchedRow.values);
+    });
 }
 
 function setupFinancialStatementsEvents() {
@@ -39044,9 +41188,2302 @@ function setupFinancialStatementsEvents() {
             });
         }
     }
+    
+    // 5. Absolute vs Percentage mode toggle buttons
+    const absBtn = document.getElementById('fs-mode-absolute-btn');
+    const pctBtn = document.getElementById('fs-mode-percentage-btn');
+    
+    if (absBtn) {
+        absBtn.addEventListener('click', () => {
+            if (activeFsMode === 'absolute') return;
+            activeFsMode = 'absolute';
+            absBtn.className = 'btn-primary';
+            absBtn.style.background = '';
+            absBtn.style.color = '';
+            if (pctBtn) {
+                pctBtn.className = 'btn-secondary';
+                pctBtn.style.background = 'none';
+                pctBtn.style.color = 'var(--text-secondary)';
+            }
+            renderActiveStatementTable();
+        });
+    }
+    
+    if (pctBtn) {
+        pctBtn.addEventListener('click', () => {
+            if (activeFsMode === 'percentage') return;
+            activeFsMode = 'percentage';
+            pctBtn.className = 'btn-primary';
+            pctBtn.style.background = '';
+            pctBtn.style.color = '';
+            if (absBtn) {
+                absBtn.className = 'btn-secondary';
+                absBtn.style.background = 'none';
+                absBtn.style.color = 'var(--text-secondary)';
+            }
+            renderActiveStatementTable();
+        });
+    }
+    
+    // 6. DuPont Accordion Toggle — handled by inline onclick="toggleDupontAccordion()" in index.html
+    
+    // 7. Visual Insight Panel toggle
+    const viToggle = document.getElementById('fs-visual-insight-toggle');
+    if (viToggle) {
+        viToggle.addEventListener('click', () => {
+            const content = document.getElementById('fs-visual-insight-content');
+            const chevron = document.getElementById('fs-visual-insight-chevron');
+            if (!content) return;
+            if (content.style.display === 'none' || content.style.display === '') {
+                content.style.display = 'block';
+                if (chevron) chevron.textContent = '▲';
+                renderVisualInsightPanel();
+            } else {
+                content.style.display = 'none';
+                if (chevron) chevron.textContent = '▼';
+            }
+        });
+    }
+    
+    // 8. Row search filter
+    const searchInput = document.getElementById('fs-row-search-input');
+    const searchClear = document.getElementById('fs-row-search-clear');
+    if (searchInput) {
+        let _searchTimer = null;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(_searchTimer);
+            _searchTimer = setTimeout(() => { filterFsTableRows(searchInput.value); }, 180);
+            if (searchClear) searchClear.style.display = searchInput.value ? 'block' : 'none';
+        });
+        searchInput.addEventListener('focus', () => {
+            searchInput.style.borderColor = 'rgba(59,130,246,0.5)';
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.style.borderColor = 'var(--border-glass)';
+        });
+    }
+    if (searchClear) {
+        searchClear.addEventListener('click', () => {
+            if (searchInput) { searchInput.value = ''; filterFsTableRows(''); }
+            searchClear.style.display = 'none';
+        });
+    }
+    
+    // 9. Compare mode
+    const compareModeBtn = document.getElementById('fs-compare-mode-btn');
+    if (compareModeBtn) {
+        compareModeBtn.addEventListener('click', toggleFsCompareMode);
+    }
+    const compareSelectedBtn = document.getElementById('fs-compare-selected-btn');
+    if (compareSelectedBtn) {
+        compareSelectedBtn.addEventListener('click', openFsCompareChart);
+    }
+    const compareCloseBtn = document.getElementById('fs-compare-close-btn');
+    if (compareCloseBtn) {
+        compareCloseBtn.addEventListener('click', closeFsCompareModal);
+    }
+    const compareModal = document.getElementById('fs-compare-modal');
+    if (compareModal) {
+        compareModal.addEventListener('click', (e) => {
+            if (e.target === compareModal) closeFsCompareModal();
+        });
+    }
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// ENHANCEMENT 1: Row Search / Filter
+// ═══════════════════════════════════════════════════════════════════
+function filterFsTableRows(query) {
+    const tableEl = document.getElementById('financial-statements-table');
+    if (!tableEl) return;
+    const q = (query || '').toLowerCase().trim();
+    const tbody = tableEl.querySelector('tbody');
+    if (!tbody) return;
+    
+    const rows = tbody.querySelectorAll('tr');
+    let matchCount = 0;
+    
+    rows.forEach(tr => {
+        if (tr.classList.contains('fs-cat-header-row')) {
+            // Always show category headers if any child matches
+            tr.style.display = '';
+            return;
+        }
+        const labelCell = tr.cells[0];
+        if (!labelCell) return;
+        const labelText = (labelCell.textContent || '').toLowerCase();
+        
+        if (!q || labelText.includes(q)) {
+            tr.style.display = '';
+            matchCount++;
+            // Highlight matching text
+            if (q) {
+                const labelSpan = labelCell.querySelector('span[style*="font-weight"]');
+                if (labelSpan) {
+                    const original = labelSpan.getAttribute('data-original-text') || labelSpan.textContent;
+                    labelSpan.setAttribute('data-original-text', original);
+                    const regex = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+                    labelSpan.innerHTML = original.replace(regex, '<mark style="background: rgba(245,158,11,0.3); color: inherit; padding: 0 1px; border-radius: 2px;">$1</mark>');
+                }
+            }
+        } else {
+            tr.style.display = 'none';
+        }
+    });
+    
+    // Clear highlights when search is empty
+    if (!q) {
+        rows.forEach(tr => {
+            const labelSpan = tr.querySelector('td:first-child span[data-original-text]');
+            if (labelSpan) {
+                labelSpan.textContent = labelSpan.getAttribute('data-original-text');
+                labelSpan.removeAttribute('data-original-text');
+            }
+        });
+    }
+    
+    // Hide category headers with no visible children
+    if (q) {
+        const catHeaders = tbody.querySelectorAll('.fs-cat-header-row');
+        catHeaders.forEach(catRow => {
+            let nextRow = catRow.nextElementSibling;
+            let hasVisible = false;
+            while (nextRow && !nextRow.classList.contains('fs-cat-header-row')) {
+                if (nextRow.style.display !== 'none') hasVisible = true;
+                nextRow = nextRow.nextElementSibling;
+            }
+            catRow.style.display = hasVisible ? '' : 'none';
+        });
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENHANCEMENT 2: Financial Health Dashboard — Key Ratio Cards
+// ═══════════════════════════════════════════════════════════════════
+function renderFinancialHealthDashboard() {
+    const container = document.getElementById('fs-health-dashboard');
+    if (!container || !activeFsData) {
+        if (container) container.classList.add('fs-hidden');
+        return;
+    }
+    
+    const isPeers = (activeFsStatement === 'peers');
+    if (isPeers) { container.classList.add('fs-hidden'); return; }
+    
+    function _findVal(stKey, keywords) {
+        if (!activeFsData[stKey] || !activeFsData[stKey].rows) return null;
+        const row = activeFsData[stKey].rows.find(r => {
+            const l = (r.label || '').toLowerCase();
+            return keywords.some(k => l.includes(k));
+        });
+        if (!row || !row.values) return null;
+        const nums = row.values.filter(v => typeof v === 'number');
+        return nums.length > 0 ? nums[nums.length - 1] : null;
+    }
+    
+    function _findVals(stKey, keywords) {
+        if (!activeFsData[stKey] || !activeFsData[stKey].rows) return [];
+        const row = activeFsData[stKey].rows.find(r => {
+            const l = (r.label || '').toLowerCase();
+            return keywords.some(k => l.includes(k));
+        });
+        if (!row || !row.values) return [];
+        return row.values.filter(v => typeof v === 'number');
+    }
+    
+    const sales = _findVal('profit_loss', ['sales', 'revenue', 'interest earned']) || _findVal('quarters', ['sales', 'revenue']);
+    const netProfit = _findVal('profit_loss', ['net profit', 'profit after tax', 'pat']);
+    const borrowings = _findVal('balance_sheet', ['borrowings']);
+    const reserves = _findVal('balance_sheet', ['reserves']);
+    const shareCapital = _findVal('balance_sheet', ['share capital', 'equity capital']) || 0;
+    const totalAssets = _findVal('balance_sheet', ['total assets']);
+    const ocf = _findVal('cash_flow', ['cash from operating', 'operating cash flow', 'operating activity']);
+    const otherAssets = _findVal('balance_sheet', ['other assets', 'current assets']);
+    const otherLiab = _findVal('balance_sheet', ['other liabilities', 'current liabilities']);
+    const opProfit = _findVal('profit_loss', ['operating profit', 'ebit', 'pbit']);
+    const interest = _findVal('profit_loss', ['interest']) || _findVal('profit_loss', ['finance cost']);
+    const depreciation = _findVal('profit_loss', ['depreciation']);
+    
+    const equity = (shareCapital || 0) + (reserves || 0);
+    
+    const cards = [];
+    
+    // 1. Current Ratio (Current Assets / Current Liabilities)
+    if (otherAssets && otherLiab && otherLiab > 0) {
+        const cr = otherAssets / otherLiab;
+        let color = cr >= 1.5 ? 'var(--color-emerald)' : cr >= 1.0 ? 'var(--color-amber)' : 'var(--color-crimson)';
+        let health = cr >= 2.0 ? 'Strong' : cr >= 1.5 ? 'Healthy' : cr >= 1.0 ? 'Tight' : 'Weak';
+        cards.push({ label: 'Current Ratio', value: cr.toFixed(2) + 'x', color, health, icon: '💧' });
+    }
+    
+    // 2. Interest Coverage Ratio (EBIT / Interest Expense)
+    if (opProfit && interest && Math.abs(interest) > 0) {
+        const icr = opProfit / Math.abs(interest);
+        let color = icr >= 3 ? 'var(--color-emerald)' : icr >= 1.5 ? 'var(--color-amber)' : 'var(--color-crimson)';
+        let health = icr >= 5 ? 'Excellent' : icr >= 3 ? 'Good' : icr >= 1.5 ? 'Adequate' : 'Distressed';
+        cards.push({ label: 'Interest Coverage', value: icr.toFixed(1) + 'x', color, health, icon: '🛡️' });
+    }
+    
+    // 3. Asset Turnover
+    if (sales && totalAssets && totalAssets > 0) {
+        const at = sales / totalAssets;
+        let color = at >= 1.0 ? 'var(--color-emerald)' : at >= 0.5 ? 'var(--color-amber)' : 'var(--text-secondary)';
+        let health = at >= 1.5 ? 'Efficient' : at >= 1.0 ? 'Good' : at >= 0.5 ? 'Moderate' : 'Capital Heavy';
+        cards.push({ label: 'Asset Turnover', value: at.toFixed(2) + 'x', color, health, icon: '⚡' });
+    }
+    
+    // 4. Debt to Equity
+    if (equity > 0 && borrowings !== null) {
+        const de = (borrowings || 0) / equity;
+        let color = de <= 0.5 ? 'var(--color-emerald)' : de <= 1.0 ? 'var(--color-amber)' : 'var(--color-crimson)';
+        let health = de <= 0.3 ? 'Low Debt' : de <= 0.5 ? 'Conservative' : de <= 1.0 ? 'Moderate' : 'Leveraged';
+        cards.push({ label: 'Debt/Equity', value: de.toFixed(2) + 'x', color, health, icon: '⚖️' });
+    }
+    
+    // 5. Net Profit Margin
+    if (sales && sales > 0 && netProfit !== null) {
+        const npm = (netProfit / sales) * 100;
+        let color = npm >= 15 ? 'var(--color-emerald)' : npm >= 5 ? 'var(--color-amber)' : 'var(--color-crimson)';
+        let health = npm >= 20 ? 'Premium' : npm >= 10 ? 'Healthy' : npm >= 5 ? 'Moderate' : npm >= 0 ? 'Thin' : 'Loss-Making';
+        cards.push({ label: 'Net Margin', value: npm.toFixed(1) + '%', color, health, icon: '💰' });
+    }
+    
+    // 6. OCF / Net Profit (Earnings Quality)
+    if (ocf !== null && netProfit && netProfit > 0) {
+        const eq = ocf / netProfit;
+        let color = eq >= 1.0 ? 'var(--color-emerald)' : eq >= 0.6 ? 'var(--color-amber)' : 'var(--color-crimson)';
+        let health = eq >= 1.2 ? 'Excellent' : eq >= 1.0 ? 'Real' : eq >= 0.6 ? 'Fair' : 'Poor';
+        cards.push({ label: 'Earnings Quality', value: eq.toFixed(2) + 'x', color, health, icon: '🏆' });
+    }
+    
+    if (cards.length === 0) {
+        container.classList.add('fs-hidden');
+        return;
+    }
+    
+    container.classList.remove('fs-hidden');
+    container.innerHTML = cards.map(c => `
+        <div style="flex: 1; min-width: 120px; padding: 10px 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px; display: flex; flex-direction: column; gap: 4px; transition: all 0.25s ease; cursor: default;"
+             onmouseover="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='${c.color}40';this.style.transform='translateY(-1px)'"
+             onmouseout="this.style.background='rgba(255,255,255,0.02)';this.style.borderColor='var(--border-glass)';this.style.transform='none'">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 9px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">${c.icon} ${c.label}</span>
+            </div>
+            <div style="font-size: 18px; font-family: 'Outfit', sans-serif; font-weight: 800; color: ${c.color};">${c.value}</div>
+            <div style="font-size: 9px; color: ${c.color}; font-weight: 600; background: ${c.color}15; padding: 1px 6px; border-radius: 3px; display: inline-block; width: fit-content;">${c.health}</div>
+        </div>
+    `).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENHANCEMENT 3: Visual Insight Panel — Quarterly Heatmap / P&L Waterfall
+// ═══════════════════════════════════════════════════════════════════
+function updateVisualInsightPanel() {
+    const panel = document.getElementById('fs-visual-insight-panel');
+    const titleEl = document.getElementById('fs-visual-insight-title');
+    if (!panel || !activeFsData) { if (panel) panel.classList.add('fs-hidden'); return; }
+    
+    const isPeers = (activeFsStatement === 'peers');
+    if (isPeers) { panel.classList.add('fs-hidden'); return; }
+    
+    if (activeFsStatement === 'quarters') {
+        if (titleEl) titleEl.textContent = '🔥 Quarterly Performance Heatmap';
+        panel.classList.remove('fs-hidden');
+    } else if (activeFsStatement === 'profit_loss') {
+        if (titleEl) titleEl.textContent = '📊 Profit & Loss Waterfall Chart';
+        panel.classList.remove('fs-hidden');
+    } else if (activeFsStatement === 'balance_sheet') {
+        if (titleEl) titleEl.textContent = '📊 Balance Sheet Composition';
+        panel.classList.remove('fs-hidden');
+    } else if (activeFsStatement === 'cash_flow') {
+        if (titleEl) titleEl.textContent = '📊 Cash Flow Waterfall (Latest Period)';
+        panel.classList.remove('fs-hidden');
+    } else {
+        panel.classList.add('fs-hidden');
+    }
+    
+    // Collapse by default
+    const content = document.getElementById('fs-visual-insight-content');
+    const chevron = document.getElementById('fs-visual-insight-chevron');
+    if (content) content.style.display = 'none';
+    if (chevron) chevron.textContent = '▼';
+}
+
+function renderVisualInsightPanel() {
+    let canvas = document.getElementById('fs-visual-insight-canvas');
+    if (!canvas || !activeFsData) return;
+    
+    // Clone and replace canvas to clear all active event listeners (prevents event leaks from Balance Sheet or other charts)
+    const newCanvas = canvas.cloneNode(true);
+    canvas.parentNode.replaceChild(newCanvas, canvas);
+    canvas = newCanvas;
+    
+    // Setup ResizeObserver on the parent container if not already setup
+    const container = canvas.parentNode;
+    if (container && !window._fsVisualInsightResizeObserver) {
+        let lastWidth = container.clientWidth;
+        let lastHeight = container.clientHeight;
+        window._fsVisualInsightResizeObserver = new ResizeObserver(() => {
+            const currentWidth = container.clientWidth;
+            const currentHeight = container.clientHeight;
+            // Only redraw if the dimensions have actually changed
+            if (currentWidth !== lastWidth || currentHeight !== lastHeight) {
+                lastWidth = currentWidth;
+                lastHeight = currentHeight;
+                const activeCanvas = document.getElementById('fs-visual-insight-canvas');
+                if (activeCanvas && activeFsData) {
+                    if (activeFsStatement === 'quarters') {
+                        renderQuarterlyHeatmap(activeCanvas);
+                    } else if (activeFsStatement === 'profit_loss') {
+                        renderPLWaterfallChart(activeCanvas);
+                    } else if (activeFsStatement === 'balance_sheet') {
+                        renderBSCompositionChart(activeCanvas);
+                    } else if (activeFsStatement === 'cash_flow') {
+                        renderCashFlowWaterfall(activeCanvas);
+                    }
+                }
+            }
+        });
+        window._fsVisualInsightResizeObserver.observe(container);
+    }
+    
+    if (activeFsStatement === 'quarters') {
+        renderQuarterlyHeatmap(canvas);
+    } else if (activeFsStatement === 'profit_loss') {
+        renderPLWaterfallChart(canvas);
+    } else if (activeFsStatement === 'balance_sheet') {
+        renderBSCompositionChart(canvas);
+    } else if (activeFsStatement === 'cash_flow') {
+        renderCashFlowWaterfall(canvas);
+    }
+}
+
+function renderQuarterlyHeatmap(canvas) {
+    const statement = activeFsData.quarters;
+    if (!statement || !statement.rows || !statement.headers) return;
+    
+    const keyMetrics = ['sales', 'operating profit', 'net profit', 'opm', 'eps'];
+    const metricRows = [];
+    
+    keyMetrics.forEach(keyword => {
+        const row = statement.rows.find(r => (r.label || '').toLowerCase().includes(keyword));
+        if (row && row.values) {
+            metricRows.push({ label: row.label, values: row.values });
+        }
+    });
+    
+    if (metricRows.length === 0) return;
+    
+    const isMobile = window.innerWidth < 480;
+    let headers = statement.headers.slice(1);
+    let metricRowsData = metricRows.map(row => ({ label: row.label, values: [...row.values] }));
+    if (isMobile && headers.length > 4) {
+        headers = headers.slice(-4);
+        metricRowsData.forEach(row => {
+            row.values = row.values.slice(-4);
+        });
+    }
+    
+    const numCols = Math.min(headers.length, metricRowsData[0].values.length);
+    const numRows = metricRowsData.length;
+    
+    const parentW = canvas.parentElement ? canvas.parentElement.clientWidth : 400;
+    const labelW = isMobile ? 90 : 120;
+    const cellW = isMobile ? Math.max(55, Math.floor((parentW - labelW - 20) / numCols)) : 65;
+    const cellH = 32;
+    const headerH = 28;
+    const W = labelW + numCols * cellW + 15;
+    const H = headerH + numRows * cellH + 15;
+    
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || 
+                    document.body.getAttribute('data-theme') === 'light' || 
+                    document.body.getAttribute('data-mode') === 'light';
+    const headerTextColor = isLight ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
+    const labelTextColor = isLight ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)';
+
+    // Draw headers
+    ctx.font = '500 9px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = headerTextColor;
+    for (let c = 0; c < numCols; c++) {
+        const x = labelW + c * cellW + cellW / 2;
+        ctx.fillText(headers[c] || '', x, headerH - 6);
+    }
+    
+    // Draw rows
+    metricRowsData.forEach((row, ri) => {
+        const y = headerH + ri * cellH;
+        
+        // Label
+        ctx.font = '600 10px Outfit, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = labelTextColor;
+        const maxLen = isMobile ? 12 : 18;
+        ctx.fillText(row.label.substring(0, maxLen), 8, y + cellH / 2 + 4);
+        
+        // Find min/max for normalization
+        const numVals = row.values.slice(0, numCols).filter(v => typeof v === 'number');
+        const min = Math.min(...numVals);
+        const max = Math.max(...numVals);
+        const range = max - min || 1;
+        
+        for (let c = 0; c < numCols; c++) {
+            const val = row.values[c];
+            const x = labelW + c * cellW;
+            
+            if (typeof val === 'number') {
+                const normalized = (val - min) / range; // 0..1
+                // Color: red(0) → amber(0.5) → green(1)
+                let r, g, b;
+                if (normalized <= 0.5) {
+                    const t = normalized * 2;
+                    r = Math.round(220 - t * 80);
+                    g = Math.round(60 + t * 130);
+                    b = Math.round(60);
+                } else {
+                    const t = (normalized - 0.5) * 2;
+                    r = Math.round(140 - t * 110);
+                    g = Math.round(190 + t * 50);
+                    b = Math.round(60 + t * 60);
+                }
+                
+                ctx.fillStyle = `rgba(${r},${g},${b},0.25)`;
+                ctx.beginPath();
+                ctx.roundRect(x + 2, y + 2, cellW - 4, cellH - 4, 4);
+                ctx.fill();
+                
+                ctx.strokeStyle = `rgba(${r},${g},${b},0.3)`;
+                ctx.lineWidth = 0.5;
+                ctx.stroke();
+                
+                // Value text
+                ctx.font = '600 9.5px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = `rgba(${r},${g},${b},0.9)`;
+                const isPercent = (row.label || '').toLowerCase().includes('%') || (row.label || '').toLowerCase().includes('opm');
+                const displayVal = isPercent ? val.toFixed(1) + '%' : (Math.abs(val) >= 100 ? Math.round(val).toLocaleString('en-IN') : val.toFixed(1));
+                ctx.fillText(displayVal, x + cellW / 2, y + cellH / 2 + 3);
+            }
+        }
+    });
+}
+
+function renderPLWaterfallChart(canvas) {
+    const statement = activeFsData.profit_loss;
+    if (!statement || !statement.rows) return;
+    
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+    const lineColor = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)';
+    const labelColor = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.6)';
+    
+    function _findLatest(keywords) {
+        const row = statement.rows.find(r => keywords.some(k => (r.label || '').toLowerCase().includes(k)));
+        if (!row || !row.values) return 0;
+        const nums = row.values.filter(v => typeof v === 'number');
+        return nums.length > 0 ? nums[nums.length - 1] : 0;
+    }
+    
+    const sales = _findLatest(['sales', 'revenue']) || 0;
+    const opProfit = _findLatest(['operating profit']) || sales;
+    const expenses = sales - opProfit;
+    
+    const interest = _findLatest(['interest', 'finance cost']) || 0;
+    const depreciation = _findLatest(['depreciation']) || 0;
+    const netProfit = _findLatest(['net profit', 'profit after tax']) || 0;
+    
+    const taxVal = _findLatest(['tax', 'tax %']) || 0;
+    const pbt = _findLatest(['profit before tax', 'pbt']) || (netProfit + (taxVal > 0 ? netProfit * (taxVal/100) : 0));
+    
+    const taxAmt = pbt - netProfit;
+    const otherIncome = pbt - opProfit + interest + depreciation;
+    
+    if (sales <= 0) return;
+    
+    const items = [
+        { label: 'Revenue', value: sales, type: 'total' }
+    ];
+    if (expenses !== 0) {
+        items.push({ label: 'Expenses', value: -Math.abs(expenses), type: 'deduction' });
+    }
+    items.push({ label: 'Operating Profit', value: opProfit, type: 'subtotal' });
+    if (otherIncome > 0) {
+        items.push({ label: 'Other Income', value: otherIncome, type: 'addition' });
+    } else if (otherIncome < 0) {
+        items.push({ label: 'Other Adj.', value: otherIncome, type: 'deduction' });
+    }
+    if (interest !== 0) {
+        items.push({ label: 'Interest', value: -Math.abs(interest), type: 'deduction' });
+    }
+    if (depreciation !== 0) {
+        items.push({ label: 'Depreciation', value: -Math.abs(depreciation), type: 'deduction' });
+    }
+    if (taxAmt !== 0) {
+        items.push({ label: 'Tax', value: -Math.abs(taxAmt), type: 'deduction' });
+    }
+    items.push({ label: 'Net Profit', value: netProfit, type: 'total' });
+    
+    const isMobile = window.innerWidth < 480;
+    const parentW = canvas.parentElement ? canvas.parentElement.clientWidth : 500;
+    const W = Math.max(280, parentW);
+    const H = 220;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    
+    const margin = isMobile ? { top: 30, bottom: 45, left: 35, right: 15 } : { top: 30, bottom: 45, left: 45, right: 20 };
+    const chartW = W - margin.left - margin.right;
+    const chartH = H - margin.top - margin.bottom;
+    const barW = Math.max(12, Math.min(45, chartW / items.length - 8));
+    
+    // Calculate running total for waterfall positioning
+    let running = 0;
+    const barData = items.map(item => {
+        if (item.type === 'total' || item.type === 'subtotal') {
+            const result = { ...item, start: 0, end: item.value, barStart: Math.min(0, item.value), barEnd: Math.max(0, item.value) };
+            running = item.value;
+            return result;
+        }
+        const start = running;
+        running += item.value;
+        return { ...item, start, end: running, barStart: Math.min(start, running), barEnd: Math.max(start, running) };
+    });
+    
+    const allVals = barData.flatMap(b => [b.barStart, b.barEnd]);
+    const maxVal = Math.max(...allVals) * 1.1;
+    const minVal = Math.min(0, ...allVals) * 1.1;
+    const valRange = maxVal - minVal || 1;
+    
+    const yScale = (v) => margin.top + chartH * (1 - (v - minVal) / valRange);
+    const zeroY = yScale(0);
+    
+    // Draw zero line
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(margin.left, zeroY);
+    ctx.lineTo(W - margin.right, zeroY);
+    ctx.stroke();
+    
+    // Draw connector lines and bars
+    barData.forEach((bar, i) => {
+        const x = margin.left + (i * (chartW / items.length)) + (chartW / items.length - barW) / 2;
+        const yTop = yScale(bar.barEnd);
+        const yBot = yScale(bar.barStart);
+        const barH = yBot - yTop;
+        
+        // Connector line
+        if (i > 0 && bar.type !== 'total' && bar.type !== 'subtotal') {
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 0.5;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            const prevBar = barData[i - 1];
+            const prevX = margin.left + ((i - 1) * (chartW / items.length)) + (chartW / items.length + barW) / 2;
+            const connY = yScale(bar.start);
+            ctx.moveTo(prevX, connY);
+            ctx.lineTo(x, connY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // Bar color
+        let fillColor, strokeColor;
+        if (bar.type === 'total' || bar.type === 'subtotal') {
+            fillColor = bar.value >= 0 ? 'rgba(59,130,246,0.4)' : 'rgba(239,68,68,0.4)';
+            strokeColor = bar.value >= 0 ? 'rgba(59,130,246,0.7)' : 'rgba(239,68,68,0.7)';
+        } else {
+            fillColor = bar.value >= 0 ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.3)';
+            strokeColor = bar.value >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.5)';
+        }
+        
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, yTop, barW, Math.max(barH, 1), 3);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Value label above/below bar
+        ctx.font = isMobile ? '700 7px Inter, sans-serif' : '700 8px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = bar.value >= 0 ? 'rgba(16,185,129,0.9)' : 'rgba(239,68,68,0.9)';
+        const valText = (bar.value >= 0 ? '' : '') + '₹' + Math.abs(Math.round(bar.value)).toLocaleString('en-IN');
+        ctx.fillText(valText, x + barW / 2, bar.value >= 0 ? yTop - 5 : yBot + 12);
+        
+        // Label below
+        ctx.font = isMobile ? '500 7.5px Outfit, sans-serif' : '500 8px Outfit, sans-serif';
+        ctx.fillStyle = labelColor;
+        ctx.save();
+        ctx.translate(x + barW / 2, H - 5);
+        ctx.rotate(isMobile ? -0.55 : -0.4);
+        ctx.fillText(bar.label, 0, 0);
+        ctx.restore();
+    });
+}
+
+
+function renderCashFlowWaterfall(canvas) {
+    const statement = activeFsData.cash_flow;
+    if (!statement || !statement.rows) return;
+    
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+    const lineColor = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)';
+    const labelColor = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.6)';
+    
+    function _findLatest(keywords) {
+        const row = statement.rows.find(r => keywords.some(k => (r.label || '').toLowerCase().includes(k)));
+        if (!row || !row.values) return 0;
+        const nums = row.values.filter(v => typeof v === 'number');
+        return nums.length > 0 ? nums[nums.length - 1] : 0;
+    }
+    
+    const cfo = _findLatest(['operating activity', 'operating cash flow', 'cash from operating']);
+    const cfi = _findLatest(['investing activity', 'cash from investing']);
+    const cff = _findLatest(['financing activity', 'cash from financing']);
+    const netCash = _findLatest(['net cash flow', 'net cash movement']) || (cfo + cfi + cff);
+    
+    const items = [
+        { label: 'Operating (CFO)', value: cfo, type: 'total' },
+        { label: 'Investing (CFI)', value: cfi, type: cfi >= 0 ? 'addition' : 'deduction' },
+        { label: 'Financing (CFF)', value: cff, type: cff >= 0 ? 'addition' : 'deduction' },
+        { label: 'Net Cash Flow', value: netCash, type: 'total' }
+    ];
+    
+    const isMobile = window.innerWidth < 480;
+    const parentW = canvas.parentElement ? canvas.parentElement.clientWidth : 500;
+    const W = Math.max(280, parentW);
+    const H = 220;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    
+    const margin = isMobile ? { top: 30, bottom: 45, left: 45, right: 15 } : { top: 30, bottom: 45, left: 60, right: 20 };
+    const chartW = W - margin.left - margin.right;
+    const chartH = H - margin.top - margin.bottom;
+    const barW = Math.max(12, Math.min(60, chartW / items.length - 12));
+    
+    let running = 0;
+    const barData = items.map((item, i) => {
+        if (i === 0 || item.type === 'total') {
+            const start = 0;
+            const end = item.value;
+            running = item.value;
+            return { ...item, start, end, barStart: Math.min(0, item.value), barEnd: Math.max(0, item.value) };
+        }
+        const start = running;
+        running += item.value;
+        return { ...item, start, end: running, barStart: Math.min(start, running), barEnd: Math.max(start, running) };
+    });
+    
+    const allVals = barData.flatMap(b => [b.barStart, b.barEnd]);
+    const maxVal = Math.max(...allVals) * 1.15;
+    const minVal = Math.min(0, ...allVals) * 1.15;
+    const valRange = maxVal - minVal || 1;
+    
+    const yScale = (v) => margin.top + chartH * (1 - (v - minVal) / valRange);
+    const zeroY = yScale(0);
+    
+    // Draw zero line
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(margin.left, zeroY);
+    ctx.lineTo(W - margin.right, zeroY);
+    ctx.stroke();
+    
+    // Draw connector lines and bars
+    barData.forEach((bar, i) => {
+        const x = margin.left + (i * (chartW / items.length)) + (chartW / items.length - barW) / 2;
+        const yTop = yScale(bar.barEnd);
+        const yBot = yScale(bar.barStart);
+        const barH = yBot - yTop;
+        
+        // Connector line
+        if (i > 0 && bar.type !== 'total') {
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 0.5;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            const prevBar = barData[i - 1];
+            const prevX = margin.left + ((i - 1) * (chartW / items.length)) + (chartW / items.length + barW) / 2;
+            const connY = yScale(bar.start);
+            ctx.moveTo(prevX, connY);
+            ctx.lineTo(x, connY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        // Bar colors
+        let fillColor, strokeColor;
+        if (i === 0) {
+            fillColor = 'rgba(59,130,246,0.4)';
+            strokeColor = 'rgba(59,130,246,0.7)';
+        } else if (i === items.length - 1) {
+            fillColor = 'rgba(139,92,246,0.4)';
+            strokeColor = 'rgba(139,92,246,0.7)';
+        } else {
+            fillColor = bar.value >= 0 ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.3)';
+            strokeColor = bar.value >= 0 ? 'rgba(16,185,129,0.6)' : 'rgba(239,68,68,0.5)';
+        }
+        
+        ctx.fillStyle = fillColor;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, yTop, barW, Math.max(barH, 1), 3);
+        ctx.fill();
+        ctx.stroke();
+        
+        // Value label
+        ctx.font = isMobile ? '700 7px Inter, sans-serif' : '700 8px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = bar.value >= 0 ? 'rgba(16,185,129,0.9)' : 'rgba(239,68,68,0.9)';
+        if (i === 0 || i === items.length - 1) {
+            ctx.fillStyle = isLight ? 'rgba(59,130,246,1)' : 'rgba(147,197,253,1)';
+        }
+        const valText = '₹' + Math.round(bar.value).toLocaleString('en-IN');
+        ctx.fillText(valText, x + barW / 2, bar.value >= 0 ? yTop - 5 : yBot + 12);
+        
+        // Label below
+        ctx.font = isMobile ? '500 7.5px Outfit, sans-serif' : '500 8px Outfit, sans-serif';
+        ctx.fillStyle = labelColor;
+        ctx.save();
+        if (isMobile) {
+            ctx.translate(x + barW / 2, H - 5);
+            ctx.rotate(-0.35);
+        } else {
+            ctx.translate(x + barW / 2, H - 15);
+        }
+        ctx.fillText(bar.label, 0, 0);
+        ctx.restore();
+    });
+}
+
+function renderBSCompositionChart(canvas) {
+    const statement = activeFsData.balance_sheet;
+    if (!statement || !statement.rows) return;
+    
+    function _findLatest(keywords) {
+        const row = statement.rows.find(r => keywords.some(k => (r.label || '').toLowerCase().includes(k)));
+        if (!row || !row.values) return 0;
+        const nums = row.values.filter(v => typeof v === 'number');
+        return nums.length > 0 ? nums[nums.length - 1] : 0;
+    }
+    
+    const items = [
+        { label: 'Share Capital', value: _findLatest(['share capital', 'equity capital']), color: '#3b82f6' },
+        { label: 'Reserves', value: _findLatest(['reserves']), color: '#10b981' },
+        { label: 'Borrowings', value: _findLatest(['borrowings']), color: '#ef4444' },
+        { label: 'Other Liabilities', value: _findLatest(['other liabilities']), color: '#f59e0b' },
+        { label: 'Fixed Assets', value: _findLatest(['fixed assets']), color: '#6366f1' },
+        { label: 'Investments', value: _findLatest(['investments']), color: '#8b5cf6' },
+        { label: 'Other Assets', value: _findLatest(['other assets']), color: '#14b8a6' },
+    ].filter(item => item.value > 0);
+    
+    if (items.length === 0) return;
+    
+    const total = items.reduce((s, i) => s + i.value, 0);
+    const parent = canvas.parentElement;
+    const W = Math.min(500, parent ? parent.clientWidth : 500);
+    const H = W < 420 ? 240 : 180;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    
+    if (typeof canvas._hoveredIndex === 'undefined') {
+        canvas._hoveredIndex = -1;
+    }
+    
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+    const titleTextColor = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.7)';
+    const legendTextColor = isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.6)';
+    
+    function draw() {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, W * dpr, H * dpr);
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        
+        // Horizontal stacked bar
+        const barY = 30;
+        const barH = 40;
+        const barW = W - 40;
+        let offset = 20;
+        
+        ctx.font = '700 11px Outfit, sans-serif';
+        ctx.fillStyle = titleTextColor;
+        ctx.textAlign = 'left';
+        ctx.fillText('BALANCE SHEET COMPOSITION (Latest Year)', 20, 20);
+        
+        items.forEach((item, idx) => {
+            const segW = (item.value / total) * barW;
+            if (segW < 2) return;
+            
+            const isHovered = canvas._hoveredIndex === idx;
+            ctx.fillStyle = item.color + (isHovered ? '95' : '60');
+            ctx.strokeStyle = item.color + (isHovered ? 'ff' : '90');
+            ctx.lineWidth = isHovered ? 1.5 : 1;
+            
+            ctx.beginPath();
+            ctx.roundRect(offset, barY, Math.max(segW - 1, 2), barH, 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            if (segW > 35) {
+                ctx.font = isHovered ? 'bold 9px Inter, sans-serif' : '600 8px Inter, sans-serif';
+                ctx.fillStyle = isHovered ? '#ffffff' : item.color;
+                ctx.textAlign = 'center';
+                ctx.fillText(((item.value / total) * 100).toFixed(0) + '%', offset + segW / 2, barY + barH / 2 + 3);
+            }
+            
+            offset += segW;
+        });
+        
+        // Legend
+        let legendX = 20;
+        let legendY = barY + barH + 25;
+        ctx.font = '500 9px Inter, sans-serif';
+        
+        items.forEach((item, idx) => {
+            const isHovered = canvas._hoveredIndex === idx;
+            ctx.fillStyle = item.color + (isHovered ? 'ff' : 'aa');
+            ctx.fillRect(legendX, legendY, 8, 8);
+            
+            ctx.fillStyle = legendTextColor;
+            ctx.font = isHovered ? 'bold 9px Inter, sans-serif' : '500 9px Inter, sans-serif';
+            ctx.textAlign = 'left';
+            const text = item.label + ' ₹' + Math.round(item.value).toLocaleString('en-IN');
+            ctx.fillText(text, legendX + 12, legendY + 7);
+            legendX += ctx.measureText(text).width + 24;
+            if (legendX > W - 50) { legendX = 20; legendY += 18; }
+        });
+        
+        // Tooltip
+        if (canvas._hoveredIndex !== -1 && canvas._mousePos) {
+            const hoveredItem = items[canvas._hoveredIndex];
+            const tooltipText = `${hoveredItem.label}: ₹${Math.round(hoveredItem.value).toLocaleString('en-IN')} (${((hoveredItem.value / total) * 100).toFixed(1)}%)`;
+            
+            ctx.font = '600 9px Inter, sans-serif';
+            const textW = ctx.measureText(tooltipText).width;
+            
+            const tooltipX = Math.min(W - textW - 20, Math.max(20, canvas._mousePos.x - textW / 2));
+            const tooltipY = barY - 18;
+            
+            ctx.fillStyle = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(15,23,42,0.95)';
+            ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.15)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(tooltipX - 6, tooltipY - 10, textW + 12, 18, 4);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.fillStyle = isLight ? '#0f172a' : '#f8fafc';
+            ctx.textAlign = 'left';
+            ctx.fillText(tooltipText, tooltipX, tooltipY + 2);
+        }
+        
+        ctx.restore();
+    }
+    
+    if (!canvas._hasInteractivity) {
+        const handleInteraction = (clientX, clientY) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = (clientX - rect.left) * (W / rect.width);
+            const mouseY = (clientY - rect.top) * (H / rect.height);
+            canvas._mousePos = { x: mouseX, y: mouseY };
+            
+            const barY = 30;
+            const barH = 40;
+            const barW = W - 40;
+            
+            let hoveredIdx = -1;
+            if (mouseY >= barY && mouseY <= barY + barH) {
+                let currentOffset = 20;
+                for (let i = 0; i < items.length; i++) {
+                    const segW = (items[i].value / total) * barW;
+                    if (segW >= 2) {
+                        if (mouseX >= currentOffset && mouseX <= currentOffset + segW) {
+                            hoveredIdx = i;
+                            break;
+                        }
+                        currentOffset += segW;
+                    }
+                }
+            }
+            
+            if (canvas._hoveredIndex !== hoveredIdx) {
+                canvas._hoveredIndex = hoveredIdx;
+                canvas.style.cursor = hoveredIdx !== -1 ? 'pointer' : 'default';
+                draw();
+            } else if (hoveredIdx !== -1) {
+                draw();
+            }
+        };
+
+        canvas.addEventListener('mousemove', (e) => {
+            handleInteraction(e.clientX, e.clientY);
+        });
+        
+        canvas.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                e.preventDefault();
+                handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: false });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                e.preventDefault();
+                handleInteraction(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: false });
+        
+        canvas.addEventListener('mouseleave', () => {
+            canvas._hoveredIndex = -1;
+            canvas._mousePos = null;
+            canvas.style.cursor = 'default';
+            draw();
+        });
+        
+        canvas.addEventListener('touchend', () => {
+            canvas._hoveredIndex = -1;
+            canvas._mousePos = null;
+            canvas.style.cursor = 'default';
+            draw();
+        });
+        
+        canvas._hasInteractivity = true;
+    }
+    
+    draw();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENHANCEMENT 4: Compare Mode State + Functions
+// ═══════════════════════════════════════════════════════════════════
+window._fsCompareMode = false;
+window._fsSelectedRows = [];
+
+function toggleFsCompareMode() {
+    window._fsCompareMode = !window._fsCompareMode;
+    window._fsSelectedRows = [];
+    
+    const btn = document.getElementById('fs-compare-mode-btn');
+    const selBtn = document.getElementById('fs-compare-selected-btn');
+    
+    if (window._fsCompareMode) {
+        if (btn) { btn.style.background = 'rgba(139,92,246,0.25)'; btn.style.borderColor = 'rgba(139,92,246,0.5)'; btn.textContent = '✕ EXIT COMPARE'; }
+        if (selBtn) selBtn.style.display = 'inline-flex';
+        updateCompareSelectedCount();
+    } else {
+        if (btn) { btn.style.background = 'rgba(139,92,246,0.1)'; btn.style.borderColor = 'rgba(139,92,246,0.3)'; btn.textContent = '⚡ COMPARE MODE'; }
+        if (selBtn) selBtn.style.display = 'none';
+    }
+    renderActiveStatementTable();
+}
+
+function updateCompareSelectedCount() {
+    const btn = document.getElementById('fs-compare-selected-btn');
+    if (btn) {
+        btn.textContent = '📊 Compare Selected (' + window._fsSelectedRows.length + ')';
+        btn.style.opacity = window._fsSelectedRows.length >= 2 ? '1' : '0.5';
+        btn.style.pointerEvents = window._fsSelectedRows.length >= 2 ? 'auto' : 'none';
+    }
+}
+
+function toggleFsRowSelection(label) {
+    const idx = window._fsSelectedRows.findIndex(r => r.label === label);
+    if (idx >= 0) {
+        window._fsSelectedRows.splice(idx, 1);
+    } else if (window._fsSelectedRows.length < 4) {
+        const statement = activeFsData[activeFsStatement];
+        if (statement) {
+            const row = statement.rows.find(r => r.label === label);
+            if (row) window._fsSelectedRows.push({ label: row.label, values: row.values });
+        }
+    }
+    updateCompareSelectedCount();
+    renderActiveStatementTable();
+}
+
+function openFsCompareChart() {
+    if (window._fsSelectedRows.length < 2) return;
+    
+    const modal = document.getElementById('fs-compare-modal');
+    if (!modal) return;
+    
+    // Initialize indexed mode flag if not set
+    if (typeof window._fsCompareIndexed === 'undefined') {
+        window._fsCompareIndexed = true;
+    }
+    
+    if (modal.style.display !== 'flex') {
+        modal.style.display = 'flex';
+        requestAnimationFrame(() => { modal.classList.add('active'); });
+    }
+    
+    const statement = activeFsData[activeFsStatement];
+    const headers = statement ? statement.headers.slice(1) : [];
+    
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+    
+    // Detect light/dark theme
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' ||
+                    document.body.getAttribute('data-theme') === 'light';
+    const textColor = isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)';
+    
+    // Build enhanced legend with mode toggle
+    const legendEl = document.getElementById('fs-compare-legend');
+    if (legendEl) {
+        const modeLabel = window._fsCompareIndexed ? 'Base=100 Indexed' : '% Change';
+        const toggleBtnId = 'fs-compare-mode-toggle';
+        legendEl.innerHTML = 
+            `<button id="${toggleBtnId}" style="font-size:9px;padding:2px 8px;border-radius:4px;border:1px solid rgba(139,92,246,0.3);background:rgba(139,92,246,0.1);color:#a78bfa;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:600;">Mode: ${modeLabel}</button>` +
+            window._fsSelectedRows.map((r, i) => 
+                '<span style="display: flex; align-items: center; gap: 4px;"><span style="width: 10px; height: 3px; background: ' + colors[i] + '; display: inline-block; border-radius: 1px;"></span> <span style="color: ' + textColor + '; font-size: 10px;">' + r.label + '</span></span>'
+            ).join('');
+        
+        // Attach toggle event listener (avoids inline onclick scope issues)
+        const toggleBtn = document.getElementById(toggleBtnId);
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                window._fsCompareIndexed = !window._fsCompareIndexed;
+                openFsCompareChart();
+            });
+        }
+    }
+    
+    // Update subtitle
+    const subtitleEl = modal.querySelector('[style*="text-transform: uppercase"]');
+    if (subtitleEl) {
+        subtitleEl.textContent = window._fsCompareIndexed 
+            ? 'indexed performance (base period = 100)'
+            : 'normalized % change from base period';
+    }
+    
+    // Initialize ResizeObserver on the canvas parent container
+    const canvas = document.getElementById('fs-compare-canvas');
+    if (canvas) {
+        const container = canvas.parentElement;
+        if (!window._fsCompareResizeObserver && container) {
+            window._fsCompareResizeObserver = new ResizeObserver(() => {
+                if (modal.style.display === 'flex' && window._activeCompareData) {
+                    renderFsCompareCanvas(window._activeCompareData.headers);
+                }
+            });
+            window._fsCompareResizeObserver.observe(container);
+        }
+    }
+    
+    // Draw chart
+    renderFsCompareCanvas(headers);
+}
+
+function renderFsCompareCanvas(headers, explicitW, explicitH) {
+    const canvas = document.getElementById('fs-compare-canvas');
+    if (!canvas) return;
+    
+    const container = canvas.parentElement;
+    const W = explicitW || container.clientWidth || 300;
+    const H = explicitH || container.clientHeight || 180;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+    
+    // Save metadata globally
+    window._activeCompareData = {
+        headers: headers,
+        selectedRows: window._fsSelectedRows,
+        width: W,
+        height: H
+    };
+    
+    const margin = { top: 20, right: 20, bottom: 30, left: 55 };
+    const chartW = W - margin.left - margin.right;
+    const chartH = H - margin.top - margin.bottom;
+
+    if (!window._fsSelectedRows || window._fsSelectedRows.length === 0) return;
+
+    // Detect light/dark theme
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' ||
+                    document.body.getAttribute('data-theme') === 'light';
+    const textColor = isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.7)';
+    const gridColor = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)';
+    const labelColor = isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.4)';
+    const refLineColor = isLight ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.25)';
+    const refLabelColor = isLight ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)';
+    const tooltipBg = isLight ? 'rgba(255,255,255,0.95)' : 'rgba(15,23,42,0.95)';
+    const tooltipBorder = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)';
+    
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+    
+    // Normalize all series
+    const normalizedSeries = window._fsSelectedRows.map(row => {
+        const nums = row.values.filter(v => typeof v === 'number');
+        if (nums.length === 0) return [];
+        const base = nums[0] || 1;
+        if (window._fsCompareIndexed) {
+            return nums.map(v => (v / Math.abs(base)) * 100);
+        } else {
+            return nums.map(v => ((v - base) / Math.abs(base)) * 100);
+        }
+    });
+    
+    const allVals = normalizedSeries.flat();
+    if (allVals.length === 0) return;
+    const maxVal = Math.max(...allVals) * 1.1;
+    const minVal = Math.min(...allVals) * (window._fsCompareIndexed ? 0.9 : 1.1);
+    const range = maxVal - minVal || 1;
+    
+    const xScale = (i, len) => margin.left + (i / Math.max(len - 1, 1)) * chartW;
+    const yScale = (v) => margin.top + chartH * (1 - (v - minVal) / range);
+    
+    // Draw grid
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 0.5;
+    const gridStep = window._fsCompareIndexed ? 50 : 25;
+    const gridStart = Math.ceil(minVal / gridStep) * gridStep;
+    for (let p = gridStart; p <= maxVal; p += gridStep) {
+        const y = yScale(p);
+        ctx.beginPath();
+        ctx.moveTo(margin.left, y);
+        ctx.lineTo(W - margin.right, y);
+        ctx.stroke();
+        
+        ctx.font = '500 8px Inter, sans-serif';
+        ctx.fillStyle = labelColor;
+        ctx.textAlign = 'right';
+        ctx.fillText(p.toFixed(0) + (window._fsCompareIndexed ? '' : '%'), margin.left - 6, y + 3);
+    }
+    
+    // Reference line (100 for indexed, 0 for % change)
+    const refVal = window._fsCompareIndexed ? 100 : 0;
+    const refY = yScale(refVal);
+    ctx.strokeStyle = refLineColor;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(margin.left, refY);
+    ctx.lineTo(W - margin.right, refY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Reference label
+    ctx.font = '600 8px Inter, sans-serif';
+    ctx.fillStyle = refLabelColor;
+    ctx.textAlign = 'right';
+    ctx.fillText(window._fsCompareIndexed ? 'Base=100' : '0%', margin.left - 6, refY - 5);
+    
+    // Draw each series with area fill
+    normalizedSeries.forEach((series, si) => {
+        if (series.length < 2) return;
+        
+        // Area fill
+        ctx.beginPath();
+        ctx.moveTo(xScale(0, series.length), yScale(refVal));
+        series.forEach((v, i) => ctx.lineTo(xScale(i, series.length), yScale(v)));
+        ctx.lineTo(xScale(series.length - 1, series.length), yScale(refVal));
+        ctx.closePath();
+        ctx.fillStyle = colors[si] + '10';
+        ctx.fill();
+        
+        // Line
+        ctx.strokeStyle = colors[si];
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        series.forEach((v, i) => {
+            const x = xScale(i, series.length);
+            const y = yScale(v);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        
+        // End dot & label
+        const lastX = xScale(series.length - 1, series.length);
+        const lastY = yScale(series[series.length - 1]);
+        ctx.fillStyle = colors[si];
+        ctx.beginPath();
+        ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.font = '600 8px Inter, sans-serif';
+        ctx.textAlign = 'left';
+        const endLabel = window._fsCompareIndexed
+            ? series[series.length - 1].toFixed(0)
+            : series[series.length - 1].toFixed(1) + '%';
+        ctx.fillText(endLabel, lastX + 6, lastY + 3);
+    });
+    
+    // X-axis labels
+    const maxLabels = Math.min(headers.length, normalizedSeries[0] ? normalizedSeries[0].length : 0);
+    ctx.font = '500 8px Inter, sans-serif';
+    ctx.fillStyle = labelColor;
+    ctx.textAlign = 'center';
+    const step = maxLabels > 10 ? 2 : 1;
+    for (let i = 0; i < maxLabels; i += step) {
+        ctx.fillText(headers[i] || '', xScale(i, maxLabels), H - 8);
+    }
+
+    // Save a base snapshot for hovering
+    const baseSnapshot = ctx.getImageData(0, 0, W * dpr, H * dpr);
+
+    function handleCanvasHover(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+        const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : null);
+        
+        if (clientX === null || clientY === null) return;
+        
+        const mouseX = clientX - rect.left;
+        const mouseY = clientY - rect.top;
+        
+        if (mouseX < margin.left || mouseX > W - margin.right) {
+            ctx.putImageData(baseSnapshot, 0, 0);
+            canvas.style.cursor = 'default';
+            return;
+        }
+        
+        const len = normalizedSeries[0] ? normalizedSeries[0].length : 0;
+        if (len < 2) return;
+        
+        // Find closest point index
+        let closestIndex = 0;
+        let minDist = Infinity;
+        for (let i = 0; i < len; i++) {
+            const x = xScale(i, len);
+            const dist = Math.abs(x - mouseX);
+            if (dist < minDist) {
+                minDist = dist;
+                closestIndex = i;
+            }
+        }
+        
+        const hoverX = xScale(closestIndex, len);
+        
+        // Restore background
+        ctx.putImageData(baseSnapshot, 0, 0);
+        
+        // Draw vertical guide line
+        ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(hoverX, margin.top);
+        ctx.lineTo(hoverX, H - margin.bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Collect rows values for tooltip
+        const tooltipItems = [];
+        normalizedSeries.forEach((series, si) => {
+            const val = series[closestIndex];
+            const originalRow = window._fsSelectedRows[si];
+            const originalVal = originalRow.values.filter(v => typeof v === 'number')[closestIndex];
+            const y = yScale(val);
+            
+            // Draw hover indicator dot
+            ctx.fillStyle = colors[si];
+            ctx.beginPath();
+            ctx.arc(hoverX, y, 4.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = isLight ? '#ffffff' : '#0f172a';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            
+            let displayVal = window._fsCompareIndexed
+                ? val.toFixed(1)
+                : (val >= 0 ? '+' : '') + val.toFixed(1) + '%';
+            
+            tooltipItems.push({
+                label: originalRow.label,
+                valStr: displayVal,
+                rawVal: formatFsValue(originalVal, originalRow.label.toLowerCase().includes('%')),
+                color: colors[si]
+            });
+        });
+        
+        // Draw Multi-row interactive Tooltip Card
+        canvas.style.cursor = 'crosshair';
+        const cardW = 160;
+        const cardH = 25 + tooltipItems.length * 15;
+        let cardX = hoverX + 10;
+        let cardY = mouseY - cardH / 2;
+        
+        // Boundaries checks
+        if (cardX + cardW > W) cardX = hoverX - cardW - 10;
+        if (cardY < 10) cardY = 10;
+        if (cardY + cardH > H - 10) cardY = H - cardH - 10;
+        
+        // Card Background
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 4;
+        
+        ctx.fillStyle = tooltipBg;
+        ctx.strokeStyle = tooltipBorder;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(cardX, cardY, cardW, cardH, 6);
+        } else {
+            ctx.rect(cardX, cardY, cardW, cardH);
+        }
+        ctx.fill();
+        ctx.stroke();
+        
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Tooltip Title: Period Header
+        ctx.font = '700 8.5px Inter, sans-serif';
+        ctx.fillStyle = textColor;
+        ctx.textAlign = 'left';
+        ctx.fillText(headers[closestIndex] || '', cardX + 8, cardY + 12);
+        
+        // Draw each row
+        tooltipItems.forEach((item, idx) => {
+            const lineY = cardY + 26 + idx * 14;
+            
+            // Color marker dot
+            ctx.fillStyle = item.color;
+            ctx.beginPath();
+            ctx.arc(cardX + 12, lineY - 3, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Label
+            ctx.font = '500 8px Inter, sans-serif';
+            ctx.fillStyle = isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.6)';
+            let truncatedLabel = item.label;
+            if (truncatedLabel.length > 15) {
+                truncatedLabel = truncatedLabel.slice(0, 13) + '...';
+            }
+            ctx.fillText(truncatedLabel, cardX + 22, lineY);
+            
+            // Value
+            ctx.font = '700 8px Courier New, monospace';
+            ctx.fillStyle = textColor;
+            ctx.textAlign = 'right';
+            ctx.fillText(`${item.valStr} (${item.rawVal})`, cardX + cardW - 8, lineY);
+            ctx.textAlign = 'left'; // restore
+        });
+    }
+
+    if (canvas._fsCompareHoverHandler) {
+        canvas.removeEventListener('mousemove', canvas._fsCompareHoverHandler);
+    }
+    canvas._fsCompareHoverHandler = handleCanvasHover;
+    canvas.addEventListener('mousemove', handleCanvasHover);
+
+    // Touch interaction support
+    function handleTouchInteraction(e) {
+        if (e.touches.length > 0) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleCanvasHover(touch);
+        }
+    }
+    
+    if (canvas._fsCompareTouchStartHandler) {
+        canvas.removeEventListener('touchstart', canvas._fsCompareTouchStartHandler);
+    }
+    canvas._fsCompareTouchStartHandler = handleTouchInteraction;
+    canvas.addEventListener('touchstart', handleTouchInteraction, { passive: false });
+    
+    if (canvas._fsCompareTouchMoveHandler) {
+        canvas.removeEventListener('touchmove', canvas._fsCompareTouchMoveHandler);
+    }
+    canvas._fsCompareTouchMoveHandler = handleTouchInteraction;
+    canvas.addEventListener('touchmove', handleTouchInteraction, { passive: false });
+
+    // Handle mouseleave / touchend to reset
+    if (canvas._fsCompareLeaveHandler) {
+        canvas.removeEventListener('mouseleave', canvas._fsCompareLeaveHandler);
+    }
+    canvas._fsCompareLeaveHandler = () => {
+        ctx.putImageData(baseSnapshot, 0, 0);
+        canvas.style.cursor = 'default';
+    };
+    canvas.addEventListener('mouseleave', canvas._fsCompareLeaveHandler);
+
+    if (canvas._fsCompareTouchEndHandler) {
+        canvas.removeEventListener('touchend', canvas._fsCompareTouchEndHandler);
+    }
+    canvas._fsCompareTouchEndHandler = () => {
+        ctx.putImageData(baseSnapshot, 0, 0);
+        canvas.style.cursor = 'default';
+    };
+    canvas.addEventListener('touchend', canvas._fsCompareTouchEndHandler);
+}
+
+function closeFsCompareModal() {
+    const modal = document.getElementById('fs-compare-modal');
+    if (!modal) return;
+    modal.classList.remove('active');
+    setTimeout(() => { modal.style.display = 'none'; }, 300);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE: P&L WATERFALL CHART (Standalone)
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * renderPnLWaterfallChart()
+ * Draws a standalone waterfall chart showing Revenue decomposition into Net Profit.
+ * Displayed inside the Visual Insight Panel when viewing P&L or Quarterly statements.
+ * Uses the LATEST period's data to build the waterfall bridges.
+ */
+function renderPnLWaterfallChart() {
+    const panel = document.getElementById('fs-visual-insight-panel');
+    let canvas = document.getElementById('fs-visual-insight-canvas');
+    if (!panel || !canvas) return;
+
+    const isPnL = (activeFsStatement === 'profit_loss');
+    if (!isPnL || !activeFsData || !activeFsData[activeFsStatement]) return;
+
+    // Clone and replace canvas to clear all active event listeners (prevents event leaks from Balance Sheet or other charts)
+    const newCanvas = canvas.cloneNode(true);
+    canvas.parentNode.replaceChild(newCanvas, canvas);
+    canvas = newCanvas;
+
+    const statement = activeFsData[activeFsStatement];
+    if (!statement || !statement.rows) return;
+
+    // Helper to find row value for the latest period
+    function getLatest(keywords) {
+        const row = statement.rows.find(r => {
+            const lbl = (r.label || '').toLowerCase();
+            return keywords.some(k => lbl.includes(k));
+        });
+        if (!row || !row.values) return null;
+        const nums = row.values.filter(v => typeof v === 'number');
+        return nums.length > 0 ? nums[nums.length - 1] : null;
+    }
+
+    const sales = getLatest(['sales', 'revenue', 'interest earned']);
+    const otherIncome = getLatest(['other income']);
+    const expenses = getLatest(['expenses']);
+    const operatingProfit = getLatest(['operating profit']);
+    const depreciation = getLatest(['depreciation']);
+    const interest = getLatest(['interest', 'finance cost']);
+    const tax = getLatest(['tax']);
+    const netProfit = getLatest(['net profit', 'profit after tax', 'pat']);
+
+    if (sales === null || netProfit === null) return;
+
+    // Build waterfall steps
+    const steps = [];
+    steps.push({ label: 'Revenue', value: sales, type: 'total' });
+    if (otherIncome !== null) steps.push({ label: 'Other Income', value: otherIncome, type: 'add' });
+    if (expenses !== null) steps.push({ label: 'Expenses', value: -Math.abs(expenses), type: 'subtract' });
+    if (operatingProfit !== null) steps.push({ label: 'Op. Profit', value: operatingProfit, type: 'subtotal' });
+    if (depreciation !== null) steps.push({ label: 'Depreciation', value: -Math.abs(depreciation), type: 'subtract' });
+    if (interest !== null && interest !== 0) steps.push({ label: 'Interest', value: -Math.abs(interest), type: 'subtract' });
+    if (tax !== null) steps.push({ label: 'Tax', value: -Math.abs(tax), type: 'subtract' });
+    steps.push({ label: 'Net Profit', value: netProfit, type: 'total' });
+
+    // Update panel title
+    const titleEl = document.getElementById('fs-visual-insight-title');
+    if (titleEl) titleEl.textContent = '📊 P&L Waterfall Breakdown (Latest Period)';
+
+    // Draw on canvas
+    const container = canvas.parentElement;
+    const W = container.clientWidth;
+    const H = 220;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, W, H);
+
+    const margin = { top: 25, right: 15, bottom: 40, left: 15 };
+    const chartW = W - margin.left - margin.right;
+    const chartH = H - margin.top - margin.bottom;
+
+    const barCount = steps.length;
+    const barGap = 8;
+    const barW = Math.min(60, (chartW - barGap * (barCount + 1)) / barCount);
+    const totalBarsW = barCount * barW + (barCount - 1) * barGap;
+    const startX = margin.left + (chartW - totalBarsW) / 2;
+
+    // Compute running totals for waterfall positioning
+    let running = 0;
+    const barData = [];
+    for (const step of steps) {
+        if (step.type === 'total' || step.type === 'subtotal') {
+            barData.push({ ...step, bottom: 0, top: step.value, isTotal: true });
+            running = step.value;
+        } else {
+            const prevRunning = running;
+            running += step.value;
+            barData.push({
+                ...step,
+                bottom: Math.min(prevRunning, running),
+                top: Math.max(prevRunning, running),
+                isTotal: false
+            });
+        }
+    }
+
+    const allVals = barData.flatMap(b => [b.bottom, b.top]);
+    const maxV = Math.max(...allVals) * 1.15;
+    const minV = Math.min(0, ...allVals) * 1.1;
+    const range = maxV - minV || 1;
+
+    const yScale = (v) => margin.top + chartH * (1 - (v - minV) / range);
+
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+    const zeroLineColor = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.12)';
+    const barBorderColor = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.1)';
+    const connectorColor = isLight ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.15)';
+    const valColor = isLight ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)';
+    const labelColor = isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.5)';
+
+    // Zero line
+    const zeroY = yScale(0);
+    ctx.strokeStyle = zeroLineColor;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(margin.left, zeroY);
+    ctx.lineTo(W - margin.right, zeroY);
+    ctx.stroke();
+
+    // Draw bars
+    barData.forEach((bar, i) => {
+        const x = startX + i * (barW + barGap);
+        const yTop = yScale(bar.top);
+        const yBot = yScale(bar.bottom);
+        const h = yBot - yTop;
+
+        let color;
+        if (bar.isTotal) {
+            color = bar.value >= 0
+                ? 'rgba(59, 130, 246, 0.75)'
+                : 'rgba(239, 68, 68, 0.75)';
+        } else if (bar.value >= 0) {
+            color = 'rgba(16, 185, 129, 0.7)';
+        } else {
+            color = 'rgba(239, 68, 68, 0.6)';
+        }
+
+        // Bar shadow
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.fillRect(x + 2, yTop + 2, barW, h);
+
+        // Bar fill
+        ctx.fillStyle = color;
+        ctx.fillRect(x, yTop, barW, h);
+
+        // Bar border
+        ctx.strokeStyle = barBorderColor;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, yTop, barW, h);
+
+        // Connector line between bars
+        if (i < barData.length - 1 && !bar.isTotal) {
+            const nextX = startX + (i + 1) * (barW + barGap);
+            ctx.strokeStyle = connectorColor;
+            ctx.lineWidth = 0.5;
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath();
+            const connectorY = bar.value >= 0 ? yTop : yBot;
+            ctx.moveTo(x + barW, connectorY);
+            ctx.lineTo(nextX, connectorY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Value label on bar
+        const fmtVal = Math.abs(bar.value) >= 10000000
+            ? (bar.value / 10000000).toFixed(0) + 'Cr'
+            : Math.abs(bar.value) >= 100000
+                ? (bar.value / 100000).toFixed(0) + 'L'
+                : bar.value.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+        ctx.fillStyle = valColor;
+        ctx.font = 'bold 8px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(fmtVal, x + barW / 2, yTop - 3);
+
+        // Label below
+        ctx.fillStyle = labelColor;
+        ctx.font = '8px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(bar.label, x + barW / 2, margin.top + chartH + 6);
+    });
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE: SMART ALERT SUBSCRIPTION
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Smart Alert system that monitors financial metrics against user-defined thresholds.
+ * Alerts are stored in localStorage and evaluated each time data is loaded.
+ */
+
+window._fsAlerts = JSON.parse(localStorage.getItem('fsSmartAlerts') || '[]');
+window._fsTriggeredAlerts = [];
+
+function saveFsAlerts() {
+    localStorage.setItem('fsSmartAlerts', JSON.stringify(window._fsAlerts));
+}
+
+function toggleFsAlertPanel() {
+    const existing = document.getElementById('fs-alert-overlay');
+    if (existing) {
+        existing.remove();
+        return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'fs-alert-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10001;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;transition:all 0.3s;';
+
+    const card = document.createElement('div');
+    card.style.cssText = 'width:90%;max-width:520px;background:var(--bg-card);border:1px solid var(--border-glass);border-radius:12px;padding:20px;box-shadow:var(--shadow-glow);display:flex;flex-direction:column;gap:14px;max-height:80vh;overflow-y:auto;';
+
+    // Header
+    card.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3 style="margin:0;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;color:var(--text-primary);">🔔 Smart Alert Subscriptions</h3>
+            <button onclick="document.getElementById('fs-alert-overlay').remove()" style="background:transparent;border:1px solid var(--border-glass);border-radius:50%;width:24px;height:24px;cursor:pointer;color:var(--text-secondary);font-size:14px;display:flex;align-items:center;justify-content:center;">×</button>
+        </div>
+        <div style="font-size:10px;color:var(--text-secondary);line-height:1.5;border-bottom:1px dashed var(--border-glass);padding-bottom:8px;">
+            Set threshold alerts on financial metrics. Alerts will trigger when a metric crosses your defined threshold in the latest data period.
+        </div>
+        <div id="fs-alert-add-form" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:1;min-width:120px;">
+                <label style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:3px;">Metric Name</label>
+                <input id="fs-alert-metric" type="text" placeholder="e.g. Net Profit, OPM, Sales" style="width:100%;height:28px;padding:0 8px;border-radius:5px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-size:10px;font-family:'Inter',sans-serif;box-sizing:border-box;outline:none;" />
+            </div>
+            <div style="width:80px;">
+                <label style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:3px;">Condition</label>
+                <select id="fs-alert-condition" style="width:100%;height:28px;padding:0 4px;border-radius:5px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-size:10px;font-family:'Inter',sans-serif;outline:none;">
+                    <option value="above">Above</option>
+                    <option value="below">Below</option>
+                    <option value="yoy_above">YoY % ></option>
+                    <option value="yoy_below">YoY % <</option>
+                </select>
+            </div>
+            <div style="width:80px;">
+                <label style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:3px;">Threshold</label>
+                <input id="fs-alert-threshold" type="number" placeholder="e.g. 1000" style="width:100%;height:28px;padding:0 8px;border-radius:5px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-size:10px;font-family:'Inter',sans-serif;box-sizing:border-box;outline:none;" />
+            </div>
+            <button onclick="addFsAlert()" style="height:28px;padding:0 12px;font-size:10px;font-family:'Outfit',sans-serif;font-weight:600;border-radius:5px;border:none;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;cursor:pointer;white-space:nowrap;">+ Add Alert</button>
+        </div>
+        <div id="fs-alert-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div id="fs-alert-triggered-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+    `;
+
+    overlay.appendChild(card);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+
+    renderFsAlertList();
+}
+
+function addFsAlert() {
+    const metricEl = document.getElementById('fs-alert-metric');
+    const conditionEl = document.getElementById('fs-alert-condition');
+    const thresholdEl = document.getElementById('fs-alert-threshold');
+    if (!metricEl || !conditionEl || !thresholdEl) return;
+
+    const metric = metricEl.value.trim();
+    const condition = conditionEl.value;
+    const threshold = parseFloat(thresholdEl.value);
+
+    if (!metric || isNaN(threshold)) return;
+
+    window._fsAlerts.push({
+        id: Date.now(),
+        metric,
+        condition,
+        threshold,
+        active: true,
+        createdAt: new Date().toISOString()
+    });
+    saveFsAlerts();
+
+    metricEl.value = '';
+    thresholdEl.value = '';
+    renderFsAlertList();
+    evaluateFsAlerts();
+}
+
+function removeFsAlert(id) {
+    window._fsAlerts = window._fsAlerts.filter(a => a.id !== id);
+    saveFsAlerts();
+    renderFsAlertList();
+}
+
+function renderFsAlertList() {
+    const listEl = document.getElementById('fs-alert-list');
+    const triggeredEl = document.getElementById('fs-alert-triggered-list');
+    if (!listEl) return;
+
+    if (window._fsAlerts.length === 0) {
+        listEl.innerHTML = '<div style="font-size:10px;color:var(--text-muted);text-align:center;padding:12px;">No alerts configured. Add one above.</div>';
+    } else {
+        const condLabels = { above: '>', below: '<', yoy_above: 'YoY% >', yoy_below: 'YoY% <' };
+        listEl.innerHTML = '<div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;margin-bottom:2px;">Active Alerts</div>' +
+            window._fsAlerts.map(a => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.15);border-radius:6px;">
+                    <div style="font-size:10px;color:var(--text-primary);font-weight:600;">
+                        <span style="color:#fbbf24;">🔔</span> ${a.metric} <span style="color:var(--text-muted);font-weight:400;">${condLabels[a.condition] || a.condition}</span> <span style="color:#fbbf24;">${a.threshold.toLocaleString('en-IN')}</span>
+                    </div>
+                    <button onclick="removeFsAlert(${a.id})" style="background:none;border:none;color:var(--color-crimson);cursor:pointer;font-size:12px;padding:0 4px;">✕</button>
+                </div>
+            `).join('');
+    }
+
+    // Show triggered alerts
+    if (triggeredEl && window._fsTriggeredAlerts.length > 0) {
+        triggeredEl.innerHTML = '<div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;margin-top:6px;margin-bottom:2px;">⚡ Triggered Alerts</div>' +
+            window._fsTriggeredAlerts.map(t => `
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${t.type === 'warning' ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)'};border:1px solid ${t.type === 'warning' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'};border-radius:6px;">
+                    <span style="font-size:12px;">${t.type === 'warning' ? '🔴' : '🟢'}</span>
+                    <span style="font-size:10px;color:var(--text-primary);">${t.message}</span>
+                </div>
+            `).join('');
+    } else if (triggeredEl) {
+        triggeredEl.innerHTML = '';
+    }
+}
+
+function evaluateFsAlerts() {
+    window._fsTriggeredAlerts = [];
+    if (!activeFsData || window._fsAlerts.length === 0) return;
+
+    // Check all statements for matching metric rows
+    const statementsToCheck = ['quarters', 'profit_loss', 'balance_sheet', 'cash_flow'];
+    
+    for (const alert of window._fsAlerts) {
+        if (!alert.active) continue;
+        const metricLower = alert.metric.toLowerCase();
+        
+        for (const stmtKey of statementsToCheck) {
+            const stmt = activeFsData[stmtKey];
+            if (!stmt || !stmt.rows) continue;
+            
+            const matchRow = stmt.rows.find(r => (r.label || '').toLowerCase().includes(metricLower));
+            if (!matchRow || !matchRow.values) continue;
+            
+            const nums = matchRow.values.filter(v => typeof v === 'number');
+            if (nums.length === 0) continue;
+            
+            const latest = nums[nums.length - 1];
+            const prev = nums.length >= 2 ? nums[nums.length - 2] : null;
+            
+            let triggered = false;
+            let message = '';
+            
+            if (alert.condition === 'above' && latest > alert.threshold) {
+                triggered = true;
+                message = `${matchRow.label} is ₹${latest.toLocaleString('en-IN')} (above ${alert.threshold.toLocaleString('en-IN')})`;
+            } else if (alert.condition === 'below' && latest < alert.threshold) {
+                triggered = true;
+                message = `${matchRow.label} is ₹${latest.toLocaleString('en-IN')} (below ${alert.threshold.toLocaleString('en-IN')})`;
+            } else if (alert.condition === 'yoy_above' && prev !== null && prev !== 0) {
+                const yoy = ((latest - prev) / Math.abs(prev)) * 100;
+                if (yoy > alert.threshold) {
+                    triggered = true;
+                    message = `${matchRow.label} YoY growth ${yoy.toFixed(1)}% (above ${alert.threshold}%)`;
+                }
+            } else if (alert.condition === 'yoy_below' && prev !== null && prev !== 0) {
+                const yoy = ((latest - prev) / Math.abs(prev)) * 100;
+                if (yoy < alert.threshold) {
+                    triggered = true;
+                    message = `${matchRow.label} YoY growth ${yoy.toFixed(1)}% (below ${alert.threshold}%)`;
+                }
+            }
+            
+            if (triggered) {
+                window._fsTriggeredAlerts.push({
+                    alertId: alert.id,
+                    metric: matchRow.label,
+                    type: (alert.condition === 'below' || alert.condition === 'yoy_below') ? 'warning' : 'positive',
+                    message
+                });
+                break;
+            }
+        }
+    }
+
+    // Update alert button badge
+    const alertBtn = document.getElementById('fs-alert-manage-btn');
+    if (alertBtn) {
+        const count = window._fsTriggeredAlerts.length;
+        if (count > 0) {
+            alertBtn.textContent = `🔔 ALERTS (${count} triggered)`;
+            alertBtn.style.borderColor = 'rgba(239,68,68,0.5)';
+            alertBtn.style.background = 'rgba(239,68,68,0.12)';
+            alertBtn.style.color = '#f87171';
+        } else {
+            alertBtn.textContent = `🔔 ALERTS${window._fsAlerts.length > 0 ? ' (' + window._fsAlerts.length + ')' : ''}`;
+            alertBtn.style.borderColor = 'rgba(245,158,11,0.3)';
+            alertBtn.style.background = 'rgba(245,158,11,0.1)';
+            alertBtn.style.color = '#fbbf24';
+        }
+    }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE: PERIOD-OVER-PERIOD COMPARISON PANEL
+// ═══════════════════════════════════════════════════════════════════
+
+window._fsPoPVisible = false;
+
+function togglePeriodComparePanel() {
+    window._fsPoPVisible = !window._fsPoPVisible;
+    const panel = document.getElementById('fs-period-comparison-panel');
+    const btn = document.getElementById('fs-period-compare-btn');
+    
+    if (!panel) return;
+    
+    if (window._fsPoPVisible) {
+        panel.style.display = 'flex';
+        if (btn) {
+            btn.textContent = '✕ CLOSE PERIOD COMPARE';
+            btn.style.borderColor = 'rgba(239,68,68,0.4)';
+            btn.style.background = 'rgba(239,68,68,0.12)';
+            btn.style.color = '#f87171';
+        }
+        populatePoPDropdowns();
+        renderPoPComparison();
+    } else {
+        panel.style.display = 'none';
+        if (btn) {
+            btn.textContent = '📅 PERIOD vs PERIOD';
+            btn.style.borderColor = 'rgba(16,185,129,0.3)';
+            btn.style.background = 'rgba(16,185,129,0.1)';
+            btn.style.color = '#34d399';
+        }
+    }
+}
+
+function populatePoPDropdowns() {
+    if (!activeFsData || !activeFsData[activeFsStatement]) return;
+    const headers = activeFsData[activeFsStatement].headers.slice(1);
+    
+    const selA = document.getElementById('fs-pop-period-a');
+    const selB = document.getElementById('fs-pop-period-b');
+    if (!selA || !selB) return;
+    
+    const opts = headers.map((h, i) => `<option value="${i}">${h}</option>`).join('');
+    selA.innerHTML = opts;
+    selB.innerHTML = opts;
+    
+    // Default: latest vs previous
+    if (headers.length >= 2) {
+        selA.value = headers.length - 1;
+        selB.value = headers.length - 2;
+    }
+    
+    selA.onchange = renderPoPComparison;
+    selB.onchange = renderPoPComparison;
+}
+
+function renderPoPComparison() {
+    const container = document.getElementById('fs-pop-table-container');
+    if (!container || !activeFsData || !activeFsData[activeFsStatement]) return;
+    
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light' || document.body.getAttribute('data-theme') === 'light';
+    const popBarBg = isLight ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.05)';
+    const popBorderColor = isLight ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)';
+    
+    const selA = document.getElementById('fs-pop-period-a');
+    const selB = document.getElementById('fs-pop-period-b');
+    if (!selA || !selB) return;
+    
+    const idxA = parseInt(selA.value);
+    const idxB = parseInt(selB.value);
+    const statement = activeFsData[activeFsStatement];
+    const headers = statement.headers.slice(1);
+    const rows = statement.rows;
+    
+    if (!rows || rows.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:11px;">No data available.</div>';
+        return;
+    }
+    
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+    html += `<thead><tr>
+        <th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;min-width:140px;">Metric</th>
+        <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;color:#3b82f6;">${headers[idxA] || 'Period A'}</th>
+        <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;color:#f59e0b;">${headers[idxB] || 'Period B'}</th>
+        <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;">Abs Δ</th>
+        <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;">% Δ</th>
+        <th style="text-align:center;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;width:80px;">Visual</th>
+    </tr></thead><tbody>`;
+    
+    rows.forEach(r => {
+        const valA = (r.values && r.values[idxA] !== undefined) ? r.values[idxA] : null;
+        const valB = (r.values && r.values[idxB] !== undefined) ? r.values[idxB] : null;
+        
+        const numA = typeof valA === 'number' ? valA : null;
+        const numB = typeof valB === 'number' ? valB : null;
+        
+        let absDelta = '--';
+        let pctDelta = '--';
+        let pctVal = 0;
+        let deltaColor = 'var(--text-muted)';
+        
+        if (numA !== null && numB !== null) {
+            const diff = numA - numB;
+            absDelta = formatFsValue(diff, false);
+            if (numB !== 0) {
+                pctVal = (diff / Math.abs(numB)) * 100;
+                pctDelta = (pctVal >= 0 ? '+' : '') + pctVal.toFixed(1) + '%';
+                deltaColor = pctVal > 0.5 ? 'var(--color-emerald)' : pctVal < -0.5 ? 'var(--color-crimson)' : 'var(--text-muted)';
+            }
+        }
+        
+        // Inline bar visual
+        const barPct = Math.min(Math.abs(pctVal), 100);
+        const barColor = pctVal >= 0 ? 'rgba(16,185,129,0.5)' : 'rgba(239,68,68,0.5)';
+        const barHtml = numA !== null && numB !== null
+            ? `<div style="display:flex;align-items:center;gap:4px;"><div style="flex:1;height:6px;background:${popBarBg};border-radius:3px;overflow:hidden;"><div style="width:${barPct}%;height:100%;background:${barColor};border-radius:3px;transition:width 0.3s;"></div></div></div>`
+            : '--';
+        
+        const boldLabels = ['sales', 'net profit', 'operating profit', 'total assets', 'expenses'];
+        const isBold = boldLabels.some(b => (r.label || '').toLowerCase().includes(b));
+        const fw = isBold ? 'font-weight:700;' : '';
+        
+        html += `<tr style="${fw}border-bottom:1px solid ${popBorderColor};">
+            <td style="text-align:left;padding:5px 10px;font-family:'Outfit',sans-serif;">${r.label}</td>
+            <td style="text-align:right;padding:5px 10px;font-family:'Inter',sans-serif;">${formatFsValue(valA, false)}</td>
+            <td style="text-align:right;padding:5px 10px;font-family:'Inter',sans-serif;">${formatFsValue(valB, false)}</td>
+            <td style="text-align:right;padding:5px 10px;font-family:'Inter',sans-serif;color:${deltaColor};">${absDelta}</td>
+            <td style="text-align:right;padding:5px 10px;font-family:'Inter',sans-serif;font-weight:600;color:${deltaColor};">${pctDelta}</td>
+            <td style="text-align:center;padding:5px 10px;">${barHtml}</td>
+        </tr>`;
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE: SEGMENT-LEVEL BREAKDOWN
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * renderSegmentBreakdown()
+ * Attempts to detect segment-like rows (revenue segments, business segments)
+ * and renders a donut chart + breakdown table.
+ * Segments are identified by keywords or by detecting sub-rows under specific categories.
+ */
+function renderSegmentBreakdown() {
+    const panel = document.getElementById('fs-segment-breakdown-panel');
+    if (!panel) return;
+
+    // Only applicable for P&L or Quarterly
+    const isPnL = (activeFsStatement === 'profit_loss' || activeFsStatement === 'quarters');
+    if (!isPnL || !activeFsData || !activeFsData[activeFsStatement]) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    const statement = activeFsData[activeFsStatement];
+    if (!statement || !statement.rows) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    // Try to detect segment data:
+    // Look for rows that look like segment revenue (contain "segment" keyword)
+    // OR look for specific patterns like "Domestic" / "Export" / named products
+    const segmentKeywords = ['segment', 'domestic', 'export', 'product', 'service', 'manufacturing', 'trading', 'retail', 'wholesale'];
+    
+    // Also detect revenue breakdown patterns (multiple rows with similar naming under Revenue)
+    const rows = statement.rows;
+    let segmentRows = [];
+    
+    // Strategy 1: Look for rows explicitly containing "segment"
+    const segRows = rows.filter(r => (r.label || '').toLowerCase().includes('segment'));
+    if (segRows.length >= 2) {
+        segmentRows = segRows;
+    }
+    
+    // Strategy 2: Look for domestic/export split
+    if (segmentRows.length < 2) {
+        const splitRows = rows.filter(r => {
+            const lbl = (r.label || '').toLowerCase();
+            return segmentKeywords.some(k => lbl.includes(k)) && !lbl.includes('total') && !lbl.includes('operating');
+        });
+        if (splitRows.length >= 2) {
+            segmentRows = splitRows;
+        }
+    }
+
+    // Strategy 3: Infer from expense structure
+    if (segmentRows.length < 2) {
+        const expenseRows = rows.filter(r => {
+            const lbl = (r.label || '').toLowerCase();
+            return (lbl.includes('cost') || lbl.includes('expense')) &&
+                   !lbl.includes('total') && !lbl.includes('operating') && !lbl.includes('other');
+        });
+        if (expenseRows.length >= 2) {
+            segmentRows = expenseRows;
+        }
+    }
+
+    if (segmentRows.length < 2) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    // Show panel
+    panel.style.display = 'flex';
+
+    // Get latest period values
+    const segData = segmentRows.map(r => {
+        const nums = (r.values || []).filter(v => typeof v === 'number');
+        return {
+            label: r.label,
+            value: nums.length > 0 ? nums[nums.length - 1] : 0,
+            values: nums
+        };
+    }).filter(s => s.value !== 0);
+
+    if (segData.length < 2) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    const total = segData.reduce((sum, s) => sum + Math.abs(s.value), 0);
+
+    // Render donut chart
+    const chartsContainer = document.getElementById('fs-segment-charts');
+    if (chartsContainer) {
+        const donutSize = 160;
+        const dpr = window.devicePixelRatio || 1;
+        
+        chartsContainer.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+                <canvas id="fs-segment-donut" width="${donutSize * dpr}" height="${donutSize * dpr}" style="width:${donutSize}px;height:${donutSize}px;"></canvas>
+                <span style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Composition (Latest Period)</span>
+            </div>
+        `;
+
+        const canvas = document.getElementById('fs-segment-donut');
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            
+            const cx = donutSize / 2;
+            const cy = donutSize / 2;
+            const outerR = donutSize / 2 - 10;
+            const innerR = outerR * 0.55;
+            
+            const segColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
+            
+            let startAngle = -Math.PI / 2;
+            segData.forEach((seg, i) => {
+                const pct = Math.abs(seg.value) / total;
+                const sweepAngle = pct * Math.PI * 2;
+                
+                ctx.beginPath();
+                ctx.arc(cx, cy, outerR, startAngle, startAngle + sweepAngle);
+                ctx.arc(cx, cy, innerR, startAngle + sweepAngle, startAngle, true);
+                ctx.closePath();
+                ctx.fillStyle = segColors[i % segColors.length];
+                ctx.fill();
+                
+                // Subtle border between segments
+                ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                startAngle += sweepAngle;
+            });
+            
+            // Center text
+            ctx.fillStyle = 'rgba(255,255,255,0.6)';
+            ctx.font = 'bold 11px Outfit, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(segData.length + ' Segments', cx, cy - 6);
+            ctx.font = '9px Inter, sans-serif';
+            ctx.fillText('Latest Period', cx, cy + 8);
+        }
+    }
+
+    // Render segment table
+    const tableContainer = document.getElementById('fs-segment-table');
+    if (tableContainer) {
+        const segColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16'];
+        
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+        html += `<thead><tr>
+            <th style="text-align:left;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;">Segment</th>
+            <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;">Value</th>
+            <th style="text-align:right;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;">Share %</th>
+            <th style="text-align:center;padding:6px 10px;border-bottom:2px solid var(--border-glass);font-family:'Outfit',sans-serif;width:120px;">Distribution</th>
+        </tr></thead><tbody>`;
+        
+        segData.forEach((seg, i) => {
+            const pct = (Math.abs(seg.value) / total * 100);
+            const color = segColors[i % segColors.length];
+            html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
+                <td style="text-align:left;padding:5px 10px;font-family:'Outfit',sans-serif;">
+                    <span style="display:inline-block;width:8px;height:8px;background:${color};border-radius:2px;margin-right:6px;vertical-align:middle;"></span>${seg.label}
+                </td>
+                <td style="text-align:right;padding:5px 10px;font-family:'Inter',sans-serif;">${formatFsValue(seg.value, false)}</td>
+                <td style="text-align:right;padding:5px 10px;font-family:'Inter',sans-serif;font-weight:600;">${pct.toFixed(1)}%</td>
+                <td style="text-align:center;padding:5px 10px;">
+                    <div style="width:100%;height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;">
+                        <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;transition:width 0.4s ease;"></div>
+                    </div>
+                </td>
+            </tr>`;
+        });
+        
+        html += '</tbody></table>';
+        tableContainer.innerHTML = html;
+    }
+}
+
+function toggleSegmentPanel() {
+    const content = document.getElementById('fs-segment-content');
+    const chevron = document.getElementById('fs-segment-chevron');
+    if (!content) return;
+    
+    const isOpen = content.style.display === 'flex';
+    content.style.display = isOpen ? 'none' : 'flex';
+    if (chevron) chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// INTEGRATION: Hook new features into renderActiveStatementTable
+// ═══════════════════════════════════════════════════════════════════
+
+(function() {
+    const _origRender = window.renderActiveStatementTable;
+    if (!_origRender) return;
+    
+    window.renderActiveStatementTable = function() {
+        // Call original
+        _origRender.apply(this, arguments);
+        
+        // Show/hide Period Compare button (not for peers)
+        const periodBtn = document.getElementById('fs-period-compare-btn');
+        if (periodBtn) {
+            periodBtn.style.display = (activeFsStatement !== 'peers') ? 'inline-flex' : 'none';
+        }
+        
+        // Show/hide Alert button (not for peers)
+        const alertBtn = document.getElementById('fs-alert-manage-btn');
+        if (alertBtn) {
+            alertBtn.style.display = (activeFsStatement !== 'peers') ? 'inline-flex' : 'none';
+        }
+        
+        // Render P&L Waterfall if applicable
+        if (typeof renderPnLWaterfallChart === 'function') {
+            try { renderPnLWaterfallChart(); } catch(e) { console.warn('Waterfall render error:', e); }
+        }
+        
+        // Render Segment Breakdown
+        if (typeof renderSegmentBreakdown === 'function') {
+            try { renderSegmentBreakdown(); } catch(e) { console.warn('Segment render error:', e); }
+        }
+        
+        // Evaluate Smart Alerts
+        if (typeof evaluateFsAlerts === 'function') {
+            try { evaluateFsAlerts(); } catch(e) { console.warn('Alert eval error:', e); }
+        }
+        
+        // Re-render Period Compare if visible
+        if (window._fsPoPVisible) {
+            try { populatePoPDropdowns(); renderPoPComparison(); } catch(e) {}
+        }
+    };
+})();
+
+// ═══════════════════════════════════════════════════════════════════
+// EVENT BINDINGS for new toolbar buttons
+// ═══════════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Period Compare button
+    const periodBtn = document.getElementById('fs-period-compare-btn');
+    if (periodBtn) periodBtn.addEventListener('click', togglePeriodComparePanel);
+    
+    // Period Compare close button
+    const popCloseBtn = document.getElementById('fs-pop-close-btn');
+    if (popCloseBtn) popCloseBtn.addEventListener('click', function() {
+        window._fsPoPVisible = false;
+        const panel = document.getElementById('fs-period-comparison-panel');
+        if (panel) panel.style.display = 'none';
+        const btn = document.getElementById('fs-period-compare-btn');
+        if (btn) {
+            btn.textContent = '📅 PERIOD vs PERIOD';
+            btn.style.borderColor = 'rgba(16,185,129,0.3)';
+            btn.style.background = 'rgba(16,185,129,0.1)';
+            btn.style.color = '#34d399';
+        }
+    });
+    
+    // Alert manage button
+    const alertBtn = document.getElementById('fs-alert-manage-btn');
+    if (alertBtn) alertBtn.addEventListener('click', toggleFsAlertPanel);
+    
+    // Segment toggle
+    const segToggle = document.getElementById('fs-segment-toggle-btn');
+    if (segToggle) segToggle.addEventListener('click', toggleSegmentPanel);
+});
+
 const fsChatTemplatesMap = {
+
     quarters: [
         { label: '📊 Trend Analysis', text: 'Analyze the sequential (QoQ) and yearly (YoY) revenue and net profit trends. Is there a seasonal pattern?' },
         { label: '📈 Margin Expansion', text: 'Check if operating profit margin (OPM) is expanding QoQ/YoY. What are the key expenses drivers?' },
@@ -41409,4 +45846,134 @@ function exportMarginChatTranscript() {
 }
 
 
+// ═══════════════════════════════════════════════════════════════════
+// FEATURE: Anomaly Scanner — Flags OPM/Sales divergence, earnings
+// quality, leverage spikes, and other structural anomalies
+// ═══════════════════════════════════════════════════════════════════
+
+function calculateAnomalyFlags() {
+    window._fsAnomalyFlags = {};
+    if (!activeFsData) return;
+    
+    function addFlag(key, type, text, detail) {
+        if (!window._fsAnomalyFlags[key]) window._fsAnomalyFlags[key] = [];
+        window._fsAnomalyFlags[key].push({ type, text, detail });
+    }
+    
+    // Helper: get latest N numeric values from a row
+    function getNumericValues(statementKey, labelKeywords) {
+        if (!activeFsData[statementKey] || !activeFsData[statementKey].rows) return null;
+        const row = activeFsData[statementKey].rows.find(r => {
+            const label = (r.label || '').toLowerCase();
+            return labelKeywords.some(kw => label.includes(kw));
+        });
+        if (!row || !row.values) return null;
+        return row.values.filter(v => typeof v === 'number');
+    }
+    
+    // ─── 1. OPM vs Sales Divergence ───
+    // If sales are growing but OPM is declining, flag margin compression
+    const salesVals = getNumericValues('profit_loss', ['sales', 'revenue']);
+    const opmVals = getNumericValues('profit_loss', ['opm', 'operating profit margin']);
+    
+    if (salesVals && salesVals.length >= 3 && opmVals && opmVals.length >= 3) {
+        const salesGrowth = salesVals[salesVals.length - 1] / salesVals[salesVals.length - 3] - 1;
+        const opmChange = opmVals[opmVals.length - 1] - opmVals[opmVals.length - 3];
+        
+        if (salesGrowth > 0.10 && opmChange < -2) {
+            addFlag('opm', 'warning', '⚠ Margin Compression',
+                `Sales grew ${(salesGrowth * 100).toFixed(1)}% but OPM fell ${Math.abs(opmChange).toFixed(1)}pp — revenue growth may not be profitable`);
+        }
+        if (salesGrowth < -0.05 && opmChange > 2) {
+            addFlag('opm', 'positive', '✦ Margin Resilience',
+                `OPM improved by ${opmChange.toFixed(1)}pp despite revenue decline — cost optimization working`);
+        }
+    }
+    
+    // ─── 2. Earnings Quality — Net Profit vs OCF ───
+    const netProfitVals = getNumericValues('profit_loss', ['net profit', 'profit after tax', 'pat']);
+    const ocfVals = getNumericValues('cash_flow', ['cash from operating', 'operating cash flow']);
+    
+    if (netProfitVals && netProfitVals.length >= 1 && ocfVals && ocfVals.length >= 1) {
+        const latestNP = netProfitVals[netProfitVals.length - 1];
+        const latestOCF = ocfVals[ocfVals.length - 1];
+        
+        if (latestNP > 0 && latestOCF > 0) {
+            const ratio = latestOCF / latestNP;
+            if (ratio < 0.5) {
+                addFlag('net profit', 'warning', '⚠ Low Cash Conversion',
+                    `OCF/PAT ratio of ${ratio.toFixed(2)}x — profits may be accrual-driven, not cash-backed`);
+            } else if (ratio > 1.5) {
+                addFlag('net profit', 'positive', '✦ Strong Cash Backing',
+                    `OCF/PAT ratio of ${ratio.toFixed(2)}x — earnings are strongly cash-supported`);
+            }
+        }
+        if (latestNP > 0 && latestOCF < 0) {
+            addFlag('net profit', 'warning', '⚠ Negative OCF',
+                'Company is reporting profits but burning operating cash — quality red flag');
+        }
+    }
+    
+    // ─── 3. Leverage Spike — Borrowings growing faster than equity ───
+    const borrowVals = getNumericValues('balance_sheet', ['borrowings', 'secured loans']);
+    const reserveVals = getNumericValues('balance_sheet', ['reserves', 'retained earnings']);
+    
+    if (borrowVals && borrowVals.length >= 2 && reserveVals && reserveVals.length >= 2) {
+        const borrowGrowth = borrowVals[borrowVals.length - 1] / borrowVals[Math.max(0, borrowVals.length - 3)] - 1;
+        const reserveGrowth = reserveVals[reserveVals.length - 1] / reserveVals[Math.max(0, reserveVals.length - 3)] - 1;
+        
+        if (borrowGrowth > 0.30 && borrowGrowth > reserveGrowth * 2) {
+            addFlag('borrowings', 'warning', '⚠ Leverage Spike',
+                `Borrowings grew ${(borrowGrowth * 100).toFixed(0)}% vs reserves ${(reserveGrowth * 100).toFixed(0)}% — increasing financial risk`);
+        }
+        if (borrowVals[borrowVals.length - 1] < borrowVals[borrowVals.length - 2] && reserveVals[reserveVals.length - 1] > reserveVals[reserveVals.length - 2]) {
+            addFlag('borrowings', 'positive', '✦ Deleveraging',
+                'Borrowings declining while reserves growing — balance sheet strengthening');
+        }
+    }
+    
+    // ─── 4. Revenue Deceleration ───
+    if (salesVals && salesVals.length >= 4) {
+        const recent = salesVals[salesVals.length - 1] / salesVals[salesVals.length - 2] - 1;
+        const prior = salesVals[salesVals.length - 2] / salesVals[salesVals.length - 3] - 1;
+        
+        if (recent > 0 && prior > 0 && recent < prior * 0.5) {
+            addFlag('sales', 'warning', '⚠ Growth Deceleration',
+                `Revenue growth slowed from ${(prior * 100).toFixed(1)}% to ${(recent * 100).toFixed(1)}% — momentum fading`);
+        }
+        if (recent > prior * 1.5 && recent > 0.10) {
+            addFlag('sales', 'positive', '✦ Growth Acceleration',
+                `Revenue growth accelerated from ${(prior * 100).toFixed(1)}% to ${(recent * 100).toFixed(1)}%`);
+        }
+    }
+    
+    // ─── 5. Interest Coverage Deterioration ───
+    const interestVals = getNumericValues('profit_loss', ['interest', 'finance cost']);
+    const opProfitVals = getNumericValues('profit_loss', ['operating profit']);
+    
+    if (interestVals && interestVals.length >= 1 && opProfitVals && opProfitVals.length >= 1) {
+        const latestInterest = interestVals[interestVals.length - 1];
+        const latestOpProfit = opProfitVals[opProfitVals.length - 1];
+        
+        if (latestInterest > 0 && latestOpProfit > 0) {
+            const coverage = latestOpProfit / latestInterest;
+            if (coverage < 2) {
+                addFlag('interest', 'warning', '⚠ Thin Coverage',
+                    `Interest coverage ratio of ${coverage.toFixed(1)}x — limited margin of safety for debt servicing`);
+            }
+        }
+    }
+    
+    // ─── 6. Fixed Asset Expansion Check ───
+    const fixedAssetVals = getNumericValues('balance_sheet', ['fixed assets', 'property plant']);
+    if (fixedAssetVals && fixedAssetVals.length >= 3 && salesVals && salesVals.length >= 3) {
+        const faGrowth = fixedAssetVals[fixedAssetVals.length - 1] / fixedAssetVals[fixedAssetVals.length - 3] - 1;
+        const sGrowth = salesVals[salesVals.length - 1] / salesVals[salesVals.length - 3] - 1;
+        
+        if (faGrowth > 0.40 && sGrowth < faGrowth * 0.3) {
+            addFlag('fixed assets', 'warning', '⚠ Low Asset Utilization',
+                `Fixed assets grew ${(faGrowth * 100).toFixed(0)}% but sales only ${(sGrowth * 100).toFixed(0)}% — capacity underutilization risk`);
+        }
+    }
+}
 

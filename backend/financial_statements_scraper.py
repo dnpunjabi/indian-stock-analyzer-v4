@@ -226,6 +226,7 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated", session
             "quarters": parse_screener_table(soup.find("section", id="quarters").find("table") if soup.find("section", id="quarters") else None),
             "profit_loss": parse_screener_table(soup.find("section", id="profit-loss").find("table") if soup.find("section", id="profit-loss") else None),
             "balance_sheet": parse_screener_table(soup.find("section", id="balance-sheet").find("table") if soup.find("section", id="balance-sheet") else None),
+            "cash_flow": parse_screener_table(soup.find("section", id="cash-flow").find("table") if soup.find("section", id="cash-flow") else None),
             "peers": parse_screener_peers_table(peers_table_el)
         }
     except Exception as err:
