@@ -1923,6 +1923,17 @@ input[type="text"]:focus {
     border-color: rgba(59, 130, 246, 0.5) !important;
 }
 
+[data-theme="light"] #watchlist-select {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid rgba(15, 23, 42, 0.15) !important;
+}
+
+[data-theme="light"] #watchlist-select option {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+}
+
 #add-to-watchlist-btn {
     font-family: var(--font-heading);
     font-size: 10.5px;
@@ -17307,4 +17318,12 @@ html[data-mode="light"] .clickable-price-level:hover {
     margin-bottom: 5px;
     width: 100%;
     box-sizing: border-box;
+}
+
+/* Standardize dropdown options visibility across themes */
+select option {
+    background-color: var(--bg-sidebar) !important;
+    color: var(--text-primary) !important;
+    font-family: var(--font-body), sans-serif;
+    font-size: 11px;
 }

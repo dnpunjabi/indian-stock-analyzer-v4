@@ -130,6 +130,32 @@ def init_db():
             value TEXT NOT NULL
         )
         """)
+        # Persistent Financial Statement alerts table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS fs_alerts (
+            id TEXT PRIMARY KEY,
+            symbol TEXT NOT NULL,
+            metric TEXT NOT NULL,
+            condition TEXT NOT NULL,
+            threshold REAL NOT NULL,
+            active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+        # Persistent Financial Statement alert history table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS fs_alert_history (
+            id TEXT PRIMARY KEY,
+            alert_id TEXT,
+            symbol TEXT NOT NULL,
+            metric TEXT NOT NULL,
+            condition TEXT NOT NULL,
+            threshold REAL NOT NULL,
+            current_value REAL,
+            severity TEXT,
+            triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
         # Persistent screener universe table
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS screener_universe (
@@ -1647,6 +1673,9 @@ async def startup_warm_caching():
     asyncio.create_task(run_background_market_movers_updater())
     # 4.5 Fire background WhatsApp daily wrap-up scheduler
     asyncio.create_task(run_background_daily_wrapup_scheduler())
+    
+    # 4.6 Fire background FS alerts scheduler
+    asyncio.create_task(run_background_fs_alerts_scheduler())
 
     # 5.5 Fire background stock events calendar refresh (2x/day)
     from backend.events_scraper import run_background_events_scheduler
@@ -1791,6 +1820,16 @@ class AlertSettingsRequest(BaseModel):
     whatsapp_recipient: str = ""
 
 class ParseNLAlertRequest(BaseModel):
+    prompt: str
+    active_ticker: Optional[str] = None
+
+class FsAlertRequest(BaseModel):
+    symbol: str
+    metric: str
+    condition: str
+    threshold: float
+
+class FsAlertParseRequest(BaseModel):
     prompt: str
     active_ticker: Optional[str] = None
 
@@ -4969,6 +5008,598 @@ async def delete_alert(alert_id: str):
             _ae.unregister_alert(alert_id)
         except Exception as e:
             print(f"Error unregistering alert: {e}")
+
+# ==================== FS ALERTS (SQLite Cache & AI) ====================
+
+@app.post("/api/fs-alerts/add")
+async def add_fs_alert(data: FsAlertRequest):
+    """Configures a custom Financial Statement alert, persisted to SQLite."""
+    try:
+        alert_id = str(uuid.uuid4())[:8]
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO fs_alerts (id, symbol, metric, condition, threshold, active) VALUES (?, ?, ?, ?, ?, 1)",
+                (alert_id, data.symbol.upper(), data.metric.strip(), data.condition.strip(), data.threshold)
+            )
+            conn.commit()
+        return {
+            "id": alert_id,
+            "symbol": data.symbol.upper(),
+            "metric": data.metric.strip(),
+            "condition": data.condition.strip(),
+            "threshold": data.threshold,
+            "active": True
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add FS alert: {str(e)}")
+
+# --- FS Evaluation Internal logic and API endpoint ---
+
+async def run_fs_evaluation_internal(symbol: str, force_refresh: bool = False) -> dict:
+    from backend.shareholding_scraper import clean_symbol
+    from backend.financial_statements_scraper import scrape_financial_statements
+    import json
+    
+    base_symbol = clean_symbol(symbol)
+    if not base_symbol:
+        return None
+        
+    if force_refresh:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM cached_financial_statements WHERE symbol = ?", (base_symbol,))
+            conn.commit()
+        
+    # Get screener session cookie if available
+    session_cookie = None
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'screener_session_cookie'")
+        cookie_row = cursor.fetchone()
+        if cookie_row:
+            session_cookie = cookie_row["value"]
+            
+    # Try fetching from cache first, otherwise scrape
+    statements = None
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, "consolidated"))
+        row = cursor.fetchone()
+        if not row:
+            cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, "standalone"))
+            row = cursor.fetchone()
+        if row:
+            try:
+                statements = json.loads(row["data_json"])
+            except Exception:
+                pass
+                
+    if not statements or "error" in statements:
+        # Scraping on demand in a thread pool to avoid blocking
+        statements = await asyncio.to_thread(scrape_financial_statements, symbol, "consolidated", session_cookie)
+        if not statements or "error" in statements:
+            # Fallback standalone
+            statements = await asyncio.to_thread(scrape_financial_statements, symbol, "standalone", session_cookie)
+            
+    if not statements or "error" in statements:
+        return None
+
+    # Extract historical fields
+    from backend.financial_utils import get_statement_row_history
+    
+    net_profit_history = get_statement_row_history(statements.get("profit_loss"), "Net Profit")
+    sales_history = get_statement_row_history(statements.get("profit_loss"), "Sales")
+    opm_history = get_statement_row_history(statements.get("profit_loss"), "OPM") or get_statement_row_history(statements.get("profit_loss"), "OPM %")
+    interest_history = get_statement_row_history(statements.get("profit_loss"), "Interest")
+    reserves_history = get_statement_row_history(statements.get("balance_sheet"), "Reserves")
+    borrowings_history = get_statement_row_history(statements.get("balance_sheet"), "Borrowings")
+    other_liab_history = get_statement_row_history(statements.get("balance_sheet"), "Other Liabilities")
+    other_assets_history = get_statement_row_history(statements.get("balance_sheet"), "Other Assets")
+    total_assets_history = get_statement_row_history(statements.get("balance_sheet"), "Total Assets")
+    equity_cap_history = get_statement_row_history(statements.get("balance_sheet"), "Equity Capital") or get_statement_row_history(statements.get("balance_sheet"), "Share Capital")
+    depreciation_history = get_statement_row_history(statements.get("profit_loss"), "Depreciation")
+    pbt_history = get_statement_row_history(statements.get("profit_loss"), "Profit before tax")
+    receivables_history = get_statement_row_history(statements.get("balance_sheet"), "Receivables") or get_statement_row_history(statements.get("balance_sheet"), "Trade Receivables")
+
+    # Fallbacks and basic metrics
+    latest_np = net_profit_history[-1] if net_profit_history else 0.0
+    prev_np = net_profit_history[-2] if len(net_profit_history) >= 2 else latest_np
+    latest_ta = total_assets_history[-1] if total_assets_history else 1.0
+    prev_ta = total_assets_history[-2] if len(total_assets_history) >= 2 else latest_ta
+    prev_ta = prev_ta or 1.0
+    
+    has_history = len(net_profit_history) >= 2 and len(total_assets_history) >= 2
+    
+    latest_depr = depreciation_history[-1] if depreciation_history else 0.0
+    latest_interest = interest_history[-1] if interest_history else 0.0
+    latest_cfo = latest_np + latest_depr + latest_interest
+    
+    pass1 = latest_np > 0
+    pass2 = latest_cfo > 0
+    roa_curr = latest_np / latest_ta if latest_ta > 0 else 0
+    roa_prev = prev_np / prev_ta if prev_ta > 0 else 0
+    pass3 = (roa_curr > roa_prev) if has_history else False
+    pass4 = latest_cfo > latest_np and latest_cfo > 0
+    latest_debt = borrowings_history[-1] if borrowings_history else 0.0
+    prev_debt = borrowings_history[-2] if len(borrowings_history) >= 2 else latest_debt
+    lev_curr = latest_debt / latest_ta if latest_ta > 0 else 0
+    lev_prev = prev_debt / prev_ta if prev_ta > 0 else 0
+    pass5 = (lev_curr <= lev_prev) if has_history else False
+    
+    latest_oa = other_assets_history[-1] if other_assets_history else 1.0
+    prev_oa = other_assets_history[-2] if len(other_assets_history) >= 2 else latest_oa
+    latest_ol = other_liab_history[-1] if other_liab_history else 1.0
+    prev_ol = other_liab_history[-2] if len(other_liab_history) >= 2 else latest_ol
+    latest_ol = latest_ol or 1.0
+    prev_ol = prev_ol or 1.0
+    cr_curr = latest_oa / latest_ol
+    cr_prev = prev_oa / prev_ol
+    pass6 = (cr_curr > cr_prev) if has_history else False
+    
+    latest_eq = equity_cap_history[-1] if equity_cap_history else 100.0
+    prev_eq = equity_cap_history[-2] if len(equity_cap_history) >= 2 else latest_eq
+    pass7 = (latest_eq <= prev_eq) if has_history else False
+    
+    latest_opm = opm_history[-1] if opm_history else 0.0
+    prev_opm = opm_history[-2] if len(opm_history) >= 2 else latest_opm
+    pass8 = (latest_opm >= prev_opm) if has_history else False
+    
+    latest_sales = sales_history[-1] if sales_history else 0.0
+    prev_sales = sales_history[-2] if len(sales_history) >= 2 else latest_sales
+    at_curr = latest_sales / latest_ta if latest_ta > 0 else 0
+    at_prev = prev_sales / prev_ta if prev_ta > 0 else 0
+    pass9 = (at_curr >= at_prev) if has_history else False
+    
+    f_score = sum([pass1, pass2, pass3, pass4, pass5, pass6, pass7, pass8, pass9])
+    
+    # Altman Z-Score
+    working_capital = latest_oa - latest_ol
+    retained_earnings = reserves_history[-1] if reserves_history else latest_np * 3.0
+    latest_pbt = pbt_history[-1] if pbt_history else latest_np * 1.3
+    ebit = latest_pbt + latest_interest
+    mcap_crores = (latest_sales * 1.5) / 1e7
+    
+    # Get actual market cap if possible
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT market_cap FROM screener_universe WHERE UPPER(symbol) = ? OR UPPER(base_symbol) = ?", (base_symbol, base_symbol))
+        mcap_row = cursor.fetchone()
+        if mcap_row and mcap_row["market_cap"]:
+            mcap_crores = float(mcap_row["market_cap"])
+            
+    total_liab = latest_debt + latest_ol
+    A = working_capital / latest_ta if latest_ta > 0 else 0
+    B = retained_earnings / latest_ta if latest_ta > 0 else 0
+    C = ebit / latest_ta if latest_ta > 0 else 0
+    D = min(mcap_crores / total_liab, 12.0) if total_liab > 0 else 3.0
+    E = latest_sales / latest_ta if latest_ta > 0 else 0
+    z_score = 1.2 * A + 1.4 * B + 3.3 * C + 0.6 * D + 1.0 * E
+    z_score = float(max(-2.0, min(15.0, z_score)))
+    
+    alerts_evaluated = []
+    
+    # 1. OPM trend
+    opm_passed = latest_opm >= prev_opm
+    alerts_evaluated.append({
+        "id": "sys-opm-trend",
+        "metric": "Operating Profit Margin (OPM)",
+        "condition": "YoY Deterioration",
+        "threshold": prev_opm,
+        "current_value": latest_opm,
+        "status": "Passed" if opm_passed else "Triggered",
+        "severity": "Warning",
+        "description": f"OPM Margin changed from {prev_opm}% to {latest_opm}%.",
+        "type": "Systematic"
+    })
+    
+    # 2. Revenue growth
+    rev_growth = ((latest_sales - prev_sales) / prev_sales * 100) if prev_sales > 0 else 0.0
+    rev_passed = rev_growth >= 5.0
+    alerts_evaluated.append({
+        "id": "sys-rev-growth",
+        "metric": "Revenue Growth (Sales)",
+        "condition": "YoY Growth < 5%",
+        "threshold": 5.0,
+        "current_value": round(rev_growth, 2),
+        "status": "Passed" if rev_passed else "Triggered",
+        "severity": "Warning",
+        "description": f"YoY Sales Growth rate is {round(rev_growth, 2)}% (Threshold: 5%).",
+        "type": "Systematic"
+    })
+    
+    # 3. Debt to Equity
+    equity = (equity_cap_history[-1] if equity_cap_history else 0.0) + (reserves_history[-1] if reserves_history else 0.0)
+    debt_equity = latest_debt / equity if equity > 0 else 0.0
+    de_passed = debt_equity <= 2.0
+    alerts_evaluated.append({
+        "id": "sys-debt-equity",
+        "metric": "Debt-to-Equity",
+        "condition": "Debt-to-Equity > 2.0",
+        "threshold": 2.0,
+        "current_value": round(debt_equity, 2),
+        "status": "Passed" if de_passed else "Triggered",
+        "severity": "Critical" if debt_equity > 2.0 else ("Warning" if debt_equity > 1.5 else "Info"),
+        "description": f"Debt-to-Equity is {round(debt_equity, 2)} (Threshold: 2.0).",
+        "type": "Systematic"
+    })
+    
+    # 4. Receivables turnover check
+    if receivables_history and len(receivables_history) >= 2:
+        rec_growth = ((receivables_history[-1] - receivables_history[-2]) / receivables_history[-2] * 100) if receivables_history[-2] > 0 else 0.0
+        rec_passed = rec_growth <= rev_growth + 5.0
+        alerts_evaluated.append({
+            "id": "sys-receivables-turnover",
+            "metric": "Receivables Growth VS Revenue",
+            "condition": "Receivables Growth > Revenue Growth + 5%",
+            "threshold": round(rev_growth + 5.0, 2),
+            "current_value": round(rec_growth, 2),
+            "status": "Passed" if rec_passed else "Triggered",
+            "severity": "Warning",
+            "description": f"Trade Receivables grew by {round(rec_growth, 2)}% YoY compared to Sales growth of {round(rev_growth, 2)}%.",
+            "type": "Systematic"
+        })
+        
+    # 5. Altman Z-Score solvency
+    z_passed = z_score >= 1.8
+    alerts_evaluated.append({
+        "id": "sys-altman-solvency",
+        "metric": "Altman Z-Score",
+        "condition": "Z-Score < 1.8 (Distress)",
+        "threshold": 1.8,
+        "current_value": round(z_score, 2),
+        "status": "Passed" if z_passed else "Triggered",
+        "severity": "Critical" if z_score < 1.8 else ("Warning" if z_score < 3.0 else "Info"),
+        "description": f"Altman Z-Score is {round(z_score, 2)} (Solvency Zone: { 'Safe' if z_score >= 3.0 else ('Grey' if z_score >= 1.8 else 'Distress') }).",
+        "type": "Systematic"
+    })
+    
+    # 6. Piotroski F-Score quality
+    f_passed = f_score >= 4
+    alerts_evaluated.append({
+        "id": "sys-piotroski-quality",
+        "metric": "Piotroski F-Score",
+        "condition": "F-Score < 4 (Weak)",
+        "threshold": 4.0,
+        "current_value": float(f_score),
+        "status": "Passed" if f_passed else "Triggered",
+        "severity": "Critical" if f_score < 4 else ("Warning" if f_score < 7 else "Info"),
+        "description": f"Piotroski F-Score is {f_score}/9.",
+        "type": "Systematic"
+    })
+    
+    # 7. Asset Turnover trend
+    at_passed = at_curr >= at_prev
+    alerts_evaluated.append({
+        "id": "sys-asset-turnover",
+        "metric": "Asset Turnover",
+        "condition": "YoY Deterioration",
+        "threshold": round(at_prev, 3),
+        "current_value": round(at_curr, 3),
+        "status": "Passed" if at_passed else "Triggered",
+        "severity": "Warning",
+        "description": f"Asset Turnover ratio changed from {round(at_prev, 3)} to {round(at_curr, 3)}.",
+        "type": "Systematic"
+    })
+    
+    # 8. Current Ratio liquidity
+    current_ratio = cr_curr
+    cr_passed = current_ratio >= 1.0
+    alerts_evaluated.append({
+        "id": "sys-current-ratio",
+        "metric": "Current Ratio",
+        "condition": "Current Ratio < 1.0",
+        "threshold": 1.0,
+        "current_value": round(current_ratio, 2),
+        "status": "Passed" if cr_passed else "Triggered",
+        "severity": "Critical" if current_ratio < 1.0 else ("Warning" if current_ratio < 1.3 else "Info"),
+        "description": f"Current Ratio is {round(current_ratio, 2)} (Threshold: 1.0).",
+        "type": "Systematic"
+    })
+
+    # Evaluate custom active rules
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, metric, condition, threshold, active FROM fs_alerts WHERE (UPPER(symbol) = ? OR UPPER(symbol) = ?) AND active = 1", (symbol.upper(), base_symbol))
+        custom_rows = cursor.fetchall()
+        
+    for crow in custom_rows:
+        rule_id = crow["id"]
+        metric_name = crow["metric"]
+        cond = crow["condition"].lower()
+        thresh = float(crow["threshold"])
+        
+        m_history = []
+        for tbl_name in ["profit_loss", "balance_sheet", "quarters", "cash_flow"]:
+            if statements.get(tbl_name):
+                m_history = get_statement_row_history(statements.get(tbl_name), metric_name)
+                if m_history:
+                    break
+        
+        if not m_history:
+            if "altman" in metric_name.lower() or "z-score" in metric_name.lower():
+                m_history = [z_score]
+            elif "piotroski" in metric_name.lower() or "f-score" in metric_name.lower():
+                m_history = [float(f_score)]
+                
+        if not m_history:
+            alerts_evaluated.append({
+                "id": rule_id,
+                "metric": metric_name,
+                "condition": cond.upper(),
+                "threshold": thresh,
+                "current_value": None,
+                "status": "Data Unavailable",
+                "severity": "Info",
+                "description": f"Custom metric '{metric_name}' not found in statements.",
+                "type": "Custom"
+            })
+            continue
+            
+        cur_val = m_history[-1]
+        triggered = False
+        
+        if cond == "above":
+            triggered = cur_val > thresh
+        elif cond == "below":
+            triggered = cur_val < thresh
+        elif cond == "yoy_above":
+            prev_val = m_history[-2] if len(m_history) >= 2 else cur_val
+            change = ((cur_val - prev_val) / prev_val * 100) if prev_val != 0 else 0
+            triggered = change > thresh
+        elif cond == "yoy_below":
+            prev_val = m_history[-2] if len(m_history) >= 2 else cur_val
+            change = ((cur_val - prev_val) / prev_val * 100) if prev_val != 0 else 0
+            triggered = change < thresh
+            
+        alerts_evaluated.append({
+            "id": rule_id,
+            "metric": metric_name,
+            "condition": cond.upper(),
+            "threshold": thresh,
+            "current_value": round(cur_val, 2) if isinstance(cur_val, float) else cur_val,
+            "status": "Triggered" if triggered else "Passed",
+            "severity": "Critical",
+            "description": f"Custom alert rule triggered: {metric_name} is {cond} {thresh} (Current: {round(cur_val, 2) if isinstance(cur_val, float) else cur_val}).",
+            "type": "Custom"
+        })
+
+    # Determine overall status
+    triggered_alerts = [a for a in alerts_evaluated if a["status"] == "Triggered"]
+    critical_triggers = [a for a in triggered_alerts if a["severity"] == "Critical"]
+    warning_triggers = [a for a in triggered_alerts if a["severity"] == "Warning"]
+    
+    if critical_triggers:
+        overall_status = "Critical"
+    elif warning_triggers:
+        overall_status = "Warning"
+    else:
+        overall_status = "Healthy"
+        
+    return {
+        "symbol": symbol,
+        "overall_status": overall_status,
+        "scores": {
+            "piotroski": f_score,
+            "altman_z": round(z_score, 2)
+        },
+        "alerts_evaluated": alerts_evaluated,
+        "financials": statements
+    }
+
+@app.get("/api/stocks/{symbol}/fs-evaluation")
+async def get_fs_evaluation(symbol: str, force_refresh: bool = False):
+    """Retrieves current stock's financial statements and evaluates systematic/custom alerts."""
+    try:
+        res = await run_fs_evaluation_internal(symbol, force_refresh=force_refresh)
+        if not res:
+            raise HTTPException(status_code=404, detail=f"Financial statements or metrics not available for {symbol}")
+        return res
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"FS evaluation failed: {str(e)}")
+
+async def evaluate_all_stocks_fs():
+    """Sweeps all watchlists/screener universe stocks, evaluates FS alerts, logs triggers to SQLite."""
+    print("FS Alerts Evaluator: starting daily sweep...")
+    symbols = set()
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT symbol FROM watchlist_items")
+            for row in cursor.fetchall():
+                symbols.add(row["symbol"])
+            cursor.execute("SELECT DISTINCT symbol FROM screener_universe WHERE symbol NOT LIKE '%DUMMY%'")
+            for row in cursor.fetchall():
+                symbols.add(row["symbol"])
+    except Exception as db_err:
+        print(f"FS Alerts Evaluator: failed to fetch symbols: {db_err}")
+        return
+
+    print(f"FS Alerts Evaluator: evaluating {len(symbols)} symbols...")
+    
+    for sym in symbols:
+        try:
+            res = await run_fs_evaluation_internal(sym)
+            if not res:
+                continue
+                
+            triggered_alerts = [a for a in res.get("alerts_evaluated", []) if a.get("status") == "Triggered"]
+            
+            with get_db() as conn:
+                cursor = conn.cursor()
+                for alert in triggered_alerts:
+                    today_str = datetime.now().strftime("%Y-%m-%d")
+                    cursor.execute(
+                        """SELECT COUNT(*) as cnt FROM fs_alert_history 
+                           WHERE symbol = ? AND metric = ? AND condition = ? AND threshold = ? AND DATE(triggered_at) = ?""",
+                        (sym, alert["metric"], alert["condition"], alert["threshold"], today_str)
+                    )
+                    count = cursor.fetchone()["cnt"]
+                    
+                    if count == 0:
+                        history_id = str(uuid.uuid4())[:8]
+                        alert_id = alert.get("id") if alert.get("type") == "Custom" else "systematic"
+                        cursor.execute(
+                            """INSERT INTO fs_alert_history (id, alert_id, symbol, metric, condition, threshold, current_value, severity) 
+                               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                            (history_id, alert_id, sym, alert["metric"], alert["condition"], alert["threshold"], alert["current_value"], alert["severity"])
+                        )
+                        conn.commit()
+                        print(f"🚨 FS ALERT TRIGGERED: {sym} - {alert['metric']} {alert['condition']} {alert['threshold']} (Current: {alert['current_value']})")
+            
+            await asyncio.sleep(1)
+        except Exception as eval_err:
+            print(f"FS Alerts Evaluator: error evaluating {sym}: {eval_err}")
+
+async def run_background_fs_alerts_scheduler():
+    """Background daily scheduler for FS alert evaluations."""
+    await asyncio.sleep(30)
+    print("Background FS Alerts Scheduler started.")
+    while True:
+        try:
+            await evaluate_all_stocks_fs()
+        except Exception as e:
+            print(f"Error in background FS Alerts Scheduler: {e}")
+        await asyncio.sleep(24 * 3600)
+
+@app.get("/api/fs-alerts/list")
+async def list_fs_alerts(symbol: Optional[str] = None):
+    """Lists all Financial Statement alerts, optionally filtered by stock symbol."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if symbol:
+            base_symbol = symbol.split(".")[0].upper()
+            cursor.execute(
+                "SELECT id, symbol, metric, condition, threshold, active, created_at FROM fs_alerts WHERE UPPER(symbol) = ? OR UPPER(symbol) = ?", 
+                (symbol.upper(), base_symbol)
+            )
+        else:
+            cursor.execute("SELECT id, symbol, metric, condition, threshold, active, created_at FROM fs_alerts")
+        rows = cursor.fetchall()
+    return [
+        {
+            "id": r["id"],
+            "symbol": r["symbol"],
+            "metric": r["metric"],
+            "condition": r["condition"],
+            "threshold": r["threshold"],
+            "active": bool(r["active"]),
+            "created_at": r["created_at"]
+        } for r in rows
+    ]
+
+@app.delete("/api/fs-alerts/{alert_id}")
+async def delete_fs_alert(alert_id: str):
+    """Deletes a single Financial Statement alert by ID."""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM fs_alerts WHERE id = ?", (alert_id,))
+            conn.commit()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete FS alert: {str(e)}")
+
+@app.post("/api/fs-alerts/toggle/{alert_id}")
+async def toggle_fs_alert(alert_id: str):
+    """Toggles active state of a single Financial Statement alert."""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT active FROM fs_alerts WHERE id = ?", (alert_id,))
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Alert not found")
+            new_state = 0 if row["active"] else 1
+            cursor.execute("UPDATE fs_alerts SET active = ? WHERE id = ?", (new_state, alert_id))
+            conn.commit()
+        return {"status": "success", "active": bool(new_state)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to toggle FS alert: {str(e)}")
+
+@app.post("/api/fs-alerts/parse-nl")
+async def parse_fs_nl_alert(data: FsAlertParseRequest):
+    """Parses a plain English prompt into a structured SQLite FS alert rule using Groq LLM."""
+    try:
+        from backend.llm_config import call_llm, TASK_FAST
+        from backend.financial_utils import resolve_company_ticker
+
+        fallback_context = ""
+        if data.active_ticker:
+            fallback_context = f"\nActive Ticker Context: {data.active_ticker}. If the user alert prompt does not explicitly specify a stock/company name or ticker, you MUST default to using this ticker for the rule.\n"
+
+        sys_prompt = (
+            "You are an expert financial system developer parsing plain English alert setup requests for financial statement metrics into structured JSON rules.\n"
+            f"{fallback_context}"
+            "Analyze the user prompt and output a single JSON object. DO NOT output any markdown tags (like ```json), and DO NOT output any conversational text or preambles. Only output the raw JSON string.\n"
+            "Allowed metrics MUST match standard financial terms. Examples: 'Sales', 'Net Profit', 'OPM', 'Borrowings', 'Interest Coverage', 'ROCE', 'Altman Z-Score', 'Piotroski Score', 'Cash from Operations', 'Expenses', 'PBT', 'Total Assets', 'Total Liabilities'.\n"
+            "Allowed conditions:\n"
+            "- 'above' (Greater than / goes above / crosses above)\n"
+            "- 'below' (Less than / drops below / falls below)\n"
+            "- 'yoy_above' (YoY growth rate exceeds / YoY% greater than)\n"
+            "- 'yoy_below' (YoY growth rate falls below / YoY% less than)\n\n"
+            "Output format:\n"
+            "{\n"
+            "  \"ticker_query\": \"STOCK_TICKER\",\n"
+            "  \"metric\": \"METRIC_NAME\",\n"
+            "  \"condition\": \"above\" | \"below\" | \"yoy_above\" | \"yoy_below\",\n"
+            "  \"threshold\": numerical_value_as_float\n"
+            "}\n\n"
+            "Output format example:\n"
+            "User: 'Alert me if Reliance sales cross 10000'\n"
+            "{\n"
+            "  \"ticker_query\": \"RELIANCE\",\n"
+            "  \"metric\": \"Sales\",\n"
+            "  \"condition\": \"above\",\n"
+            "  \"threshold\": 10000.0\n"
+            "}\n"
+        )
+
+        import asyncio
+        response = await asyncio.to_thread(call_llm, TASK_FAST, sys_prompt, data.prompt)
+        response = response.strip()
+        if response.startswith("```json"):
+            response = response[7:]
+        if response.endswith("```"):
+            response = response[:-3]
+        response = response.strip()
+
+        import json
+        parsed = json.loads(response)
+        ticker_query = parsed.get("ticker_query", data.active_ticker or "TCS")
+        metric = parsed.get("metric", "Sales")
+        condition = parsed.get("condition", "above").lower()
+        threshold = float(parsed.get("threshold", 0.0))
+
+        try:
+            res = resolve_company_ticker(ticker_query)
+            ticker = res["base_symbol"]
+        except Exception:
+            ticker = ticker_query.strip().upper().split(".")[0]
+
+        alert_id = str(uuid.uuid4())[:8]
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO fs_alerts (id, symbol, metric, condition, threshold, active) VALUES (?, ?, ?, ?, ?, 1)",
+                (alert_id, ticker, metric, condition, threshold)
+            )
+            conn.commit()
+
+        return {
+            "id": alert_id,
+            "symbol": ticker,
+            "metric": metric,
+            "condition": condition,
+            "threshold": threshold,
+            "active": True
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse and configure FS alert: {str(e)}")
 
 @app.get("/api/settings/screener-cookie")
 async def get_screener_cookie_settings():

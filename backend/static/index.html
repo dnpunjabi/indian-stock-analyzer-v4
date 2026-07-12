@@ -1332,6 +1332,9 @@
                                     <span class="pill-icon" style="font-size: 10px; margin-right: 3px;">🤖</span>
                                     <span id="meta-ai-conviction-text">Score: --/100</span>
                                 </div>
+
+                                <!-- FS Alert Pill -->
+                                <div id="meta-fs-alert-container" style="display: inline-flex; align-items: center; gap: 4px; height: 18px;"></div>
                                 
                                 <!-- Export Pitchbook Button -->
                                 <button id="export-pitchbook-btn" class="header-action-btn" style="display: none; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); font-size: 9.5px; font-weight: bold; color: var(--color-primary-light); cursor: pointer; height: 18px; line-height: 1.1; margin-left: 0; outline: none; border-radius: 99px;">
@@ -2738,6 +2741,79 @@
                                             <span id="solvency-chat-spinner" class="spinner" style="display: none; width: 8px; height: 8px; border: 1.5px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite;"></span>
                                         </button>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Financial Statement Integrity & Solvency Health HUD Card (F-Score, Z-Score, FS Alerts, Financial Data Tables) -->
+                        <div class="card col-span-4 card-hidden" id="fs-integrity-hud-card" data-subtab="fundamental" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;">
+                                <h3 style="margin: 0; font-size: 12px; letter-spacing: 0.04em; display: flex; align-items: center; gap: 6px;">
+                                    🛡️ FINANCIAL INTEGRITY & SOLVENCY HEALTH
+                                </h3>
+                                <div style="display: flex; gap: 6px;">
+                                    <button class="header-action-btn" id="fs-alerts-refresh-btn" style="padding: 2px 8px; border-radius: 4px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); font-size: 9.5px; font-weight: bold; color: var(--color-primary-light); cursor: pointer; outline: none;">
+                                        🔄 Refresh Data
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Alert Status Banner -->
+                            <div id="fs-alerts-banner" style="padding: 10px; border-radius: 6px; font-size: 11px; line-height: 1.4; display: none;"></div>
+                            
+                            <!-- Financial Score Overview Ratios Grid -->
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                <div style="background: var(--bg-card-sub); border: 1px solid var(--border-sub); padding: 10px; border-radius: 6px; text-align: center;">
+                                    <span style="font-size: 8px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px;">Piotroski F-Score</span>
+                                    <strong id="fs-hud-fscore" style="font-size: 20px; font-weight: 800; color: var(--text-primary);">--</strong>
+                                    <span id="fs-hud-fscore-label" style="font-size: 8.5px; color: var(--text-muted); display: block; margin-top: 2px;">--</span>
+                                </div>
+                                <div style="background: var(--bg-card-sub); border: 1px solid var(--border-sub); padding: 10px; border-radius: 6px; text-align: center;">
+                                    <span style="font-size: 8px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px;">Altman Z-Score</span>
+                                    <strong id="fs-hud-zscore" style="font-size: 20px; font-weight: 800; color: var(--text-primary);">--</strong>
+                                    <span id="fs-hud-zscore-label" style="font-size: 8.5px; color: var(--text-muted); display: block; margin-top: 2px;">--</span>
+                                </div>
+                                <div style="background: var(--bg-card-sub); border: 1px solid var(--border-sub); padding: 10px; border-radius: 6px; text-align: center;">
+                                    <span style="font-size: 8px; color: var(--text-secondary); font-weight: 700; text-transform: uppercase; display: block; margin-bottom: 4px;">FS Alert Status</span>
+                                    <strong id="fs-hud-alert-status" style="font-size: 16px; font-weight: 800; color: var(--text-primary); display: block; margin-top: 4px;">--</strong>
+                                    <span id="fs-hud-alert-sublabel" style="font-size: 8.5px; color: var(--text-muted); display: block; margin-top: 2px;">--</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Section: FS Alerts Breakdown -->
+                            <div style="background: rgba(255, 255, 255, 0.015); border: 1px dashed var(--border-glass); border-radius: 6px; padding: 12px;">
+                                <span style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em; margin-bottom: 8px;">🚨 Systematic Checks & Alert Signals</span>
+                                <div id="fs-alerts-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 4px;">
+                                    <div style="font-size: 10.5px; color: var(--text-muted); font-style: italic;">No active stock loaded.</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Section: Financial Statements Overview Table -->
+                            <div style="background: var(--bg-card-sub); border: 1px solid var(--border-sub); border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">📊 Raw Financial Data View</span>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button class="glossary-tab-btn active" id="fs-tab-annual" onclick="switchFsTableTab('annual')" style="font-size: 8.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary); cursor: pointer;">Annual</button>
+                                        <button class="glossary-tab-btn" id="fs-tab-quarterly" onclick="switchFsTableTab('quarterly')" style="font-size: 8.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-primary); cursor: pointer;">Quarterly</button>
+                                    </div>
+                                </div>
+                                
+                                <div style="overflow-x: auto; width: 100%; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.03);">
+                                    <table id="fs-data-table" style="width: 100%; font-size: 10.5px; border-collapse: collapse; text-align: left; min-width: 450px;">
+                                        <thead>
+                                            <tr style="background: rgba(0,0,0,0.25); border-bottom: 1.5px solid var(--border-glass);" id="fs-data-thead-tr">
+                                                <th style="padding: 8px 10px; color: var(--text-secondary); font-weight: 700;">Financial Metric</th>
+                                                <th style="padding: 8px 10px; color: var(--text-secondary); font-weight: 700; text-align: right;">--</th>
+                                                <th style="padding: 8px 10px; color: var(--text-secondary); font-weight: 700; text-align: right;">--</th>
+                                                <th style="padding: 8px 10px; color: var(--text-secondary); font-weight: 700; text-align: right;">--</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="fs-data-tbody">
+                                            <tr>
+                                                <td colspan="4" style="padding: 12px 10px; color: var(--text-muted); text-align: center; font-style: italic;">No financial data loaded.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>

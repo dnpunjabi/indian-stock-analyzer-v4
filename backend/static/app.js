@@ -37,6 +37,8 @@
         else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
         else if (activeTarget === 'solvency_chat') micBtnId = 'solvency-chat-mic-btn';
         else if (activeTarget === 'audit_chat') micBtnId = 'audit-chatbot-mic-btn';
+        else if (activeTarget === 'margin_chat') micBtnId = 'margin-chatbot-mic-btn';
+        else if (activeTarget === 'fs_alert') micBtnId = 'fs-alert-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🔴';
@@ -53,6 +55,8 @@
         else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
         else if (activeTarget === 'solvency_chat') micBtnId = 'solvency-chat-mic-btn';
         else if (activeTarget === 'audit_chat') micBtnId = 'audit-chatbot-mic-btn';
+        else if (activeTarget === 'margin_chat') micBtnId = 'margin-chatbot-mic-btn';
+        else if (activeTarget === 'fs_alert') micBtnId = 'fs-alert-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -69,6 +73,8 @@
         else if (activeTarget === 'fs_chat') micBtnId = 'fs-chat-mic-btn';
         else if (activeTarget === 'solvency_chat') micBtnId = 'solvency-chat-mic-btn';
         else if (activeTarget === 'audit_chat') micBtnId = 'audit-chatbot-mic-btn';
+        else if (activeTarget === 'margin_chat') micBtnId = 'margin-chatbot-mic-btn';
+        else if (activeTarget === 'fs_alert') micBtnId = 'fs-alert-mic-btn';
         const micBtn = document.getElementById(micBtnId);
         if (micBtn) {
             micBtn.innerHTML = '🎙️';
@@ -131,6 +137,11 @@
             }
         } else if (activeTarget === 'margin_chat') {
             const input = document.getElementById('margin-chatbot-input');
+            if (input) {
+                input.value = (input.value ? input.value + ' ' : '') + transcript;
+            }
+        } else if (activeTarget === 'fs_alert') {
+            const input = document.getElementById('fs-alert-nl-prompt');
             if (input) {
                 input.value = (input.value ? input.value + ' ' : '') + transcript;
             }
@@ -5082,6 +5093,9 @@ async function loadStockAnalyzer(query, force_llm = false) {
 
         const oldTicker = activeStockProfile ? activeStockProfile.ticker : null;
         activeStockProfile = profile;
+        if (profile && profile.ticker && typeof loadFsAlertsAndDataInBackground === 'function') {
+            loadFsAlertsAndDataInBackground(profile.ticker);
+        }
         if (typeof updateCoPilotActiveContext === 'function') {
             updateCoPilotActiveContext(profile);
         }
@@ -9608,11 +9622,61 @@ function renderComparisonArena(data) {
                     const responseData = await res.json();
 
                     if (responseData.thesis) {
-                        btnContainer.outerHTML = responseData.thesis.replace(/<h4>Rival Quality & Solvency Standings<\/h4>/gi,
+                        const processedThesis = responseData.thesis.replace(/<h4>Rival Quality & Solvency Standings<\/h4>/gi,
                             `<h4>Rival Quality & Solvency Standings <button class="section-speak-btn no-print" data-target="compare-ai-thesis" data-title="Rival Quality & Solvency" style="background: none; border: none; cursor: pointer; padding: 0; outline: none; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">🔊</button></h4>`
                         ).replace(/<h4>AI Comparative Analysis \(Local Fallback Workstation\)<\/h4>/gi,
                             `<h4>AI Comparative Analysis (Local Fallback Workstation) <button class="section-speak-btn no-print" data-target="compare-ai-thesis" data-title="AI Comparative Analysis" style="background: none; border: none; cursor: pointer; padding: 0; outline: none; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">🔊</button></h4>`
                         );
+
+                        btnContainer.outerHTML = `<div id="battleground-thesis-stream-target"></div>`;
+                        const targetEl = document.getElementById('battleground-thesis-stream-target');
+                        if (targetEl) {
+                            // Define inner helper for typewriter streaming
+                            const typewriteHTML = (element, htmlString, speed = 8) => {
+                                element.innerHTML = "";
+                                const tokens = [];
+                                let i = 0;
+                                while (i < htmlString.length) {
+                                    if (htmlString[i] === '<') {
+                                        const endIdx = htmlString.indexOf('>', i);
+                                        if (endIdx !== -1) {
+                                            tokens.push({ type: 'tag', content: htmlString.slice(i, endIdx + 1) });
+                                            i = endIdx + 1;
+                                        } else {
+                                            tokens.push({ type: 'text', content: htmlString[i] });
+                                            i++;
+                                        }
+                                    } else {
+                                        const nextTag = htmlString.indexOf('<', i);
+                                        const textEnd = nextTag !== -1 ? nextTag : htmlString.length;
+                                        const textContent = htmlString.slice(i, textEnd);
+                                        const words = textContent.split(/(\s+)/);
+                                        words.forEach(w => {
+                                            if (w) tokens.push({ type: 'text', content: w });
+                                        });
+                                        i = textEnd;
+                                    }
+                                }
+                                
+                                let tokenIdx = 0;
+                                function renderNext() {
+                                    if (tokenIdx >= tokens.length) return;
+                                    const token = tokens[tokenIdx];
+                                    if (token.type === 'tag') {
+                                        element.innerHTML += token.content;
+                                        tokenIdx++;
+                                        renderNext();
+                                    } else {
+                                        element.innerHTML += token.content;
+                                        tokenIdx++;
+                                        setTimeout(renderNext, speed);
+                                    }
+                                }
+                                renderNext();
+                            };
+                            
+                            typewriteHTML(targetEl, processedThesis, 8);
+                        }
                     } else {
                         btnContainer.innerHTML = `<p style="color: var(--neon-red); font-size: 12px;">Failed to load thesis content.</p>`;
                     }
@@ -38699,6 +38763,11 @@ async function loadFinancialStatements(symbol) {
         
         activeFsData = data;
         
+        // Fetch financial statement alerts from the database
+        if (typeof fetchFsAlerts === 'function') {
+            try { await fetchFsAlerts(symbol); } catch (e) { console.warn("Failed to load FS alerts:", e); }
+        }
+        
         // Update reporting basis text
         if (basisEl) {
             const basisText = data.is_consolidated ? "Consolidated Figures" : "Standalone Figures";
@@ -42007,9 +42076,34 @@ function renderBSCompositionChart(canvas) {
     
     const total = items.reduce((s, i) => s + i.value, 0);
     const parent = canvas.parentElement;
-    const W = Math.min(500, parent ? parent.clientWidth : 500);
-    const H = W < 420 ? 240 : 180;
+    const W = Math.max(280, Math.min(500, parent ? parent.clientWidth : 500));
+    
+    // Dynamically calculate required height based on legend line wrapping
+    const barY = 30;
+    const barH = 40;
+    const tempCtx = canvas.getContext('2d');
+    tempCtx.font = '500 9px Inter, sans-serif';
+    
+    let legendRows = 1;
+    if (W < 450) {
+        legendRows = Math.ceil(items.length / 2);
+    } else {
+        let tempX = 20;
+        items.forEach(item => {
+            const text = item.label + '  ₹' + Math.round(item.value).toLocaleString('en-IN');
+            const textW = tempCtx.measureText(text).width + 36;
+            if (tempX + textW > W - 20) {
+                tempX = 20;
+                legendRows++;
+            }
+            tempX += textW;
+        });
+    }
+    
+    const legendHeight = legendRows * 18 + 15;
+    const H = barY + barH + 25 + legendHeight;
     const dpr = window.devicePixelRatio || 1;
+    
     canvas.width = W * dpr;
     canvas.height = H * dpr;
     canvas.style.width = W + 'px';
@@ -42030,8 +42124,6 @@ function renderBSCompositionChart(canvas) {
         ctx.scale(dpr, dpr);
         
         // Horizontal stacked bar
-        const barY = 30;
-        const barH = 40;
         const barW = W - 40;
         let offset = 20;
         
@@ -42064,24 +42156,65 @@ function renderBSCompositionChart(canvas) {
             offset += segW;
         });
         
-        // Legend
+        // Legend drawing
         let legendX = 20;
         let legendY = barY + barH + 25;
         ctx.font = '500 9px Inter, sans-serif';
         
-        items.forEach((item, idx) => {
-            const isHovered = canvas._hoveredIndex === idx;
-            ctx.fillStyle = item.color + (isHovered ? 'ff' : 'aa');
-            ctx.fillRect(legendX, legendY, 8, 8);
-            
-            ctx.fillStyle = legendTextColor;
-            ctx.font = isHovered ? 'bold 9px Inter, sans-serif' : '500 9px Inter, sans-serif';
-            ctx.textAlign = 'left';
-            const text = item.label + ' ₹' + Math.round(item.value).toLocaleString('en-IN');
-            ctx.fillText(text, legendX + 12, legendY + 7);
-            legendX += ctx.measureText(text).width + 24;
-            if (legendX > W - 50) { legendX = 20; legendY += 18; }
-        });
+        if (W < 450) {
+            // Mobile: clean 2-column grid layout to prevent text clipping
+            const colWidth = (W - 30) / 2;
+            items.forEach((item, idx) => {
+                const col = idx % 2;
+                const row = Math.floor(idx / 2);
+                const x = 20 + col * colWidth;
+                const y = legendY + row * 18;
+                
+                const isHovered = canvas._hoveredIndex === idx;
+                ctx.fillStyle = item.color + (isHovered ? 'ff' : 'aa');
+                ctx.fillRect(x, y, 8, 8);
+                
+                ctx.fillStyle = legendTextColor;
+                ctx.font = isHovered ? 'bold 9px Inter, sans-serif' : '500 9px Inter, sans-serif';
+                ctx.textAlign = 'left';
+                
+                const text = item.label + ' ₹' + Math.round(item.value).toLocaleString('en-IN');
+                let displayText = text;
+                const maxTextW = colWidth - 16;
+                if (ctx.measureText(displayText).width > maxTextW) {
+                    displayText = item.label;
+                    if (ctx.measureText(displayText).width > maxTextW) {
+                        while (displayText.length > 3 && ctx.measureText(displayText + '...').width > maxTextW) {
+                            displayText = displayText.slice(0, -1);
+                        }
+                        displayText += '...';
+                    }
+                }
+                ctx.fillText(displayText, x + 12, y + 7);
+            });
+        } else {
+            // Desktop/Tablet: Flow layout with pre-wrap checking
+            items.forEach((item, idx) => {
+                const isHovered = canvas._hoveredIndex === idx;
+                const text = item.label + ' ₹' + Math.round(item.value).toLocaleString('en-IN');
+                const textW = ctx.measureText(text).width + 36;
+                
+                if (legendX + textW > W - 20) {
+                    legendX = 20;
+                    legendY += 18;
+                }
+                
+                ctx.fillStyle = item.color + (isHovered ? 'ff' : 'aa');
+                ctx.fillRect(legendX, legendY, 8, 8);
+                
+                ctx.fillStyle = legendTextColor;
+                ctx.font = isHovered ? 'bold 9px Inter, sans-serif' : '500 9px Inter, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(text, legendX + 12, legendY + 7);
+                
+                legendX += textW;
+            });
+        }
         
         // Tooltip
         if (canvas._hoveredIndex !== -1 && canvas._mousePos) {
@@ -42866,14 +42999,323 @@ function renderPnLWaterfallChart() {
  * Alerts are stored in localStorage and evaluated each time data is loaded.
  */
 
-window._fsAlerts = JSON.parse(localStorage.getItem('fsSmartAlerts') || '[]');
+window._fsAlerts = [];
 window._fsTriggeredAlerts = [];
 
-function saveFsAlerts() {
-    localStorage.setItem('fsSmartAlerts', JSON.stringify(window._fsAlerts));
+// Fetch alerts from backend SQLite database
+async function fetchFsAlerts(symbol) {
+    try {
+        const url = symbol ? `/api/fs-alerts/list?symbol=${encodeURIComponent(symbol)}` : '/api/fs-alerts/list';
+        const response = await fetch(url);
+        if (response.ok) {
+            window._fsAlerts = await response.json();
+            evaluateFsAlerts();
+            renderFsAlertList();
+        }
+    } catch(e) {
+        console.error("Error fetching FS alerts:", e);
+    }
 }
 
+// Load FS alerts and data in background to evaluate alerts for this stock
+async function loadFsAlertsAndDataInBackground(symbol) {
+    if (!symbol) return;
+    
+    // Set HUD cards to loading state
+    const scoreF = document.getElementById('fs-hud-fscore');
+    const scoreZ = document.getElementById('fs-hud-zscore');
+    const statusVal = document.getElementById('fs-hud-alert-status');
+    const statusSub = document.getElementById('fs-hud-alert-sublabel');
+    const alertsList = document.getElementById('fs-alerts-list');
+    
+    if (scoreF) scoreF.textContent = '...';
+    if (scoreZ) scoreZ.textContent = '...';
+    if (statusVal) statusVal.textContent = 'Scanning...';
+    if (alertsList) alertsList.innerHTML = '<div style="font-size: 10.5px; color: var(--text-muted); font-style: italic; padding: 10px;">Evaluating systematic rules and custom alerts...</div>';
+    
+    try {
+        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/fs-evaluation`);
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Store evaluated data locally for tab switching/use
+            activeFsData = data.financials;
+            
+            // 1. Update Piotroski Score
+            if (scoreF) {
+                scoreF.textContent = `${data.scores.piotroski}/9`;
+                const labelEl = document.getElementById('fs-hud-fscore-label');
+                if (labelEl) {
+                    let label = 'Weak';
+                    let color = 'var(--color-crimson)';
+                    if (data.scores.piotroski >= 7) {
+                        label = 'Strong';
+                        color = 'var(--color-emerald)';
+                    } else if (data.scores.piotroski >= 4) {
+                        label = 'Moderate';
+                        color = 'var(--color-amber)';
+                    }
+                    labelEl.textContent = label;
+                    labelEl.style.color = color;
+                }
+            }
+            
+            // 2. Update Altman Z-Score
+            if (scoreZ) {
+                const zVal = data.scores.altman_z;
+                scoreZ.textContent = zVal.toFixed(2);
+                const labelEl = document.getElementById('fs-hud-zscore-label');
+                if (labelEl) {
+                    let label = 'Distress';
+                    let color = 'var(--color-crimson)';
+                    if (zVal >= 3.0) {
+                        label = 'Safe';
+                        color = 'var(--color-emerald)';
+                    } else if (zVal >= 1.8) {
+                        label = 'Grey';
+                        color = 'var(--color-amber)';
+                    }
+                    labelEl.textContent = `${label} Zone`;
+                    labelEl.style.color = color;
+                }
+            }
+            
+            // 3. Update Overall Alert Status
+            if (statusVal) {
+                statusVal.textContent = data.overall_status;
+                if (data.overall_status === 'Healthy') {
+                    statusVal.style.color = 'var(--color-emerald)';
+                } else if (data.overall_status === 'Warning') {
+                    statusVal.style.color = 'var(--color-amber)';
+                } else {
+                    statusVal.style.color = 'var(--color-crimson)';
+                }
+                
+                if (statusSub) {
+                    const triggeredCount = data.alerts_evaluated.filter(a => a.status === 'Triggered').length;
+                    statusSub.textContent = `${triggeredCount} checks flagged`;
+                }
+                
+                // Show banner if warnings/critical
+                const bannerEl = document.getElementById('fs-alerts-banner');
+                if (bannerEl) {
+                    if (data.overall_status !== 'Healthy') {
+                        bannerEl.style.display = 'block';
+                        bannerEl.style.background = data.overall_status === 'Critical' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+                        bannerEl.style.border = data.overall_status === 'Critical' ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)';
+                        bannerEl.style.color = data.overall_status === 'Critical' ? '#f87171' : '#fbbf24';
+                        bannerEl.innerHTML = `⚠️ <strong>Attention:</strong> Balance sheet scans have flagged potential reporting or solvency concerns. Verify red flags below.`;
+                    } else {
+                        bannerEl.style.display = 'none';
+                    }
+                }
+            }
+            
+            // 4. Render alerts list
+            if (alertsList) {
+                alertsList.innerHTML = '';
+                if (data.alerts_evaluated && data.alerts_evaluated.length > 0) {
+                    data.alerts_evaluated.forEach(alert => {
+                        const alertRow = document.createElement('div');
+                        alertRow.style.cssText = `display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 6px; font-size: 10.5px; transition: all 0.2s;`;
+                        
+                        const isTriggered = alert.status === 'Triggered';
+                        if (isTriggered) {
+                            alertRow.style.background = alert.severity === 'Critical' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(245, 158, 11, 0.08)';
+                            alertRow.style.border = alert.severity === 'Critical' ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid rgba(245, 158, 11, 0.25)';
+                        } else {
+                            alertRow.style.background = 'rgba(16, 185, 129, 0.04)';
+                            alertRow.style.border = '1px solid rgba(16, 185, 129, 0.15)';
+                        }
+                        
+                        const icon = isTriggered ? '❌' : '🟢';
+                        const badgeColor = isTriggered 
+                            ? (alert.severity === 'Critical' ? '#ef4444' : '#fbbf24')
+                            : '#10b981';
+                            
+                        alertRow.innerHTML = `
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <div style="font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 5px;">
+                                    <span>${icon}</span>
+                                    <span>${alert.metric}</span>
+                                    <span style="font-size: 9px; font-weight: 500; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 1px 4px; border-radius: 3px;">${alert.type}</span>
+                                </div>
+                                <div style="color: var(--text-secondary); font-size: 9.5px; padding-left: 17px;">${alert.description}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="font-weight: 700; color: ${badgeColor}; font-size: 10px;">${alert.status.toUpperCase()}</span>
+                            </div>
+                        `;
+                        alertsList.appendChild(alertRow);
+                    });
+                } else {
+                    alertsList.innerHTML = '<div style="font-size: 10.5px; color: var(--text-muted); font-style: italic; padding: 10px;">No alerts evaluated.</div>';
+                }
+            }
+            
+            // 5. Populate Raw Financial Table (defaults to active tab)
+            renderFsDataTable(window._activeFsTableTab || 'annual');
+        }
+        
+        // Also fetch active alerts to keep overlay configuration screen updated
+        await fetchFsAlerts(symbol);
+    } catch (e) {
+        console.warn("Error loading FS alerts & data in background:", e);
+    }
+}
+
+window.runFsManualScan = async function(symbol) {
+    if (!symbol) return;
+    const runBtn = document.getElementById('fs-scan-run-btn');
+    const originalText = runBtn ? runBtn.innerHTML : '⚡ Run Scan';
+    
+    if (runBtn) {
+        runBtn.disabled = true;
+        runBtn.innerHTML = '<span class="loading-spinner" style="display:inline-block;width:10px;height:10px;border:2px solid var(--text-muted);border-top:2px solid var(--text-primary);border-radius:50%;animation:spin 1s linear infinite;margin-right:4px;"></span> Scanning...';
+    }
+    
+    try {
+        if (typeof showToast === 'function') {
+            showToast(`Scraping and analyzing financial statements for ${symbol}...`, "info");
+        }
+        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/fs-evaluation?force_refresh=true`);
+        if (response.ok) {
+            await loadFsAlertsAndDataInBackground(symbol);
+            if (typeof showToast === 'function') {
+                showToast('Financial Statement Scan complete! All alerts evaluated.', 'success');
+            }
+        } else {
+            const err = await response.json();
+            if (typeof showToast === 'function') {
+                showToast(`Scan failed: ${err.detail || 'Unknown error'}`, 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error during manual FS scan:", e);
+        if (typeof showToast === 'function') {
+            showToast("Failed to trigger financial statement scan.", "error");
+        }
+    } finally {
+        if (runBtn) {
+            runBtn.disabled = false;
+            runBtn.innerHTML = originalText;
+        }
+    }
+};
+
+window._activeFsTableTab = 'annual';
+function switchFsTableTab(tab) {
+    window._activeFsTableTab = tab;
+    
+    const btnAnnual = document.getElementById('fs-tab-annual');
+    const btnQuarterly = document.getElementById('fs-tab-quarterly');
+    
+    if (btnAnnual && btnQuarterly) {
+        if (tab === 'annual') {
+            btnAnnual.classList.add('active');
+            btnQuarterly.classList.remove('active');
+        } else {
+            btnQuarterly.classList.add('active');
+            btnAnnual.classList.remove('active');
+        }
+    }
+    
+    renderFsDataTable(tab);
+}
+window.switchFsTableTab = switchFsTableTab;
+
+function renderFsDataTable(tab) {
+    const tableHeader = document.getElementById('fs-data-thead-tr');
+    const tableBody = document.getElementById('fs-data-tbody');
+    if (!tableBody || !activeFsData) return;
+    
+    const stmt = tab === 'quarterly' ? activeFsData.quarters : activeFsData.profit_loss;
+    const balanceSheet = activeFsData.balance_sheet;
+    
+    if (!stmt || !stmt.headers || stmt.headers.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="4" style="padding: 12px 10px; color: var(--text-muted); text-align: center; font-style: italic;">No financial data loaded.</td></tr>';
+        return;
+    }
+    
+    // Render Headers: metric name + years/quarters (limit to last 5 for UI space)
+    const displayHeaders = stmt.headers.slice(-5);
+    if (tableHeader) {
+        tableHeader.innerHTML = `<th style="padding: 8px 10px; color: var(--text-secondary); font-weight: 700; font-size: 10px;">Financial Metric</th>` +
+            displayHeaders.map(h => `<th style="padding: 8px 10px; color: var(--text-secondary); font-weight: 700; font-size: 10px; text-align: right;">${h}</th>`).join('');
+    }
+    
+    tableBody.innerHTML = '';
+    
+    // Let's gather rows from profit_loss (or quarters) and balance_sheet
+    const rowsToRender = [];
+    
+    if (stmt.rows) {
+        stmt.rows.forEach(r => rowsToRender.push({ source: 'statement', label: r.label, values: r.values }));
+    }
+    
+    if (tab === 'annual' && balanceSheet && balanceSheet.rows) {
+        // Add divider row
+        const divRow = document.createElement('tr');
+        divRow.innerHTML = `<td colspan="${displayHeaders.length + 1}" style="padding: 6px 10px; font-weight: 800; background: rgba(255,255,255,0.03); color: var(--text-muted); font-size: 9px; text-transform: uppercase;">Balance Sheet Indicators</td>`;
+        tableBody.appendChild(divRow);
+        
+        balanceSheet.rows.forEach(r => rowsToRender.push({ source: 'balance_sheet', label: r.label, values: r.values }));
+    }
+    
+    rowsToRender.forEach(row => {
+        // Find matched values corresponding to display headers
+        const matchedValues = [];
+        const originalHeaders = tab === 'quarterly' ? activeFsData.quarters.headers : activeFsData.profit_loss.headers;
+        
+        displayHeaders.forEach(h => {
+            const idx = originalHeaders.indexOf(h);
+            if (idx !== -1 && row.values && idx < row.values.length) {
+                matchedValues.push(row.values[idx]);
+            } else {
+                matchedValues.push(null);
+            }
+        });
+        
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid rgba(255, 255, 255, 0.02)';
+        
+        const tdLabel = document.createElement('td');
+        tdLabel.style.padding = '6px 10px';
+        tdLabel.style.fontWeight = '600';
+        tdLabel.style.color = 'var(--text-secondary)';
+        tdLabel.textContent = row.label;
+        tr.appendChild(tdLabel);
+        
+        matchedValues.forEach(val => {
+            const tdVal = document.createElement('td');
+            tdVal.style.padding = '6px 10px';
+            tdVal.style.textAlign = 'right';
+            tdVal.style.fontFamily = 'monospace';
+            
+            if (val === null || val === undefined) {
+                tdVal.textContent = '-';
+            } else if (typeof val === 'number') {
+                if (row.label.toLowerCase().includes('%') || row.label.toLowerCase() === 'opm') {
+                    tdVal.textContent = `${val.toFixed(1)}%`;
+                } else {
+                    tdVal.textContent = val.toLocaleString('en-IN');
+                }
+            } else {
+                tdVal.textContent = val;
+            }
+            tr.appendChild(tdVal);
+        });
+        
+        tableBody.appendChild(tr);
+    });
+}
+
+
 function toggleFsAlertPanel() {
+    const activeStock = (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) ? activeStockProfile.ticker : 'TCS.NS';
+    if (activeStock && typeof fetchFsAlerts === 'function') {
+        fetchFsAlerts(activeStock).catch(e => console.warn("Failed to fetch alerts on panel toggle:", e));
+    }
     const existing = document.getElementById('fs-alert-overlay');
     if (existing) {
         existing.remove();
@@ -42885,37 +43327,75 @@ function toggleFsAlertPanel() {
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10001;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;transition:all 0.3s;';
 
     const card = document.createElement('div');
-    card.style.cssText = 'width:90%;max-width:520px;background:var(--bg-card);border:1px solid var(--border-glass);border-radius:12px;padding:20px;box-shadow:var(--shadow-glow);display:flex;flex-direction:column;gap:14px;max-height:80vh;overflow-y:auto;';
+    card.style.cssText = 'width:90%;max-width:540px;background:var(--bg-card);border:1px solid var(--border-glass);border-radius:12px;padding:20px;box-shadow:var(--shadow-glow);display:flex;flex-direction:column;gap:14px;max-height:85vh;overflow-y:auto;';
 
-    // Header
+    const cleanStock = activeStock ? activeStock.split('.')[0] : 'TCS';
+
+    // Header & Content Layout
     card.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;">
             <h3 style="margin:0;font-family:'Outfit',sans-serif;font-size:14px;font-weight:700;color:var(--text-primary);">🔔 Smart Alert Subscriptions</h3>
             <button onclick="document.getElementById('fs-alert-overlay').remove()" style="background:transparent;border:1px solid var(--border-glass);border-radius:50%;width:24px;height:24px;cursor:pointer;color:var(--text-secondary);font-size:14px;display:flex;align-items:center;justify-content:center;">×</button>
         </div>
         <div style="font-size:10px;color:var(--text-secondary);line-height:1.5;border-bottom:1px dashed var(--border-glass);padding-bottom:8px;">
-            Set threshold alerts on financial metrics. Alerts will trigger when a metric crosses your defined threshold in the latest data period.
+            Set threshold alerts on financial statement metrics. Alerts are saved on the server and evaluated each time data is loaded.
         </div>
-        <div id="fs-alert-add-form" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;">
-            <div style="flex:1;min-width:120px;">
-                <label style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:3px;">Metric Name</label>
-                <input id="fs-alert-metric" type="text" placeholder="e.g. Net Profit, OPM, Sales" style="width:100%;height:28px;padding:0 8px;border-radius:5px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-size:10px;font-family:'Inter',sans-serif;box-sizing:border-box;outline:none;" />
+
+        <!-- AI Natural Language Prompt Area -->
+        <div style="display:flex;flex-direction:column;gap:6px;border-bottom:1px dashed var(--border-glass);padding-bottom:12px;">
+            <label style="font-size:9.5px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;">✨ Configure with AI (Voice Supported)</label>
+            <div style="position:relative;display:flex;align-items:center;width:100%;">
+                <textarea id="fs-alert-nl-prompt" rows="2" placeholder="e.g. Alert me if ${cleanStock} Sales YoY growth exceeds 15%..." style="width:100%;min-height:48px;padding:8px 36px 8px 8px;border-radius:6px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-family:inherit;font-size:10.5px;line-height:1.4;resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+                <button id="fs-alert-mic-btn" style="position:absolute;right:8px;top:8px;background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:13px;height:24px;width:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" title="Voice Input">🎙️</button>
             </div>
-            <div style="width:80px;">
-                <label style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:3px;">Condition</label>
-                <select id="fs-alert-condition" style="width:100%;height:28px;padding:0 4px;border-radius:5px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-size:10px;font-family:'Inter',sans-serif;outline:none;">
-                    <option value="above">Above</option>
-                    <option value="below">Below</option>
-                    <option value="yoy_above">YoY % ></option>
-                    <option value="yoy_below">YoY % <</option>
-                </select>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
+                <span id="fs-alert-nl-loader" style="display:none;font-size:10px;color:#fbbf24;font-weight:600;animation:pulse 1.5s infinite;">⏳ Processing AI rules...</span>
+                <button onclick="parseFsNlAlert()" style="height:28px;padding:0 12px;font-size:10.5px;font-family:'Outfit',sans-serif;font-weight:600;border-radius:5px;border:none;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;cursor:pointer;margin-left:auto;">✨ Build Alert</button>
             </div>
-            <div style="width:80px;">
-                <label style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:3px;">Threshold</label>
-                <input id="fs-alert-threshold" type="number" placeholder="e.g. 1000" style="width:100%;height:28px;padding:0 8px;border-radius:5px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-size:10px;font-family:'Inter',sans-serif;box-sizing:border-box;outline:none;" />
+            
+            <!-- Presets / Quick Templates -->
+            <div style="margin-top:4px;">
+                <span style="font-size:9px;color:var(--text-muted);font-weight:600;display:block;margin-bottom:4px;">💡 Quick Templates (Click to fill):</span>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;max-height:85px;overflow-y:auto;padding-right:4px;">
+                    <span class="fs-template-pill" data-template="Alert me if {STOCK} Sales YoY growth exceeds 15%" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border-glass);color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none;">📈 Sales YoY >15%</span>
+                    <span class="fs-template-pill" data-template="Alert me if {STOCK} Sales drops below 5000" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border-glass);color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none;">📉 Sales <5000</span>
+                    <span class="fs-template-pill" data-template="Alert me if {STOCK} Net Profit goes above 1000" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border-glass);color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none;">💵 Net Profit >1000</span>
+                    <span class="fs-template-pill" data-template="Alert me if {STOCK} OPM drops below 10%" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border-glass);color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none;">📉 OPM <10%</span>
+                    <span class="fs-template-pill" data-template="Alert me if {STOCK} Debt to Equity ratio rises above 1.5" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border-glass);color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none;">⚖️ Debt/Equity >1.5</span>
+                    <span class="fs-template-pill" data-template="Alert me if {STOCK} Interest Coverage ratio falls below 3.0" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border-glass);color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none;">🛡️ Interest Coverage <3</span>
+                    <span class="fs-template-pill" data-template="Alert me if {STOCK} ROCE drops below 15%" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border-glass);color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none;">🔄 ROCE <15%</span>
+                    <span class="fs-template-pill" data-template="Alert me if {STOCK} Altman Z-Score falls below 1.8" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border-glass);color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none;">⚠️ Altman Z <1.8</span>
+                    <span class="fs-template-pill" data-template="Alert me if {STOCK} Piotroski Score drops below 5" style="font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid var(--border-glass);color:var(--text-secondary);cursor:pointer;transition:all 0.2s;user-select:none;">⚠️ Piotroski <5</span>
+                </div>
             </div>
-            <button onclick="addFsAlert()" style="height:28px;padding:0 12px;font-size:10px;font-family:'Outfit',sans-serif;font-weight:600;border-radius:5px;border:none;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;cursor:pointer;white-space:nowrap;">+ Add Alert</button>
         </div>
+
+        <!-- Manual Form (Fallback) -->
+        <details style="margin-top:2px;">
+            <summary style="font-size:9.5px;color:var(--text-muted);font-weight:700;cursor:pointer;outline:none;user-select:none;">🛠️ Manual Alert Builder</summary>
+            <div id="fs-alert-add-form" style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-top:6px;padding:8px;background:rgba(255,255,255,0.02);border:1px dashed var(--border-glass);border-radius:6px;">
+                <div style="flex:1;min-width:120px;">
+                    <label style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:3px;">Metric Name</label>
+                    <input id="fs-alert-metric" type="text" placeholder="e.g. Net Profit, OPM, Sales" style="width:100%;height:28px;padding:0 8px;border-radius:5px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-size:10px;font-family:'Inter',sans-serif;box-sizing:border-box;outline:none;" />
+                </div>
+                <div style="width:80px;">
+                    <label style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:3px;">Condition</label>
+                    <select id="fs-alert-condition" style="width:100%;height:28px;padding:0 4px;border-radius:5px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-size:10px;font-family:'Inter',sans-serif;outline:none;">
+                        <option value="above">Above</option>
+                        <option value="below">Below</option>
+                        <option value="yoy_above">YoY % ></option>
+                        <option value="yoy_below">YoY % <</option>
+                    </select>
+                </div>
+                <div style="width:80px;">
+                    <label style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;display:block;margin-bottom:3px;">Threshold</label>
+                    <input id="fs-alert-threshold" type="number" placeholder="e.g. 1000" style="width:100%;height:28px;padding:0 8px;border-radius:5px;border:1px solid var(--border-glass);background:var(--bg-glass-input);color:var(--text-primary);font-size:10px;font-family:'Inter',sans-serif;box-sizing:border-box;outline:none;" />
+                </div>
+                <button onclick="addFsAlert()" style="height:28px;padding:0 12px;font-size:10px;font-family:'Outfit',sans-serif;font-weight:600;border-radius:5px;border:none;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;cursor:pointer;white-space:nowrap;">+ Add Alert</button>
+            </div>
+        </details>
+
+        <!-- List Views -->
         <div id="fs-alert-list" style="display:flex;flex-direction:column;gap:6px;"></div>
         <div id="fs-alert-triggered-list" style="display:flex;flex-direction:column;gap:6px;"></div>
     `;
@@ -42924,10 +43404,26 @@ function toggleFsAlertPanel() {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
 
+    // Bind click handlers for quick templates
+    const pills = overlay.querySelectorAll('.fs-template-pill');
+    pills.forEach(pill => {
+        pill.addEventListener('click', () => {
+            const template = pill.getAttribute('data-template');
+            const populated = template.replace(/{STOCK}/g, cleanStock);
+            const promptEl = document.getElementById('fs-alert-nl-prompt');
+            if (promptEl) {
+                promptEl.value = populated;
+                promptEl.focus();
+            }
+        });
+    });
+
+    initFsAlertVoiceSearch();
     renderFsAlertList();
 }
 
-function addFsAlert() {
+async function addFsAlert() {
+    const activeStock = (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) ? activeStockProfile.ticker : 'TCS.NS';
     const metricEl = document.getElementById('fs-alert-metric');
     const conditionEl = document.getElementById('fs-alert-condition');
     const thresholdEl = document.getElementById('fs-alert-threshold');
@@ -42939,26 +43435,167 @@ function addFsAlert() {
 
     if (!metric || isNaN(threshold)) return;
 
-    window._fsAlerts.push({
-        id: Date.now(),
-        metric,
-        condition,
-        threshold,
-        active: true,
-        createdAt: new Date().toISOString()
-    });
-    saveFsAlerts();
-
-    metricEl.value = '';
-    thresholdEl.value = '';
-    renderFsAlertList();
-    evaluateFsAlerts();
+    try {
+        const response = await fetch('/api/fs-alerts/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbol: activeStock || "GLOBAL",
+                metric,
+                condition,
+                threshold
+            })
+        });
+        if (response.ok) {
+            const newAlert = await response.json();
+            window._fsAlerts.push(newAlert);
+            metricEl.value = '';
+            thresholdEl.value = '';
+            renderFsAlertList();
+            evaluateFsAlerts();
+            loadFsAlertsAndDataInBackground(activeStock);
+        } else {
+            const err = await response.json();
+            alert("Error adding alert: " + (err.detail || response.statusText));
+        }
+    } catch (e) {
+        console.error("Failed to add alert:", e);
+    }
 }
 
-function removeFsAlert(id) {
-    window._fsAlerts = window._fsAlerts.filter(a => a.id !== id);
-    saveFsAlerts();
-    renderFsAlertList();
+async function removeFsAlert(id) {
+    try {
+        const response = await fetch(`/api/fs-alerts/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            window._fsAlerts = window._fsAlerts.filter(a => a.id !== id);
+            renderFsAlertList();
+            evaluateFsAlerts();
+            const activeStock = (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) ? activeStockProfile.ticker : 'TCS.NS';
+            loadFsAlertsAndDataInBackground(activeStock);
+        }
+    } catch(e) {
+        console.error("Failed to delete alert:", e);
+    }
+}
+
+async function toggleFsAlertActive(id) {
+    try {
+        const response = await fetch(`/api/fs-alerts/toggle/${id}`, { method: 'POST' });
+        if (response.ok) {
+            const res = await response.json();
+            const alertItem = window._fsAlerts.find(a => a.id === id);
+            if (alertItem) alertItem.active = res.active;
+            renderFsAlertList();
+            evaluateFsAlerts();
+            const activeStock = (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) ? activeStockProfile.ticker : 'TCS.NS';
+            loadFsAlertsAndDataInBackground(activeStock);
+        }
+    } catch (e) {
+        console.error("Failed to toggle alert state:", e);
+    }
+}
+
+async function parseFsNlAlert() {
+    const activeStock = (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) ? activeStockProfile.ticker : 'TCS.NS';
+    const promptEl = document.getElementById('fs-alert-nl-prompt');
+    const loaderEl = document.getElementById('fs-alert-nl-loader');
+    if (!promptEl) return;
+    const prompt = promptEl.value.trim();
+    if (!prompt) return;
+
+    if (loaderEl) loaderEl.style.display = 'inline';
+    try {
+        const response = await fetch('/api/fs-alerts/parse-nl', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt,
+                active_ticker: activeStock || null
+            })
+        });
+        if (response.ok) {
+            const newAlert = await response.json();
+            window._fsAlerts.push(newAlert);
+            promptEl.value = '';
+            renderFsAlertList();
+            evaluateFsAlerts();
+            loadFsAlertsAndDataInBackground(activeStock);
+        } else {
+            const err = await response.json();
+            alert("Error parsing alert: " + (err.detail || response.statusText));
+        }
+    } catch(e) {
+        console.error("Failed to parse natural language alert:", e);
+    } finally {
+        if (loaderEl) loaderEl.style.display = 'none';
+    }
+}
+
+function initFsAlertVoiceSearch() {
+    const micBtn = document.getElementById('fs-alert-mic-btn');
+    const promptEl = document.getElementById('fs-alert-nl-prompt');
+    if (!micBtn || !promptEl) return;
+
+    const isAndroidSpeech = window.AndroidSpeech && typeof window.AndroidSpeech.startListening === 'function';
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (isAndroidSpeech) {
+        micBtn.onclick = () => {
+            if (window.AndroidSpeechListening && window.activeSpeechRecognizerTarget === 'fs_alert') {
+                window.AndroidSpeech.stopListening();
+            } else {
+                window.activeSpeechRecognizerTarget = 'fs_alert';
+                window.AndroidSpeech.startListening();
+            }
+        };
+    } else if (!SpeechRecognition) {
+        micBtn.style.display = 'none';
+    } else {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        let isRecording = false;
+
+        micBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                recognition.start();
+            } else {
+                recognition.stop();
+            }
+        });
+
+        recognition.onstart = () => {
+            isRecording = true;
+            micBtn.style.color = '#ef4444';
+            micBtn.style.background = 'rgba(239, 68, 68, 0.15)';
+            micBtn.style.boxShadow = '0 0 8px rgba(239, 68, 68, 0.5)';
+            micBtn.textContent = '🔴';
+        };
+
+        recognition.onend = () => {
+            isRecording = false;
+            micBtn.style.color = 'var(--text-muted)';
+            micBtn.style.background = 'none';
+            micBtn.style.boxShadow = 'none';
+            micBtn.textContent = '🎙️';
+        };
+
+        recognition.onresult = (event) => {
+            const text = event.results[0][0].transcript;
+            promptEl.value = (promptEl.value ? promptEl.value + ' ' : '') + text;
+        };
+
+        recognition.onerror = (e) => {
+            console.error('Speech recognition error in FS Alerts:', e);
+            isRecording = false;
+            micBtn.style.color = 'var(--text-muted)';
+            micBtn.style.background = 'none';
+            micBtn.style.boxShadow = 'none';
+            micBtn.textContent = '🎙️';
+        };
+    }
 }
 
 function renderFsAlertList() {
@@ -42970,24 +43607,28 @@ function renderFsAlertList() {
         listEl.innerHTML = '<div style="font-size:10px;color:var(--text-muted);text-align:center;padding:12px;">No alerts configured. Add one above.</div>';
     } else {
         const condLabels = { above: '>', below: '<', yoy_above: 'YoY% >', yoy_below: 'YoY% <' };
-        listEl.innerHTML = '<div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;margin-bottom:2px;">Active Alerts</div>' +
+        listEl.innerHTML = '<div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;margin-bottom:4px;">Active Alerts</div>' +
             window._fsAlerts.map(a => `
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.15);border-radius:6px;">
-                    <div style="font-size:10px;color:var(--text-primary);font-weight:600;">
-                        <span style="color:#fbbf24;">🔔</span> ${a.metric} <span style="color:var(--text-muted);font-weight:400;">${condLabels[a.condition] || a.condition}</span> <span style="color:#fbbf24;">${a.threshold.toLocaleString('en-IN')}</span>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(245,158,11,0.03);border:1px solid var(--border-glass);border-radius:6px;">
+                    <div style="font-size:10.5px;color:var(--text-primary);font-weight:600;display:flex;align-items:center;gap:6px;">
+                        <input type="checkbox" ${a.active ? 'checked' : ''} onclick="toggleFsAlertActive('${a.id}')" style="cursor:pointer;" />
+                        <span style="color:#fbbf24;">🔔</span>
+                        <span>[${a.symbol}] ${a.metric}</span>
+                        <span style="color:var(--text-muted);font-weight:400;">${condLabels[a.condition] || a.condition}</span>
+                        <span style="color:#fbbf24;">${a.threshold.toLocaleString('en-IN')}</span>
                     </div>
-                    <button onclick="removeFsAlert(${a.id})" style="background:none;border:none;color:var(--color-crimson);cursor:pointer;font-size:12px;padding:0 4px;">✕</button>
+                    <button onclick="removeFsAlert('${a.id}')" style="background:none;border:none;color:var(--color-crimson);cursor:pointer;font-size:12px;padding:0 4px;">✕</button>
                 </div>
             `).join('');
     }
 
     // Show triggered alerts
     if (triggeredEl && window._fsTriggeredAlerts.length > 0) {
-        triggeredEl.innerHTML = '<div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;margin-top:6px;margin-bottom:2px;">⚡ Triggered Alerts</div>' +
+        triggeredEl.innerHTML = '<div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:700;margin-top:8px;margin-bottom:4px;">⚡ Triggered Alerts</div>' +
             window._fsTriggeredAlerts.map(t => `
-                <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:${t.type === 'warning' ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)'};border:1px solid ${t.type === 'warning' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'};border-radius:6px;">
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${t.type === 'warning' ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)'};border:1px solid ${t.type === 'warning' ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'};border-radius:6px;">
                     <span style="font-size:12px;">${t.type === 'warning' ? '🔴' : '🟢'}</span>
-                    <span style="font-size:10px;color:var(--text-primary);">${t.message}</span>
+                    <span style="font-size:10.5px;color:var(--text-primary);">${t.message}</span>
                 </div>
             `).join('');
     } else if (triggeredEl) {
@@ -42996,6 +43637,7 @@ function renderFsAlertList() {
 }
 
 function evaluateFsAlerts() {
+    const activeStock = (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) ? activeStockProfile.ticker : 'TCS.NS';
     window._fsTriggeredAlerts = [];
     if (!activeFsData || window._fsAlerts.length === 0) return;
 
@@ -43004,6 +43646,14 @@ function evaluateFsAlerts() {
     
     for (const alert of window._fsAlerts) {
         if (!alert.active) continue;
+        
+        // Match ticker symbol if alert is ticker-specific
+        if (alert.symbol && activeStock) {
+            const alertClean = alert.symbol.split('.')[0].toUpperCase();
+            const activeClean = activeStock.split('.')[0].toUpperCase();
+            if (alertClean !== activeClean) continue;
+        }
+
         const metricLower = alert.metric.toLowerCase();
         
         for (const stmtKey of statementsToCheck) {
@@ -43047,7 +43697,7 @@ function evaluateFsAlerts() {
                     alertId: alert.id,
                     metric: matchRow.label,
                     type: (alert.condition === 'below' || alert.condition === 'yoy_below') ? 'warning' : 'positive',
-                    message
+                    message: `[${alert.symbol}] ${message}`
                 });
                 break;
             }

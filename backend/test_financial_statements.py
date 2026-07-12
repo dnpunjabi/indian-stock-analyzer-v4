@@ -184,5 +184,20 @@ class TestFinancialStatements(unittest.TestCase):
         self.assertEqual(data["analysis"], "### Key Revenue/Profitability Trends\n* TCS is showing 4% growth.")
         mock_call_llm.assert_called_once()
 
+    @patch("backend.main.run_fs_evaluation_internal")
+    def test_api_fs_evaluation_success(self, mock_eval):
+        mock_eval.return_value = {
+            "status": "Warning",
+            "scores": {"piotroski_f_score": 6, "altman_z_score": 2.1},
+            "alerts": [{"metric": "OPM Trend", "condition": "decreasing", "threshold": 0, "value": -2.5, "severity": "Warning"}],
+            "statements": {"symbol": "TCS"}
+        }
+        res = self.client.get("/api/stocks/TCS/fs-evaluation")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "Warning")
+        self.assertEqual(data["scores"]["piotroski_f_score"], 6)
+        self.assertEqual(data["alerts"][0]["metric"], "OPM Trend")
+
 if __name__ == "__main__":
     unittest.main()

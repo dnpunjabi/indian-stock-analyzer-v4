@@ -8394,7 +8394,55 @@ function renderComparisonArena(data) {
                     const responseData = await res.json();
 
                     if (responseData.thesis) {
-                        btnContainer.outerHTML = responseData.thesis;
+                        btnContainer.outerHTML = `<div id="battleground-thesis-stream-target"></div>`;
+                        const targetEl = document.getElementById('battleground-thesis-stream-target');
+                        if (targetEl) {
+                            // Define inner helper for typewriter streaming
+                            const typewriteHTML = (element, htmlString, speed = 8) => {
+                                element.innerHTML = "";
+                                const tokens = [];
+                                let i = 0;
+                                while (i < htmlString.length) {
+                                    if (htmlString[i] === '<') {
+                                        const endIdx = htmlString.indexOf('>', i);
+                                        if (endIdx !== -1) {
+                                            tokens.push({ type: 'tag', content: htmlString.slice(i, endIdx + 1) });
+                                            i = endIdx + 1;
+                                        } else {
+                                            tokens.push({ type: 'text', content: htmlString[i] });
+                                            i++;
+                                        }
+                                    } else {
+                                        const nextTag = htmlString.indexOf('<', i);
+                                        const textEnd = nextTag !== -1 ? nextTag : htmlString.length;
+                                        const textContent = htmlString.slice(i, textEnd);
+                                        const words = textContent.split(/(\s+)/);
+                                        words.forEach(w => {
+                                            if (w) tokens.push({ type: 'text', content: w });
+                                        });
+                                        i = textEnd;
+                                    }
+                                }
+                                
+                                let tokenIdx = 0;
+                                function renderNext() {
+                                    if (tokenIdx >= tokens.length) return;
+                                    const token = tokens[tokenIdx];
+                                    if (token.type === 'tag') {
+                                        element.innerHTML += token.content;
+                                        tokenIdx++;
+                                        renderNext();
+                                    } else {
+                                        element.innerHTML += token.content;
+                                        tokenIdx++;
+                                        setTimeout(renderNext, speed);
+                                    }
+                                }
+                                renderNext();
+                            };
+                            
+                            typewriteHTML(targetEl, responseData.thesis, 8);
+                        }
                     } else {
                         btnContainer.innerHTML = `<p style="color: var(--neon-red); font-size: 12px;">Failed to load thesis content.</p>`;
                     }
