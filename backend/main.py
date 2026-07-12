@@ -4724,6 +4724,11 @@ async def parse_nl_alert(data: ParseNLAlertRequest):
             "- CFO_PAT_DIVERGENCE (Cash Flow to Profit Divergence ratio, e.g. 0.6)\n"
             "- DIVIDEND_YIELD_FLOOR (dividend yield percentage support trigger, e.g. 4.0)\n"
             "- ATR_VOLATILITY_SHOCK (Average True Range volatility indicator in Rs., e.g. 50)\n"
+            "- SMA20 (price deviation from 20-day SMA in %, e.g., 2.0 for 2% above, -2.0 for 2% below)\n"
+            "- SMA100 (price deviation from 100-day SMA in %, e.g., 2.0 for 2% above, -2.0 for 2% below)\n"
+            "- EMA20 (price deviation from 20-day EMA in %, e.g., 2.0 for 2% above, -2.0 for 2% below)\n"
+            "- EMA50 (price deviation from 50-day EMA in %, e.g., 2.0 for 2% above, -2.0 for 2% below)\n"
+            "- EMA200 (price deviation from 200-day EMA in %, e.g., 2.0 for 2% above, -2.0 for 2% below)\n"
             "- COMPOUND (logical combination of multiple simple rules using AND or OR operators)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
@@ -6520,6 +6525,66 @@ async def evaluate_single_condition_bool(cond_type: str, op: str, val_str: str, 
                 triggered = True
             elif op == "<" and atr_val < threshold:
                 triggered = True
+
+        elif cond_type == "SMA20":
+            sma_20 = float(t.get("sma_20", 0.0))
+            cur_val = f"SMA20: Rs. {sma_20:.2f}"
+            if sma_20 > 0.0:
+                pct_diff = ((price_val - sma_20) / sma_20) * 100
+                cur_val = f"Price: Rs. {price_val:.2f} vs SMA20 (Diff: {pct_diff:+.1f}%)"
+                threshold = float(val_str)
+                if op == ">" and pct_diff > threshold:
+                    triggered = True
+                elif op == "<" and pct_diff < threshold:
+                    triggered = True
+
+        elif cond_type == "SMA100":
+            sma_100 = float(t.get("sma_100", 0.0))
+            cur_val = f"SMA100: Rs. {sma_100:.2f}"
+            if sma_100 > 0.0:
+                pct_diff = ((price_val - sma_100) / sma_100) * 100
+                cur_val = f"Price: Rs. {price_val:.2f} vs SMA100 (Diff: {pct_diff:+.1f}%)"
+                threshold = float(val_str)
+                if op == ">" and pct_diff > threshold:
+                    triggered = True
+                elif op == "<" and pct_diff < threshold:
+                    triggered = True
+
+        elif cond_type == "EMA20":
+            ema_20 = float(t.get("ema_20", 0.0))
+            cur_val = f"EMA20: Rs. {ema_20:.2f}"
+            if ema_20 > 0.0:
+                pct_diff = ((price_val - ema_20) / ema_20) * 100
+                cur_val = f"Price: Rs. {price_val:.2f} vs EMA20 (Diff: {pct_diff:+.1f}%)"
+                threshold = float(val_str)
+                if op == ">" and pct_diff > threshold:
+                    triggered = True
+                elif op == "<" and pct_diff < threshold:
+                    triggered = True
+
+        elif cond_type == "EMA50":
+            ema_50 = float(t.get("ema_50", 0.0))
+            cur_val = f"EMA50: Rs. {ema_50:.2f}"
+            if ema_50 > 0.0:
+                pct_diff = ((price_val - ema_50) / ema_50) * 100
+                cur_val = f"Price: Rs. {price_val:.2f} vs EMA50 (Diff: {pct_diff:+.1f}%)"
+                threshold = float(val_str)
+                if op == ">" and pct_diff > threshold:
+                    triggered = True
+                elif op == "<" and pct_diff < threshold:
+                    triggered = True
+
+        elif cond_type == "EMA200":
+            ema_200 = float(t.get("ema_200", 0.0))
+            cur_val = f"EMA200: Rs. {ema_200:.2f}"
+            if ema_200 > 0.0:
+                pct_diff = ((price_val - ema_200) / ema_200) * 100
+                cur_val = f"Price: Rs. {price_val:.2f} vs EMA200 (Diff: {pct_diff:+.1f}%)"
+                threshold = float(val_str)
+                if op == ">" and pct_diff > threshold:
+                    triggered = True
+                elif op == "<" and pct_diff < threshold:
+                    triggered = True
     except Exception as eval_err:
         print(f"Error evaluating condition {cond_type} {op} {val_str}: {eval_err}")
         
@@ -10350,7 +10415,15 @@ async def parse_nl_scan(data: ParseNLScanRequest):
             "- COMBO_DMA_CROSS_NEAR (50 SMA vs 200 SMA nearness: 50 SMA above/below 200 SMA by <= threshold % separation, value is the percentage threshold, e.g. 1.0)\n"
             "- COMBO_VALUE_TRAP_AVOID (Value-trap avoidance: PE below 15 and analyst recommendation is SELL, value is the PE threshold, e.g. 15.0)\n"
             "- COMBO_BB_REVERSION_SURGE (Bollinger Band reversion with volume: below BB lower band + RSI < 25 + volume above 2x average, value is volume ratio threshold, e.g. 2.0)\n"
-            "- COMBO_PIOTROSKI_BREAKOUT (Quality breakout confluence: price above 200 SMA + within 5% of 52-week High + Strong Buy rating, value is the proximity percentage threshold, e.g. 5.0)\n\n"
+            "- COMBO_PIOTROSKI_BREAKOUT (Quality breakout confluence: price above 200 SMA + within 5% of 52-week High + Strong Buy rating, value is the proximity percentage threshold, e.g. 5.0)\n"
+            "- COMBO_SMA_20_PULLBACK (20 SMA pullback: price near 20 SMA + price > 200 SMA, value is proximity threshold, e.g. 1.5)\n"
+            "- COMBO_MINERVINI_STAGE_2 (Minervini Stage 2: price > 50 SMA > 150 SMA > 200 SMA)\n"
+            "- COMBO_EMA_SHORT_CROSS (Short EMA crossover with volume: 5 EMA > 20 EMA + volume ratio, value is volume ratio threshold, e.g. 1.5)\n"
+            "- COMBO_SMA_200_STRETCHED (SMA200 overextended: price above 200 SMA by > value %, value is percentage threshold, e.g. 20.0)\n"
+            "- COMBO_EMA_TREND_ALIGN (EMA Ribbon Alignment: price > 20 EMA > 50 EMA > 200 EMA)\n"
+            "- COMBO_SMA_100_PULLBACK (100 SMA pullback: price near 100 SMA + price > 200 SMA, value is proximity threshold, e.g. 1.5)\n"
+            "- COMBO_EMA_200_SUPPORT (200 EMA support with oversold RSI: price near 200 EMA + RSI <= 35, value is proximity threshold, e.g. 2.0)\n"
+            "- COMBO_TREND_ACCELERATION (Trend acceleration: price > 20 SMA > 50 SMA > 200 SMA + ADX >= 25)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
             "- '<' (Less Than / Crosses Below)\n"
@@ -10677,6 +10750,66 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                     elif operator == "<" and atr_val < threshold:
                         triggered = True
 
+                elif condition_type == "SMA20":
+                    sma_20 = clean_float(t.get("sma_20"), 0.0)
+                    if sma_20 <= 0.0:
+                        continue
+                    pct_diff = ((price - sma_20) / sma_20) * 100
+                    cur_val = f"Price vs SMA20: {pct_diff:+.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and pct_diff > threshold:
+                        triggered = True
+                    elif operator == "<" and pct_diff < threshold:
+                        triggered = True
+
+                elif condition_type == "SMA100":
+                    sma_100 = clean_float(t.get("sma_100"), 0.0)
+                    if sma_100 <= 0.0:
+                        continue
+                    pct_diff = ((price - sma_100) / sma_100) * 100
+                    cur_val = f"Price vs SMA100: {pct_diff:+.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and pct_diff > threshold:
+                        triggered = True
+                    elif operator == "<" and pct_diff < threshold:
+                        triggered = True
+
+                elif condition_type == "EMA20":
+                    ema_20 = clean_float(t.get("ema_20"), 0.0)
+                    if ema_20 <= 0.0:
+                        continue
+                    pct_diff = ((price - ema_20) / ema_20) * 100
+                    cur_val = f"Price vs EMA20: {pct_diff:+.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and pct_diff > threshold:
+                        triggered = True
+                    elif operator == "<" and pct_diff < threshold:
+                        triggered = True
+
+                elif condition_type == "EMA50":
+                    ema_50 = clean_float(t.get("ema_50"), 0.0)
+                    if ema_50 <= 0.0:
+                        continue
+                    pct_diff = ((price - ema_50) / ema_50) * 100
+                    cur_val = f"Price vs EMA50: {pct_diff:+.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and pct_diff > threshold:
+                        triggered = True
+                    elif operator == "<" and pct_diff < threshold:
+                        triggered = True
+
+                elif condition_type == "EMA200":
+                    ema_200 = clean_float(t.get("ema_200"), 0.0)
+                    if ema_200 <= 0.0:
+                        continue
+                    pct_diff = ((price - ema_200) / ema_200) * 100
+                    cur_val = f"Price vs EMA200: {pct_diff:+.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and pct_diff > threshold:
+                        triggered = True
+                    elif operator == "<" and pct_diff < threshold:
+                        triggered = True
+
                 # ─── MULTI-FACTOR COMBO STRATEGIES ─────────────────────────────────────
                 elif condition_type == "COMBO_BULL_PULLBACK":
                     rsi_val = clean_float(t.get("rsi"), 50.0)
@@ -10911,6 +11044,79 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                         if diff_pct <= threshold:
                             cur_val = f"Piotroski Breakout: Above SMA200, within {diff_pct:.1f}% of 52wH (Rs.{high_52w:.0f}), Strong Buy"
                             triggered = True
+
+                elif condition_type == "COMBO_SMA_20_PULLBACK":
+                    sma_20 = clean_float(t.get("sma_20"), 0.0)
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    if sma_20 > 0 and price >= sma_20 and price > sma_200:
+                        diff_pct = ((price - sma_20) / sma_20) * 100
+                        threshold = clean_float(value, 1.5)
+                        if diff_pct <= threshold:
+                            cur_val = f"20 SMA Pullback: Price Rs.{price:.0f} near 20 SMA Rs.{sma_20:.0f} (Diff: {diff_pct:.2f}%) in uptrend"
+                            triggered = True
+
+                elif condition_type == "COMBO_MINERVINI_STAGE_2":
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    sma_150 = clean_float(t.get("sma_150"), 0.0)
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    if price > sma_50 > sma_150 > sma_200 > 0:
+                        cur_val = f"Stage 2 Alignment: Price Rs.{price:.0f} > 50 SMA ({sma_50:.0f}) > 150 SMA ({sma_150:.0f}) > 200 SMA ({sma_200:.0f})"
+                        triggered = True
+
+                elif condition_type == "COMBO_EMA_SHORT_CROSS":
+                    ema_5 = clean_float(t.get("ema_5"), 0.0)
+                    ema_20 = clean_float(t.get("ema_20"), 0.0)
+                    vol_ratio = clean_float(t.get("volume_vs_avg20", t.get("volume_ratio", t.get("vol_breakout_ratio"))), 1.0)
+                    threshold = clean_float(value, 1.5)
+                    if ema_5 > ema_20 > 0 and vol_ratio >= threshold:
+                        cur_val = f"Short EMA Crossover: 5 EMA Rs.{ema_5:.0f} > 20 EMA Rs.{ema_20:.0f} with Vol: {vol_ratio:.1f}x"
+                        triggered = True
+
+                elif condition_type == "COMBO_SMA_200_STRETCHED":
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    if sma_200 > 0:
+                        diff_pct = ((price - sma_200) / sma_200) * 100
+                        threshold = clean_float(value, 20.0)
+                        if diff_pct >= threshold:
+                            cur_val = f"SMA200 Stretched: Price Rs.{price:.0f} is {diff_pct:.1f}% above 200 SMA (Rs.{sma_200:.0f})"
+                            triggered = True
+
+                elif condition_type == "COMBO_EMA_TREND_ALIGN":
+                    ema_20 = clean_float(t.get("ema_20"), 0.0)
+                    ema_50 = clean_float(t.get("ema_50"), 0.0)
+                    ema_200 = clean_float(t.get("ema_200"), 0.0)
+                    if price > ema_20 > ema_50 > ema_200 > 0:
+                        cur_val = f"EMA Ribbon Align: Price Rs.{price:.0f} > 20 EMA ({ema_20:.0f}) > 50 EMA ({ema_50:.0f}) > 200 EMA ({ema_200:.0f})"
+                        triggered = True
+
+                elif condition_type == "COMBO_SMA_100_PULLBACK":
+                    sma_100 = clean_float(t.get("sma_100"), 0.0)
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    if sma_100 > 0 and price >= sma_100 and price > sma_200:
+                        diff_pct = ((price - sma_100) / sma_100) * 100
+                        threshold = clean_float(value, 1.5)
+                        if diff_pct <= threshold:
+                            cur_val = f"100 SMA Pullback: Price Rs.{price:.0f} near 100 SMA Rs.{sma_100:.0f} (Diff: {diff_pct:.2f}%) in uptrend"
+                            triggered = True
+
+                elif condition_type == "COMBO_EMA_200_SUPPORT":
+                    ema_200 = clean_float(t.get("ema_200"), 0.0)
+                    rsi_val = clean_float(t.get("rsi"), 50.0)
+                    if ema_200 > 0 and rsi_val <= 35:
+                        diff_pct = (abs(price - ema_200) / ema_200) * 100
+                        threshold = clean_float(value, 2.0)
+                        if diff_pct <= threshold:
+                            cur_val = f"200 EMA Support: Price Rs.{price:.0f} near 200 EMA Rs.{ema_200:.0f} (Diff: {diff_pct:.2f}%) with Oversold RSI: {rsi_val:.1f}"
+                            triggered = True
+
+                elif condition_type == "COMBO_TREND_ACCELERATION":
+                    sma_20 = clean_float(t.get("sma_20"), 0.0)
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    adx_val = clean_float(t.get("adx"), 0.0)
+                    if price > sma_20 > sma_50 > sma_200 > 0 and adx_val >= 25.0:
+                        cur_val = f"Trend Acceleration: Price Rs.{price:.0f} > 20 SMA > 50 SMA > 200 SMA with strong trend ADX: {adx_val:.1f}"
+                        triggered = True
 
             except Exception as eval_err:
                 print(f"Rule Scanner: Error evaluating {sym}: {eval_err}")
