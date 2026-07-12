@@ -10423,7 +10423,13 @@ async def parse_nl_scan(data: ParseNLScanRequest):
             "- COMBO_EMA_TREND_ALIGN (EMA Ribbon Alignment: price > 20 EMA > 50 EMA > 200 EMA)\n"
             "- COMBO_SMA_100_PULLBACK (100 SMA pullback: price near 100 SMA + price > 200 SMA, value is proximity threshold, e.g. 1.5)\n"
             "- COMBO_EMA_200_SUPPORT (200 EMA support with oversold RSI: price near 200 EMA + RSI <= 35, value is proximity threshold, e.g. 2.0)\n"
-            "- COMBO_TREND_ACCELERATION (Trend acceleration: price > 20 SMA > 50 SMA > 200 SMA + ADX >= 25)\n\n"
+            "- COMBO_TREND_ACCELERATION (Trend acceleration: price > 20 SMA > 50 SMA > 200 SMA + ADX >= 25)\n"
+            "- COMBO_52W_HIGH_RETEST (52W High breakout retest: price within threshold % above 52w high, value is proximity percentage threshold, e.g. 2.0)\n"
+            "- COMBO_52W_MIDPOINT_PIVOT (52W Range midpoint play: price within threshold % of range midpoint, value is proximity percentage threshold, e.g. 1.5)\n"
+            "- COMBO_52W_LOW_ACCUMULATION (52W Low accumulation: price within 10% of 52w low + price > 50 SMA + volume ratio >= threshold, value is volume ratio threshold, e.g. 2.0)\n"
+            "- COMBO_FIB_GOLDEN_POCKET (Golden Pocket Fibonacci: price between 61.8% and 78.6% Fib retracement levels)\n"
+            "- COMBO_FIB_VOL_POC (Fib + Volume POC confluence: price near a Fib level + near Volume POC within threshold %, value is proximity threshold, e.g. 1.5)\n"
+            "- COMBO_FIB_DEEP_VAL (Deep Fibonacci value play: price within threshold % of 78.6% Fib + RSI <= 25, value is proximity percentage threshold, e.g. 2.0)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
             "- '<' (Less Than / Crosses Below)\n"
@@ -11117,6 +11123,78 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                     if price > sma_20 > sma_50 > sma_200 > 0 and adx_val >= 25.0:
                         cur_val = f"Trend Acceleration: Price Rs.{price:.0f} > 20 SMA > 50 SMA > 200 SMA with strong trend ADX: {adx_val:.1f}"
                         triggered = True
+
+                elif condition_type == "COMBO_52W_HIGH_RETEST":
+                    high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
+                    if high_52w > 0 and price >= high_52w:
+                        diff_pct = ((price - high_52w) / high_52w) * 100
+                        threshold = clean_float(value, 2.0)
+                        if diff_pct <= threshold:
+                            cur_val = f"52W High Retest: Price Rs.{price:.2f} is {diff_pct:.2f}% above 52wH (Rs.{high_52w:.2f})"
+                            triggered = True
+
+                elif condition_type == "COMBO_52W_MIDPOINT_PIVOT":
+                    high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
+                    low_52w = clean_float(t.get("low_52w") or f.get("low_52week") or f.get("fiftyTwoWeekLow") or t.get("year_low") or f.get("year_low") or f.get("52w_low"), 0.0)
+                    if high_52w > 0 and low_52w > 0:
+                        midpoint = (high_52w + low_52w) / 2.0
+                        diff_pct = (abs(price - midpoint) / midpoint) * 100
+                        threshold = clean_float(value, 1.5)
+                        if diff_pct <= threshold:
+                            cur_val = f"52W Midpoint Pivot: Price Rs.{price:.2f} near Midpoint Rs.{midpoint:.2f} (Diff: {diff_pct:.2f}%)"
+                            triggered = True
+
+                elif condition_type == "COMBO_52W_LOW_ACCUMULATION":
+                    low_52w = clean_float(t.get("low_52w") or f.get("low_52week") or f.get("fiftyTwoWeekLow") or t.get("year_low") or f.get("year_low") or f.get("52w_low"), 0.0)
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    vol_ratio = clean_float(t.get("volume_vs_avg20", t.get("volume_ratio", t.get("vol_breakout_ratio"))), 1.0)
+                    if low_52w > 0 and sma_50 > 0 and price > sma_50:
+                        dist_low_pct = ((price - low_52w) / low_52w) * 100
+                        threshold_vol = clean_float(value, 2.0)
+                        if dist_low_pct <= 10.0 and vol_ratio >= threshold_vol:
+                            cur_val = f"52W Low Accumulation: Price Rs.{price:.2f} is {dist_low_pct:.1f}% from 52wL (Rs.{low_52w:.2f}) above 50 SMA with Vol: {vol_ratio:.1f}x"
+                            triggered = True
+
+                elif condition_type == "COMBO_FIB_GOLDEN_POCKET":
+                    fib_618 = clean_float(t.get("fib_levels", {}).get("fib_618"), 0.0)
+                    fib_786 = clean_float(t.get("fib_levels", {}).get("fib_786"), 0.0)
+                    if fib_618 > 0 and fib_786 > 0:
+                        if fib_786 <= price <= fib_618:
+                            cur_val = f"Golden Pocket: Price Rs.{price:.2f} is in zone Rs.{fib_786:.2f} - Rs.{fib_618:.2f}"
+                            triggered = True
+
+                elif condition_type == "COMBO_FIB_VOL_POC":
+                    poc_price = clean_float(t.get("poc_price"), 0.0)
+                    fib_dict = t.get("fib_levels", {})
+                    if poc_price > 0 and len(fib_dict) > 0:
+                        threshold = clean_float(value, 1.5)
+                        near_fib = False
+                        near_level_name = ""
+                        near_level_val = 0.0
+                        for k, v in fib_dict.items():
+                            f_val = clean_float(v, 0.0)
+                            if f_val > 0:
+                                diff_poc_fib = (abs(f_val - poc_price) / f_val) * 100
+                                if diff_poc_fib <= threshold:
+                                    near_fib = True
+                                    near_level_name = k
+                                    near_level_val = f_val
+                                    break
+                        if near_fib:
+                            diff_price_poc = (abs(price - poc_price) / poc_price) * 100
+                            if diff_price_poc <= threshold:
+                                cur_val = f"Fib + POC Confluence: Price Rs.{price:.2f} near POC Rs.{poc_price:.2f} & Fib {near_level_name} Rs.{near_level_val:.2f} (Sep: {diff_price_poc:.1f}%)"
+                                triggered = True
+
+                elif condition_type == "COMBO_FIB_DEEP_VAL":
+                    fib_786 = clean_float(t.get("fib_levels", {}).get("fib_786"), 0.0)
+                    rsi_val = clean_float(t.get("rsi"), 50.0)
+                    if fib_786 > 0 and rsi_val <= 25:
+                        diff_pct = (abs(price - fib_786) / fib_786) * 100
+                        threshold = clean_float(value, 2.0)
+                        if diff_pct <= threshold:
+                            cur_val = f"Deep Fib Reversal: Price Rs.{price:.2f} near 78.6% Fib Rs.{fib_786:.2f} (Diff: {diff_pct:.1f}%) with oversold RSI: {rsi_val:.1f}"
+                            triggered = True
 
             except Exception as eval_err:
                 print(f"Rule Scanner: Error evaluating {sym}: {eval_err}")
