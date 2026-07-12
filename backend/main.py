@@ -4719,11 +4719,20 @@ async def parse_nl_alert(data: ParseNLAlertRequest):
             "- FIB_382 (proximity to Fib 38.2% in %, e.g. 1.5)\n"
             "- FIB_500 (proximity to Fib 50.0% in %, e.g. 1.5)\n"
             "- FIB_618 (proximity to Fib 61.8% in %, e.g. 1.5)\n"
+            "- ALTMAN_Z (Altman Z-Score solvency indicator, e.g. 1.8)\n"
+            "- TARGET_DISCOUNT (consensus target price discount percentage, e.g. 15.0)\n"
+            "- CFO_PAT_DIVERGENCE (Cash Flow to Profit Divergence ratio, e.g. 0.6)\n"
+            "- DIVIDEND_YIELD_FLOOR (dividend yield percentage support trigger, e.g. 4.0)\n"
+            "- ATR_VOLATILITY_SHOCK (Average True Range volatility indicator in Rs., e.g. 50)\n"
             "- COMPOUND (logical combination of multiple simple rules using AND or OR operators)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
             "- '<' (Less Than / Crosses Below)\n"
             "- '==' (Equals / Near Proximity - mandatory for FIB and RATING conditions)\n\n"
+            "IMPORTANT OPERATOR RULE FOR 52W_PROXIMITY:\n"
+            "- You MUST use the operator '>' to represent proximity to the 52-week HIGH (e.g. 'within 5% of 52-week high').\n"
+            "- You MUST use the operator '<' to represent proximity to the 52-week LOW (e.g. 'within 5% of 52-week low').\n"
+            "Never output '<' for high proximity just because the user prompt contains the word 'within'.\n\n"
             "CRITICAL RULES FOR COMPOUND ALERTS:\n"
             "If the request contains multiple alert parameters combined via logical operators 'and', 'or', '&&', '||' (e.g. 'price below 2000 and rsi under 40'), you MUST:\n"
             "1. Set 'condition_type': 'COMPOUND'\n"
@@ -6461,6 +6470,56 @@ async def evaluate_single_condition_bool(cond_type: str, op: str, val_str: str, 
                         triggered = True
                         break
                 cur_val = f"Price: Rs. {price_val:.2f} near Fib {matched_level or 'Support'} Level: Rs. {matched_val:.2f}"
+
+        elif cond_type == "ALTMAN_Z":
+            eq = t.get("earnings_quality", {})
+            altman_z = float(eq.get("altman_z_score", 0.0))
+            cur_val = f"Altman Z-Score: {altman_z:.2f}"
+            threshold = float(val_str)
+            if op == "<" and altman_z < threshold:
+                triggered = True
+            elif op == ">" and altman_z > threshold:
+                triggered = True
+
+        elif cond_type == "TARGET_DISCOUNT":
+            consensus = t.get("consensus", {})
+            target_median = float(consensus.get("target_median", 0.0))
+            price_val = t.get("fundamentals", {}).get("current_price", 0.0)
+            if target_median > 0:
+                discount_pct = ((target_median - price_val) / target_median) * 100
+                cur_val = f"Price: Rs. {price_val:.0f} vs Target: Rs. {target_median:.0f} (Discount: {discount_pct:.1f}%)"
+                threshold = float(val_str)
+                if op == ">" and discount_pct > threshold:
+                    triggered = True
+                elif op == "<" and discount_pct < threshold:
+                    triggered = True
+
+        elif cond_type == "CFO_PAT_DIVERGENCE":
+            cfo_to_pat = float(t.get("fundamentals", {}).get("cfo_to_pat", 1.0))
+            cur_val = f"CFO to PAT Ratio: {cfo_to_pat:.2f}"
+            threshold = float(val_str)
+            if op == "<" and cfo_to_pat < threshold:
+                triggered = True
+            elif op == ">" and cfo_to_pat > threshold:
+                triggered = True
+
+        elif cond_type == "DIVIDEND_YIELD_FLOOR":
+            div_yield = float(t.get("fundamentals", {}).get("dividend_yield_pct", 0.0))
+            cur_val = f"Div Yield: {div_yield:.2f}%"
+            threshold = float(val_str)
+            if op == ">" and div_yield > threshold:
+                triggered = True
+            elif op == "<" and div_yield < threshold:
+                triggered = True
+
+        elif cond_type == "ATR_VOLATILITY_SHOCK":
+            atr_val = float(t.get("technicals", {}).get("atr", 0.0))
+            cur_val = f"ATR: Rs. {atr_val:.2f}"
+            threshold = float(val_str)
+            if op == ">" and atr_val > threshold:
+                triggered = True
+            elif op == "<" and atr_val < threshold:
+                triggered = True
     except Exception as eval_err:
         print(f"Error evaluating condition {cond_type} {op} {val_str}: {eval_err}")
         
@@ -10287,11 +10346,19 @@ async def parse_nl_scan(data: ParseNLScanRequest):
             "- COMBO_EARNINGS_ACCUMULATION (PE value accumulation: PE below 20 + volume above threshold average, value is the volume ratio threshold, e.g. 2.0)\n"
             "- COMBO_SHORT_TERM_REVERSION (Short pullback in uptrend: price below 50 SMA + price above 200 SMA)\n"
             "- COMBO_BB_SQUEEZE_BREAK (BB squeeze breakout: Bollinger Bands squeeze / narrow width + volume above threshold average, value is the volume ratio threshold, e.g. 2.0)\n"
-            "- COMBO_CONTRARIAN_VALUE (Contrarian value play: PE below 12 + price below 200 SMA + RSI below 30, value is the PE threshold)\n\n"
+            "- COMBO_CONTRARIAN_VALUE (Contrarian value play: PE below 12 + price below 200 SMA + RSI below 30, value is the PE threshold)\n"
+            "- COMBO_DMA_CROSS_NEAR (50 SMA vs 200 SMA nearness: 50 SMA above/below 200 SMA by <= threshold % separation, value is the percentage threshold, e.g. 1.0)\n"
+            "- COMBO_VALUE_TRAP_AVOID (Value-trap avoidance: PE below 15 and analyst recommendation is SELL, value is the PE threshold, e.g. 15.0)\n"
+            "- COMBO_BB_REVERSION_SURGE (Bollinger Band reversion with volume: below BB lower band + RSI < 25 + volume above 2x average, value is volume ratio threshold, e.g. 2.0)\n"
+            "- COMBO_PIOTROSKI_BREAKOUT (Quality breakout confluence: price above 200 SMA + within 5% of 52-week High + Strong Buy rating, value is the proximity percentage threshold, e.g. 5.0)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
             "- '<' (Less Than / Crosses Below)\n"
             "- '==' (Equals / Near Proximity)\n\n"
+            "IMPORTANT OPERATOR RULE FOR 52W_PROXIMITY:\n"
+            "- You MUST use the operator '>' to represent proximity to the 52-week HIGH (e.g. 'within 5% of 52-week high', 'near 52-week high breakout').\n"
+            "- You MUST use the operator '<' to represent proximity to the 52-week LOW (e.g. 'within 5% of 52-week low', 'near 52-week low value entry').\n"
+            "Never output '<' for high proximity just because the user prompt contains the word 'within'.\n\n"
             "Universe options: 'all', 'large', 'mid', 'small'\n\n"
             "Output format example:\n"
             "{\n"
@@ -10514,8 +10581,8 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                         triggered = True
 
                 elif condition_type == "52W_PROXIMITY":
-                    high_52w = clean_float(t.get("high_52w", t.get("year_high", f.get("year_high", f.get("52w_high")))), 0.0)
-                    low_52w = clean_float(t.get("low_52w", t.get("year_low", f.get("year_low", f.get("52w_low")))), 0.0)
+                    high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
+                    low_52w = clean_float(t.get("low_52w") or f.get("low_52week") or f.get("fiftyTwoWeekLow") or t.get("year_low") or f.get("year_low") or f.get("52w_low"), 0.0)
                     proximity_pct = float(value)
                     if operator == ">":
                         if high_52w > 0:
@@ -10531,8 +10598,8 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                                 triggered = True
 
                 elif condition_type in ["FIB_LEVEL", "FIB_382", "FIB_500", "FIB_618"]:
-                    high_52w = clean_float(t.get("high_52w", t.get("year_high", f.get("year_high", f.get("52w_high")))), 0.0)
-                    low_52w = clean_float(t.get("low_52w", t.get("year_low", f.get("year_low", f.get("52w_low")))), 0.0)
+                    high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
+                    low_52w = clean_float(t.get("low_52w") or f.get("low_52week") or f.get("fiftyTwoWeekLow") or t.get("year_low") or f.get("year_low") or f.get("52w_low"), 0.0)
                     if high_52w <= 0 or low_52w <= 0:
                         continue
                     swing_diff = high_52w - low_52w
@@ -10558,6 +10625,57 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                                 cur_val = f"Price: Rs.{price:.0f} near Fib {lbl} (Rs.{lvl:.0f}, Diff: {diff_pct:.1f}%)"
                                 triggered = True
                                 break
+
+                elif condition_type == "ALTMAN_Z":
+                    eq = prof.get("earnings_quality") or {}
+                    altman_z = clean_float(eq.get("altman_z_score", f.get("altman_z")), 0.0)
+                    cur_val = f"Altman Z-Score: {altman_z:.2f}"
+                    threshold = float(value)
+                    if operator == "<" and altman_z < threshold:
+                        triggered = True
+                    elif operator == ">" and altman_z > threshold:
+                        triggered = True
+
+                elif condition_type == "TARGET_DISCOUNT":
+                    target_discount = clean_float(f.get("target_discount"), 0.0)
+                    if target_discount <= 0.0:
+                        consensus = prof.get("consensus") or {}
+                        target_median = clean_float(consensus.get("target_median"), 0.0)
+                        if target_median > 0:
+                            target_discount = ((target_median - price) / target_median) * 100
+                    cur_val = f"Target Discount: {target_discount:.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and target_discount > threshold:
+                        triggered = True
+                    elif operator == "<" and target_discount < threshold:
+                        triggered = True
+
+                elif condition_type == "CFO_PAT_DIVERGENCE":
+                    cfo_pat = clean_float(f.get("cfo_pat_divergence", f.get("cfo_to_pat")), 1.0)
+                    cur_val = f"CFO to PAT Ratio: {cfo_pat:.2f}"
+                    threshold = float(value)
+                    if operator == "<" and cfo_pat < threshold:
+                        triggered = True
+                    elif operator == ">" and cfo_pat > threshold:
+                        triggered = True
+
+                elif condition_type == "DIVIDEND_YIELD_FLOOR":
+                    div_yield = clean_float(f.get("dividend_yield", f.get("dividend_yield_pct")), 0.0)
+                    cur_val = f"Div Yield: {div_yield:.2f}%"
+                    threshold = float(value)
+                    if operator == ">" and div_yield > threshold:
+                        triggered = True
+                    elif operator == "<" and div_yield < threshold:
+                        triggered = True
+
+                elif condition_type == "ATR_VOLATILITY_SHOCK":
+                    atr_val = clean_float(t.get("atr"), 0.0)
+                    cur_val = f"ATR: Rs. {atr_val:.2f}"
+                    threshold = float(value)
+                    if operator == ">" and atr_val > threshold:
+                        triggered = True
+                    elif operator == "<" and atr_val < threshold:
+                        triggered = True
 
                 # ─── MULTI-FACTOR COMBO STRATEGIES ─────────────────────────────────────
                 elif condition_type == "COMBO_BULL_PULLBACK":
@@ -10600,7 +10718,7 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
 
                 elif condition_type == "COMBO_52W_BREAKOUT":
                     sma_200 = clean_float(t.get("sma_200"), 0.0)
-                    high_52w = clean_float(t.get("high_52w", t.get("year_high", f.get("year_high", f.get("52w_high")))), 0.0)
+                    high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
                     if price > sma_200 > 0 and high_52w > 0:
                         diff_pct = ((high_52w - price) / high_52w) * 100
                         threshold = clean_float(value, 3.0)
@@ -10610,7 +10728,7 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
 
                 elif condition_type == "COMBO_52W_VAL_ENTRY":
                     rsi_val = clean_float(t.get("rsi"), 50.0)
-                    low_52w = clean_float(t.get("low_52w", t.get("year_low", f.get("year_low", f.get("52w_low")))), 0.0)
+                    low_52w = clean_float(t.get("low_52w") or f.get("low_52week") or f.get("fiftyTwoWeekLow") or t.get("year_low") or f.get("year_low") or f.get("52w_low"), 0.0)
                     if rsi_val < 35 and low_52w > 0:
                         diff_pct = ((price - low_52w) / low_52w) * 100
                         threshold = clean_float(value, 5.0)
@@ -10621,8 +10739,8 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                 elif condition_type == "COMBO_FIB_REVERSAL":
                     rsi_val = clean_float(t.get("rsi"), 50.0)
                     if rsi_val < 35:
-                        high_52w = clean_float(t.get("high_52w", t.get("year_high", f.get("year_high", f.get("52w_high")))), 0.0)
-                        low_52w = clean_float(t.get("low_52w", t.get("year_low", f.get("year_low", f.get("52w_low")))), 0.0)
+                        high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
+                        low_52w = clean_float(t.get("low_52w") or f.get("low_52week") or f.get("fiftyTwoWeekLow") or t.get("year_low") or f.get("year_low") or f.get("52w_low"), 0.0)
                         if high_52w > 0 and low_52w > 0 and high_52w > low_52w:
                             swing = high_52w - low_52w
                             levels = {
@@ -10684,8 +10802,8 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                 elif condition_type == "COMBO_FIB_SMA_BOUNCE":
                     sma_200 = clean_float(t.get("sma_200"), 0.0)
                     if price > sma_200 > 0:
-                        high_52w = clean_float(t.get("high_52w", t.get("year_high", f.get("year_high", f.get("52w_high")))), 0.0)
-                        low_52w = clean_float(t.get("low_52w", t.get("year_low", f.get("year_low", f.get("52w_low")))), 0.0)
+                        high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
+                        low_52w = clean_float(t.get("low_52w") or f.get("low_52week") or f.get("fiftyTwoWeekLow") or t.get("year_low") or f.get("year_low") or f.get("52w_low"), 0.0)
                         if high_52w > 0 and low_52w > 0 and high_52w > low_52w:
                             swing = high_52w - low_52w
                             levels = {
@@ -10753,6 +10871,46 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                     if 0 < pe_val < 12.0 and rsi_val < 30 and price < sma_200 > 0:
                         cur_val = f"Contrarian PE: {pe_val:.1f}, RSI: {rsi_val:.1f}, Below SMA200"
                         triggered = True
+
+                elif condition_type == "COMBO_DMA_CROSS_NEAR":
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    if sma_50 > 0 and sma_200 > 0:
+                        sep_pct = (abs(sma_50 - sma_200) / sma_200) * 100
+                        threshold = clean_float(value, 1.0)
+                        if sep_pct <= threshold:
+                            cur_val = f"50 SMA (Rs.{sma_50:.0f}) near 200 SMA (Rs.{sma_200:.0f}), Sep: {sep_pct:.2f}%"
+                            triggered = True
+
+                elif condition_type == "COMBO_VALUE_TRAP_AVOID":
+                    pe_val = clean_float(f.get("pe_ratio"), 0.0)
+                    analysis = prof.get("analysis") or {}
+                    rating_val = (analysis.get("recommendation") or prof.get("recommendation") or "N/A").upper()
+                    threshold = clean_float(value, 15.0)
+                    if 0 < pe_val < threshold and "SELL" in rating_val:
+                        cur_val = f"Value Trap: PE {pe_val:.1f} < {threshold} with SELL recommendation"
+                        triggered = True
+
+                elif condition_type == "COMBO_BB_REVERSION_SURGE":
+                    rsi_val = clean_float(t.get("rsi"), 50.0)
+                    bb_lower = clean_float(t.get("bb_lower"), 0.0)
+                    vol_ratio = clean_float(t.get("volume_vs_avg20", t.get("volume_ratio", t.get("vol_breakout_ratio"))), 1.0)
+                    threshold = clean_float(value, 2.0)
+                    if rsi_val < 25 and bb_lower > 0 and price <= bb_lower and vol_ratio > threshold:
+                        cur_val = f"BB lower reversion: Price Rs.{price:.0f} <= BB Lower Rs.{bb_lower:.0f}, RSI: {rsi_val:.1f}, Vol: {vol_ratio:.1f}x"
+                        triggered = True
+
+                elif condition_type == "COMBO_PIOTROSKI_BREAKOUT":
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
+                    analysis = prof.get("analysis") or {}
+                    rating_val = (analysis.get("recommendation") or prof.get("recommendation") or "N/A").upper()
+                    threshold = clean_float(value, 5.0)
+                    if price > sma_200 > 0 and high_52w > 0 and "STRONG BUY" in rating_val:
+                        diff_pct = ((high_52w - price) / high_52w) * 100
+                        if diff_pct <= threshold:
+                            cur_val = f"Piotroski Breakout: Above SMA200, within {diff_pct:.1f}% of 52wH (Rs.{high_52w:.0f}), Strong Buy"
+                            triggered = True
 
             except Exception as eval_err:
                 print(f"Rule Scanner: Error evaluating {sym}: {eval_err}")

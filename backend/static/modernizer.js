@@ -360,37 +360,16 @@
             const card = e.target.closest('.card');
             if (card) {
                 const rect = card.getBoundingClientRect();
-                const cardWidth = rect.width;
-                const cardHeight = rect.height;
                 
                 // Track spotlight coordinates
                 const x = e.clientX - rect.left;
                 const y = e.clientY - rect.top;
                 card.style.setProperty('--mouse-x', `${x}px`);
                 card.style.setProperty('--mouse-y', `${y}px`);
-
-                // 3D Parallax card tilting (desktops only)
-                if (window.innerWidth > 768) {
-                    const centerX = x - (cardWidth / 2);
-                    const centerY = y - (cardHeight / 2);
-                    const maxTilt = 2.0; 
-                    
-                    const tiltX = -(centerY / (cardHeight / 2)) * maxTilt;
-                    const tiltY = (centerX / (cardWidth / 2)) * maxTilt;
-                    
-                    card.style.transform = `perspective(1000px) rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg) translateY(-2px)`;
-                }
             }
         });
 
-        document.addEventListener('mouseout', (e) => {
-            const card = e.target.closest('.card');
-            if (card && !card.contains(e.relatedTarget)) {
-                card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0px)';
-            }
-        });
-
-        console.log("APEX Modernizer: Spotlight and 3D card tilt active.");
+        console.log("APEX Modernizer: Spotlight hover active (3D tilt disabled).");
     }
 
     // ==================== 7. VIEW TRANSITIONS & CLICK TRACKING ====================

@@ -255,7 +255,8 @@
 // ==================== TYPEWRITER TEXT STREAMING HELPER ====================
 function typewriteElement(element, htmlContent, onCompleteCallback = null, scrollContainer = null) {
     if (!element) return;
-    // Destroy any active Typed instances attached to this element to prevent overlap
+    
+    // Destroy any active Typed instances or intervals attached to this element to prevent overlap
     if (element._typedInstance) {
         element._typedInstance.destroy();
         element._typedInstance = null;
@@ -264,6 +265,44 @@ function typewriteElement(element, htmlContent, onCompleteCallback = null, scrol
         clearInterval(element._scrollInterval);
         element._scrollInterval = null;
     }
+    if (element._typewriterInterval) {
+        clearInterval(element._typewriterInterval);
+        element._typewriterInterval = null;
+    }
+
+    // Set innerHTML directly to build the correct DOM structure immediately
+    element.innerHTML = htmlContent;
+
+    // Recursively collect all text nodes
+    const textNodes = [];
+    function getTextNodes(node) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            if (node.nodeValue && node.nodeValue.trim().length > 0) {
+                textNodes.push({
+                    node: node,
+                    fullText: node.nodeValue,
+                    currentText: ""
+                });
+                node.nodeValue = ""; // clear initial text
+            }
+        } else {
+            if (node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
+                for (let i = 0; i < node.childNodes.length; i++) {
+                    getTextNodes(node.childNodes[i]);
+                }
+            }
+        }
+    }
+    
+    getTextNodes(element);
+
+    if (textNodes.length === 0) {
+        if (onCompleteCallback) onCompleteCallback();
+        return;
+    }
+
+    let nodeIndex = 0;
+    let charIndex = 0;
 
     const startScrolling = () => {
         if (scrollContainer) {
@@ -282,32 +321,32 @@ function typewriteElement(element, htmlContent, onCompleteCallback = null, scrol
             scrollContainer.scrollTop = scrollContainer.scrollHeight;
         }
     };
-    
-    if (typeof Typed !== 'undefined') {
-        element.innerHTML = '';
-        const typeContainer = document.createElement('span');
-        element.appendChild(typeContainer);
-        
-        startScrolling();
-        element._typedInstance = new Typed(typeContainer, {
-            strings: [htmlContent],
-            typeSpeed: 3,
-            showCursor: false,
-            contentType: 'html',
-            onComplete: () => {
-                element._typedInstance = null;
-                stopScrolling();
-                if (onCompleteCallback) onCompleteCallback();
-            },
-            onDestroy: () => {
-                stopScrolling();
-            }
-        });
-    } else {
-        element.innerHTML = htmlContent;
-        stopScrolling();
-        if (onCompleteCallback) onCompleteCallback();
-    }
+
+    startScrolling();
+
+    const typeNextChar = () => {
+        if (nodeIndex >= textNodes.length) {
+            clearInterval(element._typewriterInterval);
+            element._typewriterInterval = null;
+            stopScrolling();
+            if (onCompleteCallback) onCompleteCallback();
+            return;
+        }
+
+        const item = textNodes[nodeIndex];
+        const step = 2; // type 2 characters at a time for performance/snappiness
+        const nextChunk = item.fullText.substring(charIndex, charIndex + step);
+        item.currentText += nextChunk;
+        item.node.nodeValue = item.currentText;
+        charIndex += step;
+
+        if (charIndex >= item.fullText.length) {
+            nodeIndex++;
+            charIndex = 0;
+        }
+    };
+
+    element._typewriterInterval = setInterval(typeNextChar, 10);
 }
 
 
@@ -3202,6 +3241,35 @@ function getActiveTabNarrativeText() {
         return text.trim();
 }
 
+function isPlaceholderText(text) {
+    if (!text) return true;
+    const clean = text.trim();
+    if (clean === "...") return true;
+    const lowerText = clean.toLowerCase();
+    const exactPlaceholders = [
+        "generating...",
+        "analyzing...",
+        "generating battleground thesis (calling llm)...",
+        "select a topic",
+        "run analysis to compile",
+        "diagnostic text loaded here",
+        "click \"generate report\"",
+        "click 'generate report'",
+        "ai prescription text loaded here",
+        "generating battleground thesis...",
+        "analyzing sector battleground...",
+        "generating..."
+    ];
+    if (exactPlaceholders.includes(lowerText)) {
+        return true;
+    }
+    // Check if it's just dots, dashes or empty spaces
+    if (/^[.\-\s]*$/.test(clean)) {
+        return true;
+    }
+    return false;
+}
+
 // Global Voice Synthesis Player Controller (Option B with Glassmorphic Floating Panel)
 window.SpeechPlayer = {
     sentences: [],
@@ -3486,7 +3554,9 @@ window.SpeechPlayer = {
             return dates[parseInt(idx)].replace(/[-/]/g, ' ');
         });
 
-        if (!text || text === "..." || text.includes("Generating") || text.includes("Analyzing") || text.includes("Select a topic") || text.includes("Run analysis to compile") || text.includes("Diagnostic text loaded here") || text.includes("Click \"Generate Report\"") || text.includes("Click 'Generate Report'") || text.includes("AI Prescription text loaded here")) {
+        const isPlaceholder = isPlaceholderText(text);
+
+        if (isPlaceholder) {
             if (typeof showToast === 'function') {
                 showToast("No analysis available to read yet. Please generate analysis first.", "warning");
             }
@@ -9588,12 +9658,33 @@ function renderComparisonArena(data) {
         </div>
         `;
 
+        function formatBattlegroundThesis(thesisHTML) {
+            if (!thesisHTML) return "";
+            const parts = thesisHTML.split(/<h4>/gi);
+            if (parts.length <= 1) {
+                return `<div id="battleground-section-1-text">${thesisHTML}</div>`;
+            }
+            let result = parts[0];
+            let sectionCount = 0;
+            for (let idx = 1; idx < parts.length; idx++) {
+                const subPart = parts[idx];
+                const endH4Idx = subPart.indexOf("</h4>");
+                if (endH4Idx === -1) {
+                    result += "<h4>" + subPart;
+                    continue;
+                }
+                sectionCount++;
+                const headingText = subPart.slice(0, endH4Idx);
+                const sectionContent = subPart.slice(endH4Idx + 5);
+                const sectionId = `battleground-section-${sectionCount}-text`;
+                const newHeading = `<h4>${headingText} <button class="section-speak-btn no-print" data-target="${sectionId}" data-title="${headingText.replace(/"/g, '&quot;')}" style="background: none; border: none; cursor: pointer; padding: 0; outline: none; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">🔊</button></h4>`;
+                result += `${newHeading}<div id="${sectionId}">${sectionContent}</div>`;
+            }
+            return result;
+        }
+
         if (data.thesis) {
-            thesisHTML += data.thesis.replace(/<h4>Rival Quality & Solvency Standings<\/h4>/gi,
-                `<h4>Rival Quality & Solvency Standings <button class="section-speak-btn no-print" data-target="compare-ai-thesis" data-title="Rival Quality & Solvency" style="background: none; border: none; cursor: pointer; padding: 0; outline: none; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">🔊</button></h4>`
-            ).replace(/<h4>AI Comparative Analysis \(Local Fallback Workstation\)<\/h4>/gi,
-                `<h4>AI Comparative Analysis (Local Fallback Workstation) <button class="section-speak-btn no-print" data-target="compare-ai-thesis" data-title="AI Comparative Analysis" style="background: none; border: none; cursor: pointer; padding: 0; outline: none; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">🔊</button></h4>`
-            );
+            thesisHTML += formatBattlegroundThesis(data.thesis);
             compareThesisEl.innerHTML = thesisHTML;
         } else {
             thesisHTML += `
@@ -9622,60 +9713,12 @@ function renderComparisonArena(data) {
                     const responseData = await res.json();
 
                     if (responseData.thesis) {
-                        const processedThesis = responseData.thesis.replace(/<h4>Rival Quality & Solvency Standings<\/h4>/gi,
-                            `<h4>Rival Quality & Solvency Standings <button class="section-speak-btn no-print" data-target="compare-ai-thesis" data-title="Rival Quality & Solvency" style="background: none; border: none; cursor: pointer; padding: 0; outline: none; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">🔊</button></h4>`
-                        ).replace(/<h4>AI Comparative Analysis \(Local Fallback Workstation\)<\/h4>/gi,
-                            `<h4>AI Comparative Analysis (Local Fallback Workstation) <button class="section-speak-btn no-print" data-target="compare-ai-thesis" data-title="AI Comparative Analysis" style="background: none; border: none; cursor: pointer; padding: 0; outline: none; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;">🔊</button></h4>`
-                        );
+                        const processedThesis = formatBattlegroundThesis(responseData.thesis);
 
                         btnContainer.outerHTML = `<div id="battleground-thesis-stream-target"></div>`;
                         const targetEl = document.getElementById('battleground-thesis-stream-target');
                         if (targetEl) {
-                            // Define inner helper for typewriter streaming
-                            const typewriteHTML = (element, htmlString, speed = 8) => {
-                                element.innerHTML = "";
-                                const tokens = [];
-                                let i = 0;
-                                while (i < htmlString.length) {
-                                    if (htmlString[i] === '<') {
-                                        const endIdx = htmlString.indexOf('>', i);
-                                        if (endIdx !== -1) {
-                                            tokens.push({ type: 'tag', content: htmlString.slice(i, endIdx + 1) });
-                                            i = endIdx + 1;
-                                        } else {
-                                            tokens.push({ type: 'text', content: htmlString[i] });
-                                            i++;
-                                        }
-                                    } else {
-                                        const nextTag = htmlString.indexOf('<', i);
-                                        const textEnd = nextTag !== -1 ? nextTag : htmlString.length;
-                                        const textContent = htmlString.slice(i, textEnd);
-                                        const words = textContent.split(/(\s+)/);
-                                        words.forEach(w => {
-                                            if (w) tokens.push({ type: 'text', content: w });
-                                        });
-                                        i = textEnd;
-                                    }
-                                }
-                                
-                                let tokenIdx = 0;
-                                function renderNext() {
-                                    if (tokenIdx >= tokens.length) return;
-                                    const token = tokens[tokenIdx];
-                                    if (token.type === 'tag') {
-                                        element.innerHTML += token.content;
-                                        tokenIdx++;
-                                        renderNext();
-                                    } else {
-                                        element.innerHTML += token.content;
-                                        tokenIdx++;
-                                        setTimeout(renderNext, speed);
-                                    }
-                                }
-                                renderNext();
-                            };
-                            
-                            typewriteHTML(targetEl, processedThesis, 8);
+                            typewriteElement(targetEl, processedThesis);
                         }
                     } else {
                         btnContainer.innerHTML = `<p style="color: var(--neon-red); font-size: 12px;">Failed to load thesis content.</p>`;

@@ -1344,7 +1344,11 @@ class TestRuleScannerAPI(unittest.TestCase):
                     "pe_ratio": 22.0,
                     "year_high": 1800.0,
                     "year_low": 1200.0,
-                    "debt_to_equity": 0.05
+                    "debt_to_equity": 0.05,
+                    "altman_z": 3.2,
+                    "target_discount": 18.5,
+                    "cfo_pat_divergence": 0.85,
+                    "dividend_yield": 4.5
                 },
                 "technicals": {
                     "rsi": 28.0,
@@ -1356,7 +1360,8 @@ class TestRuleScannerAPI(unittest.TestCase):
                     "bb_lower": 1410.0,
                     "bb_upper": 1500.0,
                     "macd": -2.5,
-                    "signal": -1.0
+                    "signal": -1.0,
+                    "atr": 45.0
                 },
                 "analysis": {
                     "recommendation": "BUY",
@@ -1380,7 +1385,11 @@ class TestRuleScannerAPI(unittest.TestCase):
                     "pe_ratio": 32.0,
                     "year_high": 4200.0,
                     "year_low": 3000.0,
-                    "debt_to_equity": 0.1
+                    "debt_to_equity": 0.1,
+                    "altman_z": 4.5,
+                    "target_discount": 5.0,
+                    "cfo_pat_divergence": 1.1,
+                    "dividend_yield": 2.0
                 },
                 "technicals": {
                     "rsi": 72.0,
@@ -1392,7 +1401,8 @@ class TestRuleScannerAPI(unittest.TestCase):
                     "bb_lower": 3500.0,
                     "bb_upper": 3780.0,
                     "macd": 15.0,
-                    "signal": 10.0
+                    "signal": 10.0,
+                    "atr": 80.0
                 },
                 "analysis": {
                     "recommendation": "HOLD",
@@ -1416,7 +1426,11 @@ class TestRuleScannerAPI(unittest.TestCase):
                     "pe_ratio": 40.0,
                     "year_high": 1100.0,
                     "year_low": 700.0,
-                    "debt_to_equity": 0.8
+                    "debt_to_equity": 0.8,
+                    "altman_z": 1.5,
+                    "target_discount": 12.0,
+                    "cfo_pat_divergence": 0.45,
+                    "dividend_yield": 1.2
                 },
                 "technicals": {
                     "rsi": 55.0,
@@ -1426,7 +1440,8 @@ class TestRuleScannerAPI(unittest.TestCase):
                     "bb_lower": 880.0,
                     "bb_upper": 980.0,
                     "macd": 3.0,
-                    "signal": 2.5
+                    "signal": 2.5,
+                    "atr": 30.0
                 },
                 "analysis": {
                     "recommendation": "STRONG BUY",
@@ -1621,6 +1636,60 @@ class TestRuleScannerAPI(unittest.TestCase):
         self.assertGreaterEqual(data["matched"], 1)
         symbols = [r["symbol"] for r in data["results"]]
         self.assertIn("BHARATFORG.NS", symbols)
+
+    def test_scan_trigger_altman_z(self):
+        """Verifies ALTMAN_Z condition scan works."""
+        # TCS has altman_z = 4.5, INFY has altman_z = 3.2, BHARATFORG has altman_z = 1.5
+        # Scan for altman_z > 3.0 => TCS & INFY
+        response = self.client.get("/api/screener/scan-trigger?condition_type=ALTMAN_Z&operator=>&value=3.0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 2)
+        symbols = [r["symbol"] for r in data["results"]]
+        self.assertIn("TCS.NS", symbols)
+        self.assertIn("INFY.NS", symbols)
+
+    def test_scan_trigger_target_discount(self):
+        """Verifies TARGET_DISCOUNT condition scan works."""
+        # INFY target_discount = 18.5, BHARATFORG target_discount = 12.0, TCS target_discount = 5.0
+        # Scan for target_discount > 10.0 => INFY & BHARATFORG
+        response = self.client.get("/api/screener/scan-trigger?condition_type=TARGET_DISCOUNT&operator=>&value=10.0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 2)
+        symbols = [r["symbol"] for r in data["results"]]
+        self.assertIn("INFY.NS", symbols)
+        self.assertIn("BHARATFORG.NS", symbols)
+
+    def test_scan_trigger_cfo_pat_divergence(self):
+        """Verifies CFO_PAT_DIVERGENCE condition scan works."""
+        # BHARATFORG cfo_pat_divergence = 0.45, INFY cfo_pat_divergence = 0.85, TCS cfo_pat_divergence = 1.1
+        # Scan for cfo_pat_divergence < 0.6 => BHARATFORG
+        response = self.client.get("/api/screener/scan-trigger?condition_type=CFO_PAT_DIVERGENCE&operator=<&value=0.6&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "BHARATFORG.NS")
+
+    def test_scan_trigger_dividend_yield_floor(self):
+        """Verifies DIVIDEND_YIELD_FLOOR condition scan works."""
+        # INFY dividend_yield = 4.5, TCS dividend_yield = 2.0, BHARATFORG dividend_yield = 1.2
+        # Scan for dividend_yield >= 3.0 => INFY
+        response = self.client.get("/api/screener/scan-trigger?condition_type=DIVIDEND_YIELD_FLOOR&operator=>&value=3.0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "INFY.NS")
+
+    def test_scan_trigger_atr_volatility_shock(self):
+        """Verifies ATR_VOLATILITY_SHOCK condition scan works."""
+        # TCS atr = 80.0, INFY atr = 45.0, BHARATFORG atr = 30.0
+        # Scan for atr > 50.0 => TCS
+        response = self.client.get("/api/screener/scan-trigger?condition_type=ATR_VOLATILITY_SHOCK&operator=>&value=50.0&universe=all")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["matched"], 1)
+        self.assertEqual(data["results"][0]["symbol"], "TCS.NS")
 
     # ─── Universe Filter Tests ──────────────────────────────────────────
 
