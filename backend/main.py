@@ -10535,7 +10535,18 @@ async def parse_nl_scan(data: ParseNLScanRequest):
             "- COMBO_INST_QUALITY_BREAKOUT (Institutional quality breakout: Piotroski F-Score >= 7 and within 2% of 52-week High and delivery Z-Score > 1.5)\n"
             "- COMBO_SOLVENCY_VALUE_DIP (Fortress balance sheet value dip: Altman Z-Score >= 3.0 and DCF Margin of Safety >= 20% and RSI <= 35)\n"
             "- COMBO_HV_MOMENTUM_MARKUP (High volume momentum markup: ADX >= 25 and volume ratio >= 2.0 and price > 20 SMA > 50 SMA)\n"
-            "- COMBO_SM_BOTTOM_FISHING (Smart money bottom fishing: combined FII and DII shareholding >= 25% and RSI <= 35 and VSA pattern contains Accumulation or Demand or Strength)\n\n"
+            "- COMBO_SM_BOTTOM_FISHING (Smart money bottom fishing: combined FII and DII shareholding >= 25% and RSI <= 35 and VSA pattern contains Accumulation or Demand or Strength)\n"
+            "- COMBO_RSI_DIVERGENCE (RSI Bullish Divergence setup: price near 52w low but RSI is strong >= 45)\n"
+            "- COMBO_GOLDEN_CROSS (Structural Golden Cross: 50 SMA crosses above 200 SMA within 1.5% separation)\n"
+            "- COMBO_BB_WALK (Bollinger Upper Band breakout walking: price >= Upper Bollinger Band + volume ratio >= 2.0x)\n"
+            "- COMBO_FIB_236_BREAKOUT (Fibonacci 23.6% breakout pivot: price within 1.5% of 23.6% retracement level)\n"
+            "- COMBO_VOL_52W_HIGH (52W high breakout with volume: price within 2% of 52w High + volume ratio >= 2.0x)\n"
+            "- COMBO_PRISTINE_QUALITY (Pristine fundamental quality: Piotroski F-Score of 8 or 9)\n"
+            "- COMBO_DRY_VOLUME (Dry volume supply consolidation: Bollinger Band width <= 8% and volume ratio <= 0.5x)\n"
+            "- COMBO_BENCHMARK_ALPHA (CAPM Alpha outperformer: alpha against Nifty 50 >= 15.0%)\n"
+            "- COMBO_TRIPLE_SCREEN (Alexander Elder Triple Screen system: price > 200 SMA and RSI <= 38 and volume ratio >= 1.5x)\n"
+            "- COMBO_SMA_200_UNDER_5 (Price near but below 200 SMA: price below 200 SMA by <= 5%)\n"
+            "- COMBO_SMA_50_UNDER_3 (Price near but below 50 SMA: price below 50 SMA by <= 3%)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
             "- '<' (Less Than / Crosses Below)\n"
@@ -11502,6 +11513,93 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                     if inst_val >= 25.0 and rsi_val <= 35.0 and any(kw in vsa_pattern for kw in ["ACCUMULATION", "DEMAND", "STRENGTH", "ABSORPTION", "BUYING"]):
                         cur_val = f"SM Bottom Fishing: Institutional stake {inst_val:.1f}% >= 25%, oversold RSI {rsi_val:.1f}, VSA Setup '{vsa_pattern}'"
                         triggered = True
+
+                elif condition_type == "COMBO_RSI_DIVERGENCE":
+                    low_52w = clean_float(t.get("low_52w") or f.get("low_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_low") or f.get("year_low") or f.get("52w_low"), 0.0)
+                    rsi_val = clean_float(t.get("rsi"), 50.0)
+                    if low_52w > 0.0 and price <= low_52w * 1.05 and rsi_val >= 45.0:
+                        cur_val = f"RSI Bullish Divergence: Price Rs.{price:.2f} near 52wL Rs.{low_52w:.2f} (Diff <= 5%) but RSI strong: {rsi_val:.1f}"
+                        triggered = True
+
+                elif condition_type == "COMBO_GOLDEN_CROSS":
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    if sma_50 > sma_200 > 0.0:
+                        diff_pct = ((sma_50 - sma_200) / sma_200) * 100
+                        if diff_pct <= 1.5:
+                            cur_val = f"Golden Cross Confluence: 50 SMA (Rs.{sma_50:.2f}) is {diff_pct:.2f}% above 200 SMA (Rs.{sma_200:.2f})"
+                            triggered = True
+
+                elif condition_type == "COMBO_BB_WALK":
+                    bb_upper = clean_float(t.get("bb_upper"), 0.0)
+                    vol_ratio = clean_float(t.get("volume_vs_avg20", t.get("volume_ratio", t.get("vol_breakout_ratio"))), 1.0)
+                    if bb_upper > 0.0 and price >= bb_upper and vol_ratio >= 2.0:
+                        cur_val = f"Walking the Bands: Price Rs.{price:.2f} >= BB Upper Rs.{bb_upper:.2f} with strong Vol: {vol_ratio:.1f}x"
+                        triggered = True
+
+                elif condition_type == "COMBO_FIB_236_BREAKOUT":
+                    fib_236 = clean_float(t.get("fib_levels", {}).get("fib_236"), 0.0)
+                    if fib_236 > 0.0:
+                        diff_pct = (abs(price - fib_236) / fib_236) * 100
+                        if diff_pct <= 1.5:
+                            cur_val = f"Fib 23.6% Breakout: Price Rs.{price:.2f} near 23.6% Retracement (Rs.{fib_236:.2f}) (Diff: {diff_pct:.2f}%)"
+                            triggered = True
+
+                elif condition_type == "COMBO_VOL_52W_HIGH":
+                    high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
+                    vol_ratio = clean_float(t.get("volume_vs_avg20", t.get("volume_ratio", t.get("vol_breakout_ratio"))), 1.0)
+                    if high_52w > 0.0 and price >= high_52w * 0.98 and vol_ratio >= 2.0:
+                        cur_val = f"Volumetric 52W Breakout: Price Rs.{price:.2f} near 52wH Rs.{high_52w:.2f} (Diff <= 2%) on strong Vol: {vol_ratio:.1f}x"
+                        triggered = True
+
+                elif condition_type == "COMBO_PRISTINE_QUALITY":
+                    eq = prof.get("earnings_quality") or {}
+                    f_score = clean_float(eq.get("piotroski_score"), 0.0)
+                    if f_score >= 8.0:
+                        cur_val = f"Pristine Quality: Piotroski F-Score {f_score:.0f}/9 (Pristine Earnings)"
+                        triggered = True
+
+                elif condition_type == "COMBO_DRY_VOLUME":
+                    bb_upper = clean_float(t.get("bb_upper"), 0.0)
+                    bb_lower = clean_float(t.get("bb_lower"), 0.0)
+                    vol_ratio = clean_float(t.get("volume_vs_avg20", t.get("volume_ratio", t.get("vol_breakout_ratio"))), 1.0)
+                    if bb_upper > 0.0 and bb_lower > 0.0 and vol_ratio <= 0.5:
+                        width_pct = ((bb_upper - bb_lower) / price) * 100
+                        if width_pct <= 8.0:
+                            cur_val = f"Dry Vol Consolidation: BB Width {width_pct:.1f}% <= 8% (Tight Squeeze) with Dry Vol: {vol_ratio:.2f}x"
+                            triggered = True
+
+                elif condition_type == "COMBO_BENCHMARK_ALPHA":
+                    alpha_val = clean_float(prof.get("consensus", {}).get("alpha") or prof.get("capm_risk_nifty50", {}).get("alpha"), 0.0)
+                    if alpha_val >= 15.0:
+                        cur_val = f"Alpha Outperformer: CAPM Alpha {alpha_val:.1f}% >= 15%"
+                        triggered = True
+
+                elif condition_type == "COMBO_TRIPLE_SCREEN":
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    rsi_val = clean_float(t.get("rsi"), 50.0)
+                    vol_ratio = clean_float(t.get("volume_vs_avg20", t.get("volume_ratio", t.get("vol_breakout_ratio"))), 1.0)
+                    if price > sma_200 > 0.0 and rsi_val <= 38.0 and vol_ratio >= 1.5:
+                        cur_val = f"Triple Screen: Price Rs.{price:.2f} > 200 SMA (Uptrend), RSI {rsi_val:.1f} <= 38 (Pullback) and Vol Ratio {vol_ratio:.1f}x"
+                        triggered = True
+
+                elif condition_type == "COMBO_SMA_200_UNDER_5":
+                    sma_200 = clean_float(t.get("sma_200"), 0.0)
+                    if sma_200 > 0.0 and price < sma_200:
+                        diff_pct = ((sma_200 - price) / sma_200) * 100
+                        threshold = clean_float(value, 5.0)
+                        if diff_pct <= threshold:
+                            cur_val = f"SMA 200 Near Support: Price Rs.{price:.2f} is {diff_pct:.2f}% below 200 SMA (Rs.{sma_200:.2f})"
+                            triggered = True
+
+                elif condition_type == "COMBO_SMA_50_UNDER_3":
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    if sma_50 > 0.0 and price < sma_50:
+                        diff_pct = ((sma_50 - price) / sma_50) * 100
+                        threshold = clean_float(value, 3.0)
+                        if diff_pct <= threshold:
+                            cur_val = f"SMA 50 Near Resistance/Support: Price Rs.{price:.2f} is {diff_pct:.2f}% below 50 SMA (Rs.{sma_50:.2f})"
+                            triggered = True
 
             except Exception as eval_err:
                 print(f"Rule Scanner: Error evaluating {sym}: {eval_err}")
