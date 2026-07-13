@@ -196,7 +196,7 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated", session
             response = requests.get(fallback_url, headers=headers, cookies=cookies, timeout=12)
             
         if response.status_code != 200:
-            return {"error": f"Failed to retrieve Screener financials. Status: {response.status_code}"}
+            raise Exception(f"Failed to retrieve Screener financials. Status: {response.status_code}")
             
         soup = BeautifulSoup(response.text, "html.parser")
         
@@ -237,4 +237,248 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated", session
             "peers": parse_screener_peers_table(peers_table_el)
         }
     except Exception as err:
-        return {"error": f"Exception occurred while scraping financials: {str(err)}"}
+        print(f"Screener scrape failed for {symbol}: {err}. Attempting yfinance fallback...")
+        try:
+            return scrape_yfinance_financials_fallback(symbol, view)
+        except Exception as yf_err:
+            print(f"yfinance fallback also failed for {symbol}: {yf_err}")
+            return {"error": f"Exception occurred while scraping financials: {str(err)} (yfinance fallback error: {str(yf_err)})"}
+
+
+def scrape_yfinance_financials_fallback(symbol: str, view: str = "consolidated") -> dict:
+    """
+    Fallback data resolver using yfinance when Screener.in blocks connections or is down.
+    Converts and maps standard Yahoo Finance keys to match Screener's data schema.
+    """
+    import yfinance as yf
+    import pandas as pd
+    from datetime import datetime
+    
+    base_symbol = symbol.split(".")[0].strip().upper()
+    yf_ticker = symbol.upper()
+    if not (yf_ticker.endswith(".NS") or yf_ticker.endswith(".BO")):
+        yf_ticker = f"{base_symbol}.NS"
+        
+    stock = yf.Ticker(yf_ticker)
+    
+    def format_yf_date(col):
+        try:
+            if isinstance(col, str):
+                dt = datetime.strptime(col.split(" ")[0], "%Y-%m-%d")
+            else:
+                dt = col
+            return dt.strftime("%b %Y")
+        except Exception:
+            return str(col)
+            
+    def build_table(df, mappings):
+        if df is None or df.empty:
+            return {"headers": [], "rows": []}
+            
+        headers = [format_yf_date(col) for col in reversed(df.columns)]
+        
+        rows = []
+        for label, keys in mappings.items():
+            found_key = None
+            for key in keys:
+                matches = [idx for idx in df.index if str(idx).strip().lower() == key.strip().lower()]
+                if matches:
+                    found_key = matches[0]
+                    break
+                    
+            if found_key is not None:
+                vals = []
+                is_eps = label in ["Basic EPS", "Diluted EPS", "EPS in Rs"]
+                for val in df.loc[found_key]:
+                    if pd.isna(val) or val is None:
+                        vals.append(None)
+                    else:
+                        try:
+                            if is_eps:
+                                vals.append(round(float(val), 2))
+                            else:
+                                vals.append(round(float(val) / 10000000.0, 2))
+                        except Exception:
+                            vals.append(val)
+                rows.append({
+                    "label": label,
+                    "values": list(reversed(vals))
+                })
+            else:
+                rows.append({
+                    "label": label,
+                    "values": [None] * len(headers)
+                })
+                
+        return {"headers": headers, "rows": rows}
+
+    def postprocess_income_table(table):
+        headers = table["headers"]
+        rows = table["rows"]
+        
+        def get_vals(label):
+            for r in rows:
+                if r["label"] == label:
+                    return r["values"]
+            return [None] * len(headers)
+            
+        sales = get_vals("Sales")
+        op_profit = get_vals("Operating Profit")
+        pbt = get_vals("Profit before tax")
+        tax_prov = get_vals("Tax Provision")
+        
+        opm_pct = []
+        tax_pct = []
+        
+        for i in range(len(headers)):
+            s_val = sales[i]
+            op_val = op_profit[i]
+            if s_val and op_val and s_val > 0:
+                opm_pct.append(round((op_val / s_val) * 100.0, 2))
+            else:
+                opm_pct.append(None)
+                
+            pbt_val = pbt[i]
+            tax_val = tax_prov[i]
+            if pbt_val and tax_val and pbt_val > 0:
+                tax_pct.append(round((tax_val / pbt_val) * 100.0, 2))
+            else:
+                tax_pct.append(None)
+                
+        op_idx = next((i for i, r in enumerate(rows) if r["label"] == "Operating Profit"), -1)
+        if op_idx != -1:
+            rows.insert(op_idx + 1, {"label": "OPM %", "values": opm_pct})
+            
+        pbt_idx = next((i for i, r in enumerate(rows) if r["label"] == "Profit before tax"), -1)
+        if pbt_idx != -1:
+            rows.insert(pbt_idx + 1, {"label": "Tax %", "values": tax_pct})
+            
+        for r in rows:
+            if r["label"] == "Basic EPS":
+                r["label"] = "EPS in Rs"
+                
+        return {"headers": headers, "rows": [r for r in rows if r["label"] != "Tax Provision"]}
+
+    def postprocess_balance_sheet(table, df):
+        headers = table["headers"]
+        rows = table["rows"]
+        
+        def get_vals(label):
+            for r in rows:
+                if r["label"] == label:
+                    return r["values"]
+            return [None] * len(headers)
+            
+        total_assets = get_vals("Total Assets")
+        fixed_assets = get_vals("Fixed Assets")
+        investments = get_vals("Investments")
+        cwip = get_vals("CWIP")
+        share_cap = get_vals("Share Capital")
+        borrowings = get_vals("Borrowings")
+        
+        stockholders_equity = [None] * len(headers)
+        if df is not None and not df.empty:
+            for key in ["Stockholders Equity", "Total Equity Gross Minority Interest"]:
+                matches = [idx for idx in df.index if str(idx).strip().lower() == key.strip().lower()]
+                if matches:
+                    vals = [round(float(v) / 10000000.0, 2) if not pd.isna(v) else 0.0 for v in df.loc[matches[0]]]
+                    stockholders_equity = list(reversed(vals))
+                    break
+                    
+        reserves = []
+        for i in range(len(headers)):
+            se_val = stockholders_equity[i]
+            sc_val = share_cap[i] or 0.0
+            if se_val is not None:
+                reserves.append(round(se_val - sc_val, 2))
+            else:
+                reserves.append(None)
+                
+        for r in rows:
+            if r["label"] == "Reserves":
+                r["values"] = reserves
+                
+        other_liabs_calc = []
+        for i in range(len(headers)):
+            ta_val = total_assets[i] or 0.0
+            sc_val = share_cap[i] or 0.0
+            res_val = reserves[i] or 0.0
+            b_val = borrowings[i] or 0.0
+            other_liabs_calc.append(round(max(0.0, ta_val - sc_val - res_val - b_val), 2))
+            
+        for r in rows:
+            if r["label"] == "Other Liabilities":
+                r["values"] = other_liabs_calc
+                
+        other_assets_calc = []
+        for i in range(len(headers)):
+            ta_val = total_assets[i] or 0.0
+            fa_val = fixed_assets[i] or 0.0
+            inv_val = investments[i] or 0.0
+            cwip_val = cwip[i] or 0.0
+            other_assets_calc.append(round(max(0.0, ta_val - fa_val - inv_val - cwip_val), 2))
+            
+        for r in rows:
+            if r["label"] == "Other Assets":
+                r["values"] = other_assets_calc
+
+    # Income stmt mappings
+    income_mappings = {
+        "Sales": ["Total Revenue", "Operating Revenue", "Revenue"],
+        "Expenses": ["Total Expenses"],
+        "Operating Profit": ["Operating Income"],
+        "Other Income": ["Other Income Expense", "Net Non Operating Interest Income Expense", "Other Non Operating Income Expenses"],
+        "Interest": ["Interest Expense", "Interest Paid Cff"],
+        "Depreciation": ["Depreciation And Amortization In Income Statement", "Depreciation Income Statement", "Depreciation"],
+        "Profit before tax": ["Pretax Income"],
+        "Tax Provision": ["Tax Provision", "Income Tax Expense"],
+        "Net Profit": ["Net Income"],
+        "Basic EPS": ["Basic EPS", "Diluted EPS"]
+    }
+
+    balance_mappings = {
+        "Share Capital": ["Common Stock", "Common Stock Equity", "Capital Stock"],
+        "Reserves": ["Retained Earnings"],
+        "Borrowings": ["Long Term Debt", "Total Debt"],
+        "Other Liabilities": ["Total Liabilities Net Minority Interest"],
+        "Fixed Assets": ["Net PPE", "Property Plant And Equipment Net"],
+        "CWIP": ["Construction In Progress"],
+        "Investments": ["Investmentin Financial Assets", "Long Term Equity Investment", "Held To Maturity Securities"],
+        "Other Assets": ["Total Assets"],
+        "Total Assets": ["Total Assets"]
+    }
+
+    cashflow_mappings = {
+        "Cash from Operating Activity": ["Operating Cash Flow", "Cash Flow From Continuing Operating Activities"],
+        "Cash from Investing Activity": ["Investing Cash Flow", "Cash Flow From Continuing Investing Activities"],
+        "Cash from Financing Activity": ["Financing Cash Flow", "Cash Flow From Continuing Financing Activities"],
+        "Net Cash Flow": ["Changes In Cash", "Net Change In Cash"]
+    }
+
+    # Fetch DataFrames from yfinance
+    q_inc = stock.quarterly_income_stmt if not stock.quarterly_income_stmt.empty else stock.quarterly_financials
+    ann_inc = stock.income_stmt if not stock.income_stmt.empty else stock.financials
+    bal = stock.balance_sheet
+    cf = stock.cashflow
+
+    quarters_table = build_table(q_inc, income_mappings)
+    quarters_table = postprocess_income_table(quarters_table)
+
+    pl_table = build_table(ann_inc, income_mappings)
+    pl_table = postprocess_income_table(pl_table)
+
+    bs_table = build_table(bal, balance_mappings)
+    postprocess_balance_sheet(bs_table, bal)
+
+    cf_table = build_table(cf, cashflow_mappings)
+
+    return {
+        "symbol": symbol,
+        "resolved_symbol": base_symbol,
+        "is_consolidated": True,
+        "quarters": quarters_table,
+        "profit_loss": pl_table,
+        "balance_sheet": bs_table,
+        "cash_flow": cf_table,
+        "peers": {"headers": [], "rows": []}
+    }
