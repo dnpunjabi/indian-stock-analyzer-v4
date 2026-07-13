@@ -24848,10 +24848,17 @@ function setupRuleScanner() {
     }
 
     document.querySelectorAll('.rs-nl-template-pill').forEach(pill => {
-        // Parse raw text ignoring any icons
-        let rawText = pill.innerText.trim();
-        // Strip emojis and spacing from the beginning if present
+        // Parse raw text ignoring any children text or info trigger icons
+        let rawText = "";
+        if (pill.firstChild) {
+            rawText = pill.firstChild.textContent.trim();
+        } else {
+            rawText = pill.innerText.trim();
+        }
+        // Strip emojis and leading junk symbols
         rawText = rawText.replace(/^[^a-zA-Z0-9\(\)]+/, '').trim();
+        // Remove trailing info icon / spaces just in case it leaks in
+        rawText = rawText.replace(/[\sℹ️]+$/, '').trim();
 
         // Dynamically add a small info indicator trigger next to the text
         if (!pill.querySelector('.rs-info-trigger')) {
