@@ -42282,13 +42282,21 @@ function filterFsTableRows(query) {
 // ═══════════════════════════════════════════════════════════════════
 function renderFinancialHealthDashboard() {
     const container = document.getElementById('fs-health-dashboard');
+    const laymanPanel = document.getElementById('fs-layman-summary-panel');
+    const laymanContent = document.getElementById('fs-layman-summary-content');
+    
     if (!container || !activeFsData) {
         if (container) container.classList.add('fs-hidden');
+        if (laymanPanel) laymanPanel.classList.add('fs-hidden');
         return;
     }
     
     const isPeers = (activeFsStatement === 'peers');
-    if (isPeers) { container.classList.add('fs-hidden'); return; }
+    if (isPeers) {
+        container.classList.add('fs-hidden');
+        if (laymanPanel) laymanPanel.classList.add('fs-hidden');
+        return;
+    }
     
     function _findVal(stKey, keywords) {
         if (!activeFsData[stKey] || !activeFsData[stKey].rows) return null;
@@ -42327,10 +42335,12 @@ function renderFinancialHealthDashboard() {
     const equity = (shareCapital || 0) + (reserves || 0);
     
     const cards = [];
+    let crVal = null, icrVal = null, atVal = null, deVal = null, npmVal = null, eqVal = null;
     
     // 1. Current Ratio (Current Assets / Current Liabilities)
     if (otherAssets && otherLiab && otherLiab > 0) {
         const cr = otherAssets / otherLiab;
+        crVal = cr;
         let color = cr >= 1.5 ? 'var(--color-emerald)' : cr >= 1.0 ? 'var(--color-amber)' : 'var(--color-crimson)';
         let health = cr >= 2.0 ? 'Strong' : cr >= 1.5 ? 'Healthy' : cr >= 1.0 ? 'Tight' : 'Weak';
         cards.push({ label: 'Current Ratio', value: cr.toFixed(2) + 'x', color, health, icon: '💧' });
@@ -42339,6 +42349,7 @@ function renderFinancialHealthDashboard() {
     // 2. Interest Coverage Ratio (EBIT / Interest Expense)
     if (opProfit && interest && Math.abs(interest) > 0) {
         const icr = opProfit / Math.abs(interest);
+        icrVal = icr;
         let color = icr >= 3 ? 'var(--color-emerald)' : icr >= 1.5 ? 'var(--color-amber)' : 'var(--color-crimson)';
         let health = icr >= 5 ? 'Excellent' : icr >= 3 ? 'Good' : icr >= 1.5 ? 'Adequate' : 'Distressed';
         cards.push({ label: 'Interest Coverage', value: icr.toFixed(1) + 'x', color, health, icon: '🛡️' });
@@ -42347,6 +42358,7 @@ function renderFinancialHealthDashboard() {
     // 3. Asset Turnover
     if (sales && totalAssets && totalAssets > 0) {
         const at = sales / totalAssets;
+        atVal = at;
         let color = at >= 1.0 ? 'var(--color-emerald)' : at >= 0.5 ? 'var(--color-amber)' : 'var(--text-secondary)';
         let health = at >= 1.5 ? 'Efficient' : at >= 1.0 ? 'Good' : at >= 0.5 ? 'Moderate' : 'Capital Heavy';
         cards.push({ label: 'Asset Turnover', value: at.toFixed(2) + 'x', color, health, icon: '⚡' });
@@ -42355,6 +42367,7 @@ function renderFinancialHealthDashboard() {
     // 4. Debt to Equity
     if (equity > 0 && borrowings !== null) {
         const de = (borrowings || 0) / equity;
+        deVal = de;
         let color = de <= 0.5 ? 'var(--color-emerald)' : de <= 1.0 ? 'var(--color-amber)' : 'var(--color-crimson)';
         let health = de <= 0.3 ? 'Low Debt' : de <= 0.5 ? 'Conservative' : de <= 1.0 ? 'Moderate' : 'Leveraged';
         cards.push({ label: 'Debt/Equity', value: de.toFixed(2) + 'x', color, health, icon: '⚖️' });
@@ -42363,6 +42376,7 @@ function renderFinancialHealthDashboard() {
     // 5. Net Profit Margin
     if (sales && sales > 0 && netProfit !== null) {
         const npm = (netProfit / sales) * 100;
+        npmVal = npm;
         let color = npm >= 15 ? 'var(--color-emerald)' : npm >= 5 ? 'var(--color-amber)' : 'var(--color-crimson)';
         let health = npm >= 20 ? 'Premium' : npm >= 10 ? 'Healthy' : npm >= 5 ? 'Moderate' : npm >= 0 ? 'Thin' : 'Loss-Making';
         cards.push({ label: 'Net Margin', value: npm.toFixed(1) + '%', color, health, icon: '💰' });
@@ -42371,6 +42385,7 @@ function renderFinancialHealthDashboard() {
     // 6. OCF / Net Profit (Earnings Quality)
     if (ocf !== null && netProfit && netProfit > 0) {
         const eq = ocf / netProfit;
+        eqVal = eq;
         let color = eq >= 1.0 ? 'var(--color-emerald)' : eq >= 0.6 ? 'var(--color-amber)' : 'var(--color-crimson)';
         let health = eq >= 1.2 ? 'Excellent' : eq >= 1.0 ? 'Real' : eq >= 0.6 ? 'Fair' : 'Poor';
         cards.push({ label: 'Earnings Quality', value: eq.toFixed(2) + 'x', color, health, icon: '🏆' });
@@ -42378,6 +42393,7 @@ function renderFinancialHealthDashboard() {
     
     if (cards.length === 0) {
         container.classList.add('fs-hidden');
+        if (laymanPanel) laymanPanel.classList.add('fs-hidden');
         return;
     }
     
@@ -42393,11 +42409,132 @@ function renderFinancialHealthDashboard() {
             <div style="font-size: 9px; color: ${c.color}; font-weight: 600; background: ${c.color}15; padding: 1px 6px; border-radius: 3px; display: inline-block; width: fit-content;">${c.health}</div>
         </div>
     `).join('');
-}
 
-// ═══════════════════════════════════════════════════════════════════
-// ENHANCEMENT 3: Visual Insight Panel — Quarterly Heatmap / P&L Waterfall
-// ═══════════════════════════════════════════════════════════════════
+    // Generate Dynamic Layman Interpretation
+    if (laymanPanel && laymanContent) {
+        laymanPanel.classList.remove('fs-hidden');
+        
+        let solvencyText = "Solvency metrics are not fully populated.";
+        if (crVal !== null && deVal !== null) {
+            const deStr = deVal <= 0.3 ? "fortress balance sheet (low debt of " + deVal.toFixed(2) + "x)" :
+                          deVal <= 0.8 ? "manageable leverage level (moderate debt of " + deVal.toFixed(2) + "x)" :
+                          "highly leveraged structure (elevated debt of " + deVal.toFixed(2) + "x)";
+            const crStr = crVal >= 1.5 ? "solid cash buffer of " + crVal.toFixed(2) + "x to pay upcoming bills." :
+                          crVal >= 1.0 ? "tight cash cushion of " + crVal.toFixed(2) + "x, meaning it can pay bills but has little headroom." :
+                          "weak liquidity posture of " + crVal.toFixed(2) + "x, warning that short-term liabilities exceed quick assets.";
+            solvencyText = `<strong>Solvency & Liquidity:</strong> The company operates with a ${deStr}, combined with a ${crStr}`;
+        }
+        
+        let efficiencyText = "Efficiency metrics are not fully populated.";
+        if (atVal !== null && icrVal !== null) {
+            const atStr = atVal >= 1.2 ? "highly efficient operational turnover (" + atVal.toFixed(2) + "x), extracting good value from assets" :
+                          atVal >= 0.6 ? "moderate asset turnover efficiency of " + atVal.toFixed(2) + "x" :
+                          "capital-heavy model (" + atVal.toFixed(2) + "x) that requires significant assets to generate revenues";
+            const icrStr = icrVal >= 5.0 ? "outstanding interest coverage of " + icrVal.toFixed(1) + "x (virtually zero default stress)." :
+                           icrVal >= 1.5 ? "adequate interest coverage of " + icrVal.toFixed(1) + "x, showing reasonable servicing ability." :
+                           "distressed interest coverage of " + icrVal.toFixed(1) + "x, meaning profits barely cover interest costs.";
+            efficiencyText = `<strong>Efficiency & Debt Service:</strong> Management shows ${atStr}, and has ${icrStr}`;
+        }
+        
+        let profitText = "Profitability metrics are not fully populated.";
+        if (npmVal !== null && eqVal !== null) {
+            const npmStr = npmVal >= 15.0 ? "premium profit margins of " + npmVal.toFixed(1) + "%" :
+                           npmVal >= 5.0 ? "healthy, moderate margins of " + npmVal.toFixed(1) + "%" :
+                           "thin margins of " + npmVal.toFixed(1) + "% (highly sensitive to cost shocks)";
+            const eqStr = eqVal >= 1.0 ? "excellent cash backing (" + eqVal.toFixed(2) + "x), indicating net income is fully verified by actual cash inflows rather than accounting accruals." :
+                          eqVal >= 0.6 ? "fair cash support of " + eqVal.toFixed(2) + "x, showing standard accrual accounting." :
+                          "low cash conversion of " + eqVal.toFixed(2) + "x, which warrants a check for uncollected revenues or cash blocks.";
+            profitText = `<strong>Profitability & Cash Quality:</strong> The company commands ${npmStr}, with ${eqStr}`;
+        }
+        
+        // Calculate Bottom Line Verdict
+        let score = 0;
+        let activeRatiosCount = 0;
+        
+        if (crVal !== null) { score += (crVal >= 1.5 ? 2 : crVal >= 1.0 ? 1 : 0); activeRatiosCount += 2; }
+        if (deVal !== null) { score += (deVal <= 0.3 ? 2 : deVal <= 0.8 ? 1 : 0); activeRatiosCount += 2; }
+        if (icrVal !== null) { score += (icrVal >= 5 ? 2 : icrVal >= 2.0 ? 1 : 0); activeRatiosCount += 2; }
+        if (atVal !== null) { score += (atVal >= 1.0 ? 2 : atVal >= 0.5 ? 1 : 0); activeRatiosCount += 2; }
+        if (npmVal !== null) { score += (npmVal >= 15 ? 2 : npmVal >= 5 ? 1 : 0); activeRatiosCount += 2; }
+        if (eqVal !== null) { score += (eqVal >= 1.0 ? 2 : eqVal >= 0.6 ? 1 : 0); activeRatiosCount += 2; }
+        
+        const maxScore = activeRatiosCount;
+        const normalizedRatio = maxScore > 0 ? (score / maxScore) : 0.5;
+        
+        let verdictBadge = "";
+        let verdictColor = "";
+        if (normalizedRatio >= 0.75) {
+            verdictBadge = "🛡️ Fortress Balance Sheet (High Quality)";
+            verdictColor = "var(--color-emerald)";
+        } else if (normalizedRatio >= 0.45) {
+            verdictBadge = "⚖️ Stable / Balanced Financial Position";
+            verdictColor = "var(--color-amber)";
+        } else {
+            verdictBadge = "🚨 Elevated Solvency / Quality Risk Alert";
+            verdictColor = "var(--color-crimson)";
+        }
+        
+        const summaryHTML = `
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 11px;">
+                    <span style="color: var(--text-primary); font-weight:600;">Overall Health Verdict:</span>
+                    <span style="color: ${verdictColor}; background: ${verdictColor}15; padding: 2px 8px; border-radius: 4px; border: 1px solid ${verdictColor}30;">${verdictBadge}</span>
+                </div>
+                <ul style="margin: 0; padding-left: 14px; display: flex; flex-direction: column; gap: 6px;">
+                    <li>${solvencyText}</li>
+                    <li>${efficiencyText}</li>
+                    <li>${profitText}</li>
+                </ul>
+            </div>
+        `;
+        
+        laymanContent.innerHTML = summaryHTML;
+        
+        // Voice synthesizer readout hook
+        const audioBtn = document.getElementById('fs-layman-audio-btn');
+        if (audioBtn) {
+            // Remove previous listeners if any
+            const newAudioBtn = audioBtn.cloneNode(true);
+            audioBtn.parentNode.replaceChild(newAudioBtn, audioBtn);
+            
+            newAudioBtn.addEventListener('click', () => {
+                if ('speechSynthesis' in window) {
+                    if (window.speechSynthesis.speaking) {
+                        window.speechSynthesis.cancel();
+                        newAudioBtn.innerText = "🔊";
+                        newAudioBtn.style.transform = "scale(1)";
+                        return;
+                    }
+                    
+                    // Strip HTML tags to make a clean reading transcript
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(summaryHTML, 'text/html');
+                    const textToRead = `Overall Health Verdict is ${verdictBadge.replace(/[^a-zA-Z0-9\s]/g, '')}. ` + doc.body.textContent;
+                    
+                    const utterance = new SpeechSynthesisUtterance(textToRead);
+                    utterance.rate = 0.95; // slightly slower for premium clear pronunciation
+                    
+                    utterance.onstart = () => {
+                        newAudioBtn.innerText = "⏹️";
+                        newAudioBtn.style.transform = "scale(1.15)";
+                    };
+                    utterance.onend = () => {
+                        newAudioBtn.innerText = "🔊";
+                        newAudioBtn.style.transform = "scale(1)";
+                    };
+                    utterance.onerror = () => {
+                        newAudioBtn.innerText = "🔊";
+                        newAudioBtn.style.transform = "scale(1)";
+                    };
+                    
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    alert("Text-to-speech is not supported on this browser/wrapper.");
+                }
+            });
+        }
+    }
+}
 function updateVisualInsightPanel() {
     const panel = document.getElementById('fs-visual-insight-panel');
     const titleEl = document.getElementById('fs-visual-insight-title');
