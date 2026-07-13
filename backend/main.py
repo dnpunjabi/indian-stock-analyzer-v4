@@ -10531,7 +10531,11 @@ async def parse_nl_scan(data: ParseNLScanRequest):
             "- COMBO_HEAVY_INSTITUTIONAL (High mutual fund/FII ownership: combined FII and DII shareholding >= 30.0)\n"
             "- COMBO_LC_COMPOUNDER (Defensive large cap growth: cap type is large and beta < 1.0 and AI rating recommendation is STRONG BUY)\n"
             "- COMBO_SC_MOMENTUM (Explosive small cap growth: cap type is small and ADX >= 25 and beta > 1.2)\n"
-            "- COMBO_SECTOR_ROTATION (Sector rotation momentum: price > 50 SMA and stock sector belongs to the dynamically calculated top 3 relative strength sectors)\n\n"
+            "- COMBO_SECTOR_ROTATION (Sector rotation momentum: price > 50 SMA and stock sector belongs to the dynamically calculated top 3 relative strength sectors)\n"
+            "- COMBO_INST_QUALITY_BREAKOUT (Institutional quality breakout: Piotroski F-Score >= 7 and within 2% of 52-week High and delivery Z-Score > 1.5)\n"
+            "- COMBO_SOLVENCY_VALUE_DIP (Fortress balance sheet value dip: Altman Z-Score >= 3.0 and DCF Margin of Safety >= 20% and RSI <= 35)\n"
+            "- COMBO_HV_MOMENTUM_MARKUP (High volume momentum markup: ADX >= 25 and volume ratio >= 2.0 and price > 20 SMA > 50 SMA)\n"
+            "- COMBO_SM_BOTTOM_FISHING (Smart money bottom fishing: combined FII and DII shareholding >= 25% and RSI <= 35 and VSA pattern contains Accumulation or Demand or Strength)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
             "- '<' (Less Than / Crosses Below)\n"
@@ -11460,6 +11464,44 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                                 triggered = True
                         except Exception:
                             pass
+
+                elif condition_type == "COMBO_INST_QUALITY_BREAKOUT":
+                    eq = prof.get("earnings_quality") or {}
+                    f_score = clean_float(eq.get("piotroski_score"), 0.0)
+                    high_52w = clean_float(t.get("high_52w") or f.get("high_52week") or f.get("fiftyTwoWeekHigh") or t.get("year_high") or f.get("year_high") or f.get("52w_high"), 0.0)
+                    del_z = clean_float(t.get("delivery_z_score") or t.get("delivery_zscore"), 0.0)
+                    if f_score >= 7.0 and high_52w > 0.0 and del_z > 1.5:
+                        diff_pct = (abs(price - high_52w) / high_52w) * 100
+                        if diff_pct <= 2.0:
+                            cur_val = f"Inst Quality Breakout: Piotroski F-Score {f_score:.0f}/9, near 52wH (Diff: {diff_pct:.1f}%) on Delivery Z-Score {del_z:+.1f}"
+                            triggered = True
+
+                elif condition_type == "COMBO_SOLVENCY_VALUE_DIP":
+                    eq = prof.get("earnings_quality") or {}
+                    altman_z = clean_float(eq.get("altman_z_score", f.get("altman_z")), 0.0)
+                    dcf_val = clean_float(prof.get("dcf", {}).get("margin_of_safety"), 0.0)
+                    rsi_val = clean_float(t.get("rsi"), 50.0)
+                    if altman_z >= 3.0 and dcf_val >= 20.0 and rsi_val <= 35:
+                        cur_val = f"Solvency Value Dip: Altman Z-Score {altman_z:.2f} (Fortress Balance Sheet), DCF margin {dcf_val:.1f}% >= 20%, oversold RSI {rsi_val:.1f}"
+                        triggered = True
+
+                elif condition_type == "COMBO_HV_MOMENTUM_MARKUP":
+                    adx_val = clean_float(t.get("adx"), 0.0)
+                    vol_ratio = clean_float(t.get("volume_vs_avg20", t.get("volume_ratio", t.get("vol_breakout_ratio"))), 1.0)
+                    sma_20 = clean_float(t.get("sma_20"), 0.0)
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    if adx_val >= 25.0 and vol_ratio >= 2.0 and price > sma_20 > sma_50 > 0:
+                        cur_val = f"HV Momentum Markup: ADX {adx_val:.1f} (Strong Trend), Vol Ratio {vol_ratio:.1f}x >= 2.0x, Price Rs.{price:.2f} > 20 SMA > 50 SMA"
+                        triggered = True
+
+                elif condition_type == "COMBO_SM_BOTTOM_FISHING":
+                    shareholding = prof.get("shareholding") or {}
+                    inst_val = clean_float(shareholding.get("FIIs"), 0.0) + clean_float(shareholding.get("DIIs"), 0.0)
+                    rsi_val = clean_float(t.get("rsi"), 50.0)
+                    vsa_pattern = (t.get("vsa_pattern") or t.get("vsa_setup") or "").upper()
+                    if inst_val >= 25.0 and rsi_val <= 35.0 and any(kw in vsa_pattern for kw in ["ACCUMULATION", "DEMAND", "STRENGTH", "ABSORPTION", "BUYING"]):
+                        cur_val = f"SM Bottom Fishing: Institutional stake {inst_val:.1f}% >= 25%, oversold RSI {rsi_val:.1f}, VSA Setup '{vsa_pattern}'"
+                        triggered = True
 
             except Exception as eval_err:
                 print(f"Rule Scanner: Error evaluating {sym}: {eval_err}")
