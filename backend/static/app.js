@@ -10121,9 +10121,9 @@ function setupAlertCenter() {
         nlSubmitBtn.addEventListener('click', generateNLAlertRule);
     }
 
-    // Hook Suggested Prompt Pills
     document.querySelectorAll('.nl-template-pill').forEach(pill => {
         pill.addEventListener('click', (e) => {
+            if (e.target.classList.contains('rs-info-trigger')) return;
             const templateText = e.currentTarget.getAttribute('data-template');
 
             // Resolve stock name dynamically:
@@ -24674,7 +24674,7 @@ function setupRuleScanner() {
         },
         "Momentum Leader Scan": {
             "concept": "Finds extreme momentum leadership stocks trading at new highs with elevated RSI levels.",
-            "why": "Standard trend-following filter for momentum traders riding the strongest wave."
+            "why": "Standard trend-following filter for momentum trends."
         },
         "AI Sell-Rated Watch": {
             "concept": "Flags stocks with AI rating underperform recommendations, suggesting exit or hedging.",
@@ -24859,6 +24859,98 @@ function setupRuleScanner() {
         "DCF Undervaluation MoS": {
             "concept": "Triggers when the calculated DCF margin of safety is greater than 25.0%.",
             "why": "Provides an absolute intrinsic value cushion, buying assets at discounts to long-term free cash flow yield."
+        },
+        "Price Breakout (Above)": {
+            "concept": "Triggers when close price breaks out above a target resistance or threshold price level.",
+            "why": "Allows momentum breakouts to be captured as soon as structural resistance is breached."
+        },
+        "Price Support (Below)": {
+            "concept": "Triggers when close price falls below a target support or stop price level.",
+            "why": "Acts as a primary stop-loss trigger or dip-buying alert to capture value at key levels."
+        },
+        "38.2% Retracement": {
+            "concept": "Triggers when price pulls back to the shallow 38.2% Fibonacci retracement level.",
+            "why": "Identifies continuation entry setups during high-velocity bull runs."
+        },
+        "50.0% Retracement": {
+            "concept": "Triggers when price pulls back to the 50.0% Fibonacci midline support.",
+            "why": "Acts as a balanced risk-reward correction support level for standard pullbacks."
+        },
+        "61.8% Golden Retracement": {
+            "concept": "Triggers when price pulls back to the key 61.8% Fibonacci Golden Ratio level.",
+            "why": "The highest probability support level for capturing major structural trend reversals."
+        },
+        "52W Low Proximity": {
+            "concept": "Triggers when price trades close to its 52-week low range boundary.",
+            "why": "Alerts long-term investors to accumulation points at major cyclical price bottoms."
+        },
+        "52W High Breakout": {
+            "concept": "Triggers when price is trading near or breaking out above its 52-week high range boundary.",
+            "why": "Flags strong institutional momentum markup stages as selling supply is fully absorbed."
+        },
+        "50/200 SMA Golden Cross": {
+            "concept": "Triggers when the 50-day Simple Moving Average crosses above the 200-day Simple Moving Average.",
+            "why": "Establishes long-term bullish structural regimes, perfect for structural trend followers and investors."
+        },
+        "50/200 SMA Death Cross": {
+            "concept": "Triggers when the 50-day Simple Moving Average crosses below the 200-day Simple Moving Average.",
+            "why": "Establishes long-term bearish structural regimes, helping protect capital from deep downtrends."
+        },
+        "50/200 EMA Cross": {
+            "concept": "Triggers when the fast 50-day EMA crosses the slow 200-day EMA.",
+            "why": "A faster-reacting trend reversal signal that minimizes indicator lag compared to standard SMAs."
+        },
+        "SMA-50 Pullback": {
+            "concept": "Triggers when price drops below or tests its 50-day Simple Moving Average within an uptrend.",
+            "why": "Identifies intermediate trend pullback entries during ongoing market rallies."
+        },
+        "SMA-200 Floor": {
+            "concept": "Triggers when price trades near the major 200-day Simple Moving Average support level.",
+            "why": "Provides high-probability, low-risk support entry targets for long-term investors."
+        },
+        "20 SMA Proximity": {
+            "concept": "Triggers when price consolidates near the short-term 20-day Simple Moving Average.",
+            "why": "Locates compression zones before the next directional momentum breakout occurs."
+        },
+        "100 SMA Pullback": {
+            "concept": "Triggers when price consolidates or tests its medium-term 100-day Simple Moving Average.",
+            "why": "Acts as a secondary support layer for swing trades and medium-term positions."
+        },
+        "200 EMA Support": {
+            "concept": "Triggers when price dips to test the highly respected 200-day Exponential Moving Average.",
+            "why": "Algorithmic execution desks heavily respect this level; pullbacks here have a high rebound rate."
+        },
+        "RSI Oversold": {
+            "concept": "Triggers when RSI-14 falls below 30, signaling highly oversold momentum.",
+            "why": "Identifies high-probability bottom-fishing entries and oversold rebound targets."
+        },
+        "RSI Overbought": {
+            "concept": "Triggers when RSI-14 rises above 70, signaling overextended momentum.",
+            "why": "Alerts to potential momentum exhaustion or profit-taking reversal zones."
+        },
+        "MACD Bearish Cross": {
+            "concept": "Triggers when MACD line crosses below the Signal line, signaling momentum shift to the downside.",
+            "why": "Flags distribution phases and early exit points for protecting trailing capital."
+        },
+        "BB Lower Band Touch": {
+            "concept": "Triggers when price falls below or touches the Lower Bollinger Band.",
+            "why": "Flags short-term statistical oversold extremes for quick mean-reversion bounces."
+        },
+        "BB Upper Band Touch": {
+            "concept": "Triggers when price rises above or touches the Upper Bollinger Band.",
+            "why": "Flags volatility expansions and strong trend markup acceleration."
+        },
+        "Volume Spurt": {
+            "concept": "Triggers when current volume rises past 3x the 20-day historical average volume.",
+            "why": "Identifies early stage institutional breakouts and high-conviction buying surges."
+        },
+        "Deep Value P/E": {
+            "concept": "Triggers when P/E drops below the company's historical 10-year median P/E.",
+            "why": "Isolates fundamentally sound companies trading at deep historical discounts."
+        },
+        "AI Rating Upgrade": {
+            "concept": "Triggers when the AI Model quantitative analyst rating upgrades to BUY or STRONG BUY.",
+            "why": "Filters for high-probability setups backed by multi-factor machine learning evaluation."
         }
     };
 
@@ -24895,8 +24987,8 @@ function setupRuleScanner() {
         });
     }
 
-    // Attach to both scanner presets and alert presets
-    document.querySelectorAll('.rs-nl-template-pill, .alert-preset-pill').forEach(pill => {
+    // Attach to all scanner template pills, alert template pills, and parametric alert presets
+    document.querySelectorAll('.rs-nl-template-pill, .nl-template-pill, .alert-preset-pill').forEach(pill => {
         // Parse raw text ignoring any children text or info trigger icons
         let rawText = "";
         if (pill.firstChild) {
@@ -24905,7 +24997,7 @@ function setupRuleScanner() {
             rawText = pill.innerText.trim();
         }
         // Strip emojis and leading junk symbols
-        rawText = rawText.replace(/^[^a-zA-Z0-9\(\)]+/, '').trim();
+        rawText = rawText.replace(/^[^a-zA-Z0-9\(\)\/\%\-\+\s]+/, '').trim();
         // Remove trailing info icon / spaces just in case it leaks in
         rawText = rawText.replace(/[\sℹ️]+$/, '').trim();
 
@@ -24951,7 +25043,7 @@ function setupRuleScanner() {
                 if (opSelect) opSelect.value = op;
                 if (valInput) valInput.value = val;
             });
-        } else {
+        } else if (pill.classList.contains('rs-nl-template-pill')) {
             // Populate prompt on pill click (but not on info trigger click)
             pill.addEventListener('click', (e) => {
                 if (e.target.classList.contains('rs-info-trigger')) return;
