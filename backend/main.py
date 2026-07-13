@@ -1930,6 +1930,7 @@ class AuditFinancialsRequest(BaseModel):
     statement_type: str
     table_data: dict
     custom_prompt: Optional[str] = None
+    scorecard_metrics: Optional[list] = None
 
 class ChartChatRequest(BaseModel):
     symbol: str
@@ -6024,15 +6025,24 @@ async def audit_financial_statements(data: AuditFinancialsRequest):
         )
     else:
         system_prompt = (
-            "You are an expert Chartered Accountant and SEBI-registered CFA financial research analyst. "
-            "Analyze the provided financial statements table data and compile a structured, high-impact diagnostic audit memo. "
-            "Adhere to the following structural output layout:\n\n"
+            "You are an expert Chartered Accountant and SEBI-registered CFA financial research analyst.\n"
+            "Analyze the provided financial statements table data along with the calculated 8-point scorecard metrics to compile a structured, high-impact diagnostic audit memo.\n"
+            "In your analysis, you MUST explicitly evaluate the following 8 core financial health ratios (if calculated/provided) and connect them to the line-items from the financial tables:\n"
+            "1. Current Ratio (Liquidity & Solvency)\n"
+            "2. Interest Coverage (Debt Stress & Serviceability)\n"
+            "3. Asset Turnover (Capital & Operational Efficiency)\n"
+            "4. Debt/Equity (Financial Leverage)\n"
+            "5. Net Margin (Net Profitability)\n"
+            "6. Earnings Quality (Cash Flow vs. Accrual Profits - OCF/PAT)\n"
+            "7. ROE % (Return on Equity)\n"
+            "8. ROCE % (Return on Capital Employed)\n\n"
+            "Adhere strictly to the following structural output layout:\n\n"
             "### Key Revenue/Profitability Trends\n"
-            "* Analyze sequential (QoQ) or annual (YoY) growth rate, margin stability, and expansions/contractions.\n"
+            "* Analyze sequential (QoQ) or annual (YoY) growth rate, margin stability, and expansions/contractions. Connect these trends to Net Margin, ROE %, and ROCE %.\n"
             "### Working Capital & Balance Sheet Risks\n"
-            "* Evaluate financial leverage, debt-to-equity changes, equity capital dilution, or asset build-up flags.\n"
+            "* Evaluate financial leverage, debt-to-equity changes, equity capital dilution, interest coverage stress, current ratio, or asset build-up flags.\n"
             "### Anomalies & Flags\n"
-            "* Note any accounting flags or financial metrics anomalies (e.g. growing sales but dropping margins, reserves drop, etc.).\n"
+            "* Note any accounting flags or financial metrics anomalies (e.g. growing sales but dropping margins, reserves drop, or discrepancy between cash flow quality and reported profits).\n"
             "### Diagnostic Verdict\n"
             "* Conclude with a final rating (Safe / Watch / Distress) and a brief summary of the main driver."
         )
@@ -6052,27 +6062,44 @@ async def audit_financial_statements(data: AuditFinancialsRequest):
         f"Company Ticker: {data.symbol}\n"
         f"Reporting Basis: {'Consolidated' if data.view == 'consolidated' else 'Standalone'}\n"
         f"Statement Type: {st_title}\n\n"
-        f"Financial Table:\n{table_str}\n\n"
     )
+    
+    if data.scorecard_metrics:
+        user_prompt += "Calculated 8-Point Scorecard Ratios:\n"
+        for m in data.scorecard_metrics:
+            label = m.get("label", "")
+            value = m.get("value", "")
+            health = m.get("health", "")
+            user_prompt += f"- {label}: {value} ({health})\n"
+        user_prompt += "\n"
+        
+    user_prompt += f"Financial Table:\n{table_str}\n\n"
     
     if data.custom_prompt:
         user_prompt += (
             f"Specific User Request / Question:\n"
             f"\"{data.custom_prompt}\"\n\n"
-            f"Please address the specific user request/question directly using the provided financial table data above. "
+            f"Please address the specific user request/question directly using the provided financial table data and scorecard metrics above. "
             f"Output strictly in markdown."
         )
     else:
         user_prompt += f"Please provide your financial audit memo. Output strictly in markdown."
     
     try:
-        # Call Groq/LLM asynchronously
-        analysis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt, max_tokens=1500)
-        if not analysis:
-            raise HTTPException(status_code=500, detail="LLM failed to return a response.")
-        return {"analysis": analysis}
+        from fastapi.responses import StreamingResponse
+        from backend.llm_config import call_llm_stream
+
+        def stream_generator():
+            try:
+                for chunk in call_llm_stream(TASK_FAST, system_prompt, user_prompt, max_tokens=1500):
+                    yield chunk
+            except Exception as e:
+                yield f"\nERROR: Streaming failed mid-execution. Details: {str(e)}"
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI financial audit compilation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI financial audit streaming failed to start: {str(e)}")
+
 
 @app.get("/api/stocks/{symbol}/trades")
 async def get_stock_trades(symbol: str):

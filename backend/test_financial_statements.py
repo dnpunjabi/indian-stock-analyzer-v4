@@ -161,9 +161,9 @@ class TestFinancialStatements(unittest.TestCase):
         # Ensure scraper is not called because it was resolved from cache
         mock_scrape.assert_not_called()
 
-    @patch("backend.llm_config.call_llm")
-    def test_api_audit_financials(self, mock_call_llm):
-        mock_call_llm.return_value = "### Key Revenue/Profitability Trends\n* TCS is showing 4% growth."
+    @patch("backend.llm_config.call_llm_stream")
+    def test_api_audit_financials(self, mock_call_llm_stream):
+        mock_call_llm_stream.return_value = ["### Key Revenue/Profitability Trends\n* TCS is showing 4% growth."]
         
         payload = {
             "symbol": "TCS",
@@ -179,10 +179,8 @@ class TestFinancialStatements(unittest.TestCase):
         
         res = self.client.post("/api/ai/audit-financials", json=payload)
         self.assertEqual(res.status_code, 200)
-        data = res.json()
-        self.assertIn("analysis", data)
-        self.assertEqual(data["analysis"], "### Key Revenue/Profitability Trends\n* TCS is showing 4% growth.")
-        mock_call_llm.assert_called_once()
+        self.assertEqual(res.text, "### Key Revenue/Profitability Trends\n* TCS is showing 4% growth.")
+        mock_call_llm_stream.assert_called_once()
 
     @patch("backend.main.run_fs_evaluation_internal")
     def test_api_fs_evaluation_success(self, mock_eval):

@@ -349,6 +349,66 @@ function typewriteElement(element, htmlContent, onCompleteCallback = null, scrol
     element._typewriterInterval = setInterval(typeNextChar, 10);
 }
 
+function streamTypewrite(element, markdownTextStream, scrollContainer = null, onComplete = null) {
+    if (!element) return;
+    
+    // Clear any previous typewriter intervals
+    if (element._streamTypewriterInterval) {
+        clearInterval(element._streamTypewriterInterval);
+    }
+    
+    let displayedText = "";
+    let targetText = "";
+    let isStreamDone = false;
+    
+    // Update target text function
+    const updateTarget = (newText, done = false) => {
+        targetText = newText;
+        isStreamDone = done;
+    };
+    
+    // Attach updateTarget to the element so the caller can feed new data dynamically
+    element._updateStreamTarget = updateTarget;
+    
+    // Start typing loop
+    element._streamTypewriterInterval = setInterval(() => {
+        if (displayedText.length < targetText.length) {
+            // Determine dynamic speed (step size) based on how far behind we are
+            const gap = targetText.length - displayedText.length;
+            let step = 1;
+            if (gap > 150) {
+                step = 8; // Catch up faster
+            } else if (gap > 50) {
+                step = 4; // Catch up moderately
+            } else if (gap > 15) {
+                step = 2;
+            }
+            
+            displayedText += targetText.substring(displayedText.length, displayedText.length + step);
+            
+            // Format and render
+            let htmlContent = "";
+            if (typeof formatMarkdownToHTML === 'function') {
+                htmlContent = formatMarkdownToHTML(displayedText);
+            } else if (typeof formatMarkdownText === 'function') {
+                htmlContent = formatMarkdownText(displayedText);
+            } else {
+                htmlContent = displayedText;
+            }
+            element.innerHTML = htmlContent;
+            
+            if (scrollContainer) {
+                scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            }
+        } else if (isStreamDone) {
+            // Done streaming and typing caught up
+            clearInterval(element._streamTypewriterInterval);
+            element._streamTypewriterInterval = null;
+            if (onComplete) onComplete();
+        }
+    }, 15); // Check/type every 15ms
+}
+
 
 // ==================== LIVE TICKS WEBSOCKET MANAGER ====================
 let liveTicksWS = null;
@@ -42335,7 +42395,7 @@ function renderFinancialHealthDashboard() {
     const equity = (shareCapital || 0) + (reserves || 0);
     
     const cards = [];
-    let crVal = null, icrVal = null, atVal = null, deVal = null, npmVal = null, eqVal = null;
+    let crVal = null, icrVal = null, atVal = null, deVal = null, npmVal = null, eqVal = null, roeVal = null, roceVal = null;
     
     // 1. Current Ratio (Current Assets / Current Liabilities)
     if (otherAssets && otherLiab && otherLiab > 0) {
@@ -42389,6 +42449,28 @@ function renderFinancialHealthDashboard() {
         let color = eq >= 1.0 ? 'var(--color-emerald)' : eq >= 0.6 ? 'var(--color-amber)' : 'var(--color-crimson)';
         let health = eq >= 1.2 ? 'Excellent' : eq >= 1.0 ? 'Real' : eq >= 0.6 ? 'Fair' : 'Poor';
         cards.push({ label: 'Earnings Quality', value: eq.toFixed(2) + 'x', color, health, icon: '🏆' });
+    }
+    
+    // 7. Return on Equity (Net Profit / Equity * 100)
+    if (equity > 0 && netProfit !== null) {
+        const roe = (netProfit / equity) * 100;
+        roeVal = roe;
+        let color = roe >= 20 ? 'var(--color-emerald)' : roe >= 12 ? 'var(--color-amber)' : 'var(--color-crimson)';
+        let health = roe >= 20 ? 'Premium' : roe >= 15 ? 'Strong' : roe >= 12 ? 'Healthy' : roe >= 8 ? 'Moderate' : 'Weak';
+        cards.push({ label: 'ROE %', value: roe.toFixed(1) + '%', color, health, icon: '📈' });
+    }
+    
+    // 8. Return on Capital Employed (Operating Profit / (Equity + Borrowings) * 100)
+    if (opProfit && equity > 0) {
+        const borrowingsVal = borrowings || 0;
+        const capitalEmployed = equity + borrowingsVal;
+        if (capitalEmployed > 0) {
+            const roce = (opProfit / capitalEmployed) * 100;
+            roceVal = roce;
+            let color = roce >= 20 ? 'var(--color-emerald)' : roce >= 12 ? 'var(--color-amber)' : 'var(--color-crimson)';
+            let health = roce >= 20 ? 'Premium' : roce >= 15 ? 'Strong' : roce >= 12 ? 'Healthy' : roce >= 8 ? 'Moderate' : 'Weak';
+            cards.push({ label: 'ROCE %', value: roce.toFixed(1) + '%', color, health, icon: '🏆' });
+        }
     }
     
     if (cards.length === 0) {
@@ -42447,6 +42529,17 @@ function renderFinancialHealthDashboard() {
             profitText = `<strong>Profitability & Cash Quality:</strong> The company commands ${npmStr}, with ${eqStr}`;
         }
         
+        let capReturnText = "Capital return metrics are not fully populated.";
+        if (roeVal !== null && roceVal !== null) {
+            const roeStr = roeVal >= 20.0 ? "outstanding Return on Equity of " + roeVal.toFixed(1) + "% (elite shareholder returns)" :
+                           roeVal >= 12.0 ? "healthy Return on Equity of " + roeVal.toFixed(1) + "%" :
+                           "thin Return on Equity of " + roeVal.toFixed(1) + "% (struggling to grow capital productively)";
+            const roceStr = roceVal >= 20.0 ? "exceptional capital employment return (ROCE) of " + roceVal.toFixed(1) + "%." :
+                            roceVal >= 12.0 ? "respectable capital employment return (ROCE) of " + roceVal.toFixed(1) + "%." :
+                            "weak capital employment return (ROCE) of " + roceVal.toFixed(1) + "%, indicating poor utilization of total investments.";
+            capReturnText = `<strong>Capital Return & Efficiency:</strong> The company generates a ${roeStr}, accompanied by a ${roceStr}`;
+        }
+
         // Calculate Bottom Line Verdict
         let score = 0;
         let activeRatiosCount = 0;
@@ -42457,6 +42550,8 @@ function renderFinancialHealthDashboard() {
         if (atVal !== null) { score += (atVal >= 1.0 ? 2 : atVal >= 0.5 ? 1 : 0); activeRatiosCount += 2; }
         if (npmVal !== null) { score += (npmVal >= 15 ? 2 : npmVal >= 5 ? 1 : 0); activeRatiosCount += 2; }
         if (eqVal !== null) { score += (eqVal >= 1.0 ? 2 : eqVal >= 0.6 ? 1 : 0); activeRatiosCount += 2; }
+        if (roeVal !== null) { score += (roeVal >= 15 ? 2 : roeVal >= 10 ? 1 : 0); activeRatiosCount += 2; }
+        if (roceVal !== null) { score += (roceVal >= 15 ? 2 : roceVal >= 10 ? 1 : 0); activeRatiosCount += 2; }
         
         const maxScore = activeRatiosCount;
         const normalizedRatio = maxScore > 0 ? (score / maxScore) : 0.5;
@@ -42473,18 +42568,71 @@ function renderFinancialHealthDashboard() {
             verdictBadge = "🚨 Elevated Solvency / Quality Risk Alert";
             verdictColor = "var(--color-crimson)";
         }
+
+        // Dynamic Rupee Benchmarks
+        const deRupee = deVal !== null ? (deVal * 100).toFixed(1) : "0.0";
+        const crRupee = crVal !== null ? (crVal * 100).toFixed(0) : "0";
+        const atRupee = atVal !== null ? (atVal * 100).toFixed(0) : "0";
+        const roeRupee = roeVal !== null ? roeVal.toFixed(1) : "0.0";
+        const icrRupee = icrVal !== null ? icrVal.toFixed(1) : "0.0";
+        const roceRupee = roceVal !== null ? roceVal.toFixed(1) : "0.0";
+        const npmRupee = npmVal !== null ? npmVal.toFixed(1) : "0.0";
+        const eqRupee = eqVal !== null ? (eqVal * 100).toFixed(0) : "0";
         
         const summaryHTML = `
-            <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
                 <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 11px;">
                     <span style="color: var(--text-primary); font-weight:600;">Overall Health Verdict:</span>
                     <span style="color: ${verdictColor}; background: ${verdictColor}15; padding: 2px 8px; border-radius: 4px; border: 1px solid ${verdictColor}30;">${verdictBadge}</span>
                 </div>
-                <ul style="margin: 0; padding-left: 14px; display: flex; flex-direction: column; gap: 6px;">
-                    <li>${solvencyText}</li>
-                    <li>${efficiencyText}</li>
-                    <li>${profitText}</li>
-                </ul>
+                
+                <div class="layman-split-container">
+                    <!-- Left Column: Plain English Summary -->
+                    <div class="layman-column">
+                        <div style="font-size: 10px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; border-bottom: 1px solid var(--border-glass); padding-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <span>🗣️ Plain English Takeaways</span>
+                        </div>
+                        <ul style="margin: 0; padding-left: 14px; display: flex; flex-direction: column; gap: 8px; font-size: 11px; line-height: 1.5; color: var(--text-secondary);">
+                            <li>${solvencyText}</li>
+                            <li>${efficiencyText}</li>
+                            <li>${profitText}</li>
+                            <li>${capReturnText}</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Vertical Divider (hidden on mobile) -->
+                    <div class="layman-divider"></div>
+                    
+                    <!-- Right Column: Rupee Translator Math -->
+                    <div class="layman-column">
+                        <div style="font-size: 10px; text-transform: uppercase; font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; border-bottom: 1px solid var(--border-glass); padding-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <span>💰 The Rupee Translation (Rs. 100 Benchmark)</span>
+                        </div>
+                        <ul style="margin: 0; padding-left: 14px; display: flex; flex-direction: column; gap: 8px; font-size: 11px; line-height: 1.5; color: var(--text-secondary);">
+                            <li><strong>Liquidity (Bills):</strong> Has <span style="color: var(--color-primary); font-weight: 600;">Rs. ${crRupee}</span> in liquid assets for every Rs. 100 of bills due soon.</li>
+                            <li><strong>Solvency (Leverage):</strong> Owes just <span style="color: var(--color-primary); font-weight: 600;">Rs. ${deRupee}</span> in debt for every Rs. 100 of shareholders' equity.</li>
+                            <li><strong>Operating Efficiency:</strong> Generates <span style="color: var(--color-primary); font-weight: 600;">Rs. ${atRupee}</span> of sales for every Rs. 100 of assets/machinery.</li>
+                            <li><strong>Shareholder Returns (ROE):</strong> Generates <span style="color: var(--color-primary); font-weight: 600;">Rs. ${roeRupee}</span> in net profit per Rs. 100 of own equity.</li>
+                            <li><strong>Debt Stress (Interest):</strong> Earns <span style="color: var(--color-primary); font-weight: 600;">Rs. ${icrRupee}</span> in profit for every Rs. 1 of interest payment due.</li>
+                            <li><strong>Capital Productivity (ROCE):</strong> Generates <span style="color: var(--color-primary); font-weight: 600;">Rs. ${roceRupee}</span> in operating returns per Rs. 100 of total capital employed.</li>
+                            <li><strong>Net Profit Margin:</strong> Pockets <span style="color: var(--color-primary); font-weight: 600;">Rs. ${npmRupee}</span> in profit out of every Rs. 100 of sales.</li>
+                            <li><strong>Cash Quality:</strong> <span style="color: var(--color-primary); font-weight: 600;">Rs. ${eqRupee}</span> of every Rs. 100 in reported profits is collected in actual cash.</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- AI Audit Container -->
+                <div id="fs-layman-ai-audit-container" style="display: none; border-top: 1px dashed var(--border-glass); margin-top: 12px; padding-top: 12px; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border-glass); padding-bottom: 4px;">
+                        <span style="display: flex; align-items: center; gap: 4px; color: var(--color-primary);">✨ Deep AI Financial Audit (${window.llmConfig ? window.llmConfig.fast_label : "AI"})</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button id="fs-layman-ai-audio-btn" style="background: transparent; border: none; cursor: pointer; font-size: 11px; color: var(--color-primary); outline: none; transition: transform 0.2s;" title="Read AI Audit Out Loud">🔊</button>
+                            <button id="fs-layman-ai-close-btn" style="background: transparent; border: none; cursor: pointer; font-size: 14px; line-height: 1; color: var(--text-secondary); outline: none;" title="Close Audit">&times;</button>
+                        </div>
+                    </div>
+                    <div id="fs-layman-ai-audit-text" style="font-size: 11px; line-height: 1.5; color: var(--text-primary); word-break: break-word; overflow-wrap: break-word; padding: 4px 0;">
+                    </div>
+                </div>
             </div>
         `;
         
@@ -42502,11 +42650,125 @@ function renderFinancialHealthDashboard() {
                     // Strip HTML tags to make a clean reading transcript
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(summaryHTML, 'text/html');
-                    const textToRead = `Overall Health Verdict is ${verdictBadge.replace(/[^a-zA-Z0-9\s]/g, '')}. ` + doc.body.textContent;
+                    // Read only the qualitative Plain English Takeaways column to prevent repeating numbers
+                    const leftCol = doc.querySelector('.layman-column');
+                    const textToRead = `Overall Health Verdict is ${verdictBadge.replace(/[^a-zA-Z0-9\s]/g, '')}. ` + 
+                                       (leftCol ? leftCol.textContent : doc.body.textContent);
                     
                     window.SpeechPlayer.startSpeakingSection(textToRead, "Financial Health Summary", true);
                 } else {
                     alert("SpeechPlayer is not loaded.");
+                }
+            });
+        }
+
+        // On-Demand AI Audit hook
+        const aiBtn = document.getElementById('fs-layman-ai-btn');
+        if (aiBtn) {
+            // Remove previous listeners if any
+            const newAiBtn = aiBtn.cloneNode(true);
+            aiBtn.parentNode.replaceChild(newAiBtn, aiBtn);
+            
+            newAiBtn.addEventListener('click', async () => {
+                const auditContainer = document.getElementById('fs-layman-ai-audit-container');
+                const auditTextEl = document.getElementById('fs-layman-ai-audit-text');
+                if (!auditContainer || !auditTextEl) return;
+                
+                // Show loader and container
+                auditContainer.style.display = 'flex';
+                auditContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                
+                auditTextEl.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-muted); padding: 8px 0;">
+                        <span class="spinner-loader" style="width:12px; height:12px; border:2px solid rgba(59,130,246,0.3); border-top-color:var(--color-primary); border-radius:50%; animation:spin 1s linear infinite;"></span>
+                        Analyzing full statements with Gemini AI...
+                    </div>
+                `;
+                
+                newAiBtn.disabled = true;
+                newAiBtn.innerHTML = '⏳ Auditing...';
+                
+                try {
+                    const statementData = activeFsData[activeFsStatement];
+                    const scorecardMetrics = (typeof cards !== 'undefined' && cards) ? cards.map(c => ({
+                        label: c.label,
+                        value: c.value,
+                        health: c.health
+                    })) : [];
+                    
+                    const response = await fetch('/api/ai/audit-financials', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            symbol: activeStockProfile ? activeStockProfile.ticker : 'STOCK',
+                            view: activeFsView,
+                            statement_type: activeFsStatement,
+                            table_data: statementData,
+                            scorecard_metrics: scorecardMetrics
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error("AI analysis endpoint failed");
+                    
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder("utf-8");
+                    let auditMarkdown = "";
+                    auditTextEl.innerHTML = "";
+                    
+                    // Initialize the typewriter stream
+                    streamTypewrite(auditTextEl, "", auditContainer, () => {
+                        const finalHtml = auditTextEl.innerHTML;
+                        // Bind Speaker button for AI response when complete
+                        const aiAudioBtn = document.getElementById('fs-layman-ai-audio-btn');
+                        if (aiAudioBtn) {
+                            const newAiAudioBtn = aiAudioBtn.cloneNode(true);
+                            aiAudioBtn.parentNode.replaceChild(newAiAudioBtn, aiAudioBtn);
+                            
+                            newAiAudioBtn.addEventListener('click', () => {
+                                if (window.SpeechPlayer) {
+                                    // Extract plain text from the rendered html of the AI response
+                                    const tempDiv = document.createElement('div');
+                                    tempDiv.innerHTML = finalHtml;
+                                    const textToRead = tempDiv.textContent || tempDiv.innerText;
+                                    window.SpeechPlayer.startSpeakingSection(textToRead, "AI Financial Audit", true);
+                                } else {
+                                    alert("SpeechPlayer is not loaded.");
+                                }
+                            });
+                        }
+                    });
+                    
+                    while (true) {
+                        const { value, done } = await reader.read();
+                        if (done) {
+                            if (auditTextEl._updateStreamTarget) {
+                                auditTextEl._updateStreamTarget(auditMarkdown, true);
+                            }
+                            break;
+                        }
+                        
+                        const chunk = decoder.decode(value, { stream: true });
+                        auditMarkdown += chunk;
+                        
+                        if (auditTextEl._updateStreamTarget) {
+                            auditTextEl._updateStreamTarget(auditMarkdown, false);
+                        }
+                    }
+                    
+                    // Bind close button
+                    const aiCloseBtn = document.getElementById('fs-layman-ai-close-btn');
+                    if (aiCloseBtn) {
+                        aiCloseBtn.addEventListener('click', () => {
+                            auditContainer.style.display = 'none';
+                        });
+                    }
+                    
+                } catch (err) {
+                    console.error("AI Audit error:", err);
+                    auditTextEl.innerHTML = `<span style="color:var(--color-crimson);">❌ Error: Failed to generate AI analysis. Please try again.</span>`;
+                } finally {
+                    newAiBtn.disabled = false;
+                    newAiBtn.innerHTML = '✨ AI Audit';
                 }
             });
         }
@@ -45197,12 +45459,19 @@ async function triggerFsChatQuery() {
     appendFsChatLoading(botMsgId);
     
     try {
+        const scorecardMetrics = (typeof cards !== 'undefined' && cards) ? cards.map(c => ({
+            label: c.label,
+            value: c.value,
+            health: c.health
+        })) : [];
+
         const payload = {
             symbol: activeStockProfile ? activeStockProfile.ticker : 'STOCK',
             view: activeFsView,
             statement_type: activeFsStatement,
             table_data: activeTable,
-            custom_prompt: promptText
+            custom_prompt: promptText,
+            scorecard_metrics: scorecardMetrics
         };
         
         const res = await fetch('/api/ai/audit-financials', {
@@ -45212,11 +45481,48 @@ async function triggerFsChatQuery() {
         });
         
         if (!res.ok) throw new Error("Failed to compile AI analysis");
-        const data = await res.json();
         
-        // Remove loading message and append actual response
         removeFsChatLoading(botMsgId);
-        appendFsChatMessage('bot', data.analysis || "No response received.", true);
+        
+        const msgDiv = appendFsChatMessage('bot', '', true);
+        const contentDiv = msgDiv.querySelector('div');
+        const historyEl = document.getElementById('fs-chat-history');
+        
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let auditMarkdown = "";
+        
+        streamTypewrite(contentDiv, "", historyEl, () => {
+            const speakBtn = msgDiv.querySelector('.fs-chat-speak-btn');
+            if (speakBtn) {
+                const newSpeakBtn = speakBtn.cloneNode(true);
+                speakBtn.parentNode.replaceChild(newSpeakBtn, speakBtn);
+                newSpeakBtn.addEventListener('click', () => {
+                    speakFsBotMessage(auditMarkdown, newSpeakBtn);
+                });
+            }
+            const actionsDiv = speakBtn ? speakBtn.parentNode : null;
+            if (actionsDiv) {
+                actionsDiv.style.display = 'flex';
+            }
+        });
+        
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+                if (contentDiv._updateStreamTarget) {
+                    contentDiv._updateStreamTarget(auditMarkdown, true);
+                }
+                break;
+            }
+            
+            const chunk = decoder.decode(value, { stream: true });
+            auditMarkdown += chunk;
+            
+            if (contentDiv._updateStreamTarget) {
+                contentDiv._updateStreamTarget(auditMarkdown, false);
+            }
+        }
     } catch (err) {
         console.error("AI Chat error:", err);
         removeFsChatLoading(botMsgId);
@@ -45248,6 +45554,12 @@ async function triggerFsFullAudit() {
     appendFsChatLoading(botMsgId);
     
     try {
+        const scorecardMetrics = (typeof cards !== 'undefined' && cards) ? cards.map(c => ({
+            label: c.label,
+            value: c.value,
+            health: c.health
+        })) : [];
+
         const response = await fetch('/api/ai/audit-financials', {
             method: 'POST',
             headers: {
@@ -45257,16 +45569,54 @@ async function triggerFsFullAudit() {
                 symbol: activeStockProfile.ticker,
                 view: activeFsView,
                 statement_type: activeFsStatement,
-                table_data: statementData
+                table_data: statementData,
+                scorecard_metrics: scorecardMetrics
             })
         });
         
         if (!response.ok) throw new Error("AI analysis endpoint returned an error");
         
-        const data = await response.json();
-        
         removeFsChatLoading(botMsgId);
-        appendFsChatMessage('bot', data.analysis || "No audit response received.", true);
+        
+        const msgDiv = appendFsChatMessage('bot', '', true);
+        const contentDiv = msgDiv.querySelector('div');
+        const historyEl = document.getElementById('fs-chat-history');
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let auditMarkdown = "";
+        
+        streamTypewrite(contentDiv, "", historyEl, () => {
+            const speakBtn = msgDiv.querySelector('.fs-chat-speak-btn');
+            if (speakBtn) {
+                const newSpeakBtn = speakBtn.cloneNode(true);
+                speakBtn.parentNode.replaceChild(newSpeakBtn, speakBtn);
+                newSpeakBtn.addEventListener('click', () => {
+                    speakFsBotMessage(auditMarkdown, newSpeakBtn);
+                });
+            }
+            const actionsDiv = speakBtn ? speakBtn.parentNode : null;
+            if (actionsDiv) {
+                actionsDiv.style.display = 'flex';
+            }
+        });
+        
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+                if (contentDiv._updateStreamTarget) {
+                    contentDiv._updateStreamTarget(auditMarkdown, true);
+                }
+                break;
+            }
+            
+            const chunk = decoder.decode(value, { stream: true });
+            auditMarkdown += chunk;
+            
+            if (contentDiv._updateStreamTarget) {
+                contentDiv._updateStreamTarget(auditMarkdown, false);
+            }
+        }
     } catch (err) {
         console.error("AI Audit error:", err);
         showToast("Failed to compile AI audit: " + err.message, "error");
@@ -45371,6 +45721,7 @@ function appendFsChatMessage(sender, text, useTypewriter = false) {
     if (window.AIExportManager) {
         window.AIExportManager.decorate(history, 'chat', { module: 'FINANCIALS_CHAT' });
     }
+    return messageDiv;
 }
 
 function formatMarkdownText(text) {

@@ -8922,17 +8922,72 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
 [data-mode="light"] #rule-scanner-strategy-guide,
 [data-theme="light"] #rule-scanner-strategy-guide,
 [data-mode="light"] #alert-strategy-guide-panel,
-[data-theme="light"] #alert-strategy-guide-panel {
-    background: rgba(0, 0, 0, 0.02) !important;
-    border: 1px dashed rgba(0, 0, 0, 0.1) !important;
-    color: var(--text-secondary) !important;
+[data-theme="light"] #alert-strategy-guide-panel,
+[data-mode="light"] #swing-strategy-guide-panel,
+[data-theme="light"] #swing-strategy-guide-panel {
+    background: #f1f5f9 !important;
+    border: 1px dashed #cbd5e1 !important;
+    color: #334155 !important;
 }
 
 [data-mode="light"] #rule-scanner-strategy-guide strong,
 [data-theme="light"] #rule-scanner-strategy-guide strong,
 [data-mode="light"] #alert-strategy-guide-panel strong,
-[data-theme="light"] #alert-strategy-guide-panel strong {
-    color: var(--text-primary) !important;
+[data-theme="light"] #alert-strategy-guide-panel strong,
+[data-mode="light"] #swing-strategy-guide-panel strong,
+[data-theme="light"] #swing-strategy-guide-panel strong {
+    color: #0f172a !important;
+}
+
+/* Light mode tooltip and bottom sheet overrides */
+[data-mode="light"] .rs-tooltip,
+[data-theme="light"] .rs-tooltip {
+    background: rgba(255, 255, 255, 0.98) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+    color: #1e293b !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+[data-mode="light"] .rs-tooltip strong,
+[data-theme="light"] .rs-tooltip strong {
+    color: #0f172a !important;
+}
+[data-mode="light"] .rs-tooltip div,
+[data-theme="light"] .rs-tooltip div {
+    color: #334155 !important;
+}
+[data-mode="light"] .rs-tooltip span[style*="color: #38bdf8"],
+[data-theme="light"] .rs-tooltip span[style*="color: #38bdf8"] {
+    color: #0284c7 !important;
+}
+
+[data-mode="light"] .rs-bottom-sheet-content,
+[data-theme="light"] .rs-bottom-sheet-content {
+    background: rgba(255, 255, 255, 0.98) !important;
+    border-top: 1px solid rgba(0, 0, 0, 0.1) !important;
+    color: #1e293b !important;
+    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.05) !important;
+}
+[data-mode="light"] .rs-bottom-sheet-content strong,
+[data-theme="light"] .rs-bottom-sheet-content strong {
+    color: #0f172a !important;
+}
+[data-mode="light"] .rs-bottom-sheet-content div,
+[data-theme="light"] .rs-bottom-sheet-content div {
+    color: #334155 !important;
+}
+[data-mode="light"] .rs-bottom-sheet span[style*="color: #38bdf8"],
+[data-theme="light"] .rs-bottom-sheet span[style*="color: #38bdf8"] {
+    color: #0284c7 !important;
+}
+[data-mode="light"] .rs-bottom-sheet-handle,
+[data-theme="light"] .rs-bottom-sheet-handle {
+    background: rgba(0, 0, 0, 0.15) !important;
+}
+[data-mode="light"] .rs-bottom-sheet-close,
+[data-theme="light"] .rs-bottom-sheet-close {
+    background: rgba(0, 0, 0, 0.04) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+    color: #1e293b !important;
 }
 
 [data-theme="light"] .ai-presets-container {
@@ -17337,4 +17392,33 @@ select option {
     color: var(--text-primary) !important;
     font-family: var(--font-body), sans-serif;
     font-size: 11px;
+}
+
+/* Layman Split Scorecard Layout (Option 3) */
+.layman-split-container {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    width: 100%;
+}
+.layman-column {
+    flex: 1;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.layman-divider {
+    width: 1px;
+    background: var(--border-glass);
+    align-self: stretch;
+}
+@media (max-width: 768px) {
+    .layman-divider {
+        display: none !important;
+    }
+    .layman-column {
+        flex: 1 1 100% !important;
+    }
 }

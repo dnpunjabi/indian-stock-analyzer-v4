@@ -220,6 +220,82 @@ def _clean_reasoning_metadata(text: str) -> str:
         
     return text.strip()
 
+def call_llm_stream(task_type: str,
+                    system_prompt: str,
+                    user_prompt: str = None,
+                    max_tokens: int = 2500,
+                    messages: list = None):
+    """
+    Provider-agnostic streaming LLM call. Routes to the correct model based on task_type.
+    Yields chunks of generated text.
+    """
+    config = _get_config()
+    client = _get_client(config)
+    if client is None:
+        yield "ERROR_401: LLM client is not initialized. Please verify your API key and LLM_PROVIDER settings."
+        return
+
+    model = config["heavy_model"] if task_type == TASK_HEAVY else config["fast_model"]
+    temperature = config["temperature"]
+
+    # Ensure system prompt suppresses thinking process/chain-of-thought metadata
+    suppress_instructions = (
+        "\n\nIMPORTANT CONSTRUCT LIMITS:\n"
+        "1. Do NOT output any chain of thought, thinking process, planning steps, or self-correction commentary.\n"
+        "2. Do NOT include any introductory greetings or conversational filler.\n"
+        "3. Start your response directly with the requested output."
+    )
+
+    if messages is None:
+        messages = [
+            {"role": "system", "content": system_prompt + suppress_instructions},
+        ]
+        if user_prompt:
+            messages.append({"role": "user", "content": user_prompt})
+    else:
+        for msg in messages:
+            if msg.get("role") == "system":
+                msg["content"] = msg["content"] + suppress_instructions
+                break
+
+    safe_max_tokens = min(4096, max(max_tokens, 2000))
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=messages,
+            model=model,
+            max_tokens=safe_max_tokens,
+            temperature=temperature,
+            stream=True
+        )
+        for chunk in chat_completion:
+            if chunk.choices and len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                if delta and delta.content:
+                    yield delta.content
+    except Exception as e:
+        fallback_model = config["fast_model"] if task_type == TASK_HEAVY else config["heavy_model"]
+        if fallback_model != model:
+            try:
+                chat_completion = client.chat.completions.create(
+                    messages=messages,
+                    model=fallback_model,
+                    max_tokens=safe_max_tokens,
+                    temperature=temperature,
+                    stream=True
+                )
+                for chunk in chat_completion:
+                    if chunk.choices and len(chunk.choices) > 0:
+                        delta = chunk.choices[0].delta
+                        if delta and delta.content:
+                            yield delta.content
+                return
+            except Exception as e2:
+                yield f"ERROR: Failed to query LLM. Details: {str(e2)}"
+                return
+        yield f"ERROR: Failed to query LLM model {model}. Details: {str(e)}"
+
+
 # ---------------------------------------------------------------------------
 # Status & Configuration API (consumed by frontend via /api/llm-config)
 # ---------------------------------------------------------------------------
