@@ -24991,6 +24991,38 @@ function setupRuleScanner() {
         "Growth Compounder Buy": {
             "concept": "Triggers when Return on Equity is above 18.0% and PEG ratio is below 0.8.",
             "why": "Finds top-tier capital compounders experiencing high-speed growth at undervalued multiples."
+        },
+        "Low Beta Anchor": {
+            "concept": "Triggers when market Beta drops below 0.7, signaling low volatility relative to Nifty 50.",
+            "why": "Helps conservative investors locate stable capital compounders with minimal market noise."
+        },
+        "High Beta Trend Rider": {
+            "concept": "Triggers when market Beta is above 1.3, confirming strong systematic relative volatility.",
+            "why": "Perfect for aggressive swing traders looking to exploit rapid market expansions."
+        },
+        "Alpha Valuation Dip": {
+            "concept": "Triggers when a DCF margin of safety > 20.0% is backed by a low-volatility profile (Beta < 0.9).",
+            "why": "A high-conviction investor entry point combining absolute discount value and downside market protection."
+        },
+        "Death Cross Breakdown": {
+            "concept": "Triggers when the 50-day SMA crosses below the 200-day SMA, indicating structural breakdown.",
+            "why": "Serves as an absolute warning threshold to clean out long portfolios or initiate hedge positions."
+        },
+        "RSI Exuberance Bubble": {
+            "concept": "Triggers when RSI-14 goes above 75, signaling a highly overextended vertical markup.",
+            "why": "Prevents chasing euphoric tops and highlights targets for immediate profit booking."
+        },
+        "Speculative PE Bubble": {
+            "concept": "Triggers when trailing P/E exceeds 60.0, indicating high multiple expansion stretch.",
+            "why": "Alerts to speculative valuations that are unsupported by current corporate earnings."
+        },
+        "Pledge Liquidation Risk": {
+            "concept": "Triggers when promoter pledged shares exceed 15.0%, representing a high margin call threat.",
+            "why": "An essential warning system to avoid systemic deleveraging margin-call crashes."
+        },
+        "Altman Z Insolvency": {
+            "concept": "Triggers when Altman Z-Score falls below 1.1, signifying extreme financial distress.",
+            "why": "Protects capital from permanent impairment due to corporate bankruptcy or debt defaults."
         }
     };
 
@@ -25083,12 +25115,35 @@ function setupRuleScanner() {
                 if (opSelect) opSelect.value = op;
                 if (valInput) valInput.value = val;
             });
-        } else if (pill.classList.contains('rs-nl-template-pill')) {
+        } else if (pill.classList.contains('rs-nl-template-pill') || pill.classList.contains('nl-template-pill')) {
             // Populate prompt on pill click (but not on info trigger click)
             pill.addEventListener('click', (e) => {
                 if (e.target.classList.contains('rs-info-trigger')) return;
-                const textarea = document.getElementById('rule-scanner-nl-prompt');
-                if (textarea) textarea.value = pill.getAttribute('data-template') || '';
+                const templateText = e.currentTarget.getAttribute('data-template');
+                if (!templateText) return;
+                
+                // Resolve stock name dynamically:
+                let targetStock = 'RELIANCE';
+                const alertInputVal = document.getElementById('alert-symbol')?.value.trim();
+                if (alertInputVal) {
+                    targetStock = alertInputVal.toUpperCase();
+                } else if (typeof activeStockProfile !== 'undefined' && activeStockProfile && activeStockProfile.ticker) {
+                    targetStock = activeStockProfile.ticker.split('.')[0].toUpperCase();
+                }
+
+                const promptText = templateText.replace(/{STOCK}/g, targetStock);
+                
+                // Determine whether it's alert or rule scanner prompt textarea
+                const alertTxt = document.getElementById('alert-nl-prompt');
+                const scannerTxt = document.getElementById('rule-scanner-nl-prompt');
+                
+                if (pill.classList.contains('nl-template-pill') && alertTxt) {
+                    alertTxt.value = promptText;
+                    alertTxt.focus();
+                } else if (pill.classList.contains('rs-nl-template-pill') && scannerTxt) {
+                    scannerTxt.value = promptText;
+                    scannerTxt.focus();
+                }
             });
         }
 
