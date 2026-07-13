@@ -1117,23 +1117,43 @@ async function fetchLLMConfig() {
         // Update sidebar label
         const statusLabel = document.getElementById('llm-status-label');
         if (statusLabel) {
-            statusLabel.textContent = config.heavy_label || 'Active LLM';
+            statusLabel.textContent = config.active_label || config.heavy_label || 'Active LLM';
+        }
+        
+        // Update status indicator color based on active provider
+        const indicator = document.querySelector('#llm-connection-status .status-indicator');
+        if (indicator) {
+            if (config.status !== 'connected') {
+                indicator.style.backgroundColor = 'var(--neon-red, #ef4444)';
+                indicator.style.boxShadow = '0 0 8px var(--neon-red, #ef4444)';
+                indicator.setAttribute('title', 'LLM Connection Disconnected');
+            } else if (config.active_provider === 'groq' && config.provider === 'gemini') {
+                // Fallen back to Groq
+                indicator.style.backgroundColor = 'var(--color-amber, #f59e0b)';
+                indicator.style.boxShadow = '0 0 8px var(--color-amber, #f59e0b)';
+                indicator.setAttribute('title', 'Gemini Keys Exhausted/Rate-limited. Seamlessly using Groq Fallback.');
+            } else {
+                // Running on configured primary
+                indicator.style.backgroundColor = 'var(--color-emerald, #10b981)';
+                indicator.style.boxShadow = '0 0 8px var(--color-emerald, #10b981)';
+                indicator.setAttribute('title', `Active Engine: ${config.active_label}`);
+            }
         }
         
         // Update all general labels
         document.querySelectorAll('.llm-engine-label').forEach(el => {
-            el.textContent = config.fast_label || 'AI Engine';
+            el.textContent = config.active_label || config.fast_label || 'AI Engine';
         });
         
         // Update all badges
         document.querySelectorAll('.llm-engine-badge').forEach(el => {
-            el.textContent = config.fast_label || 'AI Copilot';
+            el.textContent = config.active_label || config.fast_label || 'AI Copilot';
         });
         
         // Also update any inline buttons or text containing Run AI Audit
         const groqAuditBtn = document.getElementById('run-groq-audit-btn');
         if (groqAuditBtn) {
-            groqAuditBtn.innerHTML = `<span>🤖</span> Run ${config.fast_label} Audit`;
+            groqAuditBtn.innerHTML = `<span>🤖</span> Run ${config.active_label || config.fast_label} Audit`;
         }
         
         console.log('[LLM Config] Dynamic labels updated:', config);
@@ -1146,6 +1166,8 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchLLMConfig();
     fetchScreenerCookieSettings();
     setupScreenerCookieListeners();
+    fetchLLMKeysSettings();
+    setupLLMKeysListeners();
     // Check if Angel One is configured before connecting WS
     fetch('/api/angel/status').then(r => r.json()).then(status => {
         if (status.connected || status.authenticated) {
@@ -5171,9 +5193,9 @@ function renderScreenerSkeletons() {
     }
 }
 
-async function loadStockAnalyzer(query, force_llm = false) {
+async function loadStockAnalyzer(query, force_llm = false, silent = false) {
     const searchInput = document.getElementById('analyzer-search-input');
-    if (searchInput) {
+    if (searchInput && !silent) {
         searchInput.value = query;
     }
 
@@ -5181,40 +5203,42 @@ async function loadStockAnalyzer(query, force_llm = false) {
     const risk = document.getElementById('profile-risk').value;
 
     const pitchbookBtn = document.getElementById('export-pitchbook-btn');
-    if (pitchbookBtn) {
+    if (pitchbookBtn && !silent) {
         pitchbookBtn.style.display = 'none';
     }
 
     const pitchbookContentPane = document.getElementById('pitchbook-content-pane');
-    if (pitchbookContentPane) {
+    if (pitchbookContentPane && !silent) {
         pitchbookContentPane.innerHTML = '';
     }
 
-    setAnalyzeBtnLoading(true);
+    if (!silent) {
+        setAnalyzeBtnLoading(true);
 
-    showLoader(
-        `Synthesizing Equity Diagnostics: ${query.toUpperCase()}`,
-        force_llm ? "Running full multi-agent LLM analysis and narrative synthesis..." : "Orchestrating mathematical subagents, evaluating balance sheets, scanning technical lines, and generating custom advisory consensus.",
-        true,
-        [
-            { threshold: 12, msg: `[INFO] Connecting to yfinance feeds for ${query.toUpperCase()}...`, color: '#38bdf8' },
-            { threshold: 24, msg: "[INFO] Compiling fundamental records (PE ratio, Book Value, debt-to-equity)...", color: '#f59e0b' },
-            { threshold: 36, msg: "[INFO] Estimating intrinsic value with dual-growth DCF parameters...", color: '#10b981' },
-            { threshold: 48, msg: "[INFO] Spawning governance scanner (audit files & pledging status)...", color: '#a855f7' },
-            { threshold: 60, msg: "[INFO] Fetching institutional analyst target price updates...", color: '#34d399' },
-            { threshold: 72, msg: "[INFO] Synthesizing sentiment feeds and technical swing matrix...", color: '#38bdf8' },
-            { threshold: 84, msg: "[INFO] Assembling final advisory consensus model...", color: '#10b981' }
-        ]
-    );
+        showLoader(
+            `Synthesizing Equity Diagnostics: ${query.toUpperCase()}`,
+            force_llm ? "Running full multi-agent LLM analysis and narrative synthesis..." : "Orchestrating mathematical subagents, evaluating balance sheets, scanning technical lines, and generating custom advisory consensus.",
+            true,
+            [
+                { threshold: 12, msg: `[INFO] Connecting to yfinance feeds for ${query.toUpperCase()}...`, color: '#38bdf8' },
+                { threshold: 24, msg: "[INFO] Compiling fundamental records (PE ratio, Book Value, debt-to-equity)...", color: '#f59e0b' },
+                { threshold: 36, msg: "[INFO] Estimating intrinsic value with dual-growth DCF parameters...", color: '#10b981' },
+                { threshold: 48, msg: "[INFO] Spawning governance scanner (audit files & pledging status)...", color: '#a855f7' },
+                { threshold: 60, msg: "[INFO] Fetching institutional analyst target price updates...", color: '#34d399' },
+                { threshold: 72, msg: "[INFO] Synthesizing sentiment feeds and technical swing matrix...", color: '#38bdf8' },
+                { threshold: 84, msg: "[INFO] Assembling final advisory consensus model...", color: '#10b981' }
+            ]
+        );
 
-    // Switch to analyzer tab immediately and load skeletons for instant feedback
-    const emptyStateEl = document.getElementById('analyzer-empty-state');
-    if (emptyStateEl) emptyStateEl.style.display = 'none';
-    const dashboardEl = document.getElementById('analyzer-dashboard');
-    if (dashboardEl) dashboardEl.style.display = 'block';
+        // Switch to analyzer tab immediately and load skeletons for instant feedback
+        const emptyStateEl = document.getElementById('analyzer-empty-state');
+        if (emptyStateEl) emptyStateEl.style.display = 'none';
+        const dashboardEl = document.getElementById('analyzer-dashboard');
+        if (dashboardEl) dashboardEl.style.display = 'block';
 
-    switchTab('analyzer');
-    applyCardSkeletons(true);
+        switchTab('analyzer');
+        applyCardSkeletons(true);
+    }
 
     try {
         const response = await fetch(`/api/analyze?query=${encodeURIComponent(query)}&horizon=${encodeURIComponent(horizon)}&risk=${encodeURIComponent(risk)}&force_llm=${force_llm}`);
@@ -5246,11 +5270,13 @@ async function loadStockAnalyzer(query, force_llm = false) {
         // Reset dynamic chart select values to default when loading a new stock
         const chartPeriodEl = document.getElementById('chart-period');
         const chartIntervalEl = document.getElementById('chart-interval');
-        if (chartPeriodEl) chartPeriodEl.value = '1y';
-        if (chartIntervalEl) chartIntervalEl.value = '1d';
+        if (chartPeriodEl && !silent) chartPeriodEl.value = '1y';
+        if (chartIntervalEl && !silent) chartIntervalEl.value = '1d';
 
         // Clear skeletons first, then render actual dashboard elements
-        applyCardSkeletons(false);
+        if (!silent) {
+            applyCardSkeletons(false);
+        }
         renderStockDashboard(profile);
         setupDCFSandbox();
         setupAuditSummary();
@@ -5259,7 +5285,7 @@ async function loadStockAnalyzer(query, force_llm = false) {
         setupPEBandsTimeframes();
         setupPeersSorting();
         triggerLiveCompoundingCalculation();
-        if (window.resetAnalyzerSubtabs) window.resetAnalyzerSubtabs();
+        if (!silent && window.resetAnalyzerSubtabs) window.resetAnalyzerSubtabs();
 
         // Load per-stock events for the summary tab
         if (typeof loadStockEvents === 'function') {
@@ -5324,30 +5350,40 @@ async function loadStockAnalyzer(query, force_llm = false) {
         }
 
         // Complete the loader animation and console text
-        const progressBar = document.getElementById('global-loader-progress-bar');
-        const progressConsole = document.getElementById('global-loader-progress-console');
-        if (progressBar) progressBar.style.width = '100%';
-        if (progressConsole) {
-            const line = document.createElement('div');
-            line.style.color = 'var(--color-emerald)';
-            line.style.fontWeight = 'bold';
-            line.innerText = `[SUCCESS] Profile diagnostics generated successfully for ${profile.symbol}!`;
-            progressConsole.appendChild(line);
-            progressConsole.scrollTop = progressConsole.scrollHeight;
+        if (!silent) {
+            const progressBar = document.getElementById('global-loader-progress-bar');
+            const progressConsole = document.getElementById('global-loader-progress-console');
+            if (progressBar) progressBar.style.width = '100%';
+            if (progressConsole) {
+                const line = document.createElement('div');
+                line.style.color = 'var(--color-emerald)';
+                line.style.fontWeight = 'bold';
+                line.innerText = `[SUCCESS] Profile diagnostics generated successfully for ${profile.symbol}!`;
+                progressConsole.appendChild(line);
+                progressConsole.scrollTop = progressConsole.scrollHeight;
+            }
         }
 
         // Load advanced shareholding and institutional holdings data
         loadShareholdingData(profile.ticker);
         loadStockTrades(profile.ticker);
 
-        setTimeout(() => {
-            hideLoader();
-            setAnalyzeBtnLoading(false);
-        }, 650);
+        if (silent && typeof loadFinancialStatements === 'function') {
+            loadFinancialStatements(profile.ticker);
+        }
+
+        if (!silent) {
+            setTimeout(() => {
+                hideLoader();
+                setAnalyzeBtnLoading(false);
+            }, 650);
+        }
     } catch (e) {
-        hideLoader();
-        applyCardSkeletons(false);
-        setAnalyzeBtnLoading(false);
+        if (!silent) {
+            hideLoader();
+            applyCardSkeletons(false);
+            setAnalyzeBtnLoading(false);
+        }
         showToast("Analysis error: " + e.message, 'error');
     }
 }
@@ -10261,6 +10297,8 @@ function setupAlertCenter() {
     setupDailyWrapupListeners();
     fetchScreenerCookieSettings();
     setupScreenerCookieListeners();
+    fetchLLMKeysSettings();
+    setupLLMKeysListeners();
     fetchAlertsList();
     startRealTimeAlertScanner();
 
@@ -11065,6 +11103,427 @@ function setupDailyWrapupListeners() {
             const previewContainer = document.getElementById('wrapup-preview-container');
             if (previewContainer) previewContainer.style.display = 'none';
         });
+    }
+}
+
+// --- LLM & Search Key Rotation Management ---
+let geminiKeysList = [];
+let serpapiKeysList = [];
+let tavilyKeysList = [];
+let llmHealthInterval = null;
+
+function maskApiKey(key) {
+    if (!key || key.length < 10) return "invalid";
+    return key.substring(0, 6) + "..." + key.substring(key.length - 4);
+}
+
+async function fetchLLMKeysSettings() {
+    try {
+        const response = await fetch('/api/settings/llm-keys');
+        if (!response.ok) return;
+        const data = await response.json();
+        
+        geminiKeysList = data.keys || [];
+        renderGeminiKeysList();
+        
+        serpapiKeysList = data.serpapi_api_key ? data.serpapi_api_key.split(',').map(s => s.trim()).filter(Boolean) : [];
+        renderSerpapiKeysList();
+        
+        tavilyKeysList = data.tavily_api_key ? data.tavily_api_key.split(',').map(s => s.trim()).filter(Boolean) : [];
+        renderTavilyKeysList();
+        
+        await updateLLMKeysHealth();
+        
+    } catch (err) {
+        console.error("Failed to fetch LLM/Search key settings:", err);
+    }
+}
+
+function renderGeminiKeysList(healthMap = {}) {
+    const container = document.getElementById('gemini-keys-container');
+    if (!container) return;
+    
+    container.innerHTML = "";
+    if (geminiKeysList.length === 0) {
+        container.innerHTML = `<div style="font-size: 9.5px; color: var(--text-muted); font-style: italic; padding: 4px 0;">No dynamic Gemini keys added yet. System will run off .env fallback keys.</div>`;
+        return;
+    }
+    
+    geminiKeysList.forEach((key, index) => {
+        const masked = maskApiKey(key);
+        const health = healthMap[masked] || { status: "active", cooldown_remaining: 0 };
+        
+        let statusBadgeColor = 'var(--neon-green)';
+        let statusText = 'Active';
+        if (health.status === 'cooldown') {
+            statusBadgeColor = 'var(--neon-orange, #ff9800)';
+            statusText = `Cooldown (${health.cooldown_remaining}s)`;
+        } else if (health.status === 'blacklisted') {
+            statusBadgeColor = 'var(--neon-red, #ff5722)';
+            statusText = 'Blacklisted / Bad Key';
+        }
+        
+        const keyRow = document.createElement('div');
+        keyRow.style = "display: flex; align-items: center; justify-content: space-between; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 8px; font-size: 10px; margin-top: 4px;";
+        keyRow.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${statusBadgeColor};" title="${statusText}"></span>
+                <span style="font-family: monospace; color: var(--text-primary); font-weight: 500;">${masked}</span>
+            </div>
+            <button class="delete-gemini-key-btn" data-index="${index}" style="background: transparent; border: none; color: var(--neon-red, #ff5722); cursor: pointer; padding: 0 4px; font-size: 11px;" title="Delete Key">🗑️</button>
+        `;
+        container.appendChild(keyRow);
+    });
+    
+    container.querySelectorAll('.delete-gemini-key-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+            const idx = parseInt(e.currentTarget.getAttribute('data-index'));
+            const originalContent = e.currentTarget.textContent;
+            e.currentTarget.textContent = "⏳";
+            e.currentTarget.disabled = true;
+            
+            const nextList = [...geminiKeysList];
+            nextList.splice(idx, 1);
+            
+            try {
+                const serpapi = serpapiKeysList.join(', ');
+                const tavily = tavilyKeysList.join(', ');
+                
+                const response = await fetch('/api/settings/llm-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        keys: nextList,
+                        serpapi_api_key: serpapi,
+                        tavily_api_key: tavily
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast("Key deleted successfully.", "success");
+                    geminiKeysList = nextList;
+                    await fetchLLMKeysSettings();
+                } else {
+                    const errData = await response.json();
+                    showToast(errData.detail || "Failed to delete key.", "error");
+                    e.currentTarget.textContent = originalContent;
+                    e.currentTarget.disabled = false;
+                }
+            } catch (err) {
+                console.error("Error deleting key:", err);
+                showToast("Error updating key pool.", "error");
+                e.currentTarget.textContent = originalContent;
+                e.currentTarget.disabled = false;
+            }
+        };
+    });
+}
+
+function renderSerpapiKeysList() {
+    const container = document.getElementById('serpapi-keys-container');
+    if (!container) return;
+    
+    container.innerHTML = "";
+    if (serpapiKeysList.length === 0) {
+        container.innerHTML = `<div style="font-size: 9.5px; color: var(--text-muted); font-style: italic; padding: 4px 0;">No dynamic SerpApi keys added yet. System will run off .env fallback keys.</div>`;
+        return;
+    }
+    
+    serpapiKeysList.forEach((key, index) => {
+        const masked = maskApiKey(key);
+        const keyRow = document.createElement('div');
+        keyRow.style = "display: flex; align-items: center; justify-content: space-between; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 8px; font-size: 10px; margin-top: 4px;";
+        keyRow.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--neon-green);" title="Configured"></span>
+                <span style="font-family: monospace; color: var(--text-primary); font-weight: 500;">${masked}</span>
+            </div>
+            <button class="delete-serpapi-key-btn" data-index="${index}" style="background: transparent; border: none; color: var(--neon-red, #ff5722); cursor: pointer; padding: 0 4px; font-size: 11px;" title="Delete Key">🗑️</button>
+        `;
+        container.appendChild(keyRow);
+    });
+    
+    container.querySelectorAll('.delete-serpapi-key-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+            const idx = parseInt(e.currentTarget.getAttribute('data-index'));
+            const originalContent = e.currentTarget.textContent;
+            e.currentTarget.textContent = "⏳";
+            e.currentTarget.disabled = true;
+            
+            const nextList = [...serpapiKeysList];
+            nextList.splice(idx, 1);
+            
+            try {
+                const response = await fetch('/api/settings/llm-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        keys: geminiKeysList,
+                        serpapi_api_key: nextList.join(', '),
+                        tavily_api_key: tavilyKeysList.join(', ')
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast("SerpApi key deleted successfully.", "success");
+                    serpapiKeysList = nextList;
+                    await fetchLLMKeysSettings();
+                } else {
+                    const errData = await response.json();
+                    showToast(errData.detail || "Failed to delete SerpApi key.", "error");
+                    e.currentTarget.textContent = originalContent;
+                    e.currentTarget.disabled = false;
+                }
+            } catch (err) {
+                console.error("Error deleting key:", err);
+                showToast("Error updating key pool.", "error");
+                e.currentTarget.textContent = originalContent;
+                e.currentTarget.disabled = false;
+            }
+        };
+    });
+}
+
+function renderTavilyKeysList() {
+    const container = document.getElementById('tavily-keys-container');
+    if (!container) return;
+    
+    container.innerHTML = "";
+    if (tavilyKeysList.length === 0) {
+        container.innerHTML = `<div style="font-size: 9.5px; color: var(--text-muted); font-style: italic; padding: 4px 0;">No dynamic Tavily keys added yet. System will run off .env fallback keys.</div>`;
+        return;
+    }
+    
+    tavilyKeysList.forEach((key, index) => {
+        const masked = maskApiKey(key);
+        const keyRow = document.createElement('div');
+        keyRow.style = "display: flex; align-items: center; justify-content: space-between; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-glass); border-radius: 4px; padding: 4px 8px; font-size: 10px; margin-top: 4px;";
+        keyRow.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--neon-green);" title="Configured"></span>
+                <span style="font-family: monospace; color: var(--text-primary); font-weight: 500;">${masked}</span>
+            </div>
+            <button class="delete-tavily-key-btn" data-index="${index}" style="background: transparent; border: none; color: var(--neon-red, #ff5722); cursor: pointer; padding: 0 4px; font-size: 11px;" title="Delete Key">🗑️</button>
+        `;
+        container.appendChild(keyRow);
+    });
+    
+    container.querySelectorAll('.delete-tavily-key-btn').forEach(btn => {
+        btn.onclick = async (e) => {
+            const idx = parseInt(e.currentTarget.getAttribute('data-index'));
+            const originalContent = e.currentTarget.textContent;
+            e.currentTarget.textContent = "⏳";
+            e.currentTarget.disabled = true;
+            
+            const nextList = [...tavilyKeysList];
+            nextList.splice(idx, 1);
+            
+            try {
+                const response = await fetch('/api/settings/llm-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        keys: geminiKeysList,
+                        serpapi_api_key: serpapiKeysList.join(', '),
+                        tavily_api_key: nextList.join(', ')
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast("Tavily key deleted successfully.", "success");
+                    tavilyKeysList = nextList;
+                    await fetchLLMKeysSettings();
+                } else {
+                    const errData = await response.json();
+                    showToast(errData.detail || "Failed to delete Tavily key.", "error");
+                    e.currentTarget.textContent = originalContent;
+                    e.currentTarget.disabled = false;
+                }
+            } catch (err) {
+                console.error("Error deleting key:", err);
+                showToast("Error updating key pool.", "error");
+                e.currentTarget.textContent = originalContent;
+                e.currentTarget.disabled = false;
+            }
+        };
+    });
+}
+
+async function updateLLMKeysHealth() {
+    try {
+        const response = await fetch('/api/settings/llm-health');
+        if (!response.ok) return;
+        const healthList = await response.json();
+        
+        const healthMap = {};
+        if (Array.isArray(healthList)) {
+            healthList.forEach(item => {
+                healthMap[item.masked_key] = item;
+            });
+        }
+        renderGeminiKeysList(healthMap);
+    } catch (err) {
+        console.warn("Failed to fetch LLM keys health details:", err);
+    }
+}
+
+function setupLLMKeysListeners() {
+    const addKeyBtn = document.getElementById('add-gemini-key-btn');
+    const newKeyInput = document.getElementById('gemini-new-key');
+    const saveAllBtn = document.getElementById('save-llm-search-keys-btn');
+    
+    if (addKeyBtn && newKeyInput) {
+        addKeyBtn.onclick = async () => {
+            const val = newKeyInput.value.trim();
+            if (!val) return;
+            if (geminiKeysList.includes(val)) {
+                showToast("Key is already in the list.", "warning");
+                return;
+            }
+            
+            const originalText = addKeyBtn.textContent;
+            addKeyBtn.textContent = "Verifying...";
+            addKeyBtn.disabled = true;
+            
+            const nextList = [...geminiKeysList, val];
+            const serpapi = serpapiKeysList.join(', ');
+            const tavily = tavilyKeysList.join(', ');
+            
+            try {
+                const response = await fetch('/api/settings/llm-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        keys: nextList,
+                        serpapi_api_key: serpapi,
+                        tavily_api_key: tavily
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast("Gemini key added and verified successfully.", "success");
+                    newKeyInput.value = "";
+                    geminiKeysList = nextList;
+                    await fetchLLMKeysSettings();
+                } else {
+                    const errData = await response.json();
+                    showToast(errData.detail || "Failed to verify/add Gemini key.", "error");
+                }
+            } catch (err) {
+                console.error("Error adding Gemini key:", err);
+                showToast("Error connecting to server for key verification.", "error");
+            } finally {
+                addKeyBtn.textContent = originalText;
+                addKeyBtn.disabled = false;
+            }
+        };
+    }
+    
+    const addSerpapiBtn = document.getElementById('add-serpapi-key-btn');
+    const newSerpapiInput = document.getElementById('serpapi-new-key');
+    if (addSerpapiBtn && newSerpapiInput) {
+        addSerpapiBtn.onclick = async () => {
+            const val = newSerpapiInput.value.trim();
+            if (!val) return;
+            if (serpapiKeysList.includes(val)) {
+                showToast("Key is already in the list.", "warning");
+                return;
+            }
+            
+            const originalText = addSerpapiBtn.textContent;
+            addSerpapiBtn.textContent = "Verifying...";
+            addSerpapiBtn.disabled = true;
+            
+            const nextList = [...serpapiKeysList, val];
+            const gemini = geminiKeysList;
+            const tavily = tavilyKeysList.join(', ');
+            
+            try {
+                const response = await fetch('/api/settings/llm-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        keys: gemini,
+                        serpapi_api_key: nextList.join(', '),
+                        tavily_api_key: tavily
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast("SerpApi key added and verified successfully.", "success");
+                    newSerpapiInput.value = "";
+                    serpapiKeysList = nextList;
+                    await fetchLLMKeysSettings();
+                } else {
+                    const errData = await response.json();
+                    showToast(errData.detail || "Failed to verify/add SerpApi key.", "error");
+                }
+            } catch (err) {
+                console.error("Error adding SerpApi key:", err);
+                showToast("Error connecting to server for key verification.", "error");
+            } finally {
+                addSerpapiBtn.textContent = originalText;
+                addSerpapiBtn.disabled = false;
+            }
+        };
+    }
+    
+    const addTavilyBtn = document.getElementById('add-tavily-key-btn');
+    const newTavilyInput = document.getElementById('tavily-new-key');
+    if (addTavilyBtn && newTavilyInput) {
+        addTavilyBtn.onclick = async () => {
+            const val = newTavilyInput.value.trim();
+            if (!val) return;
+            if (tavilyKeysList.includes(val)) {
+                showToast("Key is already in the list.", "warning");
+                return;
+            }
+            
+            const originalText = addTavilyBtn.textContent;
+            addTavilyBtn.textContent = "Verifying...";
+            addTavilyBtn.disabled = true;
+            
+            const nextList = [...tavilyKeysList, val];
+            const gemini = geminiKeysList;
+            const serpapi = serpapiKeysList.join(', ');
+            
+            try {
+                const response = await fetch('/api/settings/llm-keys', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        keys: gemini,
+                        serpapi_api_key: serpapi,
+                        tavily_api_key: nextList.join(', ')
+                    })
+                });
+                
+                if (response.ok) {
+                    showToast("Tavily key added and verified successfully.", "success");
+                    newTavilyInput.value = "";
+                    tavilyKeysList = nextList;
+                    await fetchLLMKeysSettings();
+                } else {
+                    const errData = await response.json();
+                    showToast(errData.detail || "Failed to verify/add Tavily key.", "error");
+                }
+            } catch (err) {
+                console.error("Error adding Tavily key:", err);
+                showToast("Error connecting to server for key verification.", "error");
+            } finally {
+                addTavilyBtn.textContent = originalText;
+                addTavilyBtn.disabled = false;
+            }
+        };
+    }
+    
+    if (!llmHealthInterval) {
+        llmHealthInterval = setInterval(() => {
+            if (document.getElementById('gemini-keys-container')) {
+                updateLLMKeysHealth();
+            }
+            fetchLLMConfig();
+        }, 10000);
     }
 }
 
@@ -39666,7 +40125,7 @@ async function loadFinancialStatements(symbol) {
     if (basisEl) basisEl.textContent = "Reporting Basis: --";
     
     try {
-        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/financial-statements?view=${activeFsView}`);
+        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/financial-statements?view=${activeFsView}&_t=${Date.now()}`);
         if (!response.ok) throw new Error("Failed to fetch financial statements");
         
         const data = await response.json();
@@ -39679,10 +40138,32 @@ async function loadFinancialStatements(symbol) {
             try { await fetchFsAlerts(symbol); } catch (e) { console.warn("Failed to load FS alerts:", e); }
         }
         
+        // Keep activeFsView in memory in sync with actual loaded data
+        if (typeof data.is_consolidated !== 'undefined') {
+            activeFsView = data.is_consolidated ? 'consolidated' : 'standalone';
+        }
+
         // Update reporting basis text
         if (basisEl) {
             const basisText = data.is_consolidated ? "Consolidated Figures" : "Standalone Figures";
-            basisEl.textContent = `Reporting Basis: ${basisText}`;
+            if (data.source === "yfinance_fallback" || data.is_fallback) {
+                basisEl.innerHTML = `Reporting Basis: <span style="color: #f59e0b; font-weight: 700;">${basisText} (Yahoo Finance Fallback)</span>`;
+            } else {
+                basisEl.textContent = `Reporting Basis: ${basisText}`;
+            }
+            
+            const dataSourceEl = document.getElementById('fs-data-source-text');
+            if (dataSourceEl) {
+                if (data.source === "yfinance_fallback" || data.is_fallback) {
+                    dataSourceEl.innerHTML = `⚠️ Screener.in is currently unreachable. Displaying fallback data from Yahoo Finance (Note: yfinance only provides Consolidated statements for Indian equities).`;
+                    dataSourceEl.style.color = '#ef4444';
+                    dataSourceEl.style.fontWeight = '600';
+                } else {
+                    dataSourceEl.textContent = `Data sourced from Screener.in integration.`;
+                    dataSourceEl.style.color = '';
+                    dataSourceEl.style.fontWeight = '';
+                }
+            }
             
             // Sync the toggle button active states if the scraped actual state differs
             const consBtn = document.getElementById('fs-view-consolidated-btn');
@@ -40463,9 +40944,15 @@ function renderActiveStatementTable() {
         return;
     }
     
+    const isPeers = (activeFsStatement === 'peers');
+    
+    // Robust alignment: ensure headers array starts with a dummy column placeholder to match index 0 values
+    if (!isPeers && statement.headers && statement.headers.length > 0 && statement.headers[0] !== '') {
+        statement.headers = [''].concat(statement.headers);
+    }
+    
     const headers = statement.headers;
     const rows = statement.rows;
-    const isPeers = (activeFsStatement === 'peers');
     
     if (!window.collapsedFsCategories) {
         window.collapsedFsCategories = {};
@@ -41602,6 +42089,54 @@ function exportFsTableExcel() {
         btn.textContent = '✅ Downloaded';
         btn.style.color = 'var(--color-emerald)';
         setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
+    }
+}
+
+async function refreshFinancialStatements() {
+    if (!activeStockProfile || !activeStockProfile.ticker) {
+        showToast('Please search for a stock first before refreshing.', 'warning');
+        return;
+    }
+    
+    const btn = document.getElementById('fs-refresh-btn');
+    const symbol = activeStockProfile.ticker;
+    const origHtml = btn ? btn.innerHTML : '🔄 Refresh';
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '🔄 Refreshing...';
+        btn.style.opacity = '0.7';
+    }
+    
+    showToast(`Refreshing financial statements for ${symbol} from Screener.in...`, 'info');
+    
+    try {
+        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/financial-statements?view=${activeFsView}&force_refresh=true&_t=${Date.now()}`);
+        if (!response.ok) throw new Error("Failed to refresh financial statements from Screener.in.");
+        
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        
+        // Update loaded data in memory
+        activeFsData = data;
+        
+        showToast('Financial statements refreshed. Re-generating profile & analysis...', 'info');
+        
+        // Re-run the main analyzer loadStockAnalyzer to recompute everything silently
+        if (typeof loadStockAnalyzer === 'function') {
+            await loadStockAnalyzer(symbol, false, true);
+        }
+        
+        showToast('Financial statements and metrics refreshed successfully!', 'success');
+    } catch (err) {
+        console.error("Error refreshing financials:", err);
+        showToast(`Refresh failed: ${err.message}`, 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+            btn.style.opacity = '';
+        }
     }
 }
 
@@ -44261,7 +44796,7 @@ async function loadFsAlertsAndDataInBackground(symbol) {
     if (alertsList) alertsList.innerHTML = '<div style="font-size: 10.5px; color: var(--text-muted); font-style: italic; padding: 10px;">Evaluating systematic rules and custom alerts...</div>';
     
     try {
-        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/fs-evaluation`);
+        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/fs-evaluation?view=${activeFsView}`);
         if (response.ok) {
             const data = await response.json();
             
@@ -44405,7 +44940,7 @@ window.runFsManualScan = async function(symbol) {
         if (typeof showToast === 'function') {
             showToast(`Scraping and analyzing financial statements for ${symbol}...`, "info");
         }
-        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/fs-evaluation?force_refresh=true`);
+        const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/fs-evaluation?view=${activeFsView}&force_refresh=true`);
         if (response.ok) {
             await loadFsAlertsAndDataInBackground(symbol);
             if (typeof showToast === 'function') {

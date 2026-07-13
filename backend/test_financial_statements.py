@@ -161,6 +161,33 @@ class TestFinancialStatements(unittest.TestCase):
         # Ensure scraper is not called because it was resolved from cache
         mock_scrape.assert_not_called()
 
+    @patch("backend.financial_statements_scraper.scrape_financial_statements")
+    def test_api_financial_statements_force_refresh(self, mock_scrape):
+        mock_scrape.return_value = {
+            "symbol": "INFY",
+            "is_consolidated": True,
+            "quarters": {"headers": ["", "Mar 2024"], "rows": []},
+            "cash_flow": {"headers": ["", "Mar 2024"], "rows": []}
+        }
+        # Prepare cache DB connection
+        with get_db() as conn:
+            c = conn.cursor()
+            c.execute(
+                "INSERT OR REPLACE INTO cached_financial_statements (symbol, view, data_json, last_updated) VALUES (?, ?, ?, datetime('now', '-1 day'))",
+                ("INFY", "consolidated", json.dumps({"symbol": "INFY", "is_consolidated": True, "quarters": {"headers": ["", "Dec 2023"], "rows": []}, "cash_flow": {"headers": ["", "Dec 2023"], "rows": []}}))
+            )
+            conn.commit()
+            
+        res = self.client.get("/api/stocks/INFY/financial-statements?view=consolidated&force_refresh=true")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["symbol"], "INFY")
+        
+        # Ensure scraper is called despite the cached entry because force_refresh=true
+        mock_scrape.assert_called_once()
+        self.assertEqual(mock_scrape.call_args[0][0], "INFY")
+        self.assertEqual(mock_scrape.call_args[0][1], "consolidated")
+
     @patch("backend.llm_config.call_llm_stream")
     def test_api_audit_financials(self, mock_call_llm_stream):
         mock_call_llm_stream.return_value = ["### Key Revenue/Profitability Trends\n* TCS is showing 4% growth."]

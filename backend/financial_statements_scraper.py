@@ -1,7 +1,25 @@
-# Force IPv4 in requests/urllib3 to prevent "Network is unreachable" (Errno 101) in restricted IPv6 routing environments (e.g. Oracle VM)
+# Dynamic IPv6/IPv4 selector to support both normal networks and restricted environments (e.g. Oracle VM)
 try:
+    import socket
     import urllib3.util.connection as urllib3_cn
-    urllib3_cn.HAS_IPV6 = False
+    has_screener_ipv6 = False
+    try:
+        res = socket.getaddrinfo('www.screener.in', 443, 0, socket.SOCK_STREAM)
+        ipv6_addrs = [r[4] for r in res if r[0] == socket.AF_INET6]
+        if ipv6_addrs:
+            s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            s.settimeout(1.2)
+            try:
+                s.connect(ipv6_addrs[0])
+                has_screener_ipv6 = True
+            except Exception:
+                pass
+            finally:
+                s.close()
+    except Exception:
+        pass
+    if not has_screener_ipv6:
+        urllib3_cn.HAS_IPV6 = False
 except Exception:
     pass
 
@@ -111,6 +129,20 @@ def parse_screener_peers_table(table_el) -> dict:
         "rows": rows
     }
 
+def make_screener_request(url: str, headers: dict, cookies: dict = None, timeout: int = 10) -> requests.Response:
+    """Robust requests fetcher that falls back to anonymous guest request on 429 rate limit or timeout."""
+    if cookies:
+        try:
+            res = requests.get(url, headers=headers, cookies=cookies, timeout=max(2, timeout // 2))
+            if res.status_code != 429:
+                return res
+            print(f"Screener returned 429 for {url} with cookies. Retrying as guest...")
+        except Exception as e:
+            print(f"Screener request to {url} with cookies failed/timed out: {e}. Retrying as guest...")
+    
+    # Guest request (no cookies)
+    return requests.get(url, headers=headers, timeout=timeout)
+
 def scrape_financial_statements(symbol: str, view: str = "consolidated", session_cookie: str = None) -> dict:
     """
     Scrapes the Quarterly Results, annual Profit & Loss, and Balance Sheet statements
@@ -143,18 +175,19 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated", session
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    # 2. Resolve URL path using Screener's API search suggestion
-    resolved_path = None
-    search_queries = [base_symbol]
-    if company_name:
-        clean_name = company_name.replace("Limited", "").replace("Ltd.", "").replace("Ltd", "").strip()
-        if clean_name and clean_name not in search_queries:
-            search_queries.append(clean_name)
-            
-    for q in search_queries:
-        search_url = f"https://www.screener.in/api/company/search/?q={requests.utils.quote(q)}"
-        try:
-            search_res = requests.get(search_url, headers=headers, cookies=cookies, timeout=5)
+    try:
+        # 2. Resolve URL path using Screener's API search suggestion
+        resolved_path = None
+        search_queries = [base_symbol]
+        if company_name:
+            clean_name = company_name.replace("Limited", "").replace("Ltd.", "").replace("Ltd", "").strip()
+            if clean_name and clean_name not in search_queries:
+                search_queries.append(clean_name)
+                
+        for q in search_queries:
+            search_url = f"https://www.screener.in/api/company/search/?q={requests.utils.quote(q)}"
+            # Propagate connection errors/timeouts up so we proceed directly to yfinance fallback
+            search_res = make_screener_request(search_url, headers=headers, cookies=cookies, timeout=3)
             if search_res.status_code == 200:
                 results = search_res.json()
                 if results and len(results) > 0:
@@ -169,31 +202,28 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated", session
                         resolved_path = results[0].get("url")
                     if resolved_path:
                         break
-        except Exception as search_err:
-            print(f"Screener search suggest query failed in financial_statements_scraper for '{q}': {search_err}")
 
-    # Remove trailing slash if present to make URL construction clean
-    if resolved_path:
-        base_path = resolved_path.rstrip("/")
-        # If search suggest returned a consolidated path, extract the base slug
-        if "/consolidated" in base_path:
-            base_path = base_path.replace("/consolidated", "")
-    else:
-        base_path = f"/company/{base_symbol}"
+        # Remove trailing slash if present to make URL construction clean
+        if resolved_path:
+            base_path = resolved_path.rstrip("/")
+            # If search suggest returned a consolidated path, extract the base slug
+            if "/consolidated" in base_path:
+                base_path = base_path.replace("/consolidated", "")
+        else:
+            base_path = f"/company/{base_symbol}"
 
-    # Build URLs
-    if view == "consolidated":
-        url = f"https://www.screener.in{base_path}/consolidated/"
-    else:
-        url = f"https://www.screener.in{base_path}/"
+        # Build URLs
+        if view == "consolidated":
+            url = f"https://www.screener.in{base_path}/consolidated/"
+        else:
+            url = f"https://www.screener.in{base_path}/"
 
-    try:
-        response = requests.get(url, headers=headers, cookies=cookies, timeout=12)
+        response = make_screener_request(url, headers=headers, cookies=cookies, timeout=4)
         
         # Fallback if consolidated returns 404 or redirects back to the main standalone profile page
         if view == "consolidated" and (response.status_code != 200 or len(response.history) > 0):
             fallback_url = f"https://www.screener.in{base_path}/"
-            response = requests.get(fallback_url, headers=headers, cookies=cookies, timeout=12)
+            response = make_screener_request(fallback_url, headers=headers, cookies=cookies, timeout=4)
             
         if response.status_code != 200:
             raise Exception(f"Failed to retrieve Screener financials. Status: {response.status_code}")
@@ -219,7 +249,7 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated", session
         if warehouse_id:
             try:
                 peers_url = f"https://www.screener.in/api/company/{warehouse_id}/peers/"
-                peers_res = requests.get(peers_url, headers=headers, cookies=cookies, timeout=10)
+                peers_res = make_screener_request(peers_url, headers=headers, cookies=cookies, timeout=3)
                 if peers_res.status_code == 200:
                     peers_soup = BeautifulSoup(peers_res.text, "html.parser")
                     peers_table_el = peers_soup.find("table")
@@ -230,6 +260,8 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated", session
             "symbol": symbol,
             "resolved_symbol": base_symbol,
             "is_consolidated": actual_is_consolidated,
+            "source": "screener",
+            "is_fallback": False,
             "quarters": parse_screener_table(soup.find("section", id="quarters").find("table") if soup.find("section", id="quarters") else None),
             "profit_loss": parse_screener_table(soup.find("section", id="profit-loss").find("table") if soup.find("section", id="profit-loss") else None),
             "balance_sheet": parse_screener_table(soup.find("section", id="balance-sheet").find("table") if soup.find("section", id="balance-sheet") else None),
@@ -237,12 +269,12 @@ def scrape_financial_statements(symbol: str, view: str = "consolidated", session
             "peers": parse_screener_peers_table(peers_table_el)
         }
     except Exception as err:
-        print(f"Screener scrape failed for {symbol}: {err}. Attempting yfinance fallback...")
+        print(f"Screener connection/scrape failed: {err}. Proceeding to yfinance fallback.")
         try:
             return scrape_yfinance_financials_fallback(symbol, view)
         except Exception as yf_err:
-            print(f"yfinance fallback also failed for {symbol}: {yf_err}")
-            return {"error": f"Exception occurred while scraping financials: {str(err)} (yfinance fallback error: {str(yf_err)})"}
+            print(f"yfinance fallback also failed: {yf_err}")
+            return {"error": f"Exception occurred: {str(err)} (yfinance fallback error: {str(yf_err)})"}
 
 
 def scrape_yfinance_financials_fallback(symbol: str, view: str = "consolidated") -> dict:
@@ -472,10 +504,22 @@ def scrape_yfinance_financials_fallback(symbol: str, view: str = "consolidated")
 
     cf_table = build_table(cf, cashflow_mappings)
 
+    # Prepend empty header to all fallback tables to align with the frontend renderer
+    if quarters_table and quarters_table.get("headers"):
+        quarters_table["headers"] = [""] + quarters_table["headers"]
+    if pl_table and pl_table.get("headers"):
+        pl_table["headers"] = [""] + pl_table["headers"]
+    if bs_table and bs_table.get("headers"):
+        bs_table["headers"] = [""] + bs_table["headers"]
+    if cf_table and cf_table.get("headers"):
+        cf_table["headers"] = [""] + cf_table["headers"]
+
     return {
         "symbol": symbol,
         "resolved_symbol": base_symbol,
-        "is_consolidated": True,
+        "is_consolidated": (view == "consolidated"),
+        "source": "yfinance_fallback",
+        "is_fallback": True,
         "quarters": quarters_table,
         "profit_loss": pl_table,
         "balance_sheet": bs_table,

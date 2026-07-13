@@ -1,7 +1,25 @@
-# Force IPv4 in requests/urllib3 to prevent "Network is unreachable" (Errno 101) in restricted IPv6 routing environments (e.g. Oracle VM)
+# Dynamic IPv6/IPv4 selector to support both normal networks and restricted environments (e.g. Oracle VM)
 try:
+    import socket
     import urllib3.util.connection as urllib3_cn
-    urllib3_cn.HAS_IPV6 = False
+    has_screener_ipv6 = False
+    try:
+        res = socket.getaddrinfo('www.screener.in', 443, 0, socket.SOCK_STREAM)
+        ipv6_addrs = [r[4] for r in res if r[0] == socket.AF_INET6]
+        if ipv6_addrs:
+            s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            s.settimeout(1.2)
+            try:
+                s.connect(ipv6_addrs[0])
+                has_screener_ipv6 = True
+            except Exception:
+                pass
+            finally:
+                s.close()
+    except Exception:
+        pass
+    if not has_screener_ipv6:
+        urllib3_cn.HAS_IPV6 = False
 except Exception:
     pass
 
@@ -2796,7 +2814,7 @@ def _build_financial_profile(ticker_query: str) -> dict:
                 conn = sqlite3.connect(DATABASE_PATH_LOCAL)
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT event_type, event_date, details 
+                    SELECT event_type, event_date, description 
                     FROM stock_events 
                     WHERE symbol = ? 
                     ORDER BY event_date DESC
@@ -2910,6 +2928,8 @@ def _build_financial_profile(ticker_query: str) -> dict:
     debt_eq = float(screener_data["ratios"].get("Debt to Equity") or info.get("debtToEquity", 0.0) / 100.0 if info.get("debtToEquity") else 0.1)
     
     # Self-Healing from Statement tables
+    net_margin_calc = None
+    ebitda_margin_calc = None
     if statements_data:
         def get_row_last_val(table_data, label_name):
             if not table_data or "rows" not in table_data:
@@ -2936,17 +2956,18 @@ def _build_financial_profile(ticker_query: str) -> dict:
         interest_val = get_row_last_val(statements_data.get("profit_loss"), "Interest") or 0.0
         ebit_val = pbt_val + interest_val
 
-        if roce == 0.0 or roce is None or math.isnan(roce) or roce == 18.5:
+        sales_val = get_row_last_val(statements_data.get("profit_loss"), "Sales") or 0.0
+        op_profit_val = get_row_last_val(statements_data.get("profit_loss"), "Operating Profit") or 0.0
+        if sales_val > 0:
+            net_margin_calc = (net_profit_val / sales_val) * 100.0
+            ebitda_margin_calc = (op_profit_val / sales_val) * 100.0
+
+        if not screener_data.get("scraped_successfully") or roce == 18.5 or roe == 16.2 or (roce < 8.0 and roe < 8.0):
             capital_employed = net_worth + borrowings_val
             if capital_employed > 0:
                 roce = (ebit_val / capital_employed) * 100.0
-                
-        if roe == 0.0 or roe is None or math.isnan(roe) or roe == 16.2:
             if net_worth > 0:
                 roe = (net_profit_val / net_worth) * 100.0
-                
-        if debt_eq == 0.0 or debt_eq is None or math.isnan(debt_eq) or debt_eq == 0.1:
-            if net_worth > 0:
                 debt_eq = borrowings_val / net_worth
     
     # Calculate true 3-Year CAGR from yfinance annual financials
@@ -3203,11 +3224,18 @@ def _build_financial_profile(ticker_query: str) -> dict:
     debt_eq = float(screener_data["ratios"].get("Debt to Equity") or info.get("debtToEquity", 0.0) / 100.0 if info.get("debtToEquity") else 0.1)
     
     # Ratios estimations
-    profit_margin = float(info.get("profitMargins") or 0.12)
-    net_margin = profit_margin * 100.0
-    ebitda_margin = float(info.get("ebitdaMargins") or 0.18) * 100.0
-    if ebitda_margin <= 0.0:
-        ebitda_margin = 1.5 * net_margin
+    if net_margin_calc is not None:
+        net_margin = net_margin_calc
+    else:
+        profit_margin = float(info.get("profitMargins") or 0.12)
+        net_margin = profit_margin * 100.0
+
+    if ebitda_margin_calc is not None:
+        ebitda_margin = ebitda_margin_calc
+    else:
+        ebitda_margin = float(info.get("ebitdaMargins") or 0.18) * 100.0
+        if ebitda_margin <= 0.0:
+            ebitda_margin = 1.5 * net_margin
         
     ebitda_val = info.get("ebitda")
     interest_exp = info.get("interestExpense")

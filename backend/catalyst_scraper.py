@@ -34,41 +34,69 @@ def fetch_latest_news_for_query(
     qdr = timeframe_map_qdr.get(timeframe.lower().strip(), "w")
     
     # Get all configured API keys
-    serpapi_key = serpapi_api_key or os.environ.get("SERPAPI_API_KEY", "")
-    tavily_key = tavily_api_key or os.environ.get("TAVILY_API_KEY", "")
+    serpapi_keys = []
+    if isinstance(serpapi_api_key, list):
+        serpapi_keys = serpapi_api_key
+    elif isinstance(serpapi_api_key, str) and serpapi_api_key:
+        serpapi_keys = [k.strip() for k in serpapi_api_key.split(",") if k and k.strip()]
+    else:
+        for k, v in os.environ.items():
+            if k.startswith("SERPAPI_API_KEY"):
+                val = v.strip()
+                if val and val not in serpapi_keys:
+                    serpapi_keys.append(val)
+            
+    tavily_keys = []
+    if isinstance(tavily_api_key, list):
+        tavily_keys = tavily_api_key
+    elif isinstance(tavily_api_key, str) and tavily_api_key:
+        tavily_keys = [k.strip() for k in tavily_api_key.split(",") if k and k.strip()]
+    else:
+        for k, v in os.environ.items():
+            if k.startswith("TAVILY_API_KEY"):
+                val = v.strip()
+                if val and val not in tavily_keys:
+                    tavily_keys.append(val)
+            
     brave_key = os.environ.get("BRAVE_API_KEY", "")
 
     # 1. TIER 1: SerpApi (If toggled ON and Key configured)
-    if use_serpapi and serpapi_key:
-        try:
-            print(f"[Catalyst Scraper] Querying SerpApi for: {query}")
-            encoded_query = urllib.parse.quote(query)
-            tbs = f"qdr:{qdr}"
-            url = f"https://serpapi.com/search.json?engine=google&q={encoded_query}&api_key={serpapi_key}&tbs={tbs}"
-            r = requests.get(url, timeout=20.0)
-            if r.status_code == 200:
-                data = r.json()
-                ai_overview = data.get("ai_overview", {})
-                if ai_overview:
-                    text = ai_overview.get("text", "")
-                    if text:
-                        print("[Catalyst Scraper] SerpApi SGE successfully returned AI Overview.")
-                        # Return overview as a singular high-fidelity snapshot
-                        return [f"Google AI Overview: {text}"], "SerpApi AI Overview"
-                
-                # Fallback: Parse organic snippets if no AI Overview exists
-                organic_results = data.get("organic_results", [])
-                snippets = []
-                for item in organic_results[:6]:
-                    title = item.get("title", "")
-                    snippet = item.get("snippet", "")
-                    if title or snippet:
-                        snippets.append(f"Title: {title}\nSnippet: {snippet}")
-                if snippets:
-                    print(f"[Catalyst Scraper] SerpApi successfully returned {len(snippets)} organic snippets.")
-                    return snippets, "SerpApi Search"
-        except Exception as e:
-            print(f"[Catalyst Scraper] SerpApi query failed: {e}. Moving to next tier.")
+    if use_serpapi and serpapi_keys:
+        for sk in serpapi_keys:
+            if not sk:
+                continue
+            try:
+                masked_sk = f"{sk[:6]}...{sk[-4:]}" if len(sk) > 10 else sk
+                print(f"[Catalyst Scraper] Querying SerpApi with key {masked_sk} for: {query}")
+                encoded_query = urllib.parse.quote(query)
+                tbs = f"qdr:{qdr}"
+                url = f"https://serpapi.com/search.json?engine=google&q={encoded_query}&api_key={sk}&tbs={tbs}"
+                r = requests.get(url, timeout=20.0)
+                if r.status_code == 200:
+                    data = r.json()
+                    ai_overview = data.get("ai_overview", {})
+                    if ai_overview:
+                        text = ai_overview.get("text", "")
+                        if text:
+                            print("[Catalyst Scraper] SerpApi SGE successfully returned AI Overview.")
+                            return [f"Google AI Overview: {text}"], "SerpApi AI Overview"
+                    
+                    organic_results = data.get("organic_results", [])
+                    snippets = []
+                    for item in organic_results[:6]:
+                        title = item.get("title", "")
+                        snippet = item.get("snippet", "")
+                        if title or snippet:
+                            snippets.append(f"Title: {title}\nSnippet: {snippet}")
+                    if snippets:
+                        print(f"[Catalyst Scraper] SerpApi successfully returned {len(snippets)} organic snippets.")
+                        return snippets, "SerpApi Search"
+                else:
+                    print(f"[Catalyst Scraper] SerpApi key {masked_sk} returned status {r.status_code}. Rotating key.")
+                    continue
+            except Exception as e:
+                print(f"[Catalyst Scraper] SerpApi query failed for key {masked_sk}: {e}. Rotating key.")
+                continue
 
     # 2. TIER 2: Brave Search API (If toggled ON and Key configured)
     if use_brave and brave_key:
@@ -126,29 +154,37 @@ def fetch_latest_news_for_query(
             print(f"[Catalyst Scraper] Brave Search failed: {e}. Moving to next tier.")
 
     # 3. TIER 3: Tavily Search API (If toggled ON and Key configured)
-    if use_tavily and tavily_key:
-        try:
-            print(f"[Catalyst Scraper] Querying Tavily AI Search for: {query}")
-            payload = {
-                "api_key": tavily_key,
-                "query": query,
-                "search_depth": "basic",
-                "max_results": 5
-            }
-            r = requests.post("https://api.tavily.com/search", json=payload, timeout=6.0)
-            if r.status_code == 200:
-                data = r.json()
-                snippets = []
-                for item in data.get("results", []):
-                    title = item.get("title", "")
-                    content = item.get("content", "")
-                    if title or content:
-                        snippets.append(f"Title: {title}\nSnippet: {content}")
-                if snippets:
-                    print(f"[Catalyst Scraper] Tavily successfully returned {len(snippets)} snippets.")
-                    return snippets, "Tavily Search"
-        except Exception as e:
-            print(f"[Catalyst Scraper] Tavily search failed: {e}. Moving to next tier.")
+    if use_tavily and tavily_keys:
+        for tk in tavily_keys:
+            if not tk:
+                continue
+            try:
+                masked_tk = f"{tk[:6]}...{tk[-4:]}" if len(tk) > 10 else tk
+                print(f"[Catalyst Scraper] Querying Tavily with key {masked_tk} for: {query}")
+                payload = {
+                    "api_key": tk,
+                    "query": query,
+                    "search_depth": "basic",
+                    "max_results": 5
+                }
+                r = requests.post("https://api.tavily.com/search", json=payload, timeout=6.0)
+                if r.status_code == 200:
+                    data = r.json()
+                    snippets = []
+                    for item in data.get("results", []):
+                        title = item.get("title", "")
+                        content = item.get("content", "")
+                        if title or content:
+                            snippets.append(f"Title: {title}\nSnippet: {content}")
+                    if snippets:
+                        print(f"[Catalyst Scraper] Tavily successfully returned {len(snippets)} snippets.")
+                        return snippets, "Tavily Search"
+                else:
+                    print(f"[Catalyst Scraper] Tavily key {masked_tk} returned status {r.status_code}. Rotating key.")
+                    continue
+            except Exception as e:
+                print(f"[Catalyst Scraper] Tavily search failed for key {masked_tk}: {e}. Rotating key.")
+                continue
 
     # 3. TIER 3: Free Google News RSS feed (Fallback)
     try:

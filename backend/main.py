@@ -5,10 +5,28 @@ import asyncio
 import time
 import uuid
 
-# Force IPv4 in requests/urllib3 to prevent "Network is unreachable" (Errno 101) in restricted IPv6 routing environments (e.g. Oracle VM)
+# Dynamic IPv6/IPv4 selector to support both normal networks and restricted environments (e.g. Oracle VM)
 try:
+    import socket
     import urllib3.util.connection as urllib3_cn
-    urllib3_cn.HAS_IPV6 = False
+    has_screener_ipv6 = False
+    try:
+        res = socket.getaddrinfo('www.screener.in', 443, 0, socket.SOCK_STREAM)
+        ipv6_addrs = [r[4] for r in res if r[0] == socket.AF_INET6]
+        if ipv6_addrs:
+            s = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            s.settimeout(1.2)
+            try:
+                s.connect(ipv6_addrs[0])
+                has_screener_ipv6 = True
+            except Exception:
+                pass
+            finally:
+                s.close()
+    except Exception:
+        pass
+    if not has_screener_ipv6:
+        urllib3_cn.HAS_IPV6 = False
 except Exception:
     pass
 
@@ -19,7 +37,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 import math
-from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Header
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Header, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -1439,7 +1457,12 @@ def update_sector_regime_stats():
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT symbol, sector FROM screener_universe WHERE symbol NOT LIKE '%DUMMY%'")
-            stocks = [dict(row) for row in cursor.fetchall()]
+            stocks = []
+            for r in cursor.fetchall():
+                if isinstance(r, (dict, sqlite3.Row)) or (hasattr(r, "keys") and "symbol" in r.keys()):
+                    stocks.append({"symbol": r["symbol"], "sector": r["sector"]})
+                else:
+                    stocks.append({"symbol": r[0], "sector": r[1]})
             
         if not stocks:
             return
@@ -1563,6 +1586,7 @@ def update_sector_regime_stats():
         print(f"Error computing sector relative strength regime stats: {e}")
         
     with get_db() as conn:
+        conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT COUNT(*) as cnt FROM sector_regime_stats")
         row = cursor.fetchone()
@@ -1614,7 +1638,12 @@ def update_sector_regime_stats():
         if db_stock_count == 0:
             print("Populating stock_regime_stats with realistic defaults...")
             cursor.execute("SELECT symbol, sector FROM screener_universe WHERE symbol NOT LIKE '%DUMMY%'")
-            all_db_stocks = [dict(row) for row in cursor.fetchall()]
+            all_db_stocks = []
+            for r in cursor.fetchall():
+                if isinstance(r, (dict, sqlite3.Row)) or (hasattr(r, "keys") and "symbol" in r.keys()):
+                    all_db_stocks.append({"symbol": r["symbol"], "sector": r["sector"]})
+                else:
+                    all_db_stocks.append({"symbol": r[0], "sector": r[1]})
             import random
             for st in all_db_stocks:
                 sym = st["symbol"]
@@ -5068,7 +5097,7 @@ async def add_fs_alert(data: FsAlertRequest):
 
 # --- FS Evaluation Internal logic and API endpoint ---
 
-async def run_fs_evaluation_internal(symbol: str, force_refresh: bool = False) -> dict:
+async def run_fs_evaluation_internal(symbol: str, view: str = "consolidated", force_refresh: bool = False) -> dict:
     from backend.shareholding_scraper import clean_symbol
     from backend.financial_statements_scraper import scrape_financial_statements
     import json
@@ -5076,6 +5105,10 @@ async def run_fs_evaluation_internal(symbol: str, force_refresh: bool = False) -
     base_symbol = clean_symbol(symbol)
     if not base_symbol:
         return None
+        
+    view = view.strip().lower()
+    if view not in ["standalone", "consolidated"]:
+        view = "consolidated"
         
     if force_refresh:
         with get_db() as conn:
@@ -5096,10 +5129,11 @@ async def run_fs_evaluation_internal(symbol: str, force_refresh: bool = False) -
     statements = None
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, "consolidated"))
+        cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, view))
         row = cursor.fetchone()
         if not row:
-            cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, "standalone"))
+            alt_view = "standalone" if view == "consolidated" else "consolidated"
+            cursor.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, alt_view))
             row = cursor.fetchone()
         if row:
             try:
@@ -5109,10 +5143,11 @@ async def run_fs_evaluation_internal(symbol: str, force_refresh: bool = False) -
                 
     if not statements or "error" in statements:
         # Scraping on demand in a thread pool to avoid blocking
-        statements = await asyncio.to_thread(scrape_financial_statements, symbol, "consolidated", session_cookie)
+        statements = await asyncio.to_thread(scrape_financial_statements, symbol, view, session_cookie)
         if not statements or "error" in statements:
-            # Fallback standalone
-            statements = await asyncio.to_thread(scrape_financial_statements, symbol, "standalone", session_cookie)
+            # Fallback
+            alt_view = "standalone" if view == "consolidated" else "consolidated"
+            statements = await asyncio.to_thread(scrape_financial_statements, symbol, alt_view, session_cookie)
             
     if not statements or "error" in statements:
         return None
@@ -5420,10 +5455,10 @@ async def run_fs_evaluation_internal(symbol: str, force_refresh: bool = False) -
     }
 
 @app.get("/api/stocks/{symbol}/fs-evaluation")
-async def get_fs_evaluation(symbol: str, force_refresh: bool = False):
+async def get_fs_evaluation(symbol: str, view: str = "consolidated", force_refresh: bool = False):
     """Retrieves current stock's financial statements and evaluates systematic/custom alerts."""
     try:
-        res = await run_fs_evaluation_internal(symbol, force_refresh=force_refresh)
+        res = await run_fs_evaluation_internal(symbol, view=view, force_refresh=force_refresh)
         if not res:
             raise HTTPException(status_code=404, detail=f"Financial statements or metrics not available for {symbol}")
         return res
@@ -5655,6 +5690,188 @@ async def save_screener_cookie_settings(payload: dict):
         conn.commit()
     return {"status": "success"}
 
+import base64
+
+def encode_key(raw_str: str) -> str:
+    if not raw_str:
+        return ""
+    try:
+        return "b64_" + base64.b64encode(raw_str.encode("utf-8")).decode("utf-8")
+    except Exception:
+        return raw_str
+
+def decode_key(encoded_str: str) -> str:
+    if not encoded_str:
+        return ""
+    try:
+        if encoded_str.startswith("b64_"):
+            return base64.b64decode(encoded_str[4:].encode("utf-8")).decode("utf-8")
+        return encoded_str
+    except Exception:
+        return encoded_str
+
+def mask_key(key: str) -> str:
+    if not key:
+        return ""
+    if len(key) < 10:
+        return f"{key[:3]}...{key[-3:]}" if len(key) > 6 else key
+    return f"{key[:6]}...{key[-4:]}"
+
+def verify_gemini_key(key: str) -> bool:
+    if not key:
+        return False
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+        res = requests.get(url, timeout=5.0)
+        if res.status_code == 200:
+            return True
+        if res.status_code == 400:
+            err_json = res.json()
+            if "API_KEY_INVALID" in str(err_json) or "invalid" in str(err_json).lower():
+                return False
+            return True
+        return False
+    except Exception:
+        return True
+
+def verify_tavily_key(key: str) -> bool:
+    if not key:
+        return False
+    try:
+        url = "https://api.tavily.com/search"
+        payload = {"api_key": key, "query": "ping", "max_results": 1}
+        res = requests.post(url, json=payload, timeout=5.0)
+        if res.status_code == 200:
+            return True
+        return False
+    except Exception:
+        return True
+
+def verify_serpapi_key(key: str) -> bool:
+    if not key:
+        return False
+    try:
+        url = f"https://serpapi.com/search.json?q=ping&api_key={key}&num=1"
+        res = requests.get(url, timeout=5.0)
+        if res.status_code == 200:
+            return True
+        return False
+    except Exception:
+        return True
+
+@app.get("/api/settings/llm-keys")
+async def get_llm_keys_settings():
+    """Retrieves custom LLM and search keys from the database."""
+    gemini_keys = []
+    serpapi_key = ""
+    tavily_key = ""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        
+        # Load Gemini keys pool
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'gemini_keys_pool'")
+        row = cursor.fetchone()
+        if row and row["value"]:
+            try:
+                encoded_list = json.loads(row["value"])
+                if isinstance(encoded_list, list):
+                    gemini_keys = [decode_key(k) for k in encoded_list]
+            except Exception:
+                pass
+                
+        # Load SerpApi key
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'serpapi_api_key'")
+        row = cursor.fetchone()
+        if row:
+            decoded = decode_key(row["value"])
+            if decoded.startswith("["):
+                try:
+                    serpapi_key = ", ".join(json.loads(decoded))
+                except Exception:
+                    serpapi_key = decoded
+            else:
+                serpapi_key = decoded
+            
+        # Load Tavily key
+        cursor.execute("SELECT value FROM alert_settings WHERE key = 'tavily_api_key'")
+        row = cursor.fetchone()
+        if row:
+            decoded = decode_key(row["value"])
+            if decoded.startswith("["):
+                try:
+                    tavily_key = ", ".join(json.loads(decoded))
+                except Exception:
+                    tavily_key = decoded
+            else:
+                tavily_key = decoded
+            
+    return {
+        "keys": gemini_keys,
+        "serpapi_api_key": serpapi_key,
+        "tavily_api_key": tavily_key
+    }
+
+@app.post("/api/settings/llm-keys")
+async def save_llm_keys_settings(payload: dict):
+    """Verifies and saves dynamic LLM and Search keys."""
+    keys = payload.get("keys", [])
+    serpapi_key = payload.get("serpapi_api_key", "").strip()
+    tavily_key = payload.get("tavily_api_key", "").strip()
+    
+    # 1. Verification Smoke Tests (Only verify if key is new/changed and not masked placeholder)
+    existing = await get_llm_keys_settings()
+    existing_gemini = existing["keys"]
+    existing_serpapi = existing["serpapi_api_key"]
+    existing_tavily = existing["tavily_api_key"]
+    
+    # Filter empty keys from input
+    keys = [k.strip() for k in keys if k and k.strip()]
+    
+    # Parse dynamic SerpApi and Tavily list inputs
+    serpapi_keys = [k.strip() for k in serpapi_key.split(",") if k and k.strip()]
+    tavily_keys = [k.strip() for k in tavily_key.split(",") if k and k.strip()]
+    
+    existing_serpapi_list = [k.strip() for k in existing_serpapi.split(",") if k and k.strip()]
+    existing_tavily_list = [k.strip() for k in existing_tavily.split(",") if k and k.strip()]
+    
+    # Verify Gemini keys
+    for k in keys:
+        if k not in existing_gemini:
+            if not verify_gemini_key(k):
+                raise HTTPException(status_code=400, detail=f"Gemini API key verification failed for key starting with '{k[:6]}'.")
+                
+    # Verify SerpApi keys
+    for sk in serpapi_keys:
+        if sk not in existing_serpapi_list:
+            if not verify_serpapi_key(sk):
+                raise HTTPException(status_code=400, detail=f"SerpApi API key verification failed for key starting with '{sk[:6]}'.")
+            
+    # Verify Tavily keys
+    for tk in tavily_keys:
+        if tk not in existing_tavily_list:
+            if not verify_tavily_key(tk):
+                raise HTTPException(status_code=400, detail=f"Tavily API key verification failed for key starting with '{tk[:6]}'.")
+            
+    # 2. Base64 encode before storage (serialize lists as JSON list strings)
+    encoded_gemini = [encode_key(k) for k in keys]
+    encoded_serpapi = encode_key(json.dumps(serpapi_keys))
+    encoded_tavily = encode_key(json.dumps(tavily_keys))
+    
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('gemini_keys_pool', ?)", (json.dumps(encoded_gemini),))
+        cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('serpapi_api_key', ?)", (encoded_serpapi,))
+        cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('tavily_api_key', ?)", (encoded_tavily,))
+        conn.commit()
+        
+    return {"status": "success"}
+
+@app.get("/api/settings/llm-health")
+async def get_llm_keys_health():
+    """Returns dynamic key rotation health telemetry."""
+    from backend.llm_config import get_gemini_keys_health
+    return get_gemini_keys_health()
+
 @app.get("/api/screener-external/screens")
 async def get_screener_screens():
     """Fetches the saved custom screens from Screener.in."""
@@ -5857,10 +6074,14 @@ async def get_stock_shareholding(symbol: str):
     return data
 
 @app.get("/api/stocks/{symbol}/financial-statements")
-async def get_stock_financial_statements(symbol: str, view: str = "consolidated"):
+async def get_stock_financial_statements(symbol: str, response: Response, view: str = "consolidated", force_refresh: bool = False):
     """Retrieves Quarterly, P&L and Balance Sheet tables from 30-day SQLite cache or scrapes on-demand."""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     from backend.financial_statements_scraper import scrape_financial_statements
     from backend.shareholding_scraper import clean_symbol
+    from backend.financial_utils import clear_profile_cache
     from datetime import datetime, timedelta
     import json
     
@@ -5872,6 +6093,17 @@ async def get_stock_financial_statements(symbol: str, view: str = "consolidated"
     if view not in ["standalone", "consolidated"]:
         view = "consolidated"
         
+    if force_refresh:
+        try:
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM cached_financial_statements WHERE symbol = ?", (base_symbol,))
+                cursor.execute("DELETE FROM cached_profiles WHERE symbol = ? OR symbol LIKE ?", (base_symbol, f"{base_symbol}.%"))
+                conn.commit()
+            clear_profile_cache()
+        except Exception as cache_err:
+            logger.error(f"Error purging cache on force_refresh: {cache_err}")
+            
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT data_json, last_updated FROM cached_financial_statements WHERE symbol = ? AND view = ?", (base_symbol, view))
@@ -5898,7 +6130,7 @@ async def get_stock_financial_statements(symbol: str, view: str = "consolidated"
         if cookie_row:
             session_cookie = cookie_row["value"]
             
-    data = scrape_financial_statements(base_symbol, view, session_cookie)
+    data = await asyncio.to_thread(scrape_financial_statements, base_symbol, view, session_cookie)
     if not data or "error" in data:
         raise HTTPException(status_code=500, detail=data.get("error", "Failed to retrieve financial statements."))
         
@@ -12493,17 +12725,52 @@ def get_stock_catalysts(
     use_brave: bool = Query(True),
     ai_engine: str = Query("gemini"),
     timeframe: str = Query("7d"),
-    direction: Optional[str] = Query(None),
-    x_serpapi_key: Optional[str] = Header(None, alias="X-SerpApi-Key"),
-    x_tavily_key: Optional[str] = Header(None, alias="X-Tavily-Key")
+    direction: Optional[str] = Query(None)
 ):
     try:
         import requests
         from backend.catalyst_scraper import fetch_latest_news_for_query
         from backend.llm_config import call_llm, TASK_FAST
         
-        # Diagnostic print for incoming headers
-        print(f"[Catalyst API] Headers received: X-SerpApi-Key={x_serpapi_key[:10] + '...' if x_serpapi_key else 'None'}, X-Tavily-Key={x_tavily_key[:10] + '...' if x_tavily_key else 'None'}")
+        # Load SerpApi and Tavily keys from SQLite Database or .env fallback
+        serpapi_keys = []
+        tavily_keys = []
+        try:
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT value FROM alert_settings WHERE key = 'serpapi_api_key'")
+                row = cursor.fetchone()
+                if row:
+                    decoded = decode_key(row["value"])
+                    if decoded.startswith("["):
+                        serpapi_keys = json.loads(decoded)
+                    elif decoded:
+                        serpapi_keys = [k.strip() for k in decoded.split(",") if k and k.strip()]
+                
+                cursor.execute("SELECT value FROM alert_settings WHERE key = 'tavily_api_key'")
+                row = cursor.fetchone()
+                if row:
+                    decoded = decode_key(row["value"])
+                    if decoded.startswith("["):
+                        tavily_keys = json.loads(decoded)
+                    elif decoded:
+                        tavily_keys = [k.strip() for k in decoded.split(",") if k and k.strip()]
+        except Exception:
+            pass
+            
+        # Merge with .env pools
+        for k, v in os.environ.items():
+            if k.startswith("SERPAPI_API_KEY"):
+                val = v.strip()
+                if val and val not in serpapi_keys:
+                    serpapi_keys.append(val)
+            elif k.startswith("TAVILY_API_KEY"):
+                val = v.strip()
+                if val and val not in tavily_keys:
+                    tavily_keys.append(val)
+            
+        # Diagnostic print for loaded keys
+        print(f"[Catalyst API] Keys loaded: SerpApi count={len(serpapi_keys)}, Tavily count={len(tavily_keys)}")
         print(f"[Catalyst API] Query params: use_serpapi={use_serpapi}, use_tavily={use_tavily_search}, use_brave={use_brave}")
         
         # 1. Clean ticker symbol and resolve to human-readable company name
@@ -12564,8 +12831,8 @@ def get_stock_catalysts(
             use_tavily=use_tavily_search,
             use_serpapi=use_serpapi,
             use_brave=use_brave,
-            serpapi_api_key=x_serpapi_key or "",
-            tavily_api_key=x_tavily_key or ""
+            serpapi_api_key=serpapi_keys,
+            tavily_api_key=tavily_keys
         )
         
         # If no snippets found, search sector-specific trends as fallback
@@ -12582,8 +12849,8 @@ def get_stock_catalysts(
                 use_tavily=use_tavily_search,
                 use_serpapi=use_serpapi,
                 use_brave=use_brave,
-                serpapi_api_key=x_serpapi_key or "",
-                tavily_api_key=x_tavily_key or ""
+                serpapi_api_key=serpapi_keys,
+                tavily_api_key=tavily_keys
             )
             
         # If still no snippets, return a graceful fallback

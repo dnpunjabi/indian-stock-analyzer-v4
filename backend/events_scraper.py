@@ -653,13 +653,14 @@ def get_stock_events_cached(symbol):
         symbol: Base symbol (e.g., 'RELIANCE') or full symbol ('RELIANCE.NS')
     """
     base_symbol = symbol.replace(".NS", "").replace(".BO", "")
+    start_date = (date.today() - timedelta(days=7)).isoformat()
 
     with _get_db() as conn:
         rows = conn.execute(
             """SELECT * FROM stock_events
-               WHERE symbol = ?
+               WHERE symbol = ? AND event_date >= ?
                ORDER BY event_date ASC""",
-            (base_symbol,)
+            (base_symbol, start_date)
         ).fetchall()
 
     events = []

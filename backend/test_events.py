@@ -151,7 +151,7 @@ class TestStockEventsCalendar(unittest.TestCase):
             "dividendRate": 18.0,
             "dividendYield": 0.012,
             "exDividendDate": int(datetime(2026, 7, 10).timestamp()),
-            "lastSplitDate": int(datetime(2024, 6, 1).timestamp()),
+            "lastSplitDate": int(datetime(2026, 7, 28).timestamp()),
             "lastSplitFactor": "2:1",
         }
 

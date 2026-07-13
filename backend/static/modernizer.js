@@ -810,19 +810,14 @@
         if (currentCatalystIsSector && sectorRadarLookback) {
             searchHorizon = sectorRadarLookback.value || '7d';
         }
+        
         const useTavily = localStorage.getItem('use_tavily_search') === 'true';
         const useSerpApi = localStorage.getItem('use_serpapi') !== 'false'; // default to true
         const useBrave = localStorage.getItem('use_brave_search') !== 'false'; // default to true
-        const serpapiKey = localStorage.getItem('serpapi_api_key') || '';
-        const tavilyKey = localStorage.getItem('tavily_api_key') || '';
         
-        const headers = {};
-        if (serpapiKey) headers['X-SerpApi-Key'] = serpapiKey;
-        if (tavilyKey) headers['X-Tavily-Key'] = tavilyKey;
-
         const url = `/api/stock-catalysts?symbol=${encodeURIComponent(currentCatalystSymbol)}&sector=${encodeURIComponent(currentCatalystSector)}&is_sector=${currentCatalystIsSector}&ai_engine=${aiEngine}&timeframe=${searchHorizon}&use_tavily_search=${useTavily}&use_serpapi=${useSerpApi}&use_brave=${useBrave}&direction=${currentCatalystDirection}`;
 
-        fetch(url, { headers })
+        fetch(url)
             .then(res => res.json())
             .then(data => {
                 loader.style.display = 'none';
@@ -1260,26 +1255,11 @@
                 localStorage.setItem('use_brave_search', e.target.checked);
                 AudioCueManager.playTick();
                 window.showToast(`Brave Search ${e.target.checked ? 'Enabled' : 'Disabled'}`, 'success');
+                // Note: SerpApi & Tavily key storage has been modernized to use backend SQLite database dynamic key configuration.
             });
         }
 
-        // SerpApi & Tavily dynamic keys setup
-        const serpapiKeyInput = document.getElementById('setting-serpapi-key');
-        const tavilyKeyInput = document.getElementById('setting-tavily-key');
-
-        if (serpapiKeyInput) {
-            serpapiKeyInput.value = localStorage.getItem('serpapi_api_key') || '';
-            serpapiKeyInput.addEventListener('input', (e) => {
-                localStorage.setItem('serpapi_api_key', e.target.value.trim());
-            });
-        }
-
-        if (tavilyKeyInput) {
-            tavilyKeyInput.value = localStorage.getItem('tavily_api_key') || '';
-            tavilyKeyInput.addEventListener('input', (e) => {
-                localStorage.setItem('tavily_api_key', e.target.value.trim());
-            });
-        }
+        // Note: SerpApi & Tavily key storage has been modernized to use backend SQLite database dynamic key configuration.
     }
 
     // Initialize all visual modernization layers safely
