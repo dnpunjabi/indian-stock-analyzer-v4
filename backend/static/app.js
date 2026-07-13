@@ -39218,7 +39218,12 @@ async function loadStockTrades(symbol) {
         
         if (warningBadge) {
             if (data.error) {
-                warningBadge.innerHTML = `<span style="color: var(--color-amber); background: rgba(245,158,11,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(245,158,11,0.25);">🔒 Cookie Expired/Not Set</span>`;
+                const errStr = String(data.error).toLowerCase();
+                if (errStr.includes("cookie") || errStr.includes("expired") || errStr.includes("login")) {
+                    warningBadge.innerHTML = `<span style="color: var(--color-amber); background: rgba(245,158,11,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(245,158,11,0.25);">🔒 Cookie Expired/Not Set</span>`;
+                } else {
+                    warningBadge.innerHTML = `<span style="color: var(--color-crimson); background: rgba(239,68,68,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(239,68,68,0.25);" title="${data.error.replace(/"/g, '&quot;')}">⚠️ Connection / Server Error</span>`;
+                }
             } else {
                 warningBadge.innerHTML = `<span style="color: var(--color-emerald); background: rgba(16,185,129,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.25);">✓ Authenticated</span>`;
             }
@@ -39503,7 +39508,12 @@ async function loadGlobalTrades(forceRefresh = false) {
             console.error("Expected array from global-scanner, got:", deals);
             let errMsg = "Failed to load deals feed.";
             if (deals && deals.error) {
-                errMsg = `🔒 Screener Session Cookie is missing or expired. Please configure it in System Settings (⚙️ dropdown) to load promoter and institutional deals.`;
+                const errStr = String(deals.error).toLowerCase();
+                if (errStr.includes("cookie") || errStr.includes("expired") || errStr.includes("login")) {
+                    errMsg = `🔒 Screener Session Cookie is missing or expired. Please configure it in System Settings (⚙️ dropdown) to load promoter and institutional deals.`;
+                } else {
+                    errMsg = `⚠️ Screener.in Connection / Server Error: ${deals.error}`;
+                }
             }
             container.innerHTML = `<div style="text-align: center; color: var(--color-amber); padding: 35px; font-size: 11.5px; font-weight: 500; background: rgba(245,158,11,0.05); border: 1px dashed rgba(245,158,11,0.2); border-radius: 8px; margin: 15px;">${errMsg}</div>`;
             return;
