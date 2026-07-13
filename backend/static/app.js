@@ -24951,6 +24951,46 @@ function setupRuleScanner() {
         "AI Rating Upgrade": {
             "concept": "Triggers when the AI Model quantitative analyst rating upgrades to BUY or STRONG BUY.",
             "why": "Filters for high-probability setups backed by multi-factor machine learning evaluation."
+        },
+        "PEG Cheap Growth": {
+            "concept": "Triggers when the PEG ratio drops below 1.0, targeting companies with growth at reasonable price.",
+            "why": "Ensures that you do not overpay for earnings growth, optimizing value-growth balance."
+        },
+        "Buffett Moat Quality": {
+            "concept": "Triggers when Return on Equity (ROE) is above 15% and Debt-to-Equity is below 0.5.",
+            "why": "Selects high-quality companies with high profitability and clean, low-debt balance sheets."
+        },
+        "Demat Delivery Block Buy": {
+            "concept": "Triggers when Demat Delivery volume exceeds 60% with a volume Z-score above 2.0.",
+            "why": "Indicates institutional block buying where shares are being actively locked up in demat accounts."
+        },
+        "FII/DII Accumulation": {
+            "concept": "Triggers when combined FII & DII holdings exceed 35% of total equity.",
+            "why": "Ensures strong institutional backing, offering a robust price cushion during market panics."
+        },
+        "Low-Beta Defensive Anchor": {
+            "concept": "Triggers when market Beta is below 0.8 and the AI analyst rating is BUY.",
+            "why": "Selects low-volatility, defensive compounders that tend to outperform during down markets."
+        },
+        "Promoter Pledge Warning": {
+            "concept": "Triggers when promoters pledge more than 5.0% of their total company shares.",
+            "why": "Acts as an early warnings indicator to protect from sudden margin-call crashes."
+        },
+        "Fortress DCF Margin of Safety": {
+            "concept": "Triggers when the DCF intrinsic value margin of safety exceeds 30.0%.",
+            "why": "Ensures buying assets at a steep discount to long-term future cash flow generation."
+        },
+        "High Beta Momentum Play": {
+            "concept": "Triggers when systematic Beta is above 1.25 and price consolidates above 20 SMA.",
+            "why": "Captures high-velocity, fast markup momentum sweeps during bullish market phases."
+        },
+        "Clean Governance Check": {
+            "concept": "Triggers when promoter pledging is under 1.0% and CFO to PAT is above 1.0.",
+            "why": "Confirms clean accounting where cash flows match profits and promoter pledging leverage is minimal."
+        },
+        "Growth Compounder Buy": {
+            "concept": "Triggers when Return on Equity is above 18.0% and PEG ratio is below 0.8.",
+            "why": "Finds top-tier capital compounders experiencing high-speed growth at undervalued multiples."
         }
     };
 
