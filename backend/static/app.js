@@ -24371,11 +24371,205 @@ function setupRuleScanner() {
     }
 
     // NL template pills
+    const RULE_SCANNER_UTILITY_GUIDE = {
+        "RSI Oversold Universe": "Identifies highly oversold stocks where selling pressure is exhausted, indicating a high probability of technical rebound.",
+        "RSI Overbought Universe": "Highlights stocks in extreme bullish territory; alerts to potential exhaustion or profit-taking reversals.",
+        "MACD Bullish Cross": "Triggers when MACD line crosses above the Signal line, confirming intermediate momentum shift to the upside.",
+        "MACD Bearish Divergence": "Indicates momentum slowdown as MACD crosses below the Signal line, warning of trend weakness.",
+        "Deep Oversold Mid-Caps": "Isolates mid-cap stocks with extremely low RSI (< 25) for high-potential contrarian mean-reversion plays.",
+        "Neutral RSI Large-Caps": "Finds large-caps in consolidation phase (RSI 40-60) before their next directional expansion breakout.",
+        "ATR Volatility Shock": "Flags stocks experiencing extreme daily price volatility ranges (ATR > 50) for intraday or breakout trading.",
+        "RSI Bullish Divergence": "Detects structural divergence where price is near 52-week lows but momentum RSI is showing strong support (RSI >= 45).",
+        "Golden Cross Stocks": "Classic long-term trend reversal signal indicating that structural market momentum has turned bullish.",
+        "Death Cross Stocks": "Classic warning signal that structural market momentum has turned bearish.",
+        "Below SMA-200 Pullback": "Identifies stocks trading below their structural 200-day average, signaling long-term downtrend correction.",
+        "Above SMA-200 Breakout": "Screens for stocks establishing strong uptrends above their long-term structural average.",
+        "SMA-50 Short-Term Dip": "Finds short-term pullbacks where price dips below the 50-day average within a medium-term trend.",
+        "EMA Golden Cross": "An exponential moving average crossover that reacts faster to intermediate trend reversals.",
+        "EMA Death Cross": "An exponential moving average crossover that alerts faster to intermediate trend breakdowns.",
+        "20 SMA Pullback": "Finds highly active stocks pulling back to their short-term 20-day mean within strong bull runs.",
+        "Stage 2 Trend": "Screens for Mark Minervini style Stage 2 momentum uptrends where all SMAs are perfectly aligned.",
+        "5/20 EMA Cross": "Finds short-term momentum triggers where 5 EMA crosses 20 EMA, backed by active volume.",
+        "SMA-200 Stretched": "Flags stocks trading excessively high above their 200 SMA, warning of overextension and reversion risk.",
+        "EMA Ribbon Align": "Finds stocks in structural uptrends where 20, 50, and 200 EMAs are perfectly aligned in parallel markup.",
+        "100 SMA Pullback": "Identifies medium-term trend pullback entries near the key 100-day Simple Moving Average.",
+        "200 EMA Support Dip": "Catches high-probability support entries where price dips precisely to the 200-day Exponential average.",
+        "Trend Acceleration": "Screens for stocks showing rapid momentum markup with aligned averages and strong ADX trend strength.",
+        "Structural Golden Cross": "Finds recent Golden Cross setups where 50 SMA is crossing above the 200 SMA within 1.5% separation.",
+        "SMA-200 Near Support": "Catches stocks trading just below their 200 SMA by less than 5%, offering low-risk pivot setups.",
+        "SMA-50 Near Pivot": "Highlights stocks trading just below their 50 SMA by less than 3% before potential breakout breakout.",
+        "BB Lower Band Touch": "Finds oversold stocks trading below their Bollinger Lower Band for a quick statistical mean reversion bounce.",
+        "BB Upper Band Breakout": "Flags stocks breaking out of their volatility channel, signaling the start of a strong trend markup.",
+        "Mid-Cap BB Squeeze": "Identifies mid-caps in tight Bollinger squeeze, preceding explosive breakout volatility expansion.",
+        "BB Walk the Bands": "Highlights strong trend expansions where price closes above the upper band on high volume validation.",
+        "All Fibonacci Levels": "Screens for stocks trading near any key Fibonacci retracement level for support/resistance pivots.",
+        "Fib 38.2% Bounce Zone": "Catches shallow retracements near 38.2% Fib level, common in strong trending bull markets.",
+        "Fib 50.0% Midline": "Identifies pullbacks to the 50.0% Fibonacci midline, representing a balanced risk-reward entry zone.",
+        "Fib 61.8% Golden Ratio": "Screens for pullbacks to the 61.8% Golden Ratio, the most watched retracement level for structural reversals.",
+        "Large-Cap Fib Entries": "Isolates large-caps trading near key Fibonacci retracements for highly reliable, low-volatility support entries.",
+        "Golden Pocket Zone": "Finds stocks in the high-conviction Golden Pocket (61.8% - 78.6% Fib), where major reversals occur.",
+        "Vol POC + Fib Confluence": "Highlights extreme support levels where a Fibonacci level coincides with the Volume Point of Control (POC).",
+        "Capitulation Deep Value": "Catches panic selling dips at the deep 78.6% Fibonacci level with oversold RSI (< 25).",
+        "Fib 23.6% Breakout Pivot": "Detects initial breakout pivots crossing above the 23.6% Fibonacci level from long-term bottoms.",
+        "Near 52-Week Low": "Isolates stocks trading near their 52-week low, suitable for contrarian long-term value accumulation.",
+        "Near 52-Week High": "Highlights stocks trading near their 52-week high, indicating strong institutional momentum.",
+        "Large-Cap 52W Breakout": "Screens for large-caps breaking out to new 52-week highs, confirming strong structural leadership.",
+        "Mid-Cap 52W Value Entry": "Finds mid-caps accumulating near their 52-week low, offering asymmetric value risk-reward.",
+        "52W High Retest": "Highlights stocks retesting their 52-week high after a minor consolidation pull back.",
+        "52W Midpoint Pivot": "Catches stocks crossing their 52-week range midpoint, signifying transition from distribution to markup.",
+        "52W Low Accumulation": "Finds stocks bouncing off their 52-week low with strong volume support.",
+        "Volumetric 52W High Breakout": "Confirms massive institutional breakouts exceeding 52w Highs on high volume > 2x average.",
+        "Deep Value P/E (<15)": "Screens for high-value large-cap stocks trading at conservative price-to-earnings multiples.",
+        "Ultra Value P/E (<10)": "Isolates dirt-cheap stocks trading at extremely depressed earnings multiples.",
+        "Overvalued P/E (>50)": "Identifies potentially overstretched or speculative stocks trading at high multiples.",
+        "Penny Stocks (<₹100)": "Filters for lower-priced stocks with high retail liquidity and high percentage swing potential.",
+        "Premium Stocks (>₹5000)": "Screens for premium high-priced corporate leaders, usually backed by strong institutional demand.",
+        "AI Strong Buy Rated": "Displays stocks that have received the highest quantitative ratings from the AI analytical models.",
+        "AI Buy Rated": "Displays stocks with solid positive ratings from the AI analytical models.",
+        "Altman Z Distress": "Identifies stocks with Altman Z-Scores below 1.8, warning of potential financial insolvency risks.",
+        "Target 15% Discount": "Finds stocks trading at a discount of more than 15.0% relative to analyst consensus price targets.",
+        "CFO/PAT Divergence": "Highlights potential accounting quality issues where operating cash flows lag net profits.",
+        "Dividend Support": "Screens for high-dividend yield stocks (>3%) that offer safety cushion during down markets.",
+        "DCF Undervalued (>20% MoS)": "Finds stocks trading at more than 20% discount relative to their conservative DCF intrinsic valuations.",
+        "Buffett Quality Moat": "Isolates high-ROE companies (>15%) operating with low debt-to-equity leverage (<0.5).",
+        "Clean Promoter Ownership": "Highlights promoter pledged shares under 1% and solid profits, confirming clean corporate governance.",
+        "GARP PEG Cheap Growth": "Finds Growth at a Reasonable Price, screening for stocks with PEG ratios under 1.0.",
+        "Pristine Earnings Quality": "Filters for pristine financial companies with near-perfect Piotroski F-Scores (8 or 9).",
+        "2x Volume Surge": "Highlights initial momentum breakouts where trading volume exceeds the 20-day average by 2x.",
+        "3x Volume Spurt": "Flags strong momentum surges where trading volume reaches 3x the 20-day average.",
+        "5x Extreme Volume": "Isolates extreme institutional volume spikes (5x average) indicating massive block deals or regime shift.",
+        "Large-Cap Volume Alert": "Finds large-caps attracting sudden volume expansion (> 1.5x average) for institutional momentum.",
+        "Institutional Absorption": "Identifies quiet accumulation phases where high demat delivery percentage and positive delivery Z-score confirm buying.",
+        "VSA Smart Money Demand": "Detects Volume Spread Analysis demand and strength setups, confirming smart money accumulation.",
+        "Heavy Institutional Holding": "Screens for companies with heavy FII & DII stakes (>30%), offering strong ownership shield.",
+        "Dry Volume Consolidation": "Detects tight price consolidation ranges on very dry volume, signaling supply exhaustion before breakout.",
+        "Large-Cap Reversal Setup": "Finds large-caps pulling back to oversold levels with golden crosses for low-risk entries.",
+        "Mid-Cap Value + Momentum": "Isolates cheap mid-caps with strong earnings margins entering bullish momentum zones.",
+        "Small-Cap Volume Breakout": "Screens for highly active small-caps breaking out on major volume spurts.",
+        "Contrarian Deep Value": "Highlights deeply beaten-down stocks trading well below their 200 SMA at cheap multiples.",
+        "Momentum Leader Scan": "Finds extreme momentum leadership stocks trading at new highs with elevated RSI levels.",
+        "AI Sell-Rated Watch": "Flags stocks with AI rating underperform recommendations, suggesting exit or hedging.",
+        "Large-Cap Steady Compounder": "Finds low-volatility large-caps (Beta < 1.0) with strong AI ratings for defensive compounding.",
+        "Small-Cap Momentum Markup": "Identifies high-beta small-caps in active momentum markup phase.",
+        "Sector Rotation Alpha Play": "Finds stocks leading the top 3 strongest relative strength sectors in the market.",
+        "Benchmark Alpha Outperformer": "Screens for stocks showing exceptional alpha outperformance (>15%) relative to the benchmark index.",
+        "Bullish Pullback (RSI + SMA)": "Identifies short-term dips in long-term uptrends for high-probability pullback entries.",
+        "Breakout Momentum (RSI + SMA)": "Finds high-momentum breakouts in active structural uptrends.",
+        "Oversold Value Buy (PE + RSI)": "Combines fundamental cheapness with technical oversold conditions for low-risk value entries.",
+        "Growth Momentum (SMA + RSI + Rating)": "Institutional setup: Aligned uptrend, high relative strength, and Strong Buy AI rating.",
+        "Vol Trend Spurt (Volume + SMA50)": "Catches momentum spikes where volume surge occurs right above the 50 SMA support.",
+        "52W Trend Breakout (SMA200 + 52W High)": "Finds structural breakouts exceeding 52w Highs in long-term uptrends.",
+        "52W Value Entry (52W Low + RSI)": "Catches bottom-reversal entries near the 52w Low with oversold momentum.",
+        "Fib Support Bounce (Fib + RSI)": "Finds confluence buy setups where a Fibonacci retracement level aligns with oversold RSI.",
+        "BB Reversion (BB Lower + RSI)": "Mean reversion setup: Price below lower band with oversold RSI.",
+        "BB Breakout (BB Upper + Vol Surge)": "High-momentum breakout setup crossing the upper band on volume confirmation.",
+        "MACD Vol Surge (MACD + Vol Surge)": "Confirms MACD crossover buy signals with volume surge validation.",
+        "Quality Dip Buy (Rating + RSI)": "Finds dips in high-conviction companies with positive analyst and model ratings.",
+        "Death Cross Vol Spurt (SMA Cross + Vol)": "Flags high-volume breakdowns on Death Cross confirmation.",
+        "Fib Trend Confluence (Fib + SMA200)": "Finds structural trend entries where a Fib level aligns with the 200 SMA support.",
+        "Penny Momentum Surge (Price + RSI + Vol)": "Finds low-priced stocks gaining high-speed volume and momentum breakouts.",
+        "Premium Quality Growth (Price + PE + Rating)": "Isolates high-priced corporate quality growth compounders.",
+        "PE Value Accumulation (PE + Vol)": "Identifies value accumulation patterns on rising volumes.",
+        "Short Pullback in Uptrend (SMA50 + SMA200)": "Buy the dip entry where price drops below 50 SMA but stays safely above 200 SMA.",
+        "BB Squeeze Breakout (Bands Width + Vol)": "Finds volatility expansion breakouts after a period of tight consolidation.",
+        "Contrarian Value Play (PE + SMA + RSI)": "Deep value mean reversion play on oversold, cheap stocks.",
+        "DMA Cross Nearness": "Highlights stocks where 50 SMA is in close proximity to 200 SMA before cross.",
+        "Value Trap Avoidance": "Helps avoid low-PE value traps that have a consensus Sell recommendation.",
+        "BB Reversion Surge": "Extremely oversold mean reversion play under the lower band on high volume.",
+        "Piotroski Breakout": "Screens for top-tier Piotroski score stocks breaking out above 200 SMA.",
+        "Institutional Quality Breakout": "Finds high-quality Piotroski companies breaking out near their 52w High on delivery volume.",
+        "Solvency Value Dip": "Buy the dip setup on financially solid, DCF-undervalued stocks with oversold RSI.",
+        "HV Momentum Markup": "Trend following entry: Strong ADX trend and volume markup crossing moving averages.",
+        "SM Bottom Fishing": "Catches institutional reversal pivots using FII/DII stakes and VSA demand bars.",
+        "Elder Triple Screen": "Alexander Elder style screen: Price > 200 SMA (Trend), RSI < 38 (Oversold), and Volume > 1.5x."
+    };
+
+    // Lazy load tooltip / bottom sheet components to keep DOM clean
+    let rsTooltip = document.getElementById('rs-tooltip');
+    if (!rsTooltip) {
+        rsTooltip = document.createElement('div');
+        rsTooltip.id = 'rs-tooltip';
+        rsTooltip.className = 'rs-tooltip';
+        document.body.appendChild(rsTooltip);
+    }
+
+    let rsBottomSheet = document.getElementById('rs-bottom-sheet');
+    if (!rsBottomSheet) {
+        rsBottomSheet = document.createElement('div');
+        rsBottomSheet.id = 'rs-bottom-sheet';
+        rsBottomSheet.className = 'rs-bottom-sheet';
+        rsBottomSheet.innerHTML = `
+            <div class="rs-bottom-sheet-backdrop"></div>
+            <div class="rs-bottom-sheet-content">
+                <div class="rs-bottom-sheet-handle"></div>
+                <h4 id="rs-bottom-sheet-title">Strategy Insight</h4>
+                <p id="rs-bottom-sheet-utility"></p>
+                <button class="rs-bottom-sheet-close">Dismiss</button>
+            </div>
+        `;
+        document.body.appendChild(rsBottomSheet);
+
+        rsBottomSheet.querySelector('.rs-bottom-sheet-backdrop').addEventListener('click', () => {
+            rsBottomSheet.classList.remove('active');
+        });
+        rsBottomSheet.querySelector('.rs-bottom-sheet-close').addEventListener('click', () => {
+            rsBottomSheet.classList.remove('active');
+        });
+    }
+
     document.querySelectorAll('.rs-nl-template-pill').forEach(pill => {
-        pill.addEventListener('click', () => {
+        // Parse raw text ignoring any icons
+        let rawText = pill.innerText.trim();
+        // Strip emojis from the beginning if present
+        rawText = rawText.replace(/^[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+
+        // Dynamically add a small info indicator trigger next to the text
+        if (!pill.querySelector('.rs-info-trigger')) {
+            const infoIcon = document.createElement('i');
+            infoIcon.className = 'rs-info-trigger';
+            infoIcon.innerText = ' ℹ️';
+            pill.appendChild(infoIcon);
+        }
+
+        const utilityText = RULE_SCANNER_UTILITY_GUIDE[rawText] || 'Run a quick query using this preset strategy.';
+
+        // Populate prompt on pill click (but not on info trigger click)
+        pill.addEventListener('click', (e) => {
+            if (e.target.classList.contains('rs-info-trigger')) return;
             const textarea = document.getElementById('rule-scanner-nl-prompt');
             if (textarea) textarea.value = pill.getAttribute('data-template') || '';
         });
+
+        // Hover Tooltip logic for Desktop (screens > 768px wide)
+        pill.addEventListener('mouseenter', () => {
+            if (window.innerWidth > 768) {
+                rsTooltip.innerHTML = `<strong>${rawText}</strong><div style="margin-top: 4px; font-weight: normal; color: var(--text-secondary);">${utilityText}</div>`;
+                rsTooltip.classList.add('visible');
+            }
+        });
+
+        pill.addEventListener('mouseleave', () => {
+            rsTooltip.classList.remove('visible');
+        });
+
+        pill.addEventListener('mousemove', (e) => {
+            if (window.innerWidth > 768) {
+                rsTooltip.style.left = (e.pageX + 10) + 'px';
+                rsTooltip.style.top = (e.pageY + 10) + 'px';
+            }
+        });
+
+        // Click on info trigger shows bottom sheet on mobile screens
+        const infoTrigger = pill.querySelector('.rs-info-trigger');
+        if (infoTrigger) {
+            infoTrigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                document.getElementById('rs-bottom-sheet-title').innerText = rawText;
+                document.getElementById('rs-bottom-sheet-utility').innerText = utilityText;
+                rsBottomSheet.classList.add('active');
+            });
+        }
     });
 
     // NL Submit

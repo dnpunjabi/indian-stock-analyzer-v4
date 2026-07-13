@@ -4888,6 +4888,129 @@
                                     color: #a9dfbf !important;
                                     border: 1px solid rgba(0, 0, 0, 0.15) !important;
                                 }
+
+                                /* Rule Scanner Tooltips & Bottom Sheets */
+                                .rs-nl-template-pill {
+                                    position: relative;
+                                    display: inline-flex !important;
+                                    align-items: center;
+                                    gap: 4px;
+                                }
+                                .rs-info-trigger {
+                                    font-style: normal;
+                                    font-size: 9px;
+                                    opacity: 0.5;
+                                    cursor: pointer;
+                                    padding: 0 2px;
+                                    transition: opacity 0.2s;
+                                }
+                                .rs-info-trigger:hover {
+                                    opacity: 1;
+                                }
+                                .rs-tooltip {
+                                    position: absolute;
+                                    z-index: 10000;
+                                    background: rgba(15, 23, 42, 0.95);
+                                    backdrop-filter: blur(10px);
+                                    border: 1px solid var(--border-glass);
+                                    border-radius: 6px;
+                                    padding: 8px 12px;
+                                    color: var(--text-primary);
+                                    font-size: 11px;
+                                    line-height: 1.4;
+                                    max-width: 250px;
+                                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+                                    opacity: 0;
+                                    pointer-events: none;
+                                    transition: opacity 0.2s ease, transform 0.2s ease;
+                                    transform: translateY(5px);
+                                }
+                                .rs-tooltip.visible {
+                                    opacity: 1;
+                                    transform: translateY(0);
+                                }
+                                /* Bottom sheet for mobile view */
+                                .rs-bottom-sheet {
+                                    position: fixed;
+                                    top: 0;
+                                    left: 0;
+                                    right: 0;
+                                    bottom: 0;
+                                    z-index: 99999;
+                                    visibility: hidden;
+                                    transition: visibility 0.3s;
+                                }
+                                .rs-bottom-sheet.active {
+                                    visibility: visible;
+                                }
+                                .rs-bottom-sheet-backdrop {
+                                    position: absolute;
+                                    top: 0;
+                                    left: 0;
+                                    right: 0;
+                                    bottom: 0;
+                                    background: rgba(0, 0, 0, 0.5);
+                                    backdrop-filter: blur(4px);
+                                    opacity: 0;
+                                    transition: opacity 0.3s;
+                                }
+                                .rs-bottom-sheet.active .rs-bottom-sheet-backdrop {
+                                    opacity: 1;
+                                }
+                                .rs-bottom-sheet-content {
+                                    position: absolute;
+                                    left: 0;
+                                    right: 0;
+                                    bottom: 0;
+                                    background: rgba(17, 24, 39, 0.98);
+                                    backdrop-filter: blur(12px);
+                                    border-top: 1px solid var(--border-glass);
+                                    border-top-left-radius: 16px;
+                                    border-top-right-radius: 16px;
+                                    padding: 20px;
+                                    transform: translateY(100%);
+                                    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                                    color: var(--text-primary);
+                                    box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.3);
+                                }
+                                .rs-bottom-sheet.active .rs-bottom-sheet-content {
+                                    transform: translateY(0);
+                                }
+                                .rs-bottom-sheet-handle {
+                                    width: 40px;
+                                    height: 4px;
+                                    background: rgba(255, 255, 255, 0.2);
+                                    border-radius: 2px;
+                                    margin: -10px auto 15px auto;
+                                }
+                                .rs-bottom-sheet h4 {
+                                    margin: 0 0 10px 0;
+                                    font-size: 14px;
+                                    font-weight: 700;
+                                    letter-spacing: 0.5px;
+                                    color: var(--color-primary);
+                                    text-transform: uppercase;
+                                }
+                                .rs-bottom-sheet p {
+                                    margin: 0 0 20px 0;
+                                    font-size: 12px;
+                                    line-height: 1.5;
+                                    color: var(--text-secondary);
+                                }
+                                .rs-bottom-sheet-close {
+                                    width: 100%;
+                                    padding: 10px;
+                                    border-radius: 8px;
+                                    background: rgba(255, 255, 255, 0.05);
+                                    border: 1px solid var(--border-glass);
+                                    color: var(--text-primary);
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    cursor: pointer;
+                                }
+                                .rs-bottom-sheet-close:hover {
+                                    background: rgba(255, 255, 255, 0.1);
+                                }
                             </style>
                             <h3 style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
                                 <span>📈 DAILY CLOSING WRAP-UP</span>
