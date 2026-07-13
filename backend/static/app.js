@@ -24372,116 +24372,446 @@ function setupRuleScanner() {
 
     // NL template pills
     const RULE_SCANNER_UTILITY_GUIDE = {
-        "RSI Oversold Universe": "Identifies highly oversold stocks where selling pressure is exhausted, indicating a high probability of technical rebound.",
-        "RSI Overbought Universe": "Highlights stocks in extreme bullish territory; alerts to potential exhaustion or profit-taking reversals.",
-        "MACD Bullish Cross": "Triggers when MACD line crosses above the Signal line, confirming intermediate momentum shift to the upside.",
-        "MACD Bearish Divergence": "Indicates momentum slowdown as MACD crosses below the Signal line, warning of trend weakness.",
-        "Deep Oversold Mid-Caps": "Isolates mid-cap stocks with extremely low RSI (< 25) for high-potential contrarian mean-reversion plays.",
-        "Neutral RSI Large-Caps": "Finds large-caps in consolidation phase (RSI 40-60) before their next directional expansion breakout.",
-        "ATR Volatility Shock": "Flags stocks experiencing extreme daily price volatility ranges (ATR > 50) for intraday or breakout trading.",
-        "RSI Bullish Divergence": "Detects structural divergence where price is near 52-week lows but momentum RSI is showing strong support (RSI >= 45).",
-        "Golden Cross Stocks": "Classic long-term trend reversal signal indicating that structural market momentum has turned bullish.",
-        "Death Cross Stocks": "Classic warning signal that structural market momentum has turned bearish.",
-        "Below SMA-200 Pullback": "Identifies stocks trading below their structural 200-day average, signaling long-term downtrend correction.",
-        "Above SMA-200 Breakout": "Screens for stocks establishing strong uptrends above their long-term structural average.",
-        "SMA-50 Short-Term Dip": "Finds short-term pullbacks where price dips below the 50-day average within a medium-term trend.",
-        "EMA Golden Cross": "An exponential moving average crossover that reacts faster to intermediate trend reversals.",
-        "EMA Death Cross": "An exponential moving average crossover that alerts faster to intermediate trend breakdowns.",
-        "20 SMA Pullback": "Finds highly active stocks pulling back to their short-term 20-day mean within strong bull runs.",
-        "Stage 2 Trend": "Screens for Mark Minervini style Stage 2 momentum uptrends where all SMAs are perfectly aligned.",
-        "5/20 EMA Cross": "Finds short-term momentum triggers where 5 EMA crosses 20 EMA, backed by active volume.",
-        "SMA-200 Stretched": "Flags stocks trading excessively high above their 200 SMA, warning of overextension and reversion risk.",
-        "EMA Ribbon Align": "Finds stocks in structural uptrends where 20, 50, and 200 EMAs are perfectly aligned in parallel markup.",
-        "100 SMA Pullback": "Identifies medium-term trend pullback entries near the key 100-day Simple Moving Average.",
-        "200 EMA Support Dip": "Catches high-probability support entries where price dips precisely to the 200-day Exponential average.",
-        "Trend Acceleration": "Screens for stocks showing rapid momentum markup with aligned averages and strong ADX trend strength.",
-        "Structural Golden Cross": "Finds recent Golden Cross setups where 50 SMA is crossing above the 200 SMA within 1.5% separation.",
-        "SMA-200 Near Support": "Catches stocks trading just below their 200 SMA by less than 5%, offering low-risk pivot setups.",
-        "SMA-50 Near Pivot": "Highlights stocks trading just below their 50 SMA by less than 3% before potential breakout breakout.",
-        "BB Lower Band Touch": "Finds oversold stocks trading below their Bollinger Lower Band for a quick statistical mean reversion bounce.",
-        "BB Upper Band Breakout": "Flags stocks breaking out of their volatility channel, signaling the start of a strong trend markup.",
-        "Mid-Cap BB Squeeze": "Identifies mid-caps in tight Bollinger squeeze, preceding explosive breakout volatility expansion.",
-        "BB Walk the Bands": "Highlights strong trend expansions where price closes above the upper band on high volume validation.",
-        "All Fibonacci Levels": "Screens for stocks trading near any key Fibonacci retracement level for support/resistance pivots.",
-        "Fib 38.2% Bounce Zone": "Catches shallow retracements near 38.2% Fib level, common in strong trending bull markets.",
-        "Fib 50.0% Midline": "Identifies pullbacks to the 50.0% Fibonacci midline, representing a balanced risk-reward entry zone.",
-        "Fib 61.8% Golden Ratio": "Screens for pullbacks to the 61.8% Golden Ratio, the most watched retracement level for structural reversals.",
-        "Large-Cap Fib Entries": "Isolates large-caps trading near key Fibonacci retracements for highly reliable, low-volatility support entries.",
-        "Golden Pocket Zone": "Finds stocks in the high-conviction Golden Pocket (61.8% - 78.6% Fib), where major reversals occur.",
-        "Vol POC + Fib Confluence": "Highlights extreme support levels where a Fibonacci level coincides with the Volume Point of Control (POC).",
-        "Capitulation Deep Value": "Catches panic selling dips at the deep 78.6% Fibonacci level with oversold RSI (< 25).",
-        "Fib 23.6% Breakout Pivot": "Detects initial breakout pivots crossing above the 23.6% Fibonacci level from long-term bottoms.",
-        "Near 52-Week Low": "Isolates stocks trading near their 52-week low, suitable for contrarian long-term value accumulation.",
-        "Near 52-Week High": "Highlights stocks trading near their 52-week high, indicating strong institutional momentum.",
-        "Large-Cap 52W Breakout": "Screens for large-caps breaking out to new 52-week highs, confirming strong structural leadership.",
-        "Mid-Cap 52W Value Entry": "Finds mid-caps accumulating near their 52-week low, offering asymmetric value risk-reward.",
-        "52W High Retest": "Highlights stocks retesting their 52-week high after a minor consolidation pull back.",
-        "52W Midpoint Pivot": "Catches stocks crossing their 52-week range midpoint, signifying transition from distribution to markup.",
-        "52W Low Accumulation": "Finds stocks bouncing off their 52-week low with strong volume support.",
-        "Volumetric 52W High Breakout": "Confirms massive institutional breakouts exceeding 52w Highs on high volume > 2x average.",
-        "Deep Value P/E (<15)": "Screens for high-value large-cap stocks trading at conservative price-to-earnings multiples.",
-        "Ultra Value P/E (<10)": "Isolates dirt-cheap stocks trading at extremely depressed earnings multiples.",
-        "Overvalued P/E (>50)": "Identifies potentially overstretched or speculative stocks trading at high multiples.",
-        "Penny Stocks (<₹100)": "Filters for lower-priced stocks with high retail liquidity and high percentage swing potential.",
-        "Premium Stocks (>₹5000)": "Screens for premium high-priced corporate leaders, usually backed by strong institutional demand.",
-        "AI Strong Buy Rated": "Displays stocks that have received the highest quantitative ratings from the AI analytical models.",
-        "AI Buy Rated": "Displays stocks with solid positive ratings from the AI analytical models.",
-        "Altman Z Distress": "Identifies stocks with Altman Z-Scores below 1.8, warning of potential financial insolvency risks.",
-        "Target 15% Discount": "Finds stocks trading at a discount of more than 15.0% relative to analyst consensus price targets.",
-        "CFO/PAT Divergence": "Highlights potential accounting quality issues where operating cash flows lag net profits.",
-        "Dividend Support": "Screens for high-dividend yield stocks (>3%) that offer safety cushion during down markets.",
-        "DCF Undervalued (>20% MoS)": "Finds stocks trading at more than 20% discount relative to their conservative DCF intrinsic valuations.",
-        "Buffett Quality Moat": "Isolates high-ROE companies (>15%) operating with low debt-to-equity leverage (<0.5).",
-        "Clean Promoter Ownership": "Highlights promoter pledged shares under 1% and solid profits, confirming clean corporate governance.",
-        "GARP PEG Cheap Growth": "Finds Growth at a Reasonable Price, screening for stocks with PEG ratios under 1.0.",
-        "Pristine Earnings Quality": "Filters for pristine financial companies with near-perfect Piotroski F-Scores (8 or 9).",
-        "2x Volume Surge": "Highlights initial momentum breakouts where trading volume exceeds the 20-day average by 2x.",
-        "3x Volume Spurt": "Flags strong momentum surges where trading volume reaches 3x the 20-day average.",
-        "5x Extreme Volume": "Isolates extreme institutional volume spikes (5x average) indicating massive block deals or regime shift.",
-        "Large-Cap Volume Alert": "Finds large-caps attracting sudden volume expansion (> 1.5x average) for institutional momentum.",
-        "Institutional Absorption": "Identifies quiet accumulation phases where high demat delivery percentage and positive delivery Z-score confirm buying.",
-        "VSA Smart Money Demand": "Detects Volume Spread Analysis demand and strength setups, confirming smart money accumulation.",
-        "Heavy Institutional Holding": "Screens for companies with heavy FII & DII stakes (>30%), offering strong ownership shield.",
-        "Dry Volume Consolidation": "Detects tight price consolidation ranges on very dry volume, signaling supply exhaustion before breakout.",
-        "Large-Cap Reversal Setup": "Finds large-caps pulling back to oversold levels with golden crosses for low-risk entries.",
-        "Mid-Cap Value + Momentum": "Isolates cheap mid-caps with strong earnings margins entering bullish momentum zones.",
-        "Small-Cap Volume Breakout": "Screens for highly active small-caps breaking out on major volume spurts.",
-        "Contrarian Deep Value": "Highlights deeply beaten-down stocks trading well below their 200 SMA at cheap multiples.",
-        "Momentum Leader Scan": "Finds extreme momentum leadership stocks trading at new highs with elevated RSI levels.",
-        "AI Sell-Rated Watch": "Flags stocks with AI rating underperform recommendations, suggesting exit or hedging.",
-        "Large-Cap Steady Compounder": "Finds low-volatility large-caps (Beta < 1.0) with strong AI ratings for defensive compounding.",
-        "Small-Cap Momentum Markup": "Identifies high-beta small-caps in active momentum markup phase.",
-        "Sector Rotation Alpha Play": "Finds stocks leading the top 3 strongest relative strength sectors in the market.",
-        "Benchmark Alpha Outperformer": "Screens for stocks showing exceptional alpha outperformance (>15%) relative to the benchmark index.",
-        "Bullish Pullback (RSI + SMA)": "Identifies short-term dips in long-term uptrends for high-probability pullback entries.",
-        "Breakout Momentum (RSI + SMA)": "Finds high-momentum breakouts in active structural uptrends.",
-        "Oversold Value Buy (PE + RSI)": "Combines fundamental cheapness with technical oversold conditions for low-risk value entries.",
-        "Growth Momentum (SMA + RSI + Rating)": "Institutional setup: Aligned uptrend, high relative strength, and Strong Buy AI rating.",
-        "Vol Trend Spurt (Volume + SMA50)": "Catches momentum spikes where volume surge occurs right above the 50 SMA support.",
-        "52W Trend Breakout (SMA200 + 52W High)": "Finds structural breakouts exceeding 52w Highs in long-term uptrends.",
-        "52W Value Entry (52W Low + RSI)": "Catches bottom-reversal entries near the 52w Low with oversold momentum.",
-        "Fib Support Bounce (Fib + RSI)": "Finds confluence buy setups where a Fibonacci retracement level aligns with oversold RSI.",
-        "BB Reversion (BB Lower + RSI)": "Mean reversion setup: Price below lower band with oversold RSI.",
-        "BB Breakout (BB Upper + Vol Surge)": "High-momentum breakout setup crossing the upper band on volume confirmation.",
-        "MACD Vol Surge (MACD + Vol Surge)": "Confirms MACD crossover buy signals with volume surge validation.",
-        "Quality Dip Buy (Rating + RSI)": "Finds dips in high-conviction companies with positive analyst and model ratings.",
-        "Death Cross Vol Spurt (SMA Cross + Vol)": "Flags high-volume breakdowns on Death Cross confirmation.",
-        "Fib Trend Confluence (Fib + SMA200)": "Finds structural trend entries where a Fib level aligns with the 200 SMA support.",
-        "Penny Momentum Surge (Price + RSI + Vol)": "Finds low-priced stocks gaining high-speed volume and momentum breakouts.",
-        "Premium Quality Growth (Price + PE + Rating)": "Isolates high-priced corporate quality growth compounders.",
-        "PE Value Accumulation (PE + Vol)": "Identifies value accumulation patterns on rising volumes.",
-        "Short Pullback in Uptrend (SMA50 + SMA200)": "Buy the dip entry where price drops below 50 SMA but stays safely above 200 SMA.",
-        "BB Squeeze Breakout (Bands Width + Vol)": "Finds volatility expansion breakouts after a period of tight consolidation.",
-        "Contrarian Value Play (PE + SMA + RSI)": "Deep value mean reversion play on oversold, cheap stocks.",
-        "DMA Cross Nearness": "Highlights stocks where 50 SMA is in close proximity to 200 SMA before cross.",
-        "Value Trap Avoidance": "Helps avoid low-PE value traps that have a consensus Sell recommendation.",
-        "BB Reversion Surge": "Extremely oversold mean reversion play under the lower band on high volume.",
-        "Piotroski Breakout": "Screens for top-tier Piotroski score stocks breaking out above 200 SMA.",
-        "Institutional Quality Breakout": "Finds high-quality Piotroski companies breaking out near their 52w High on delivery volume.",
-        "Solvency Value Dip": "Buy the dip setup on financially solid, DCF-undervalued stocks with oversold RSI.",
-        "HV Momentum Markup": "Trend following entry: Strong ADX trend and volume markup crossing moving averages.",
-        "SM Bottom Fishing": "Catches institutional reversal pivots using FII/DII stakes and VSA demand bars.",
-        "Elder Triple Screen": "Alexander Elder style screen: Price > 200 SMA (Trend), RSI < 38 (Oversold), and Volume > 1.5x."
+        "RSI Oversold Universe": {
+            "concept": "Identifies highly oversold stocks where selling pressure is exhausted, indicating a high probability of technical rebound.",
+            "why": "Helps capture bottom-fishing setups and short-term oversold bounces in stable indices."
+        },
+        "RSI Overbought Universe": {
+            "concept": "Highlights stocks in extreme bullish territory; alerts to potential momentum exhaustion or profit-taking reversals.",
+            "why": "Allows traders to identify overextended rallies for profit booking or defensive hedging."
+        },
+        "MACD Bullish Cross": {
+            "concept": "Triggers when MACD line crosses above the Signal line, confirming intermediate momentum shift to the upside.",
+            "why": "Validates trend reversals and momentum shifts before price gains significant distance."
+        },
+        "MACD Bearish Divergence": {
+            "concept": "Indicates momentum slowdown as MACD crosses below the Signal line, warning of trend weakness.",
+            "why": "Flags distribution phases and early exit points for protecting trailing capital."
+        },
+        "Deep Oversold Mid-Caps": {
+            "concept": "Isolates mid-cap stocks with extremely low RSI (< 25) for high-potential contrarian mean-reversion plays.",
+            "why": "Capitalizes on sharp mid-cap selloffs that often lead to quick 10-15% short-term recoveries."
+        },
+        "Neutral RSI Large-Caps": {
+            "concept": "Finds large-caps in consolidation phase (RSI 40-60) before their next directional expansion breakout.",
+            "why": "Helps identify low-volatility consolidation zones prior to strong volatility expansions."
+        },
+        "ATR Volatility Shock": {
+            "concept": "Flags stocks experiencing extreme daily price volatility ranges (ATR > 50) for active breakout trading.",
+            "why": "Filters for high-beta stocks with massive intraday ranges suitable for momentum scalping."
+        },
+        "RSI Bullish Divergence": {
+            "concept": "Detects structural divergence where price is near 52-week lows but momentum RSI is showing strong support (RSI >= 45).",
+            "why": "Confirms seller exhaustion; price is making lower lows but momentum is rising, suggesting smart money absorption."
+        },
+        "Golden Cross Stocks": {
+            "concept": "Classic long-term trend reversal signal where the 50-day Simple Moving Average crosses above the 200-day Simple Moving Average.",
+            "why": "Establishes long-term bullish structural regimes, perfect for structural trend followers and investors."
+        },
+        "Death Cross Stocks": {
+            "concept": "Classic warning signal where the 50-day Simple Moving Average crosses below the 200-day Simple Moving Average.",
+            "why": "Alerts to structural bearish regime changes; serves as an absolute macro warning filter to avoid long entries."
+        },
+        "Below SMA-200 Pullback": {
+            "concept": "Identifies stocks trading below their structural 200-day average, signaling long-term downtrend correction.",
+            "why": "Helps contrarians locate deep discount entries, or trend followers locate short targets."
+        },
+        "Above SMA-200 Breakout": {
+            "concept": "Screens for stocks establishing strong uptrends above their long-term structural average.",
+            "why": "Ensures that trading is aligned with the major long-term market regime."
+        },
+        "SMA-50 Short-Term Dip": {
+            "concept": "Finds short-term pullbacks where price dips below the 50-day average within a medium-term trend.",
+            "why": "Offers cheap entries in ongoing bull runs when stocks temporarily consolidate."
+        },
+        "EMA Golden Cross": {
+            "concept": "An exponential moving average crossover (50 EMA crossing above 200 EMA) that reacts faster to intermediate trend reversals.",
+            "why": "Minimizes indicator lag, allowing earlier participation in structural trend shifts."
+        },
+        "EMA Death Cross": {
+            "concept": "An exponential moving average crossover (50 EMA crossing below 200 EMA) that alerts faster to intermediate trend breakdowns.",
+            "why": "Provides rapid warnings of structural distribution before major price damage occurs."
+        },
+        "20 SMA Pullback": {
+            "concept": "Finds highly active stocks pulling back to their short-term 20-day mean within strong bull runs.",
+            "why": "The classic pullback entry for strong momentum leaders; captures high velocity moves on minor dips."
+        },
+        "Stage 2 Trend": {
+            "concept": "Screens for Mark Minervini style Stage 2 momentum uptrends where 50 SMA > 150 SMA > 200 SMA and price is in structural markup.",
+            "why": "Aligns trades with institutional accumulation; ensures buying occurs only when trend is in active markup phase."
+        },
+        "5/20 EMA Cross": {
+            "concept": "Finds short-term momentum triggers where 5 EMA crosses 20 EMA, backed by active volume.",
+            "why": "Screener for short-term swing traders looking for explosive markup starts."
+        },
+        "SMA-200 Stretched": {
+            "concept": "Flags stocks trading excessively high above their 200 SMA, warning of overextension and reversion risk.",
+            "why": "Helps avoid chasing stocks at the top of their cycles and alerts to potential short-term profit-taking dips."
+        },
+        "EMA Ribbon Align": {
+            "concept": "Finds stocks in structural uptrends where 20, 50, and 200 EMAs are perfectly aligned in parallel markup.",
+            "why": "Signals strong, clean institutional support at multiple moving average horizons."
+        },
+        "100 SMA Pullback": {
+            "concept": "Identifies medium-term trend pullback entries near the key 100-day Simple Moving Average.",
+            "why": "Serves as a reliable support entry level for medium-term position traders."
+        },
+        "200 EMA Support Dip": {
+            "concept": "Catches high-probability support entries where price dips precisely to the 200-day Exponential average.",
+            "why": "The 200 EMA is highly respected by institutional trading algorithms; dips here have high bounce probabilities."
+        },
+        "Trend Acceleration": {
+            "concept": "Screens for stocks showing rapid momentum markup with aligned averages and strong ADX trend strength.",
+            "why": "Locates the most aggressive momentum plays where trend speed is increasing rapidly."
+        },
+        "Structural Golden Cross": {
+            "concept": "Finds recent Golden Cross setups where 50 SMA is crossing above the 200 SMA within 1.5% separation.",
+            "why": "Captures the exact transition window where the long-term trend shifts from consolidation to markup."
+        },
+        "SMA-200 Near Support": {
+            "concept": "Catches stocks trading just below their 200 SMA by less than 5%, offering low-risk pivot setups.",
+            "why": "Locates stocks forming base support near the structural 200-day average before a potential breakout."
+        },
+        "SMA-50 Near Pivot": {
+            "concept": "Highlights stocks trading just below their 50 SMA by less than 3% before potential breakout.",
+            "why": "Identifies compression consolidation zones right under intermediate resistance, ready for breakout."
+        },
+        "BB Lower Band Touch": {
+            "concept": "Finds oversold stocks trading below their Bollinger Lower Band for a quick statistical mean reversion bounce.",
+            "why": "Perfect for short-term mean-reversion traders exploiting temporary panic selling."
+        },
+        "BB Upper Band Breakout": {
+            "concept": "Flags stocks breaking out of their volatility channel, signaling the start of a strong trend markup.",
+            "why": "Captures volatility breakout events that often precede long-term trending expansions."
+        },
+        "Mid-Cap BB Squeeze": {
+            "concept": "Identifies mid-caps in tight Bollinger squeeze, preceding explosive breakout volatility expansion.",
+            "why": "Locates quiet consolidation phases where low volatility warns of an imminent sharp move."
+        },
+        "BB Walk the Bands": {
+            "concept": "Highlights strong trend expansions where price closes above the upper band on high volume validation.",
+            "why": "Signals a powerful volatility markup phase where momentum is strong enough to push bands wider."
+        },
+        "All Fibonacci Levels": {
+            "concept": "Screens for stocks trading near any key Fibonacci retracement level for support/resistance pivots.",
+            "why": "Pinpoints mathematical support levels respected by algorithmic trading engines."
+        },
+        "Fib 38.2% Bounce Zone": {
+            "concept": "Catches shallow retracements near 38.2% Fib level, common in strong trending bull markets.",
+            "why": "Enables entry in strong secular trends that do not experience deep corrections."
+        },
+        "Fib 50.0% Midline": {
+            "concept": "Identifies pullbacks to the 50.0% Fibonacci midline, representing a balanced risk-reward entry zone.",
+            "why": "Matches standard pullback rules where buyers defend the intermediate midpoint of the prior rally."
+        },
+        "Fib 61.8% Golden Ratio": {
+            "concept": "Screens for pullbacks to the 61.8% Golden Ratio, the most watched retracement level for structural reversals.",
+            "why": "The ultimate buy-the-dip level; captures deep value corrections before the major trend resumes."
+        },
+        "Large-Cap Fib Entries": {
+            "concept": "Isolates large-caps trading near key Fibonacci retracements for highly reliable, low-volatility support entries.",
+            "why": "Combines institutional stability with mathematical entry precision."
+        },
+        "Golden Pocket Zone": {
+            "concept": "Finds stocks in the high-conviction Golden Pocket (61.8% - 78.6% Fib), where major reversals occur.",
+            "why": "Provides a high-probability reversal window where risk-reward is heavily skewed in favor of buyers."
+        },
+        "Vol POC + Fib Confluence": {
+            "concept": "Highlights extreme support levels where a Fibonacci level coincides with the Volume Point of Control (POC).",
+            "why": "Confluence of Fibonacci geometry and actual volume profile distribution, indicating very strong support."
+        },
+        "Capitulation Deep Value": {
+            "concept": "Catches panic selling dips at the deep 78.6% Fibonacci level with oversold RSI (< 25).",
+            "why": "Identifies extreme capitulation events where weak hands dump shares, creating asymmetric value."
+        },
+        "Fib 23.6% Breakout Pivot": {
+            "concept": "Detects initial breakout pivots crossing above the 23.6% Fibonacci level from long-term bottoms.",
+            "why": "Flags early stage structural trend shifts from bearish consolidation to intermediate uptrends."
+        },
+        "Near 52-Week Low": {
+            "concept": "Isolates stocks trading near their 52-week low, suitable for contrarian long-term value accumulation.",
+            "why": "Enables long-term investors to build positions in sound companies at cyclical lows."
+        },
+        "Near 52-Week High": {
+            "concept": "Highlights stocks trading near their 52-week high, indicating strong institutional momentum.",
+            "why": "Helps trend followers capture structural markup rallies with institutional backing."
+        },
+        "Large-Cap 52W Breakout": {
+            "concept": "Screens for large-caps breaking out to new 52-week highs, confirming strong structural leadership.",
+            "why": "Identifies market leaders that are attracting the bulk of institutional asset allocation."
+        },
+        "Mid-Cap 52W Value Entry": {
+            "concept": "Finds mid-caps accumulating near their 52-week low, offering asymmetric value risk-reward.",
+            "why": "Catches beaten-down mid-sized companies before their structural recovery cycle begins."
+        },
+        "52W High Retest": {
+            "concept": "Highlights stocks retesting their 52-week high after a minor consolidation pullback.",
+            "why": "Screens for continuation cup-and-handle setups before the next leg of markup begins."
+        },
+        "52W Midpoint Pivot": {
+            "concept": "Catches stocks crossing their 52-week range midpoint, signifying transition from distribution to markup.",
+            "why": "Validates the change in control from sellers to buyers over a 12-month period."
+        },
+        "52W Low Accumulation": {
+            "concept": "Finds stocks bouncing off their 52-week low with strong volume support.",
+            "why": "Confirms demand support at cyclical lows, indicating institutional accumulation."
+        },
+        "Volumetric 52W High Breakout": {
+            "concept": "Confirms massive institutional breakouts exceeding 52w Highs on high volume > 2x average.",
+            "why": "The ultimate breakout scan; ensures the 52-week high breakout is backed by real smart money buying conviction."
+        },
+        "Deep Value P/E (<15)": {
+            "concept": "Screens for high-value stocks trading at conservative price-to-earnings multiples.",
+            "why": "Ensures margin of safety by filtering out highly speculative valuation multiples."
+        },
+        "Ultra Value P/E (<10)": {
+            "concept": "Isolates cheap stocks trading at extremely depressed earnings multiples.",
+            "why": "Filters for defensive contrarian value plays with potential for multiple rerating."
+        },
+        "Overvalued P/E (>50)": {
+            "concept": "Identifies potentially overstretched or speculative stocks trading at high multiples.",
+            "why": "Serves as an essential risk-avoidance screen for value-conscious portfolios."
+        },
+        "Penny Stocks (<₹100)": {
+            "concept": "Filters for lower-priced stocks with high retail liquidity and high percentage swing potential.",
+            "why": "Helps locate high-beta retail momentum plays with low capital requirements."
+        },
+        "Premium Stocks (>₹5000)": {
+            "concept": "Screens for premium high-priced corporate leaders, usually backed by strong institutional demand.",
+            "why": "Isolates high-priced premium quality stocks with institutional ownership shielding."
+        },
+        "AI Strong Buy Rated": {
+            "concept": "Displays stocks that have received the highest quantitative ratings from the AI analytical models.",
+            "why": "Filters for high-probability setups backed by multi-factor machine learning evaluation."
+        },
+        "AI Buy Rated": {
+            "concept": "Displays stocks with solid positive ratings from the AI analytical models.",
+            "why": "Provides a comprehensive shortlist of fundamentally sound candidate stocks."
+        },
+        "Altman Z Distress": {
+            "concept": "Identifies stocks with Altman Z-Scores below 1.8, warning of potential financial insolvency risks.",
+            "why": "Serves as a critical risk control filter; helps screen out fundamentally weak companies with bankruptcy risk."
+        },
+        "Target 15% Discount": {
+            "concept": "Finds stocks trading at a discount of more than 15.0% relative to consensus target prices.",
+            "why": "Leverages consensus analyst research to locate mispriced high-upside opportunities."
+        },
+        "CFO/PAT Divergence": {
+            "concept": "Highlights potential accounting quality issues where operating cash flows lag net profits.",
+            "why": "Helps avoid earnings manipulation risks by ensuring net income is backed by real cash flows."
+        },
+        "Dividend Support": {
+            "concept": "Screens for high-dividend yield stocks (>3%) that offer safety cushion during down markets.",
+            "why": "Provides a defensive yield buffer and downside price support during market downturns."
+        },
+        "DCF Undervalued (>20% MoS)": {
+            "concept": "Finds stocks trading at more than 20% discount relative to their conservative DCF intrinsic valuations.",
+            "why": "The cornerstone of value investing; ensures purchasing a stock well below its long-term cash generation value."
+        },
+        "Buffett Quality Moat": {
+            "concept": "Isolates high-ROE companies (>15%) operating with low debt-to-equity leverage (<0.5).",
+            "why": "Implements Warren Buffett's quality criteria; selects highly profitable businesses with zero solvency risk."
+        },
+        "Clean Promoter Ownership": {
+            "concept": "Highlights promoter pledged shares under 1% and solid profit growth, confirming clean corporate governance.",
+            "why": "Protects portfolios from sudden margin-call crashes caused by promoters pledging their stakes."
+        },
+        "GARP PEG Cheap Growth": {
+            "concept": "Finds Growth at a Reasonable Price, screening for stocks with PEG ratios under 1.0.",
+            "why": "Avoids overpaying for growth; targets high-earnings expansion companies trading at fair valuations."
+        },
+        "Pristine Earnings Quality": {
+            "concept": "Filters for pristine financial companies with near-perfect Piotroski F-Scores (8 or 9).",
+            "why": "Locates companies with improving profitability, capital structure efficiency, and operational quality."
+        },
+        "2x Volume Surge": {
+            "concept": "Highlights initial momentum breakouts where trading volume exceeds the 20-day average by 2x.",
+            "why": "Signals early institutional interest; volume precede price movements in trending phases."
+        },
+        "3x Volume Spurt": {
+            "concept": "Flags strong momentum surges where trading volume reaches 3x the 20-day average.",
+            "why": "Confirms aggressive buying conviction, indicating active base breakout or rally continuation."
+        },
+        "5x Extreme Volume": {
+            "concept": "Isolates extreme institutional volume spikes (5x average) indicating massive block deals or regime shifts.",
+            "why": "Captures extreme liquidity events that mark structural accumulation bottoms or distribution tops."
+        },
+        "Large-Cap Volume Alert": {
+            "concept": "Finds large-caps attracting sudden volume expansion (> 1.5x average) for institutional momentum.",
+            "why": "Detects institutional rotation into specific blue-chip sectors."
+        },
+        "Institutional Absorption": {
+            "concept": "Identifies quiet accumulation phases where high demat delivery percentage and positive delivery Z-score confirm buying.",
+            "why": "Ensures that trading volume is being locked up in demat accounts, indicating structural accumulation rather than day trading."
+        },
+        "VSA Smart Money Demand": {
+            "concept": "Detects Volume Spread Analysis demand and strength setups, confirming smart money accumulation.",
+            "why": "Combines price action spread and volume profiles to read raw supply/demand imbalances."
+        },
+        "Heavy Institutional Holding": {
+            "concept": "Screens for companies with combined FII & DII stakes above 30%, offering strong ownership shield.",
+            "why": "Ensures structural support during market downturns due to heavy institutional backing."
+        },
+        "Dry Volume Consolidation": {
+            "concept": "Detects tight price consolidation ranges on very dry volume (volume ratio <= 0.5x).",
+            "why": "Flags supply exhaustion; indicates that sellers are gone and a minor demand surge can trigger a massive breakout."
+        },
+        "Large-Cap Reversal Setup": {
+            "concept": "Finds large-caps pulling back to oversold levels with golden crosses for low-risk entries.",
+            "why": "Capitalizes on stable blue-chip rebounds near key structural support zones."
+        },
+        "Mid-Cap Value + Momentum": {
+            "concept": "Isolates cheap mid-caps with strong earnings margins entering bullish momentum zones.",
+            "why": "Combines fundamental value safety with immediate trend acceleration."
+        },
+        "Small-Cap Volume Breakout": {
+            "concept": "Screens for highly active small-caps breaking out on major volume surges.",
+            "why": "Captures initial explosive markup waves in micro and small-sized companies."
+        },
+        "Contrarian Deep Value": {
+            "concept": "Highlights deeply beaten-down stocks trading well below their 200 SMA at cheap multiples.",
+            "why": "Screens for highly asymmetric turnaround bets with massive recovery potential."
+        },
+        "Momentum Leader Scan": {
+            "concept": "Finds extreme momentum leadership stocks trading at new highs with elevated RSI levels.",
+            "why": "Standard trend-following filter for momentum traders riding the strongest wave."
+        },
+        "AI Sell-Rated Watch": {
+            "concept": "Flags stocks with AI rating underperform recommendations, suggesting exit or hedging.",
+            "why": "Provides an automated early warning risk management check for capital preservation."
+        },
+        "Large-Cap Steady Compounder": {
+            "concept": "Finds low-volatility large-caps (Beta < 1.0) with strong AI ratings for defensive compounding.",
+            "why": "Ideal for low-risk portfolios looking for safe market outperformance with minimal drawdowns."
+        },
+        "Small-Cap Momentum Markup": {
+            "concept": "Identifies high-beta small-caps in active momentum markup phase (ADX >= 25 + Beta > 1.2).",
+            "why": "Captures high-velocity, high-risk trades where markup is supported by rising trend strength."
+        },
+        "Sector Rotation Alpha Play": {
+            "concept": "Finds stocks leading the top 3 strongest relative strength sectors in the market.",
+            "why": "Aligns trades with structural sector rotation, capturing tailwinds of institutional fund flows."
+        },
+        "Benchmark Alpha Outperformer": {
+            "concept": "Screens for stocks showing exceptional alpha outperformance (>15%) relative to Nifty 50.",
+            "why": "Ensures selection of stocks that are systematically generating excess return over market benchmark."
+        },
+        "Bullish Pullback (RSI + SMA)": {
+            "concept": "Identifies short-term dips (RSI < 35) in long-term uptrends (Price > 200 SMA).",
+            "why": "High-probability swing trading setup; buys the consolidation dip before the main uptrend resumes."
+        },
+        "Breakout Momentum (RSI + SMA)": {
+            "concept": "Finds high-momentum breakouts (RSI > 65) in active structural uptrends (Price > 200 SMA).",
+            "why": "Captures momentum breakout events that have structural trend support."
+        },
+        "Oversold Value Buy (PE + RSI)": {
+            "concept": "Combines fundamental cheapness (PE < 15) with technical oversold conditions (RSI < 35) for value entries.",
+            "why": "Minimizes downside risk; captures fundamentally cheap stocks at short-term emotional panic lows."
+        },
+        "Growth Momentum (SMA + RSI + Rating)": {
+            "concept": "Institutional setup: Aligned uptrend, high relative strength (RSI > 65), and Strong Buy AI rating.",
+            "why": "Ensures all dimensions (trend, momentum, and machine learning rating) are aligned for maximum velocity."
+        },
+        "Vol Trend Spurt (Volume + SMA50)": {
+            "concept": "Catches momentum spikes where volume surge occurs right above the 50 SMA support.",
+            "why": "Finds stocks resuming their intermediate trend directly from support with volume conviction."
+        },
+        "52W Trend Breakout (SMA200 + 52W High)": {
+            "concept": "Finds structural breakouts exceeding 52w Highs in long-term uptrends (Price > 200 SMA).",
+            "why": "Flags the strongest secular breakouts in the market, having macro trend backing."
+        },
+        "52W Value Entry (52W Low + RSI)": {
+            "concept": "Catches bottom-reversal entries near the 52w Low with oversold momentum.",
+            "why": "Low-risk contrarian accumulation setup right at cyclical bottom boundaries."
+        },
+        "Fib Support Bounce (Fib + RSI)": {
+            "concept": "Finds confluence buy setups where a Fibonacci retracement level aligns with oversold RSI.",
+            "why": "Combines price geometry and momentum exhaustion to locate high-accuracy bounce pivots."
+        },
+        "BB Reversion (BB Lower + RSI)": {
+            "concept": "Mean reversion setup: Price below lower Bollinger Band with oversold RSI.",
+            "why": "A highly robust statistical mean-reversion setup exploiting extreme price extensions."
+        },
+        "BB Breakout (BB Upper + Vol Surge)": {
+            "concept": "High-momentum breakout setup crossing the upper band on volume confirmation.",
+            "why": "Filters for the start of powerful breakout rallies as volatility expands."
+        },
+        "MACD Vol Surge (MACD + Vol Surge)": {
+            "concept": "Confirms MACD crossover buy signals with volume surge validation.",
+            "why": "Reduces false MACD crossover signals by requiring institutional volume support."
+        },
+        "Quality Dip Buy (Rating + RSI)": {
+            "concept": "Finds dips (RSI < 35) in high-conviction companies with Strong Buy rating.",
+            "why": "A classic investor buy-the-dip scanner for building positions in top-tier companies."
+        },
+        "Death Cross Vol Spurt (SMA Cross + Vol)": {
+            "concept": "Flags high-volume breakdowns on Death Cross confirmation.",
+            "why": "Alerts to dangerous structural breakdown events where institutions are actively selling."
+        },
+        "Fib Trend Confluence (Fib + SMA200)": {
+            "concept": "Finds structural trend entries where a Fib level aligns with the 200 SMA support.",
+            "why": "Identifies long-term trend continuation entries where multiple support levels converge."
+        },
+        "Penny Momentum Surge (Price + RSI + Vol)": {
+            "concept": "Finds low-priced stocks gaining high-speed volume and momentum breakouts.",
+            "why": "Filters for explosive micro-cap swing trades with high retail interest."
+        },
+        "Premium Quality Growth (Price + PE + Rating)": {
+            "concept": "Isolates high-priced corporate quality growth compounders.",
+            "why": "Focuses purely on high-priced premium quality stocks with institutional ownership shield."
+        },
+        "PE Value Accumulation (PE + Vol)": {
+            "concept": "Identifies value accumulation patterns on rising volumes.",
+            "why": "Catches long-term smart money accumulation phases on fundamentally cheap stocks."
+        },
+        "Short Pullback in Uptrend (SMA50 + SMA200)": {
+            "concept": "Buy the dip entry where price drops below 50 SMA but stays safely above 200 SMA.",
+            "why": "Locates intermediate pullback entries in a secular structural bull market."
+        },
+        "BB Squeeze Breakout (Bands Width + Vol)": {
+            "concept": "Finds volatility expansion breakouts after a period of tight consolidation.",
+            "why": "Captures the exact moment volatility expands, indicating a massive directional move."
+        },
+        "Contrarian Value Play (PE + SMA + RSI)": {
+            "concept": "Deep value mean reversion play on oversold, cheap stocks.",
+            "why": "Excellent for bottom-fishing structural turnarounds at depressed valuations."
+        },
+        "DMA Cross Nearness": {
+            "concept": "Highlights stocks where 50 SMA is in close proximity to 200 SMA before cross.",
+            "why": "Identifies stocks building structural momentum right before a Golden Cross occurs."
+        },
+        "Value Trap Avoidance": {
+            "concept": "Helps avoid low-PE value traps that have a consensus Sell recommendation.",
+            "why": "Crucial risk filter; prevents buying fundamentally broken stocks that appear superficially cheap."
+        },
+        "BB Reversion Surge": {
+            "concept": "Extremely oversold mean reversion play under the lower band on high volume.",
+            "why": "Exploits severe capitulation selloffs where institutional support triggers a fast bounce."
+        },
+        "Piotroski Breakout": {
+            "concept": "Screens for top-tier Piotroski score stocks breaking out above 200 SMA.",
+            "why": "Combines institutional quality rating with long-term trend breakout confirmation."
+        },
+        "Institutional Quality Breakout": {
+            "concept": "Combines fundamental strength with price breakout. Filters for companies of exceptional financial health (Piotroski F-Score >= 7) breaking out of their 52-week High, backed by smart money delivery absorption (Delivery Z-Score > 1.5).",
+            "why": "Avoids low-quality momentum pumps; ensures that the breakout is occurring on a fundamentally rock-solid company and is being supported by long-term delivery accumulation."
+        },
+        "Solvency Value Dip": {
+            "concept": "Buy the dip setup on financially solid (Altman Z >= 3.0), DCF-undervalued stocks with oversold RSI (<= 35).",
+            "why": "Ensures you are buying the dip on highly solvent companies with significant valuation margins of safety, minimizing downside."
+        },
+        "HV Momentum Markup": {
+            "concept": "Trend following entry: Strong ADX trend (>= 25) and volume markup (> 2x average) crossing moving averages (Price > 20 > 50 SMA).",
+            "why": "Catches stocks entering their most explosive trend markup phase (Stage 2 breakout) with high volume validation."
+        },
+        "SM Bottom Fishing": {
+            "concept": "Catches institutional reversal pivots using FII/DII stakes (>= 25%), oversold RSI (<= 35), and VSA demand bars.",
+            "why": "Alerts you precisely when institutions are stepping in to support a high-quality stock during a dip."
+        },
+        "Elder Triple Screen": {
+            "concept": "Alexander Elder style screen: Price > 200 SMA (Trend Filter) + RSI < 38 (Oversold pullback) + Volume > 1.5x (Trigger).",
+            "why": "Ensures you participate in pullbacks in a major uptrend when trading volumes confirm buying interest."
+        }
     };
 
     // Lazy load tooltip / bottom sheet components to keep DOM clean
@@ -24503,8 +24833,8 @@ function setupRuleScanner() {
             <div class="rs-bottom-sheet-content">
                 <div class="rs-bottom-sheet-handle"></div>
                 <h4 id="rs-bottom-sheet-title">Strategy Insight</h4>
-                <p id="rs-bottom-sheet-utility"></p>
-                <button class="rs-bottom-sheet-close">Dismiss</button>
+                <div id="rs-bottom-sheet-utility"></div>
+                <button class="rs-bottom-sheet-close" style="margin-top: 15px;">Dismiss</button>
             </div>
         `;
         document.body.appendChild(rsBottomSheet);
@@ -24520,8 +24850,8 @@ function setupRuleScanner() {
     document.querySelectorAll('.rs-nl-template-pill').forEach(pill => {
         // Parse raw text ignoring any icons
         let rawText = pill.innerText.trim();
-        // Strip emojis from the beginning if present
-        rawText = rawText.replace(/^[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '').trim();
+        // Strip emojis and spacing from the beginning if present
+        rawText = rawText.replace(/^[^a-zA-Z0-9\(\)]+/, '').trim();
 
         // Dynamically add a small info indicator trigger next to the text
         if (!pill.querySelector('.rs-info-trigger')) {
@@ -24531,7 +24861,20 @@ function setupRuleScanner() {
             pill.appendChild(infoIcon);
         }
 
-        const utilityText = RULE_SCANNER_UTILITY_GUIDE[rawText] || 'Run a quick query using this preset strategy.';
+        const guideObj = RULE_SCANNER_UTILITY_GUIDE[rawText] || {
+            "concept": "Run a quick query using this preset strategy.",
+            "why": "Helps screen stocks based on custom technical criteria."
+        };
+
+        const tooltipHTML = `
+            <strong>${rawText}</strong>
+            <div style="margin-top: 6px; font-size: 10.5px; line-height: 1.45; font-weight: normal; color: var(--text-primary);">
+                <span style="color: var(--color-primary); font-weight: 700;">Concept:</span> ${guideObj.concept}
+            </div>
+            <div style="margin-top: 5px; font-size: 10.5px; line-height: 1.45; font-weight: normal; color: var(--text-secondary);">
+                <span style="color: #38bdf8; font-weight: 700;">Why it's useful:</span> ${guideObj.why}
+            </div>
+        `;
 
         // Populate prompt on pill click (but not on info trigger click)
         pill.addEventListener('click', (e) => {
@@ -24543,7 +24886,7 @@ function setupRuleScanner() {
         // Hover Tooltip logic for Desktop (screens > 768px wide)
         pill.addEventListener('mouseenter', () => {
             if (window.innerWidth > 768) {
-                rsTooltip.innerHTML = `<strong>${rawText}</strong><div style="margin-top: 4px; font-weight: normal; color: var(--text-secondary);">${utilityText}</div>`;
+                rsTooltip.innerHTML = tooltipHTML;
                 rsTooltip.classList.add('visible');
             }
         });
@@ -24566,7 +24909,14 @@ function setupRuleScanner() {
                 e.stopPropagation();
                 e.preventDefault();
                 document.getElementById('rs-bottom-sheet-title').innerText = rawText;
-                document.getElementById('rs-bottom-sheet-utility').innerText = utilityText;
+                document.getElementById('rs-bottom-sheet-utility').innerHTML = `
+                    <div style="font-size: 12px; line-height: 1.5; color: var(--text-primary); margin-bottom: 8px;">
+                        <span style="color: var(--color-primary); font-weight: 700;">Concept:</span> ${guideObj.concept}
+                    </div>
+                    <div style="font-size: 12px; line-height: 1.5; color: var(--text-secondary);">
+                        <span style="color: #38bdf8; font-weight: 700;">Why it's useful:</span> ${guideObj.why}
+                    </div>
+                `;
                 rsBottomSheet.classList.add('active');
             });
         }
