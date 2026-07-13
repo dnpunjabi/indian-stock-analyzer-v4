@@ -16,3 +16,4 @@ pyotp>=2.9.0
 websocket-client>=1.7.0
 logzero>=1.7.0
 openai>=1.30.0
+cloudscraper>=1.2.71

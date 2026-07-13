@@ -1,6 +1,7 @@
 import re
 import requests
 from bs4 import BeautifulSoup
+from backend.financial_utils import make_screener_request
 
 def clean_symbol(symbol: str) -> str:
     """Cleans ticker symbols (e.g. RELIANCE.NS -> RELIANCE)."""
@@ -31,7 +32,7 @@ def scrape_saved_screens(session_cookie: str = None) -> list:
     # We fetch /explore/ because it lists custom user screens under 'Your screens'
     url = "https://www.screener.in/explore/"
     try:
-        res = requests.get(url, headers=headers, cookies=cookies, timeout=15)
+        res = make_screener_request(url, headers=headers, cookies=cookies, timeout=15)
         if res.status_code != 200:
             return []
             
@@ -97,7 +98,7 @@ def scrape_screen_results(screen_id: str, session_cookie: str = None, page: int 
         url = f"https://www.screener.in/screen/raw/{clean_id}/?page={page}"
         
     try:
-        res = requests.get(url, headers=headers, cookies=cookies, timeout=15)
+        res = make_screener_request(url, headers=headers, cookies=cookies, timeout=15)
         if res.status_code != 200:
             if res.status_code == 404:
                 return {"error": f"Screen not found (URL: {url}).", "companies": [], "total_pages": 1}

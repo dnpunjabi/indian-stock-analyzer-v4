@@ -1,6 +1,7 @@
 import re
 import requests
 from bs4 import BeautifulSoup
+from backend.financial_utils import make_screener_request
 
 def clean_symbol(symbol: str) -> str:
     """Cleans ticker symbols (e.g. RELIANCE.NS -> RELIANCE)."""
@@ -59,7 +60,7 @@ def scrape_shareholding_pattern(symbol: str, session_cookie: str = None, company
     for q in search_queries:
         search_url = f"https://www.screener.in/api/company/search/?q={requests.utils.quote(q)}"
         try:
-            search_res = requests.get(search_url, headers=headers, timeout=5)
+            search_res = make_screener_request(search_url, headers=headers, timeout=5)
             if search_res.status_code == 200:
                 results = search_res.json()
                 if results and len(results) > 0:
@@ -88,7 +89,7 @@ def scrape_shareholding_pattern(symbol: str, session_cookie: str = None, company
         url = f"https://www.screener.in/company/{base_symbol}/"
         
     try:
-        res = requests.get(url, headers=headers, cookies=cookies, timeout=15)
+        res = make_screener_request(url, headers=headers, cookies=cookies, timeout=15)
         if res.status_code != 200:
             raise Exception(f"Failed to fetch Screener page. Status: {res.status_code}")
             
@@ -147,7 +148,7 @@ def scrape_shareholding_pattern(symbol: str, session_cookie: str = None, company
                 for c, frontend_key in category_mapping.items():
                     api_url = f"https://www.screener.in/api/3/{company_id}/investors/{c}/quarterly/"
                     try:
-                        api_res = requests.get(api_url, headers=headers, cookies=cookies, timeout=10)
+                        api_res = make_screener_request(api_url, headers=headers, cookies=cookies, timeout=10)
                         if api_res.status_code == 200:
                             api_data = api_res.json()
                             if api_data:

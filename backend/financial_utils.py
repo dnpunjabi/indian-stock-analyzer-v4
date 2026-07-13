@@ -38,6 +38,52 @@ import threading
 _profile_cache = TTLCache(maxsize=200, ttl=300)
 _cache_lock = threading.Lock()
 
+# Centralized Cloudscraper requester session to bypass Cloudflare fingerprints
+_screener_scraper = None
+_scraper_lock = threading.Lock()
+
+def make_screener_request(url: str, headers: dict = None, cookies: dict = None, timeout: int = 10) -> requests.Response:
+    """
+    Centralized HTTP requester for Screener.in.
+    Uses cloudscraper to bypass Cloudflare anti-bot fingerprinting.
+    Gracefully falls back to standard requests if cloudscraper encounters issues.
+    """
+    global _screener_scraper
+    
+    # Lazily initialize cloudscraper safely across threads
+    if _screener_scraper is None:
+        with _scraper_lock:
+            if _screener_scraper is None:
+                try:
+                    import cloudscraper
+                    _screener_scraper = cloudscraper.create_scraper()
+                except Exception as scraper_init_err:
+                    print(f"[Cloudscraper] Failed to initialize: {scraper_init_err}. Using fallback requests.get.")
+                    _screener_scraper = False
+
+    # Attempt to request using cloudscraper if successfully initialized
+    if _screener_scraper:
+        try:
+            res = _screener_scraper.get(url, headers=headers, cookies=cookies, timeout=timeout)
+            if res.status_code == 429 and cookies:
+                print(f"[Cloudscraper] 429 received with cookies for {url}. Retrying as guest...")
+                res = _screener_scraper.get(url, headers=headers, timeout=timeout)
+            return res
+        except Exception as e:
+            print(f"[Cloudscraper] Request failed for {url}: {e}. Falling back to standard requests.get.")
+
+    # Fallback to standard requests
+    if cookies:
+        try:
+            res = requests.get(url, headers=headers, cookies=cookies, timeout=max(2, timeout // 2))
+            if res.status_code != 429:
+                return res
+            print(f"Standard requests returned 429 for {url} with cookies. Retrying as guest...")
+        except Exception as e:
+            print(f"Standard requests failed/timed out for {url} with cookies: {e}. Retrying as guest...")
+
+    return requests.get(url, headers=headers, timeout=timeout)
+
 def clear_profile_cache():
     """Thread-safe purge of the in-memory TTLCache."""
     with _cache_lock:
@@ -449,7 +495,7 @@ def fetch_screener_data(symbol: str) -> dict:
     resolved_path = None
     search_url = f"https://www.screener.in/api/company/search/?q={requests.utils.quote(base_symbol)}"
     try:
-        search_res = requests.get(search_url, headers=headers, timeout=5)
+        search_res = make_screener_request(search_url, headers=headers, timeout=5)
         if search_res.status_code == 200:
             results = search_res.json()
             if results and len(results) > 0:
@@ -479,7 +525,7 @@ def fetch_screener_data(symbol: str) -> dict:
     }
     
     try:
-        response = requests.get(url, headers=headers, timeout=8)
+        response = make_screener_request(url, headers=headers, timeout=8)
         if response.status_code != 200:
             return result
             
@@ -491,7 +537,7 @@ def fetch_screener_data(symbol: str) -> dict:
         consolidated_link = soup.find("a", href=re.compile(rf"/company/{re.escape(slug)}/consolidated/?", re.IGNORECASE))
         if consolidated_link:
             url = f"https://www.screener.in/company/{slug}/consolidated/"
-            response = requests.get(url, headers=headers, timeout=8)
+            response = make_screener_request(url, headers=headers, timeout=8)
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, "html.parser")
                 
@@ -518,7 +564,7 @@ def fetch_screener_data(symbol: str) -> dict:
         if warehouse_id:
             try:
                 peers_api_url = f"https://www.screener.in/api/company/{warehouse_id}/peers/"
-                peers_res = requests.get(peers_api_url, headers=headers, timeout=5)
+                peers_res = make_screener_request(peers_api_url, headers=headers, timeout=5)
                 if peers_res.status_code == 200:
                     peers_soup = BeautifulSoup(peers_res.text, "html.parser")
                     peer_table = peers_soup.select_one("table")

@@ -26,6 +26,7 @@ except Exception:
 import requests
 from bs4 import BeautifulSoup
 import re
+from backend.financial_utils import make_screener_request
 
 def clean_label(label: str) -> str:
     # Remove trailing plus and whitespace
@@ -129,19 +130,6 @@ def parse_screener_peers_table(table_el) -> dict:
         "rows": rows
     }
 
-def make_screener_request(url: str, headers: dict, cookies: dict = None, timeout: int = 10) -> requests.Response:
-    """Robust requests fetcher that falls back to anonymous guest request on 429 rate limit or timeout."""
-    if cookies:
-        try:
-            res = requests.get(url, headers=headers, cookies=cookies, timeout=max(2, timeout // 2))
-            if res.status_code != 429:
-                return res
-            print(f"Screener returned 429 for {url} with cookies. Retrying as guest...")
-        except Exception as e:
-            print(f"Screener request to {url} with cookies failed/timed out: {e}. Retrying as guest...")
-    
-    # Guest request (no cookies)
-    return requests.get(url, headers=headers, timeout=timeout)
 
 def scrape_financial_statements(symbol: str, view: str = "consolidated", session_cookie: str = None) -> dict:
     """

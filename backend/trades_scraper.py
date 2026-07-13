@@ -1,6 +1,7 @@
 import re
 import requests
 from bs4 import BeautifulSoup
+from backend.financial_utils import make_screener_request
 
 def clean_symbol(symbol: str) -> str:
     """Cleans ticker symbols (e.g. RELIANCE.NS -> RELIANCE)."""
@@ -46,7 +47,7 @@ def scrape_trades(symbol: str, session_cookie: str = None, company_name: str = N
     for q in search_queries:
         search_url = f"https://www.screener.in/api/company/search/?q={requests.utils.quote(q)}"
         try:
-            search_res = requests.get(search_url, headers=headers, timeout=5)
+            search_res = make_screener_request(search_url, headers=headers, timeout=5)
             if search_res.status_code == 200:
                 results = search_res.json()
                 if results and len(results) > 0:
@@ -60,7 +61,7 @@ def scrape_trades(symbol: str, session_cookie: str = None, company_name: str = N
     if not resolved_id:
         company_url = f"https://www.screener.in/company/{base_symbol}/"
         try:
-            res_main = requests.get(company_url, headers=headers, timeout=10)
+            res_main = make_screener_request(company_url, headers=headers, timeout=10)
             if res_main.status_code == 200:
                 id_match = re.search(r'data-company-id=["\'](\d+)["\']', res_main.text)
                 if id_match:
@@ -73,7 +74,7 @@ def scrape_trades(symbol: str, session_cookie: str = None, company_name: str = N
         
     url = f"https://www.screener.in/trades/company-{resolved_id}/"
     try:
-        res = requests.get(url, headers=headers, cookies=cookies, timeout=15)
+        res = make_screener_request(url, headers=headers, cookies=cookies, timeout=15)
         if res.status_code != 200:
             if res.status_code == 404:
                 return {"error": f"Trades page not found for symbol {base_symbol}"}
