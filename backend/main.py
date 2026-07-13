@@ -4729,6 +4729,11 @@ async def parse_nl_alert(data: ParseNLAlertRequest):
             "- EMA20 (price deviation from 20-day EMA in %, e.g., 2.0 for 2% above, -2.0 for 2% below)\n"
             "- EMA50 (price deviation from 50-day EMA in %, e.g., 2.0 for 2% above, -2.0 for 2% below)\n"
             "- EMA200 (price deviation from 200-day EMA in %, e.g., 2.0 for 2% above, -2.0 for 2% below)\n"
+            "- PEG (price/earnings-to-growth ratio, e.g. 1.0)\n"
+            "- ROE (return on equity in percentage, e.g. 15.0)\n"
+            "- DE (debt-to-equity leverage ratio, e.g. 0.5)\n"
+            "- PLEDGE (promoter pledged share percentage, e.g. 1.0)\n"
+            "- DCF_SAFETY (margin of safety relative to DCF intrinsic value in %, e.g. 20.0)\n"
             "- COMPOUND (logical combination of multiple simple rules using AND or OR operators)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
@@ -6585,6 +6590,52 @@ async def evaluate_single_condition_bool(cond_type: str, op: str, val_str: str, 
                     triggered = True
                 elif op == "<" and pct_diff < threshold:
                     triggered = True
+
+        elif cond_type == "PEG":
+            scoring = t.get("score_metrics") or {}
+            peg_val = float(scoring.get("peg_ratio", 99.0))
+            cur_val = f"PEG Ratio: {peg_val:.2f}"
+            threshold = float(val_str)
+            if op == "<" and peg_val < threshold:
+                triggered = True
+            elif op == ">" and peg_val > threshold:
+                triggered = True
+
+        elif cond_type == "ROE":
+            roe_val = float(t.get("fundamentals", {}).get("roe_pct") or t.get("fundamentals", {}).get("roe", 0.0))
+            cur_val = f"ROE: {roe_val:.1f}%"
+            threshold = float(val_str)
+            if op == ">" and roe_val > threshold:
+                triggered = True
+            elif op == "<" and roe_val < threshold:
+                triggered = True
+
+        elif cond_type == "DE":
+            de_val = float(t.get("fundamentals", {}).get("debt_to_equity") or t.get("fundamentals", {}).get("de_ratio", 0.0))
+            cur_val = f"Debt-to-Equity: {de_val:.2f}"
+            threshold = float(val_str)
+            if op == "<" and de_val < threshold:
+                triggered = True
+            elif op == ">" and de_val > threshold:
+                triggered = True
+
+        elif cond_type == "PLEDGE":
+            pledge_val = float(t.get("fundamentals", {}).get("promoter_pledge_pct", 0.0))
+            cur_val = f"Promoter Pledge: {pledge_val:.1f}%"
+            threshold = float(val_str)
+            if op == "<" and pledge_val < threshold:
+                triggered = True
+            elif op == ">" and pledge_val > threshold:
+                triggered = True
+
+        elif cond_type == "DCF_SAFETY":
+            dcf_val = float(t.get("dcf", {}).get("margin_of_safety", 0.0))
+            cur_val = f"DCF Margin of Safety: {dcf_val:.1f}%"
+            threshold = float(val_str)
+            if op == ">" and dcf_val > threshold:
+                triggered = True
+            elif op == "<" and dcf_val < threshold:
+                triggered = True
     except Exception as eval_err:
         print(f"Error evaluating condition {cond_type} {op} {val_str}: {eval_err}")
         
@@ -10429,7 +10480,11 @@ async def parse_nl_scan(data: ParseNLScanRequest):
             "- COMBO_52W_LOW_ACCUMULATION (52W Low accumulation: price within 10% of 52w low + price > 50 SMA + volume ratio >= threshold, value is volume ratio threshold, e.g. 2.0)\n"
             "- COMBO_FIB_GOLDEN_POCKET (Golden Pocket Fibonacci: price between 61.8% and 78.6% Fib retracement levels)\n"
             "- COMBO_FIB_VOL_POC (Fib + Volume POC confluence: price near a Fib level + near Volume POC within threshold %, value is proximity threshold, e.g. 1.5)\n"
-            "- COMBO_FIB_DEEP_VAL (Deep Fibonacci value play: price within threshold % of 78.6% Fib + RSI <= 25, value is proximity percentage threshold, e.g. 2.0)\n\n"
+            "- COMBO_FIB_DEEP_VAL (Deep Fibonacci value play: price within threshold % of 78.6% Fib + RSI <= 25, value is proximity percentage threshold, e.g. 2.0)\n"
+            "- COMBO_DCF_UNDERVALUED (DCF margin of safety: margin of safety >= threshold % and valuation is not overvalued, value is margin of safety threshold, e.g. 20.0)\n"
+            "- COMBO_BUFFETT_QUALITY (Warren Buffett style clean operations: ROE >= 15% and Debt-to-Equity <= 0.5)\n"
+            "- COMBO_CLEAN_GOVERNANCE (Zero or low promoter pledge + growth: promoter pledge < 1% and profit growth >= 12%)\n"
+            "- COMBO_GARP_PEG (Growth at a reasonable price: PEG ratio < 1.0)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
             "- '<' (Less Than / Crosses Below)\n"
@@ -10816,6 +10871,51 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                     elif operator == "<" and pct_diff < threshold:
                         triggered = True
 
+                elif condition_type == "PEG":
+                    peg_val = clean_float(prof.get("score_metrics", {}).get("peg_ratio"), 99.0)
+                    cur_val = f"PEG: {peg_val:.2f}"
+                    threshold = float(value)
+                    if operator == "<" and peg_val < threshold:
+                        triggered = True
+                    elif operator == ">" and peg_val > threshold:
+                        triggered = True
+
+                elif condition_type == "ROE":
+                    roe_val = clean_float(f.get("roe_pct") or f.get("roe"), 0.0)
+                    cur_val = f"ROE: {roe_val:.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and roe_val > threshold:
+                        triggered = True
+                    elif operator == "<" and roe_val < threshold:
+                        triggered = True
+
+                elif condition_type == "DE":
+                    de_val = clean_float(f.get("debt_to_equity") or f.get("de_ratio"), 0.0)
+                    cur_val = f"Debt-to-Equity: {de_val:.2f}"
+                    threshold = float(value)
+                    if operator == "<" and de_val < threshold:
+                        triggered = True
+                    elif operator == ">" and de_val > threshold:
+                        triggered = True
+
+                elif condition_type == "PLEDGE":
+                    pledge_val = clean_float(f.get("promoter_pledge_pct"), 0.0)
+                    cur_val = f"Promoter Pledge: {pledge_val:.1f}%"
+                    threshold = float(value)
+                    if operator == "<" and pledge_val < threshold:
+                        triggered = True
+                    elif operator == ">" and pledge_val > threshold:
+                        triggered = True
+
+                elif condition_type == "DCF_SAFETY":
+                    dcf_val = clean_float(prof.get("dcf", {}).get("margin_of_safety"), 0.0)
+                    cur_val = f"DCF Margin of Safety: {dcf_val:.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and dcf_val > threshold:
+                        triggered = True
+                    elif operator == "<" and dcf_val < threshold:
+                        triggered = True
+
                 # ─── MULTI-FACTOR COMBO STRATEGIES ─────────────────────────────────────
                 elif condition_type == "COMBO_BULL_PULLBACK":
                     rsi_val = clean_float(t.get("rsi"), 50.0)
@@ -11195,6 +11295,34 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                         if diff_pct <= threshold:
                             cur_val = f"Deep Fib Reversal: Price Rs.{price:.2f} near 78.6% Fib Rs.{fib_786:.2f} (Diff: {diff_pct:.1f}%) with oversold RSI: {rsi_val:.1f}"
                             triggered = True
+
+                elif condition_type == "COMBO_DCF_UNDERVALUED":
+                    dcf_val = clean_float(prof.get("dcf", {}).get("margin_of_safety"), 0.0)
+                    dcf_rating = (prof.get("dcf", {}).get("valuation_rating") or "N/A").upper()
+                    threshold = clean_float(value, 20.0)
+                    if dcf_val >= threshold and "OVERVALUED" not in dcf_rating:
+                        cur_val = f"DCF Undervalued: Margin of Safety {dcf_val:.1f}% >= {threshold}% ({dcf_rating})"
+                        triggered = True
+
+                elif condition_type == "COMBO_BUFFETT_QUALITY":
+                    roe_val = clean_float(f.get("roe_pct") or f.get("roe"), 0.0)
+                    de_val = clean_float(f.get("debt_to_equity") or f.get("de_ratio"), 0.0)
+                    if roe_val >= 15.0 and (de_val <= 0.5 or de_val == 0.0):
+                        cur_val = f"Buffett Quality: ROE {roe_val:.1f}% >= 15% and Debt-to-Equity {de_val:.2f} <= 0.5"
+                        triggered = True
+
+                elif condition_type == "COMBO_CLEAN_GOVERNANCE":
+                    pledge_val = clean_float(f.get("promoter_pledge_pct"), 0.0)
+                    profit_growth = clean_float(f.get("profit_growth_3y_pct"), 0.0)
+                    if pledge_val < 1.0 and profit_growth >= 12.0:
+                        cur_val = f"Clean Governance: Pledging {pledge_val:.1f}% < 1% and Profit Growth {profit_growth:.1f}% >= 12%"
+                        triggered = True
+
+                elif condition_type == "COMBO_GARP_PEG":
+                    peg_val = clean_float(prof.get("score_metrics", {}).get("peg_ratio"), 99.0)
+                    if 0 < peg_val < 1.0:
+                        cur_val = f"GARP: PEG ratio {peg_val:.2f} < 1.0"
+                        triggered = True
 
             except Exception as eval_err:
                 print(f"Rule Scanner: Error evaluating {sym}: {eval_err}")

@@ -4773,6 +4773,11 @@
                                         <option value="EMA20">Price vs EMA-20 (% Diff)</option>
                                         <option value="EMA50">Price vs EMA-50 (% Diff)</option>
                                         <option value="EMA200">Price vs EMA-200 (% Diff)</option>
+                                        <option value="PEG">PEG Ratio (&lt; 1.0 Cheap Growth)</option>
+                                        <option value="ROE">Return on Equity (%)</option>
+                                        <option value="DE">Debt-to-Equity Leverage Ratio</option>
+                                        <option value="PLEDGE">Promoter Pledged Shares (%)</option>
+                                        <option value="DCF_SAFETY">DCF Margin of Safety (%)</option>
                                     </select>
                                     <div id="alert-strategy-guide-panel" style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.35; margin-top: 6px; padding: 8px 10px; border-radius: 6px; background: rgba(255, 255, 255, 0.02); border: 1px dashed var(--border-glass); box-sizing: border-box; transition: all 0.2s ease;">
                                         <span id="alert-strategy-guide-text"><strong>RSI-14:</strong> Tracks momentum speed/change. Triggers when RSI crosses boundaries (&lt; 30 oversold or &gt; 70 overbought).</span>
@@ -5214,6 +5219,10 @@
                                         <span class="rs-nl-template-pill" data-template="Scan for stocks trading at a discount to target price of more than 15.0%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🎯 Target 15% Discount</span>
                                         <span class="rs-nl-template-pill" data-template="Scan for stocks with CFO to PAT ratio below 0.6" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💸 CFO/PAT Divergence</span>
                                         <span class="rs-nl-template-pill" data-template="Scan for stocks with dividend yield above 3.0%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💰 Dividend Support</span>
+                                        <span class="rs-nl-template-pill" data-template="Scan for stocks with DCF margin of safety above 20%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">💰 DCF Undervalued (&gt;20% MoS)</span>
+                                        <span class="rs-nl-template-pill" data-template="Scan for stocks with ROE above 15% and Debt-to-Equity below 0.5" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🏆 Buffett Quality Moat</span>
+                                        <span class="rs-nl-template-pill" data-template="Scan for stocks with promoter pledged shares less than 1% and profit growth above 12%" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🛡️ Clean Promoter Ownership</span>
+                                        <span class="rs-nl-template-pill" data-template="Scan for stocks with PEG ratio below 1.0" style="font-size: 9.5px; padding: 3px 6px; border-radius: 4px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); color: var(--text-secondary); cursor: pointer; transition: all 0.2s; display: inline-block;">🎯 GARP PEG Cheap Growth</span>
                                     </div>
                                 </details>
                                 
