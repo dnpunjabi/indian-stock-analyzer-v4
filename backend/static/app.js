@@ -24811,6 +24811,54 @@ function setupRuleScanner() {
         "Elder Triple Screen": {
             "concept": "Alexander Elder style screen: Price > 200 SMA (Trend Filter) + RSI < 38 (Oversold pullback) + Volume > 1.5x (Trigger).",
             "why": "Ensures you participate in pullbacks in a major uptrend when trading volumes confirm buying interest."
+        },
+        "Oversold RSI Limit": {
+            "concept": "Triggers when RSI-14 drops below 30, indicating that selling momentum is temporarily exhausted.",
+            "why": "Helps buy the dip at key technical support limits for fast mean-reversion bounces."
+        },
+        "Deep Value PE Reversal": {
+            "concept": "Triggers when a company's price-to-earnings multiple drops below 12.0.",
+            "why": "Alerts when fundamentally profitable companies become value opportunities due to market corrections."
+        },
+        "Golden Cross Breakout": {
+            "concept": "Triggers when the 50-day SMA crosses above the 200-day SMA by more than 1.0% separation.",
+            "why": "Confirms the long-term trend has shifted from bearish to bullish, signaling new institutional markup cycles."
+        },
+        "Volumetric Breakout Alert": {
+            "concept": "Triggers when current volume reaches more than 2.5x the 20-day historical average.",
+            "why": "Signals strong institutional blocks trading or volume-backed breakout moves, avoiding low-volume fakeouts."
+        },
+        "Altman Z Distress": {
+            "concept": "Triggers when a company's Altman Z-Score falls below 1.8, warning of financial risk.",
+            "why": "Serves as an automated credit risk alert to protect long positions from insolvency risks."
+        },
+        "Target consensus Discount": {
+            "concept": "Triggers when current market price is at least 20.0% below analyst consensus target price.",
+            "why": "Finds mispriced stocks offering significant value margins relative to professional research expectations."
+        },
+        "High Demat Delivery": {
+            "concept": "Triggers when the percentage of delivery shares exceeds 60% of total daily volume.",
+            "why": "Ensures that buying is long-term investment absorption, rather than short-term retail day trading."
+        },
+        "Delivery Z-Score Spike": {
+            "concept": "Triggers when delivery volume exceeds the 20-day mean by 2.0 standard deviations.",
+            "why": "Identifies extreme institutional accumulation periods that often precede major structural rallies."
+        },
+        "Strong Inst Holding Shield": {
+            "concept": "Triggers when combined FII and DII stakes are higher than 35.0% of total equity.",
+            "why": "Filters for stocks backed by major domestic and foreign institutions, shielding price from retail panic."
+        },
+        "Bollinger Upper Cross": {
+            "concept": "Triggers when close price crosses above the Upper Bollinger Band.",
+            "why": "Alerts to volatility expansions, enabling momentum traders to ride high-speed trend breakouts."
+        },
+        "Fib 61.8% Golden Ratio": {
+            "concept": "Triggers when price retreats within 1.5% proximity of the 61.8% Fibonacci retracement level.",
+            "why": "Acts as the ultimate geometric entry pivot to capture major pullback support bounces."
+        },
+        "DCF Undervaluation MoS": {
+            "concept": "Triggers when the calculated DCF margin of safety is greater than 25.0%.",
+            "why": "Provides an absolute intrinsic value cushion, buying assets at discounts to long-term free cash flow yield."
         }
     };
 
@@ -24847,7 +24895,8 @@ function setupRuleScanner() {
         });
     }
 
-    document.querySelectorAll('.rs-nl-template-pill').forEach(pill => {
+    // Attach to both scanner presets and alert presets
+    document.querySelectorAll('.rs-nl-template-pill, .alert-preset-pill').forEach(pill => {
         // Parse raw text ignoring any children text or info trigger icons
         let rawText = "";
         if (pill.firstChild) {
@@ -24883,12 +24932,33 @@ function setupRuleScanner() {
             </div>
         `;
 
-        // Populate prompt on pill click (but not on info trigger click)
-        pill.addEventListener('click', (e) => {
-            if (e.target.classList.contains('rs-info-trigger')) return;
-            const textarea = document.getElementById('rule-scanner-nl-prompt');
-            if (textarea) textarea.value = pill.getAttribute('data-template') || '';
-        });
+        // Click logic
+        if (pill.classList.contains('alert-preset-pill')) {
+            pill.addEventListener('click', (e) => {
+                if (e.target.classList.contains('rs-info-trigger')) return;
+                const cond = pill.getAttribute('data-cond');
+                const op = pill.getAttribute('data-op');
+                const val = pill.getAttribute('data-val');
+
+                const condSelect = document.getElementById('alert-condition');
+                const opSelect = document.getElementById('alert-operator');
+                const valInput = document.getElementById('alert-value');
+
+                if (condSelect) {
+                    condSelect.value = cond;
+                    condSelect.dispatchEvent(new Event('change'));
+                }
+                if (opSelect) opSelect.value = op;
+                if (valInput) valInput.value = val;
+            });
+        } else {
+            // Populate prompt on pill click (but not on info trigger click)
+            pill.addEventListener('click', (e) => {
+                if (e.target.classList.contains('rs-info-trigger')) return;
+                const textarea = document.getElementById('rule-scanner-nl-prompt');
+                if (textarea) textarea.value = pill.getAttribute('data-template') || '';
+            });
+        }
 
         // Hover Tooltip logic for Desktop (screens > 768px wide)
         pill.addEventListener('mouseenter', () => {
