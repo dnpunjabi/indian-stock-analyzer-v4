@@ -8919,9 +8919,20 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     background: rgba(59, 130, 246, 0.03) !important;
 }
 
-[data-theme="light"] #rule-scanner-strategy-guide {
+[data-mode="light"] #rule-scanner-strategy-guide,
+[data-theme="light"] #rule-scanner-strategy-guide,
+[data-mode="light"] #alert-strategy-guide-panel,
+[data-theme="light"] #alert-strategy-guide-panel {
     background: rgba(0, 0, 0, 0.02) !important;
-    border-color: rgba(0, 0, 0, 0.08) !important;
+    border: 1px dashed rgba(0, 0, 0, 0.1) !important;
+    color: var(--text-secondary) !important;
+}
+
+[data-mode="light"] #rule-scanner-strategy-guide strong,
+[data-theme="light"] #rule-scanner-strategy-guide strong,
+[data-mode="light"] #alert-strategy-guide-panel strong,
+[data-theme="light"] #alert-strategy-guide-panel strong {
+    color: var(--text-primary) !important;
 }
 
 [data-theme="light"] .ai-presets-container {
