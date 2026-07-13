@@ -1,3 +1,10 @@
+# Force IPv4 in requests/urllib3 to prevent "Network is unreachable" (Errno 101) in restricted IPv6 routing environments (e.g. Oracle VM)
+try:
+    import urllib3.util.connection as urllib3_cn
+    urllib3_cn.HAS_IPV6 = False
+except Exception:
+    pass
+
 import requests
 import math
 from bs4 import BeautifulSoup
