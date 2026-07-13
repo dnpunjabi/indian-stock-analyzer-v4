@@ -4734,6 +4734,10 @@ async def parse_nl_alert(data: ParseNLAlertRequest):
             "- DE (debt-to-equity leverage ratio, e.g. 0.5)\n"
             "- PLEDGE (promoter pledged share percentage, e.g. 1.0)\n"
             "- DCF_SAFETY (margin of safety relative to DCF intrinsic value in %, e.g. 20.0)\n"
+            "- BETA (systematic risk beta against Nifty 50, e.g. 1.0)\n"
+            "- DELIVERY_PCT (delivery volume percentage, e.g. 50.0)\n"
+            "- DELIVERY_ZSCORE (delivery Z-Score relative to 20-day mean, e.g. 2.0)\n"
+            "- INST_HOLDING (combined FII and DII shareholding percentage, e.g. 30.0)\n"
             "- COMPOUND (logical combination of multiple simple rules using AND or OR operators)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
@@ -6635,6 +6639,43 @@ async def evaluate_single_condition_bool(cond_type: str, op: str, val_str: str, 
             if op == ">" and dcf_val > threshold:
                 triggered = True
             elif op == "<" and dcf_val < threshold:
+                triggered = True
+
+        elif cond_type == "BETA":
+            beta_val = float(t.get("consensus", {}).get("beta") or t.get("capm_risk_nifty50", {}).get("beta", 1.0))
+            cur_val = f"Beta: {beta_val:.2f}"
+            threshold = float(val_str)
+            if op == ">" and beta_val > threshold:
+                triggered = True
+            elif op == "<" and beta_val < threshold:
+                triggered = True
+
+        elif cond_type == "DELIVERY_PCT":
+            del_val = float(t.get("technicals", {}).get("delivery_percentage") or t.get("technicals", {}).get("delivery_pct", 0.0))
+            cur_val = f"Delivery: {del_val:.1f}%"
+            threshold = float(val_str)
+            if op == ">" and del_val > threshold:
+                triggered = True
+            elif op == "<" and del_val < threshold:
+                triggered = True
+
+        elif cond_type == "DELIVERY_ZSCORE":
+            z_val = float(t.get("technicals", {}).get("delivery_z_score") or t.get("technicals", {}).get("delivery_zscore", 0.0))
+            cur_val = f"Delivery Z-Score: {z_val:+.2f}"
+            threshold = float(val_str)
+            if op == ">" and z_val > threshold:
+                triggered = True
+            elif op == "<" and z_val < threshold:
+                triggered = True
+
+        elif cond_type == "INST_HOLDING":
+            shareholding = t.get("shareholding", {})
+            inst_val = float(shareholding.get("FIIs", 0.0)) + float(shareholding.get("DIIs", 0.0))
+            cur_val = f"Institutional Holding: {inst_val:.1f}%"
+            threshold = float(val_str)
+            if op == ">" and inst_val > threshold:
+                triggered = True
+            elif op == "<" and inst_val < threshold:
                 triggered = True
     except Exception as eval_err:
         print(f"Error evaluating condition {cond_type} {op} {val_str}: {eval_err}")
@@ -10484,7 +10525,13 @@ async def parse_nl_scan(data: ParseNLScanRequest):
             "- COMBO_DCF_UNDERVALUED (DCF margin of safety: margin of safety >= threshold % and valuation is not overvalued, value is margin of safety threshold, e.g. 20.0)\n"
             "- COMBO_BUFFETT_QUALITY (Warren Buffett style clean operations: ROE >= 15% and Debt-to-Equity <= 0.5)\n"
             "- COMBO_CLEAN_GOVERNANCE (Zero or low promoter pledge + growth: promoter pledge < 1% and profit growth >= 12%)\n"
-            "- COMBO_GARP_PEG (Growth at a reasonable price: PEG ratio < 1.0)\n\n"
+            "- COMBO_GARP_PEG (Growth at a reasonable price: PEG ratio < 1.0)\n"
+            "- COMBO_INST_ABSORPTION (Institutional absorption: delivery percentage >= 55% and delivery z-score >= 2.0)\n"
+            "- COMBO_VSA_DEMAND (Volume Spread Analysis demand confirmation: VSA pattern contains Accumulation or Demand or Strength and volume ratio >= 1.5)\n"
+            "- COMBO_HEAVY_INSTITUTIONAL (High mutual fund/FII ownership: combined FII and DII shareholding >= 30.0)\n"
+            "- COMBO_LC_COMPOUNDER (Defensive large cap growth: cap type is large and beta < 1.0 and AI rating recommendation is STRONG BUY)\n"
+            "- COMBO_SC_MOMENTUM (Explosive small cap growth: cap type is small and ADX >= 25 and beta > 1.2)\n"
+            "- COMBO_SECTOR_ROTATION (Sector rotation momentum: price > 50 SMA and stock sector belongs to the dynamically calculated top 3 relative strength sectors)\n\n"
             "Operators:\n"
             "- '>' (Greater Than / Crosses Above)\n"
             "- '<' (Less Than / Crosses Below)\n"
@@ -10916,6 +10963,43 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                     elif operator == "<" and dcf_val < threshold:
                         triggered = True
 
+                elif condition_type == "BETA":
+                    beta_val = clean_float(prof.get("consensus", {}).get("beta") or prof.get("capm_risk_nifty50", {}).get("beta"), 1.0)
+                    cur_val = f"Beta: {beta_val:.2f}"
+                    threshold = float(value)
+                    if operator == ">" and beta_val > threshold:
+                        triggered = True
+                    elif operator == "<" and beta_val < threshold:
+                        triggered = True
+
+                elif condition_type == "DELIVERY_PCT":
+                    del_val = clean_float(t.get("delivery_percentage") or t.get("delivery_pct"), 0.0)
+                    cur_val = f"Delivery: {del_val:.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and del_val > threshold:
+                        triggered = True
+                    elif operator == "<" and del_val < threshold:
+                        triggered = True
+
+                elif condition_type == "DELIVERY_ZSCORE":
+                    z_val = clean_float(t.get("delivery_z_score") or t.get("delivery_zscore"), 0.0)
+                    cur_val = f"Delivery Z-Score: {z_val:+.2f}"
+                    threshold = float(value)
+                    if operator == ">" and z_val > threshold:
+                        triggered = True
+                    elif operator == "<" and z_val < threshold:
+                        triggered = True
+
+                elif condition_type == "INST_HOLDING":
+                    shareholding = prof.get("shareholding") or {}
+                    inst_val = clean_float(shareholding.get("FIIs"), 0.0) + clean_float(shareholding.get("DIIs"), 0.0)
+                    cur_val = f"Institutional Holding: {inst_val:.1f}%"
+                    threshold = float(value)
+                    if operator == ">" and inst_val > threshold:
+                        triggered = True
+                    elif operator == "<" and inst_val < threshold:
+                        triggered = True
+
                 # ─── MULTI-FACTOR COMBO STRATEGIES ─────────────────────────────────────
                 elif condition_type == "COMBO_BULL_PULLBACK":
                     rsi_val = clean_float(t.get("rsi"), 50.0)
@@ -11323,6 +11407,59 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                     if 0 < peg_val < 1.0:
                         cur_val = f"GARP: PEG ratio {peg_val:.2f} < 1.0"
                         triggered = True
+
+                elif condition_type == "COMBO_INST_ABSORPTION":
+                    del_pct = clean_float(t.get("delivery_percentage") or t.get("delivery_pct"), 0.0)
+                    del_z = clean_float(t.get("delivery_z_score") or t.get("delivery_zscore"), 0.0)
+                    if del_pct >= 55.0 and del_z >= 2.0:
+                        cur_val = f"Inst Absorption: Delivery {del_pct:.1f}% >= 55% on Delivery Z-Score {del_z:+.1f}"
+                        triggered = True
+
+                elif condition_type == "COMBO_VSA_DEMAND":
+                    vsa_pattern = (t.get("vsa_pattern") or t.get("vsa_setup") or "").upper()
+                    vol_ratio = clean_float(t.get("volume_vs_avg20", t.get("volume_ratio", t.get("vol_breakout_ratio"))), 1.0)
+                    if vol_ratio >= 1.5 and any(kw in vsa_pattern for kw in ["ACCUMULATION", "DEMAND", "STRENGTH", "ABSORPTION", "BUYING"]):
+                        cur_val = f"VSA Demand: setup '{vsa_pattern}' with volume ratio {vol_ratio:.1f}x"
+                        triggered = True
+
+                elif condition_type == "COMBO_HEAVY_INSTITUTIONAL":
+                    shareholding = prof.get("shareholding") or {}
+                    inst_val = clean_float(shareholding.get("FIIs"), 0.0) + clean_float(shareholding.get("DIIs"), 0.0)
+                    if inst_val >= 30.0:
+                        cur_val = f"Heavy Inst: FII + DII holding {inst_val:.1f}% >= 30%"
+                        triggered = True
+
+                elif condition_type == "COMBO_LC_COMPOUNDER":
+                    cap_type = (s.get("cap_type") or "").lower()
+                    beta_val = clean_float(prof.get("consensus", {}).get("beta") or prof.get("capm_risk_nifty50", {}).get("beta"), 1.0)
+                    analysis = prof.get("analysis") or {}
+                    rating_val = (analysis.get("recommendation") or prof.get("recommendation") or "N/A").upper()
+                    if cap_type == "large" and beta_val < 1.0 and "STRONG BUY" in rating_val:
+                        cur_val = f"LC Compounder: Large cap with low beta {beta_val:.2f} and AI Strong Buy"
+                        triggered = True
+
+                elif condition_type == "COMBO_SC_MOMENTUM":
+                    cap_type = (s.get("cap_type") or "").lower()
+                    adx_val = clean_float(t.get("adx"), 0.0)
+                    beta_val = clean_float(prof.get("consensus", {}).get("beta") or prof.get("capm_risk_nifty50", {}).get("beta"), 1.0)
+                    if cap_type == "small" and adx_val >= 25.0 and beta_val > 1.2:
+                        cur_val = f"SC Momentum: Small cap with ADX {adx_val:.1f} >= 25 and beta {beta_val:.2f} > 1.2"
+                        triggered = True
+
+                elif condition_type == "COMBO_SECTOR_ROTATION":
+                    sma_50 = clean_float(t.get("sma_50"), 0.0)
+                    sector = prof.get("sector") or s.get("sector", "N/A")
+                    if price > sma_50 > 0:
+                        try:
+                            with get_db() as conn:
+                                cursor = conn.cursor()
+                                cursor.execute("SELECT sector FROM sector_regime_stats ORDER BY return_1m DESC LIMIT 3")
+                                top_3 = [r["sector"] for r in cursor.fetchall()]
+                            if sector in top_3:
+                                cur_val = f"Sector Rotation: Price Rs.{price:.2f} > 50 SMA in leading sector '{sector}'"
+                                triggered = True
+                        except Exception:
+                            pass
 
             except Exception as eval_err:
                 print(f"Rule Scanner: Error evaluating {sym}: {eval_err}")
