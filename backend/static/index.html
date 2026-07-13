@@ -3190,7 +3190,17 @@
                                     <span style="font-size: 10px; font-weight: 700; color: var(--color-primary); display: flex; align-items: center; gap: 6px; text-transform: uppercase; letter-spacing: 0.05em;">
                                         💡 Layman's Financial Health Summary
                                     </span>
-                                    <button id="fs-layman-audio-btn" style="background: transparent; border: none; cursor: pointer; font-size: 11px; color: var(--color-primary); outline: none; transition: transform 0.2s;" title="Read Summary Out Loud">🔊</button>
+                                    <!-- Audio Control Panel -->
+                                    <div id="fs-layman-audio-panel" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 20px; padding: 4px 10px;">
+                                        <button id="fs-layman-play-btn" style="background: transparent; border: none; cursor: pointer; font-size: 10px; color: var(--color-primary); outline: none; display: flex; align-items: center; justify-content: center; padding: 2px;" title="Play / Pause">▶️</button>
+                                        <button id="fs-layman-stop-btn" style="background: transparent; border: none; cursor: pointer; font-size: 10px; color: var(--color-primary); outline: none; display: flex; align-items: center; justify-content: center; padding: 2px;" title="Stop">⏹️</button>
+                                        <select id="fs-layman-speed-select" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-glass); border-radius: 4px; color: var(--text-secondary); font-size: 9px; padding: 1px 4px; outline: none; cursor: pointer; font-family: inherit;">
+                                            <option value="0.8">0.8x Speed</option>
+                                            <option value="1.0" selected>1.0x Speed</option>
+                                            <option value="1.2">1.2x Speed</option>
+                                            <option value="1.5">1.5x Speed</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div id="fs-layman-summary-content" style="font-size: 10.5px; line-height: 1.5; color: var(--text-secondary);">
                                     Loading interpretation...
@@ -8137,7 +8147,7 @@
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
     <script src="export_manager.js?v=1.1.7"></script>
-    <script src="app.js?v=1.6.8"></script>
+    <script src="app.js?v=1.6.9"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>

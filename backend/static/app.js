@@ -42491,45 +42491,89 @@ function renderFinancialHealthDashboard() {
         laymanContent.innerHTML = summaryHTML;
         
         // Voice synthesizer readout hook
-        const audioBtn = document.getElementById('fs-layman-audio-btn');
-        if (audioBtn) {
-            // Remove previous listeners if any
-            const newAudioBtn = audioBtn.cloneNode(true);
-            audioBtn.parentNode.replaceChild(newAudioBtn, audioBtn);
+        const playBtn = document.getElementById('fs-layman-play-btn');
+        const stopBtn = document.getElementById('fs-layman-stop-btn');
+        const speedSelect = document.getElementById('fs-layman-speed-select');
+        
+        let lastUtterance = null;
+        
+        if (playBtn && stopBtn && speedSelect) {
+            // Strip HTML tags to make a clean reading transcript
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(summaryHTML, 'text/html');
+            const textToRead = `Overall Health Verdict is ${verdictBadge.replace(/[^a-zA-Z0-9\s]/g, '')}. ` + doc.body.textContent;
             
-            newAudioBtn.addEventListener('click', () => {
+            // Remove previous listeners if any
+            const newPlayBtn = playBtn.cloneNode(true);
+            playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
+            
+            const newStopBtn = stopBtn.cloneNode(true);
+            stopBtn.parentNode.replaceChild(newStopBtn, stopBtn);
+
+            const newSpeedSelect = speedSelect.cloneNode(true);
+            speedSelect.parentNode.replaceChild(newSpeedSelect, speedSelect);
+            
+            function cancelSpeech() {
                 if ('speechSynthesis' in window) {
-                    if (window.speechSynthesis.speaking) {
-                        window.speechSynthesis.cancel();
-                        newAudioBtn.innerText = "🔊";
-                        newAudioBtn.style.transform = "scale(1)";
-                        return;
+                    window.speechSynthesis.cancel();
+                }
+                newPlayBtn.innerText = "▶️";
+                newPlayBtn.title = "Play";
+            }
+            
+            newPlayBtn.addEventListener('click', () => {
+                if (!('speechSynthesis' in window)) {
+                    alert("Text-to-speech is not supported on this browser/wrapper.");
+                    return;
+                }
+                
+                if (window.speechSynthesis.speaking) {
+                    if (window.speechSynthesis.paused) {
+                        window.speechSynthesis.resume();
+                        newPlayBtn.innerText = "⏸️";
+                        newPlayBtn.title = "Pause";
+                    } else {
+                        window.speechSynthesis.pause();
+                        newPlayBtn.innerText = "▶️";
+                        newPlayBtn.title = "Resume";
                     }
-                    
-                    // Strip HTML tags to make a clean reading transcript
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(summaryHTML, 'text/html');
-                    const textToRead = `Overall Health Verdict is ${verdictBadge.replace(/[^a-zA-Z0-9\s]/g, '')}. ` + doc.body.textContent;
-                    
+                } else {
+                    // Start new playback
                     const utterance = new SpeechSynthesisUtterance(textToRead);
-                    utterance.rate = 0.95; // slightly slower for premium clear pronunciation
+                    
+                    // Set playback speed
+                    const currentSpeed = parseFloat(newSpeedSelect.value) || 1.0;
+                    utterance.rate = currentSpeed;
                     
                     utterance.onstart = () => {
-                        newAudioBtn.innerText = "⏹️";
-                        newAudioBtn.style.transform = "scale(1.15)";
+                        newPlayBtn.innerText = "⏸️";
+                        newPlayBtn.title = "Pause";
                     };
                     utterance.onend = () => {
-                        newAudioBtn.innerText = "🔊";
-                        newAudioBtn.style.transform = "scale(1)";
+                        newPlayBtn.innerText = "▶️";
+                        newPlayBtn.title = "Play";
                     };
                     utterance.onerror = () => {
-                        newAudioBtn.innerText = "🔊";
-                        newAudioBtn.style.transform = "scale(1)";
+                        newPlayBtn.innerText = "▶️";
+                        newPlayBtn.title = "Play";
                     };
                     
+                    lastUtterance = utterance;
                     window.speechSynthesis.speak(utterance);
-                } else {
-                    alert("Text-to-speech is not supported on this browser/wrapper.");
+                }
+            });
+            
+            newStopBtn.addEventListener('click', () => {
+                cancelSpeech();
+            });
+
+            // Adjust speed dynamically during play or on change
+            newSpeedSelect.addEventListener('change', () => {
+                if (window.speechSynthesis.speaking) {
+                    cancelSpeech();
+                    setTimeout(() => {
+                        newPlayBtn.click();
+                    }, 50);
                 }
             });
         }
