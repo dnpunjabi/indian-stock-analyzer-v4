@@ -42491,89 +42491,22 @@ function renderFinancialHealthDashboard() {
         laymanContent.innerHTML = summaryHTML;
         
         // Voice synthesizer readout hook
-        const playBtn = document.getElementById('fs-layman-play-btn');
-        const stopBtn = document.getElementById('fs-layman-stop-btn');
-        const speedSelect = document.getElementById('fs-layman-speed-select');
-        
-        let lastUtterance = null;
-        
-        if (playBtn && stopBtn && speedSelect) {
-            // Strip HTML tags to make a clean reading transcript
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(summaryHTML, 'text/html');
-            const textToRead = `Overall Health Verdict is ${verdictBadge.replace(/[^a-zA-Z0-9\s]/g, '')}. ` + doc.body.textContent;
-            
+        const audioBtn = document.getElementById('fs-layman-audio-btn');
+        if (audioBtn) {
             // Remove previous listeners if any
-            const newPlayBtn = playBtn.cloneNode(true);
-            playBtn.parentNode.replaceChild(newPlayBtn, playBtn);
+            const newAudioBtn = audioBtn.cloneNode(true);
+            audioBtn.parentNode.replaceChild(newAudioBtn, audioBtn);
             
-            const newStopBtn = stopBtn.cloneNode(true);
-            stopBtn.parentNode.replaceChild(newStopBtn, stopBtn);
-
-            const newSpeedSelect = speedSelect.cloneNode(true);
-            speedSelect.parentNode.replaceChild(newSpeedSelect, speedSelect);
-            
-            function cancelSpeech() {
-                if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel();
-                }
-                newPlayBtn.innerText = "▶️";
-                newPlayBtn.title = "Play";
-            }
-            
-            newPlayBtn.addEventListener('click', () => {
-                if (!('speechSynthesis' in window)) {
-                    alert("Text-to-speech is not supported on this browser/wrapper.");
-                    return;
-                }
-                
-                if (window.speechSynthesis.speaking) {
-                    if (window.speechSynthesis.paused) {
-                        window.speechSynthesis.resume();
-                        newPlayBtn.innerText = "⏸️";
-                        newPlayBtn.title = "Pause";
-                    } else {
-                        window.speechSynthesis.pause();
-                        newPlayBtn.innerText = "▶️";
-                        newPlayBtn.title = "Resume";
-                    }
+            newAudioBtn.addEventListener('click', () => {
+                if (window.SpeechPlayer) {
+                    // Strip HTML tags to make a clean reading transcript
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(summaryHTML, 'text/html');
+                    const textToRead = `Overall Health Verdict is ${verdictBadge.replace(/[^a-zA-Z0-9\s]/g, '')}. ` + doc.body.textContent;
+                    
+                    window.SpeechPlayer.startSpeakingSection(textToRead, "Financial Health Summary", true);
                 } else {
-                    // Start new playback
-                    const utterance = new SpeechSynthesisUtterance(textToRead);
-                    
-                    // Set playback speed
-                    const currentSpeed = parseFloat(newSpeedSelect.value) || 1.0;
-                    utterance.rate = currentSpeed;
-                    
-                    utterance.onstart = () => {
-                        newPlayBtn.innerText = "⏸️";
-                        newPlayBtn.title = "Pause";
-                    };
-                    utterance.onend = () => {
-                        newPlayBtn.innerText = "▶️";
-                        newPlayBtn.title = "Play";
-                    };
-                    utterance.onerror = () => {
-                        newPlayBtn.innerText = "▶️";
-                        newPlayBtn.title = "Play";
-                    };
-                    
-                    lastUtterance = utterance;
-                    window.speechSynthesis.speak(utterance);
-                }
-            });
-            
-            newStopBtn.addEventListener('click', () => {
-                cancelSpeech();
-            });
-
-            // Adjust speed dynamically during play or on change
-            newSpeedSelect.addEventListener('change', () => {
-                if (window.speechSynthesis.speaking) {
-                    cancelSpeech();
-                    setTimeout(() => {
-                        newPlayBtn.click();
-                    }, 50);
+                    alert("SpeechPlayer is not loaded.");
                 }
             });
         }
