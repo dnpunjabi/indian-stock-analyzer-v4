@@ -22,7 +22,12 @@ html[data-typography="developer"] {
     --font-heading: 'JetBrains Mono', monospace;
     --font-body: 'IBM Plex Sans', sans-serif;
 }
+html[data-typography="paytm"] {
+    --font-heading: 'Roboto', sans-serif;
+    --font-body: 'Roboto', sans-serif;
+}
 
+:root {
     /* Base Default Variables (Dark Mode + Classic Theme) */
     --primary-rgb: 59, 130, 246;
     --academy-accent-hover: rgba(var(--primary-rgb), 0.06);
@@ -603,7 +608,30 @@ html[data-typography="developer"] {
     --color-amber-glow: rgba(244, 207, 128, 0.2);
     --neon-green: #7fd962;
     --glow-shadow: 0 0 10px rgba(226, 125, 96, 0.2);
-    --bg-row-hover: rgba(226, 125, 96, 0.05);
+}
+
+/* Theme 18: Paytm Money Dark */
+[data-mode="dark"][data-theme="paytm-money"] {
+    --primary-rgb: 0, 185, 241;
+    --bg-main: #060913;
+    --bg-sidebar: #0b0f1d;
+    --bg-card: rgba(18, 25, 41, 0.7);
+    --bg-card-hover: rgba(26, 36, 59, 0.85);
+    --border-glass: rgba(255, 255, 255, 0.06);
+    --bg-glass-input: rgba(15, 23, 42, 0.8);
+    
+    --color-primary: #00B9F1; /* Paytm Future Blue */
+    --color-primary-glow: rgba(0, 185, 241, 0.3);
+    
+    --color-emerald: #00B074; /* Paytm Profit Green */
+    --color-emerald-glow: rgba(0, 176, 116, 0.25);
+    --color-crimson: #EC184A; /* Paytm Loss Crimson */
+    --color-crimson-glow: rgba(236, 24, 74, 0.25);
+    --color-amber: #f59e0b;
+    --color-amber-glow: rgba(245, 158, 11, 0.25);
+    --neon-green: #00B074;
+    --glow-shadow: 0 0 12px rgba(0, 185, 241, 0.25);
+    --bg-row-hover: rgba(255, 255, 255, 0.035);
 }
 
 /* Light Accent Theme: Geist Light */
@@ -710,6 +738,29 @@ html[data-typography="developer"] {
     --bg-row-hover: rgba(9, 105, 218, 0.03);
 }
 
+/* Light Accent Theme: Paytm Money */
+[data-mode="light"][data-accent="paytm-money"] {
+    --bg-main: #f1f5f9;
+    --bg-sidebar: #ffffff;
+    --bg-card: rgba(255, 255, 255, 0.75);
+    --bg-card-hover: rgba(255, 255, 255, 0.95);
+    --border-glass: rgba(0, 0, 0, 0.08);
+    --bg-glass-input: rgba(255, 255, 255, 0.9);
+
+    --text-primary: #002E6E; /* Dark Midnight Blue for Paytm High-Trust Text */
+    --text-secondary: #00B9F1; /* Primary Paytm Blue */
+    --text-muted: #64748b;
+
+    --color-primary: #00B9F1;
+    --color-primary-glow: rgba(0, 185, 241, 0.15);
+    --primary-rgb: 0, 185, 241;
+    --color-emerald: #00B074;
+    --color-emerald-glow: rgba(0, 176, 116, 0.12);
+    --color-crimson: #EC184A;
+    --color-crimson-glow: rgba(236, 24, 74, 0.12);
+    --neon-green: #00B074;
+    --glow-shadow: 0 4px 12px rgba(0, 185, 241, 0.08);
+}
 
 /* Global Reset */
 * {
@@ -18250,7 +18301,7 @@ select option {
     }
 
     #tab-analyzer #analyzer-empty-state {
-        padding: 15px !important;
+        padding: 0 !important;
         margin: 0 !important;
         border: none !important;
         background: transparent !important;

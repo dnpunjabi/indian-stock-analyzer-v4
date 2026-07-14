@@ -2042,7 +2042,7 @@ function setupTabNavigation() {
     // Listen to hash changes for browser back/forward history navigation
     window.addEventListener('hashchange', () => {
         const tabKey = location.hash.substring(1);
-        if (tabKey && tabBtns[tabKey]) {
+        if (tabKey && tabBtns[tabKey] && tabKey !== activeTab) {
             switchTab(tabKey);
         }
     });
@@ -16273,6 +16273,14 @@ const LIGHT_THEMES = ['light', 'geist-light', 'nord-light', 'solarized-light', '
 
 // Dark/Light Theme Handler
 function setupThemeToggle() {
+    // Dynamic viewport config: allow pinch-to-zoom on browsers, lock inside native mobile app wrapper
+    if (!window.Capacitor) {
+        const viewport = document.querySelector('meta[name="viewport"]');
+        if (viewport) {
+            viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+        }
+    }
+
     const savedMode = localStorage.getItem('theme-mode') || localStorage.getItem('theme') || 'dark';
     let savedAccent;
     if (savedMode === 'light') {
