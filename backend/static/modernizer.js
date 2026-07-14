@@ -3751,6 +3751,20 @@
                         }
                         
                         
+                        // Check if backend cache is pending or empty
+                        if (moversData.status === "pending" || (!moversData.gainers?.all || moversData.gainers.all.length === 0)) {
+                            gainersContainer.innerHTML = `
+                                <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>
+                                <div class="recent-research-empty" style="font-size:11px;">Warming live market movers cache...</div>
+                            `;
+                            losersContainer.innerHTML = `
+                                <h5 style="margin:15px 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>
+                                <div class="recent-research-empty" style="font-size:11px;">Warming live market movers cache...</div>
+                            `;
+                            setTimeout(updateDynamicCommandCenterContent, 3000);
+                            return;
+                        }
+
                         // Render Gainers
                         const gainersList = moversData.gainers?.all?.slice(0, 5) || [];
                         if (gainersList.length > 0) {
@@ -4353,6 +4367,13 @@
                         });
                     });
                 };
+
+                if (data.status === "pending" || (!data.gainers?.all || data.gainers.all.length === 0)) {
+                    gainersContainer.innerHTML = `<div class="recent-research-empty">Warming market cache...</div>`;
+                    losersContainer.innerHTML = `<div class="recent-research-empty">Warming market cache...</div>`;
+                    setTimeout(loadMarketMovers, 3000);
+                    return;
+                }
 
                 renderStockList(gainersContainer, data.gainers ? data.gainers.all : [], true);
                 renderStockList(losersContainer, data.losers ? data.losers.all : [], false);

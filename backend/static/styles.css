@@ -18921,3 +18921,90 @@ select option {
     line-height: 1.4;
 }
 
+/* ==================== LIGHT MODE AESTHETIC & HIGH CONTRAST OVERRIDES ==================== */
+[data-theme="light"] .desktop-cmd-card {
+    background: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
+
+[data-theme="light"] .sector-block {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+[data-theme="light"] .sector-block.bullish {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+[data-theme="light"] .sector-block.bullish .sector-name,
+[data-theme="light"] .sector-block.bullish .sector-change {
+    color: #047857 !important;
+    font-weight: 700;
+}
+
+[data-theme="light"] .sector-block.bearish {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+[data-theme="light"] .sector-block.bearish .sector-name,
+[data-theme="light"] .sector-block.bearish .sector-change {
+    color: #b91c1c !important;
+    font-weight: 700;
+}
+
+[data-theme="light"] .sector-block.neutral {
+    background: rgba(148, 163, 184, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+[data-theme="light"] .sector-block.neutral .sector-name,
+[data-theme="light"] .sector-block.neutral .sector-change {
+    color: #334155 !important;
+}
+
+[data-theme="light"] .news-sentiment-badge.positive {
+    background: rgba(16, 185, 129, 0.12);
+    color: #047857 !important;
+    font-weight: 700;
+}
+
+[data-theme="light"] .news-sentiment-badge.negative {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c !important;
+    font-weight: 700;
+}
+
+[data-theme="light"] .news-sentiment-badge.neutral {
+    background: rgba(148, 163, 184, 0.15);
+    color: #334155 !important;
+    font-weight: 600;
+}
+
+[data-theme="light"] .gainer-column .mover-stock-change {
+    color: #047857 !important;
+    font-weight: 700;
+}
+
+[data-theme="light"] .loser-column .mover-stock-change {
+    color: #b91c1c !important;
+    font-weight: 700;
+}
+
+[data-theme="light"] .mover-stock-item {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] .mover-stock-item:hover {
+    background: #f1f5f9 !important;
+    border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .recent-research-empty {
+    color: #64748b !important;
+}
+
+
