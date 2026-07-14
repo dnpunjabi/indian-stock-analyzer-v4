@@ -1447,7 +1447,7 @@
         const swipeMaxCrossDistance = 45;
 
         function handleSwipeGesture(e) {
-            if (e.target.closest('#tv-chart-workstation, input, textarea, select, button, .pin-key, .rs-bottom-sheet')) {
+            if (e.target.closest('#tv-chart-workstation, input, textarea, select, button, .pin-key, .rs-bottom-sheet, tr, .swipeable-row-container, .swipeable-row-content, .swipe-actions, .tearsheet-range-slider, .tearsheet-range-marker, .watchlist-scroll-wrapper, .data-table-wrapper')) {
                 return;
             }
             const isSwipeLeft = touchendX < touchstartX - swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
