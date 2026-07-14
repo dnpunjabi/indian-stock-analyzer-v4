@@ -112,6 +112,89 @@
     };
     AudioCueManager.init();
 
+    // ==================== 0. ROUTING INTERCEPTOR & TRANSITIONS ====================
+    const originalSwitchTab = window.switchTab;
+    if (originalSwitchTab) {
+        window.switchTab = function(tabKey) {
+            // Intercept mobile portfolio check
+            if (tabKey === 'portfolio' && window.innerWidth <= 768) {
+                const shieldEnabled = localStorage.getItem('portfolio-security-shield-enabled') !== 'false';
+                if (shieldEnabled && !window.portfolioUnlocked) {
+                    const pinOverlay = document.getElementById('portfolio-pin-overlay');
+                    if (pinOverlay) {
+                        pinOverlay.style.display = 'flex';
+                        const pinTitle = pinOverlay.querySelector('.pin-title');
+                        if (pinTitle) {
+                            const hasPin = localStorage.getItem('portfolio-pin') !== null;
+                            pinTitle.textContent = hasPin ? "Enter Security Passcode" : "Define Security Passcode";
+                        }
+                        const desktopLock = document.getElementById('portfolio-lock-overlay');
+                        if (desktopLock) desktopLock.classList.add('hidden');
+                        
+                        // Let the tab display under the lock
+                        if (typeof gsap !== 'undefined') {
+                            playTabGSAPTransition(tabKey, originalSwitchTab);
+                        } else {
+                            originalSwitchTab(tabKey);
+                        }
+                        return;
+                    }
+                }
+            }
+            
+            // Play audio click tick
+            if (AudioCueManager && typeof AudioCueManager.playTick === 'function') {
+                AudioCueManager.playTick();
+            }
+            
+            // Play GSAP Transition
+            if (typeof gsap !== 'undefined') {
+                playTabGSAPTransition(tabKey, originalSwitchTab);
+            } else {
+                originalSwitchTab(tabKey);
+            }
+            
+            // Highlight bottom nav active tab
+            const bottomNav = document.querySelector('.mobile-bottom-nav');
+            if (bottomNav) {
+                bottomNav.querySelectorAll('.mobile-bottom-nav-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                let navId = 'nav-terminal';
+                if (tabKey === 'analyzer') navId = 'nav-terminal';
+                else if (tabKey === 'screener') navId = 'nav-screener';
+                else if (tabKey === 'watchlist') navId = 'nav-watchlist';
+                else if (tabKey === 'portfolio') navId = 'nav-portfolio';
+                const activeBtn = document.getElementById(navId);
+                if (activeBtn) activeBtn.classList.add('active');
+            }
+        };
+    }
+
+    function playTabGSAPTransition(tabKey, realSwitch) {
+        const activeTabEl = document.querySelector('.active-tab-content');
+        if (activeTabEl && typeof gsap !== 'undefined') {
+            gsap.to(activeTabEl, {
+                opacity: 0,
+                y: -8,
+                duration: 0.12,
+                ease: "power2.in",
+                onComplete: () => {
+                    realSwitch(tabKey);
+                    const newActiveEl = document.querySelector('.active-tab-content');
+                    if (newActiveEl) {
+                        gsap.fromTo(newActiveEl, 
+                            { opacity: 0, y: 12 },
+                            { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }
+                        );
+                    }
+                }
+            });
+        } else {
+            realSwitch(tabKey);
+        }
+    }
+
     // ==================== 2. LUCIDE SVG ICONS SETUP ====================
     function setupLucideIcons() {
         if (typeof lucide === 'undefined') {
@@ -176,36 +259,7 @@
 
     // ==================== 3. GSAP WORKSPACE TRANSITIONS ====================
     function setupGSAPTransitions() {
-        const originalSwitchTab = window.switchTab;
-        if (originalSwitchTab && typeof gsap !== 'undefined') {
-            window.switchTab = function(tabKey) {
-                const activeTabEl = document.querySelector('.active-tab-content');
-                
-                AudioCueManager.playTick(); // Play mechanically responsive tab click tick
-
-                if (activeTabEl) {
-                    gsap.to(activeTabEl, {
-                        opacity: 0,
-                        y: -8,
-                        duration: 0.12,
-                        ease: "power2.in",
-                        onComplete: () => {
-                            originalSwitchTab(tabKey);
-                            const newActiveEl = document.querySelector('.active-tab-content');
-                            if (newActiveEl) {
-                                gsap.fromTo(newActiveEl, 
-                                    { opacity: 0, y: 12 },
-                                    { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }
-                                );
-                            }
-                        }
-                    });
-                } else {
-                    originalSwitchTab(tabKey);
-                }
-            };
-            console.log("APEX Modernizer: GSAP tab transitions configured.");
-        }
+        console.log("APEX Modernizer: GSAP tab transitions dynamically handled by the property router wrapper.");
     }
 
     // ==================== 4. CHAT TYPEWRITER & BOUNCING SKELETON ====================
@@ -1262,6 +1316,1047 @@
         // Note: SerpApi & Tavily key storage has been modernized to use backend SQLite database dynamic key configuration.
     }
 
+    // ==================== MOBILE ENTERPRISE UI LAYOUT & CONTROLLER ====================
+    function setupMobileUpgrades() {
+        const isMobile = () => window.innerWidth <= 768;
+
+        // Bottom nav tab IDs mapping
+        const tabsList = ['analyzer', 'screener', 'watchlist', 'portfolio'];
+
+        function injectMobileBottomNav() {
+            if (document.querySelector('.mobile-bottom-nav')) return;
+            const bottomNav = document.createElement('nav');
+            bottomNav.className = 'mobile-bottom-nav no-print';
+            bottomNav.innerHTML = `
+                <button class="mobile-bottom-nav-item" id="nav-terminal" title="Terminal">
+                    <i data-lucide="line-chart"></i>
+                    <span>Terminal</span>
+                </button>
+                <button class="mobile-bottom-nav-item" id="nav-screener" title="Screener">
+                    <i data-lucide="search"></i>
+                    <span>Screener</span>
+                </button>
+                <button class="mobile-bottom-nav-item" id="nav-watchlist" title="Watchlist">
+                    <i data-lucide="list"></i>
+                    <span>Watchlist</span>
+                </button>
+                <button class="mobile-bottom-nav-item" id="nav-portfolio" title="Portfolio">
+                    <i data-lucide="pie-chart"></i>
+                    <span>Portfolio</span>
+                </button>
+                <button class="mobile-bottom-nav-item" id="nav-more" title="More">
+                    <i data-lucide="menu"></i>
+                    <span>More</span>
+                </button>
+            `;
+            document.body.appendChild(bottomNav);
+
+            document.getElementById('nav-terminal').addEventListener('click', () => window.switchTab('analyzer'));
+            document.getElementById('nav-screener').addEventListener('click', () => window.switchTab('screener'));
+            document.getElementById('nav-watchlist').addEventListener('click', () => window.switchTab('watchlist'));
+            document.getElementById('nav-portfolio').addEventListener('click', () => window.switchTab('portfolio'));
+            document.getElementById('nav-more').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar) sidebar.classList.add('open');
+            });
+
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            syncActiveBottomNavTab();
+        }
+
+        function removeMobileBottomNav() {
+            const bottomNav = document.querySelector('.mobile-bottom-nav');
+            if (bottomNav) bottomNav.remove();
+        }
+
+        function syncActiveBottomNavTab(activeTabKey) {
+            const bottomNav = document.querySelector('.mobile-bottom-nav');
+            if (!bottomNav) return;
+
+            bottomNav.querySelectorAll('.mobile-bottom-nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            const currentTab = activeTabKey || window.activeTab || (location.hash ? location.hash.substring(1) : 'analyzer');
+            let navId = 'nav-terminal';
+            if (currentTab === 'analyzer') navId = 'nav-terminal';
+            else if (currentTab === 'screener') navId = 'nav-screener';
+            else if (currentTab === 'watchlist') navId = 'nav-watchlist';
+            else if (currentTab === 'portfolio') navId = 'nav-portfolio';
+
+            const activeBtn = document.getElementById(navId);
+            if (activeBtn) activeBtn.classList.add('active');
+        }
+
+        // Tap Haptic Simulation Helper
+        function playHaptic(ms = 10) {
+            const Haptics = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
+            if (Haptics && typeof Haptics.vibrate === 'function') {
+                try {
+                    Haptics.vibrate({ duration: ms });
+                    return;
+                } catch(e) {}
+            }
+            if (navigator.vibrate) {
+                try {
+                    navigator.vibrate(ms);
+                } catch(e) {}
+            }
+        }
+
+        // Dynamic active state touch classes & clicks sonification
+        document.addEventListener('touchstart', e => {
+            const tapTarget = e.target.closest('.mobile-bottom-nav-item, .pin-key, .btn-primary, .btn-secondary, .portfolio-subtab-btn');
+            if (tapTarget) {
+                tapTarget.classList.add('touch-active');
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', e => {
+            const tapTarget = e.target.closest('.mobile-bottom-nav-item, .pin-key, .btn-primary, .btn-secondary, .portfolio-subtab-btn');
+            if (tapTarget) {
+                tapTarget.classList.remove('touch-active');
+                playHaptic(8);
+            }
+        }, { passive: true });
+
+        // Initialize bottom navigation display
+        if (isMobile()) {
+            injectMobileBottomNav();
+        }
+
+        window.addEventListener('resize', () => {
+            if (isMobile()) {
+                injectMobileBottomNav();
+            } else {
+                removeMobileBottomNav();
+            }
+        });
+
+        // Note: switchTab interception and nav highlights are fully handled by the global routing interceptor property defined at the top of the file.
+
+        // 2. Swipe Gestures for Tab Navigation
+        let touchstartX = 0;
+        let touchendX = 0;
+        let touchstartY = 0;
+        let touchendY = 0;
+        const swipeMinDistance = 75;
+        const swipeMaxCrossDistance = 45;
+
+        function handleSwipeGesture(e) {
+            if (e.target.closest('#tv-chart-workstation, input, textarea, select, button, .pin-key, .rs-bottom-sheet')) {
+                return;
+            }
+            const isSwipeLeft = touchendX < touchstartX - swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
+            const isSwipeRight = touchendX > touchstartX + swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
+
+            if (isSwipeLeft || isSwipeRight) {
+                const currentHash = location.hash.substring(1) || 'analyzer';
+                const currentIndex = tabsList.indexOf(currentHash);
+                if (currentIndex !== -1) {
+                    let nextIndex = currentIndex;
+                    if (isSwipeLeft && currentIndex < tabsList.length - 1) {
+                        nextIndex = currentIndex + 1;
+                    } else if (isSwipeRight && currentIndex > 0) {
+                        nextIndex = currentIndex - 1;
+                    }
+                    if (nextIndex !== currentIndex) {
+                        playHaptic(12);
+                        window.switchTab(tabsList[nextIndex]);
+                    }
+                }
+            }
+        }
+
+        document.addEventListener('touchstart', e => {
+            touchstartX = e.changedTouches[0].screenX;
+            touchstartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        document.addEventListener('touchend', e => {
+            touchendX = e.changedTouches[0].screenX;
+            touchendY = e.changedTouches[0].screenY;
+            if (isMobile()) handleSwipeGesture(e);
+        }, { passive: true });
+
+        // 3. Pull-To-Refresh Gestures
+        let pullStartX = 0;
+        let pullStartY = 0;
+        let isPulling = false;
+        let activePullContainer = null;
+        let pullIndicator = null;
+
+        function initPullToRefresh() {
+            if (!isMobile()) return;
+            pullIndicator = document.querySelector('.pull-to-refresh-indicator');
+            if (!pullIndicator) {
+                pullIndicator = document.createElement('div');
+                pullIndicator.className = 'pull-to-refresh-indicator';
+                pullIndicator.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`;
+                document.body.appendChild(pullIndicator);
+            }
+
+            document.addEventListener('touchstart', e => {
+                if (!isMobile()) return;
+                const targetContainer = e.target.closest('#watchlist-items-card, #portfolio-doctor-card, #movers-grid');
+                if (!targetContainer) return;
+
+                const scrollContainer = targetContainer.closest('.data-table-wrapper, .watchlist-scroll-wrapper, body');
+                if (scrollContainer && scrollContainer.scrollTop > 5) return;
+                if (window.scrollY > 5) return;
+
+                pullStartX = e.touches[0].clientX;
+                pullStartY = e.touches[0].clientY;
+                activePullContainer = targetContainer;
+                isPulling = false;
+            }, { passive: true });
+
+            document.addEventListener('touchmove', e => {
+                if (!activePullContainer || !pullIndicator) return;
+                const currentY = e.touches[0].clientY;
+                const currentX = e.touches[0].clientX;
+                const diffY = currentY - pullStartY;
+                const diffX = currentX - pullStartX;
+
+                if (diffY > 10 && Math.abs(diffY) > Math.abs(diffX) * 1.5) {
+                    isPulling = true;
+                    const pullDist = Math.min(diffY * 0.4, 75);
+                    pullIndicator.style.opacity = Math.min(pullDist / 40, 1);
+                    pullIndicator.style.transform = `translateX(-50%) translateY(${pullDist}px)`;
+                    
+                    const rotate = pullDist * 5;
+                    const spinner = pullIndicator.querySelector('svg');
+                    if (spinner) spinner.style.transform = `rotate(${rotate}deg)`;
+                }
+            }, { passive: true });
+
+            document.addEventListener('touchend', async e => {
+                if (!activePullContainer || !isPulling || !pullIndicator) {
+                    activePullContainer = null;
+                    isPulling = false;
+                    return;
+                }
+                const diffY = e.changedTouches[0].clientY - pullStartY;
+                activePullContainer = null;
+                isPulling = false;
+
+                if (diffY > 60) {
+                    pullIndicator.classList.add('refreshing');
+                    pullIndicator.style.transform = `translateX(-50%) translateY(40px)`;
+                    pullIndicator.style.opacity = '1';
+                    playHaptic(15);
+
+                    try {
+                        const currentHash = location.hash.substring(1) || 'analyzer';
+                        if (currentHash === 'watchlist') {
+                            const refreshBtn = document.getElementById('watchlist-refresh-btn');
+                            if (refreshBtn) refreshBtn.click();
+                        } else if (currentHash === 'portfolio') {
+                            const refreshBtn = document.getElementById('portfolio-refresh-btn');
+                            if (refreshBtn) refreshBtn.click();
+                        } else {
+                            window.location.reload();
+                        }
+                    } catch (err) {
+                        console.error("[Mobile Refresh] Failed:", err);
+                    } finally {
+                        setTimeout(() => {
+                            if (pullIndicator) {
+                                pullIndicator.classList.remove('refreshing');
+                                pullIndicator.style.transform = `translateX(-50%) translateY(-46px)`;
+                                pullIndicator.style.opacity = '0';
+                            }
+                        }, 1200);
+                    }
+                } else {
+                    pullIndicator.style.transform = `translateX(-50%) translateY(-46px)`;
+                    pullIndicator.style.opacity = '0';
+                }
+            });
+        }
+        initPullToRefresh();
+
+        // 4. Custom Mobile Bottom Sheets for Selector Dropdowns
+        function initMobileSelects() {
+            document.addEventListener('click', e => {
+                if (!isMobile()) return;
+                const selectEl = e.target.closest('select');
+                if (!selectEl || selectEl.id === 'setting-refresh-interval' || selectEl.id === 'setting-speech-voice') return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                openCustomSelectBottomSheet(selectEl);
+            }, true);
+        }
+
+        function openCustomSelectBottomSheet(selectEl) {
+            let sheet = document.getElementById('rs-bottom-sheet');
+            if (!sheet) {
+                sheet = document.createElement('div');
+                sheet.id = 'rs-bottom-sheet';
+                sheet.className = 'rs-bottom-sheet';
+                sheet.innerHTML = `
+                    <div class="rs-bottom-sheet-backdrop"></div>
+                    <div class="rs-bottom-sheet-content">
+                        <div class="rs-bottom-sheet-handle"></div>
+                        <h4 id="rs-bottom-sheet-title">Select Option</h4>
+                        <div id="rs-bottom-sheet-utility"></div>
+                        <button class="rs-bottom-sheet-close" style="margin-top: 15px;">Dismiss</button>
+                    </div>
+                `;
+                document.body.appendChild(sheet);
+                sheet.querySelector('.rs-bottom-sheet-backdrop').addEventListener('click', () => sheet.classList.remove('active'));
+                sheet.querySelector('.rs-bottom-sheet-close').addEventListener('click', () => sheet.classList.remove('active'));
+            }
+
+            const label = selectEl.previousElementSibling ? selectEl.previousElementSibling.textContent.trim() : "Select Option";
+            document.getElementById('rs-bottom-sheet-title').innerText = label;
+
+            let html = '<div class="bottom-sheet-options-list" style="display:flex;flex-direction:column;gap:12px;margin:15px 0;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;">';
+            Array.from(selectEl.options).forEach((opt, idx) => {
+                const isSelected = opt.selected;
+                html += `
+                    <button class="bottom-sheet-option-row" data-value="${opt.value}" data-index="${idx}" style="background:${isSelected ? 'rgba(99,102,241,0.12)' : 'transparent'}; border:1px solid ${isSelected ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.06)'}; color:${isSelected ? 'var(--color-primary)' : 'var(--text-primary)'}; padding:12px 16px; border-radius:8px; font-family:Inter,sans-serif; font-size:13px; font-weight:600; text-align:left; cursor:pointer; width:100%; display:flex; justify-content:space-between; align-items:center; outline:none;-webkit-tap-highlight-color:transparent;">
+                        <span>${opt.text}</span>
+                        ${isSelected ? '<span style="color:var(--color-primary)">✓</span>' : ''}
+                    </button>
+                `;
+            });
+            html += '</div>';
+
+            const utilityContainer = document.getElementById('rs-bottom-sheet-utility');
+            utilityContainer.innerHTML = html;
+            sheet.classList.add('active');
+
+            utilityContainer.querySelectorAll('.bottom-sheet-option-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const idx = parseInt(row.getAttribute('data-index'), 10);
+                    selectEl.selectedIndex = idx;
+                    selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+                    playHaptic(8);
+                    sheet.classList.remove('active');
+                });
+            });
+        }
+        initMobileSelects();
+
+        // 5. Offline Connectivity Dots & local stashing
+        function initOfflineDetection() {
+            const banner = document.getElementById('network-offline-banner');
+
+            const updateStatus = () => {
+                if (!navigator.onLine) {
+                    if (banner) banner.classList.add('active');
+                    const mobileDot = document.getElementById('mobile-ws-dot');
+                    if (mobileDot) {
+                        mobileDot.style.background = '#ef4444';
+                        mobileDot.style.boxShadow = '0 0 8px #ef4444';
+                    }
+                    loadOfflineCache();
+                } else {
+                    if (banner) banner.classList.remove('active');
+                }
+            };
+
+            window.addEventListener('online', updateStatus);
+            window.addEventListener('offline', updateStatus);
+            updateStatus();
+        }
+        initOfflineDetection();
+
+        function stashOfflineCache() {
+            try {
+                const watchlistBody = document.getElementById('watchlist-table-body');
+                if (watchlistBody && watchlistBody.children.length > 0) {
+                    localStorage.setItem('cached-watchlist-html', watchlistBody.innerHTML);
+                }
+                const portfolioCapital = document.getElementById('port-total-investment');
+                if (portfolioCapital && portfolioCapital.innerText !== '' && portfolioCapital.innerText !== '--') {
+                    const portData = {
+                        investment: portfolioCapital.innerText,
+                        value: document.getElementById('port-total-value').innerText,
+                        pl: document.getElementById('port-total-pl').innerText,
+                        plClass: document.getElementById('port-total-pl').className
+                    };
+                    localStorage.setItem('cached-portfolio-metrics', JSON.stringify(portData));
+                }
+            } catch(e) {}
+        }
+        setInterval(stashOfflineCache, 5000);
+
+        function loadOfflineCache() {
+            try {
+                const cachedWL = localStorage.getItem('cached-watchlist-html');
+                const wlBody = document.getElementById('watchlist-table-body');
+                if (cachedWL && wlBody && wlBody.children.length === 0) {
+                    wlBody.innerHTML = cachedWL;
+                    console.log("[Offline Cache] Watchlist stashed values loaded.");
+                }
+                const cachedPort = localStorage.getItem('cached-portfolio-metrics');
+                const portCapital = document.getElementById('port-total-investment');
+                if (cachedPort && portCapital && (portCapital.innerText === '' || portCapital.innerText === '--')) {
+                    const data = JSON.parse(cachedPort);
+                    portCapital.innerText = data.investment;
+                    document.getElementById('port-total-value').innerText = data.value;
+                    const plEl = document.getElementById('port-total-pl');
+                    if (plEl) {
+                        plEl.innerText = data.pl;
+                        plEl.className = data.plClass;
+                    }
+                    console.log("[Offline Cache] Portfolio metrics loaded.");
+                }
+            } catch(e) {}
+        }
+
+        // Intercept Connection Status Dot updates
+        const originalUpdateIndicator = window.updateConnectionIndicator;
+        if (originalUpdateIndicator) {
+            window.updateConnectionIndicator = function(status) {
+                originalUpdateIndicator(status);
+                const mobileDot = document.getElementById('mobile-ws-dot');
+                if (mobileDot) {
+                    mobileDot.style.display = 'inline-block';
+                    if (status === 'live') {
+                        mobileDot.style.background = '#10b981';
+                        mobileDot.style.boxShadow = '0 0 8px #10b981';
+                    } else if (status === 'polling') {
+                        mobileDot.style.background = '#f59e0b';
+                        mobileDot.style.boxShadow = '0 0 8px #f59e0b';
+                    } else {
+                        mobileDot.style.background = '#ef4444';
+                        mobileDot.style.boxShadow = '0 0 8px #ef4444';
+                    }
+                }
+            };
+        }
+
+        // 6. Landscape chart orientation mode
+        function initLandscapeChartMode() {
+            const handleOrientation = () => {
+                const isLandscape = window.innerWidth > window.innerHeight;
+                const isChartTab = (location.hash === '#analyzer');
+                
+                const header = document.querySelector('.mobile-header');
+                const footer = document.querySelector('.mobile-bottom-nav');
+                const container = document.querySelector('.app-container');
+                const chartCard = document.getElementById('tv-chart-workstation');
+
+                if (isMobile() && isLandscape && isChartTab) {
+                    if (header) header.style.setProperty('display', 'none', 'important');
+                    if (footer) footer.style.setProperty('display', 'none', 'important');
+                    if (container) container.style.setProperty('padding-top', '0', 'important');
+                    if (chartCard) {
+                        chartCard.style.setProperty('position', 'fixed', 'important');
+                        chartCard.style.setProperty('top', '0', 'important');
+                        chartCard.style.setProperty('left', '0', 'important');
+                        chartCard.style.setProperty('width', '100vw', 'important');
+                        chartCard.style.setProperty('height', '100vh', 'important');
+                        chartCard.style.setProperty('z-index', '99999', 'important');
+                    }
+                } else {
+                    if (header) header.style.display = '';
+                    if (footer) footer.style.display = '';
+                    if (container) container.style.paddingTop = '';
+                    if (chartCard) {
+                        chartCard.style.position = '';
+                        chartCard.style.top = '';
+                        chartCard.style.left = '';
+                        chartCard.style.width = '';
+                        chartCard.style.height = '';
+                        chartCard.style.zIndex = '';
+                    }
+                }
+            };
+            window.addEventListener('resize', handleOrientation);
+            window.addEventListener('hashchange', handleOrientation);
+            handleOrientation();
+        }
+        initLandscapeChartMode();
+
+        // 7. Fallback Keypad Passcode Lock Screen & Capacitor Lifecycle Hooks
+        function initPINKeypadLock() {
+            const pinOverlay = document.getElementById('portfolio-pin-overlay');
+            if (!pinOverlay) return;
+
+            const dots = pinOverlay.querySelectorAll('.pin-dot');
+            let currentPin = "";
+            const getPIN = () => localStorage.getItem('portfolio-pin') || '1234';
+
+            pinOverlay.querySelectorAll('.pin-keyboard .pin-key[data-value]').forEach(key => {
+                key.addEventListener('click', () => {
+                    if (currentPin.length >= 4) return;
+                    currentPin += key.getAttribute('data-value');
+                    updateDots();
+                    if (currentPin.length === 4) {
+                        setTimeout(validatePIN, 200);
+                    }
+                });
+            });
+
+            const delBtn = document.getElementById('pin-action-delete');
+            if (delBtn) {
+                delBtn.addEventListener('click', () => {
+                    if (currentPin.length > 0) {
+                        currentPin = currentPin.substring(0, currentPin.length - 1);
+                        updateDots();
+                    }
+                });
+            }
+
+            const bioBtn = document.getElementById('pin-action-biometric');
+            if (bioBtn) {
+                bioBtn.addEventListener('click', () => {
+                    if (window.triggerBiometricVerification) {
+                        window.triggerBiometricVerification();
+                    }
+                });
+            }
+
+            const cancelBtn = document.getElementById('pin-action-cancel');
+            if (cancelBtn) {
+                cancelBtn.addEventListener('click', () => {
+                    pinOverlay.style.display = 'none';
+                    window.switchTab('analyzer');
+                });
+            }
+
+            function updateDots() {
+                dots.forEach((dot, idx) => {
+                    if (idx < currentPin.length) dot.classList.add('filled');
+                    else dot.classList.remove('filled');
+                });
+            }
+
+            function validatePIN() {
+                const hasPin = localStorage.getItem('portfolio-pin') !== null;
+                if (!hasPin) {
+                    localStorage.setItem('portfolio-pin', currentPin);
+                    window.portfolioUnlocked = true;
+                    pinOverlay.style.display = 'none';
+                    const desktopLock = document.getElementById('portfolio-lock-overlay');
+                    if (desktopLock) desktopLock.classList.add('hidden');
+                    if (window.loadPortfolioDoctorLedger) {
+                        window.loadPortfolioDoctorLedger(true);
+                    }
+                    window.showToast("Security passcode configured successfully.", "success");
+                    currentPin = "";
+                    updateDots();
+                    return;
+                }
+
+                const expected = getPIN();
+                if (currentPin === expected) {
+                    window.portfolioUnlocked = true;
+                    pinOverlay.style.display = 'none';
+                    const desktopLock = document.getElementById('portfolio-lock-overlay');
+                    if (desktopLock) desktopLock.classList.add('hidden');
+                    if (window.loadPortfolioDoctorLedger) {
+                        window.loadPortfolioDoctorLedger(true);
+                    }
+                    window.showToast("Portfolio security shield unlocked.", "success");
+                    currentPin = "";
+                    updateDots();
+                } else {
+                    pinOverlay.classList.add('pin-shake-animate');
+                    playHaptic(30);
+                    setTimeout(() => {
+                        pinOverlay.classList.remove('pin-shake-animate');
+                        currentPin = "";
+                        updateDots();
+                    }, 400);
+                }
+            }
+
+            // Wrap switchTab to overlay PIN modal on mobile
+            const wrappedSwitch = window.switchTab;
+            window.switchTab = function(tabKey) {
+                if (tabKey === 'portfolio' && isMobile()) {
+                    const shieldEnabled = localStorage.getItem('portfolio-security-shield-enabled') !== 'false';
+                    if (shieldEnabled && !window.portfolioUnlocked) {
+                        pinOverlay.style.display = 'flex';
+                        const desktopLock = document.getElementById('portfolio-lock-overlay');
+                        if (desktopLock) desktopLock.classList.add('hidden');
+                        
+                        if (window.triggerBiometricVerification) {
+                            setTimeout(() => {
+                                if (pinOverlay.style.display === 'flex' && !window.portfolioUnlocked) {
+                                    window.triggerBiometricVerification();
+                                }
+                            }, 300);
+                        }
+                        wrappedSwitch(tabKey);
+                        return;
+                    }
+                }
+                wrappedSwitch(tabKey);
+            };
+
+            // Enhance biometric trigger to unlock mobile overlay
+            const originalBioVerify = window.triggerBiometricVerification;
+            if (originalBioVerify) {
+                window.triggerBiometricVerification = async function() {
+                    const NativeBiometric = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.NativeBiometric;
+                    if (NativeBiometric) {
+                        try {
+                            const avail = await NativeBiometric.isAvailable();
+                            if (avail.isAvailable) {
+                                await NativeBiometric.verifyIdentity({
+                                    reason: 'Unlock Portfolio Security Shield',
+                                    title: 'Portfolio Lock',
+                                    subtitle: 'Verify identity to view diagnostics audit ledger'
+                                });
+                                window.portfolioUnlocked = true;
+                                pinOverlay.style.display = 'none';
+                                const desktopLock = document.getElementById('portfolio-lock-overlay');
+                                if (desktopLock) desktopLock.classList.add('hidden');
+                                if (window.loadPortfolioDoctorLedger) {
+                                    window.loadPortfolioDoctorLedger(true);
+                                }
+                                window.showToast("Portfolio security shield unlocked via biometrics.", "success");
+                                return;
+                            }
+                        } catch (e) {
+                            console.warn("Native biometrics failed, using passcode fallback.", e);
+                        }
+                    }
+                    originalBioVerify();
+                    let checks = 0;
+                    const checkInterval = setInterval(() => {
+                        checks++;
+                        if (window.portfolioUnlocked) {
+                            pinOverlay.style.display = 'none';
+                            clearInterval(checkInterval);
+                        }
+                        if (checks > 20) clearInterval(checkInterval);
+                    }, 200);
+                };
+            }
+        }
+        initPINKeypadLock();
+
+        // ==================== PREMIUM MOBILE ENHANCEMENTS ====================
+        
+        // Helper to format rupees safely
+        const formatRupees = (val) => {
+            if (typeof safeFormatRupees === 'function') return safeFormatRupees(val, 2);
+            return '₹' + (val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        // 1. Swipe-to-Action Rows on Lists (Watchlist & Portfolio)
+        function setupSwipeableWatchlistRows() {
+            const watchlistBody = document.getElementById('watchlist-table-body');
+            const holdingsBody = document.getElementById('holdings-table-body');
+            
+            const bindSwipe = (body) => {
+                if (!body) return;
+                let startX = 0;
+                let startY = 0;
+                let activeRow = null;
+                let currentOffset = 0;
+                let isSwipingRow = false;
+
+                body.addEventListener('touchstart', e => {
+                    const tr = e.target.closest('tr');
+                    if (!tr || e.target.closest('button, input, a, select')) return;
+                    
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    activeRow = tr;
+                    isSwipingRow = false;
+                    
+                    // Reset other swiped rows
+                    body.querySelectorAll('tr').forEach(row => {
+                        if (row !== activeRow && row.style.transform) {
+                            row.style.transform = '';
+                            row.style.transition = 'transform 0.25s ease';
+                        }
+                    });
+                }, { passive: true });
+
+                body.addEventListener('touchmove', e => {
+                    if (!activeRow) return;
+                    
+                    const currentX = e.touches[0].clientX;
+                    const currentY = e.touches[0].clientY;
+                    const diffX = currentX - startX;
+                    const diffY = currentY - startY;
+
+                    if (Math.abs(diffX) > Math.abs(diffY) * 1.5 && Math.abs(diffX) > 10) {
+                        isSwipingRow = true;
+                        currentOffset = Math.max(-80, Math.min(80, diffX));
+                        activeRow.style.transform = `translateX(${currentOffset}px)`;
+                        activeRow.style.transition = 'none';
+                    }
+                }, { passive: true });
+
+                body.addEventListener('touchend', e => {
+                    if (!activeRow || !isSwipingRow) {
+                        activeRow = null;
+                        return;
+                    }
+
+                    activeRow.style.transition = 'transform 0.2s ease-out';
+                    if (currentOffset < -40) {
+                        activeRow.style.transform = 'translateX(-70px)';
+                        triggerSwipeRowAction(activeRow, 'delete');
+                    } else if (currentOffset > 40) {
+                        activeRow.style.transform = 'translateX(70px)';
+                        triggerSwipeRowAction(activeRow, 'audit');
+                    } else {
+                        activeRow.style.transform = '';
+                    }
+                    activeRow = null;
+                });
+            };
+
+            bindSwipe(watchlistBody);
+            bindSwipe(holdingsBody);
+        }
+
+        function triggerSwipeRowAction(rowEl, action) {
+            const firstCell = rowEl.cells[0];
+            if (!firstCell) return;
+            const symbol = firstCell.textContent.trim().split('\n')[0].replace('.NS', '').trim();
+            
+            playHaptic(12);
+            if (action === 'delete') {
+                window.showToast(`Action: Delete/Remove ${symbol}`, "info");
+                const delBtn = rowEl.querySelector('button[title*="Delete"], button[onclick*="deleteWatchlistItem"], button[onclick*="deleteHoldingsItem"]');
+                if (delBtn) {
+                    delBtn.click();
+                } else {
+                    const buttons = rowEl.querySelectorAll('button');
+                    if (buttons.length > 0) {
+                        buttons[buttons.length - 1].click(); // assume last button is delete
+                    }
+                }
+                setTimeout(() => { if (rowEl) rowEl.style.transform = ''; }, 600);
+            } else if (action === 'audit') {
+                window.showToast(`Triggering AI Audit: ${symbol}`, "success");
+                const searchInput = document.getElementById('analyzer-search-input');
+                const searchBtn = document.getElementById('analyzer-search-btn');
+                if (searchInput && searchBtn) {
+                    searchInput.value = symbol;
+                    searchBtn.click();
+                    window.switchTab('analyzer');
+                }
+                setTimeout(() => { if (rowEl) rowEl.style.transform = ''; }, 600);
+            }
+        }
+
+        // 2. Compact Equities Tearsheet Header
+        function setupMobileTearsheet() {
+            const searchBtn = document.getElementById('analyzer-search-btn');
+            const searchInput = document.getElementById('analyzer-search-input');
+            
+            if (searchBtn && searchInput) {
+                const triggerUpdate = () => {
+                    setTimeout(updateMobileTearsheetContent, 1000);
+                };
+                searchBtn.addEventListener('click', triggerUpdate);
+                searchInput.addEventListener('keypress', e => {
+                    if (e.key === 'Enter') triggerUpdate();
+                });
+            }
+        }
+
+        function updateMobileTearsheetContent() {
+            if (!isMobile()) return;
+            if (typeof activeStockProfile === 'undefined' || !activeStockProfile || !activeStockProfile.ticker) return;
+
+            let tearsheet = document.getElementById('mobile-tearsheet-container');
+            if (!tearsheet) {
+                const analyzerTab = document.getElementById('tab-analyzer');
+                if (analyzerTab) {
+                    tearsheet = document.createElement('div');
+                    tearsheet.id = 'mobile-tearsheet-container';
+                    tearsheet.className = 'mobile-tearsheet no-print';
+                    analyzerTab.insertBefore(tearsheet, analyzerTab.firstChild);
+                }
+            }
+
+            if (!tearsheet) return;
+
+            const ticker = activeStockProfile.ticker;
+            const name = activeStockProfile.name || activeStockProfile.company_name || "Company Profile";
+            const price = activeStockProfile.fundamentals?.current_price || activeStockProfile.price || 0;
+            const changePct = activeStockProfile.technicals?.price_change_pct || activeStockProfile.change_pct || 0;
+            const high = activeStockProfile.technicals?.daily_high || price * 1.02;
+            const low = activeStockProfile.technicals?.daily_low || price * 0.98;
+            
+            let sliderPct = 50;
+            if (high > low) {
+                sliderPct = Math.max(0, Math.min(100, ((price - low) / (high - low)) * 100));
+            }
+
+            const isPositive = changePct >= 0;
+            const sign = isPositive ? '+' : '';
+
+            tearsheet.innerHTML = `
+                <div class="tearsheet-meta-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div>
+                        <h3 style="margin:0;font-family:'Outfit';font-size:16px;font-weight:800;color:var(--text-primary);">${ticker}</h3>
+                        <span style="font-size:10px;color:var(--text-secondary);">${name}</span>
+                    </div>
+                    <div class="tearsheet-price-area" style="text-align:right;">
+                        <span style="font-size:18px;font-family:'Outfit';font-weight:800;color:var(--text-primary);">${formatRupees(price)}</span>
+                        <span class="${isPositive ? 'green-text' : 'red-text'}" style="font-size:11px;font-weight:700;margin-left:6px;">
+                            ${sign}${changePct.toFixed(2)}%
+                        </span>
+                    </div>
+                </div>
+                <div class="tearsheet-range-slider" style="height:4px; background:rgba(255,255,255,0.06); border-radius:2px; position:relative; margin:10px 0 6px 0;">
+                    <div style="position:absolute; top:0; bottom:0; left:0; right:0; background:linear-gradient(90deg, #ef4444, #eab308, #22c55e); border-radius:2px; opacity:0.15;"></div>
+                    <div class="tearsheet-range-marker" style="left: ${sliderPct}%; width:10px; height:10px; border-radius:50%; background:var(--color-primary-light); box-shadow:0 0 8px var(--color-primary); position:absolute; top:-3px; transform:translateX(-50%); transition:left 0.3s ease;"></div>
+                </div>
+                <div class="tearsheet-range-labels" style="display:flex; justify-content:space-between; font-size:9px; color:var(--text-secondary); font-family:Inter;">
+                    <span>L: ${formatRupees(low)}</span>
+                    <span>H: ${formatRupees(high)}</span>
+                </div>
+            `;
+        }
+
+        // 3. Persistent Quick-Search Overlay in Header
+        function injectMobileHeaderSearch() {
+            const header = document.querySelector('.mobile-header');
+            if (!header || document.getElementById('mobile-search-trigger')) return;
+
+            const searchBtn = document.createElement('button');
+            searchBtn.id = 'mobile-search-trigger';
+            searchBtn.className = 'theme-toggle-btn';
+            searchBtn.innerHTML = '🔍';
+            searchBtn.style.marginRight = '6px';
+            
+            const themeToggle = document.getElementById('mobile-theme-toggle');
+            if (themeToggle) {
+                header.insertBefore(searchBtn, themeToggle);
+            } else {
+                header.appendChild(searchBtn);
+            }
+
+            searchBtn.addEventListener('click', openQuickSearchBottomSheet);
+        }
+
+        function openQuickSearchBottomSheet() {
+            let sheet = document.getElementById('rs-bottom-sheet');
+            if (!sheet) {
+                sheet = document.createElement('div');
+                sheet.id = 'rs-bottom-sheet';
+                sheet.className = 'rs-bottom-sheet';
+                sheet.innerHTML = `
+                    <div class="rs-bottom-sheet-backdrop"></div>
+                    <div class="rs-bottom-sheet-content">
+                        <div class="rs-bottom-sheet-handle"></div>
+                        <h4 id="rs-bottom-sheet-title">Select Option</h4>
+                        <div id="rs-bottom-sheet-utility"></div>
+                        <button class="rs-bottom-sheet-close" style="margin-top: 15px;">Dismiss</button>
+                    </div>
+                `;
+                document.body.appendChild(sheet);
+            }
+
+            document.getElementById('rs-bottom-sheet-title').innerText = "Quick Asset Search";
+            const recents = JSON.parse(localStorage.getItem('recent-mobile-searches') || '["RELIANCE", "TCS", "INFY", "TATASTEEL"]');
+            
+            let html = `
+                <div style="display:flex; flex-direction:column; gap:16px; margin: 15px 0;">
+                    <div style="position:relative; width:100%;">
+                        <input type="text" id="mobile-quick-search-input" placeholder="Enter stock symbol (e.g. RELIANCE)..." style="width:100% !important; box-sizing:border-box !important; padding:12px 16px !important; font-size:14px !important; background:rgba(255,255,255,0.03) !important; border:1px solid var(--border-glass) !important; color:var(--text-primary) !important; border-radius:8px !important;">
+                    </div>
+                    <div>
+                        <h5 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit;">Recent Searches</h5>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            `;
+            
+            recents.forEach(sym => {
+                html += `<button class="quick-search-pill-btn" data-symbol="${sym}" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); color:var(--text-primary); padding:6px 12px; border-radius:15px; font-size:11px; font-weight:600; cursor:pointer;">${sym}</button>`;
+            });
+            
+            html += `
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="mobile-quick-search-submit-btn" style="width:100%; height:40px; border-radius:8px; font-weight:700;">ANALYZE ASSET</button>
+                </div>
+            `;
+
+            const utilityContainer = document.getElementById('rs-bottom-sheet-utility');
+            utilityContainer.innerHTML = html;
+            sheet.classList.add('active');
+
+            // Wire backdrop close
+            const backdrop = sheet.querySelector('.rs-bottom-sheet-backdrop');
+            const closeBtn = sheet.querySelector('.rs-bottom-sheet-close');
+            const closeSheet = () => sheet.classList.remove('active');
+            backdrop.onclick = closeSheet;
+            closeBtn.onclick = closeSheet;
+
+            setTimeout(() => {
+                const input = document.getElementById('mobile-quick-search-input');
+                if (input) input.focus();
+            }, 300);
+
+            utilityContainer.querySelectorAll('.quick-search-pill-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    executeQuickSearch(btn.getAttribute('data-symbol'), sheet);
+                });
+            });
+
+            const inputEl = document.getElementById('mobile-quick-search-input');
+            inputEl.addEventListener('keypress', e => {
+                if (e.key === 'Enter') {
+                    executeQuickSearch(inputEl.value.trim(), sheet);
+                }
+            });
+
+            document.getElementById('mobile-quick-search-submit-btn').addEventListener('click', () => {
+                executeQuickSearch(inputEl.value.trim(), sheet);
+            });
+        }
+
+        function executeQuickSearch(symbol, sheetEl) {
+            if (!symbol) return;
+            symbol = symbol.toUpperCase();
+            
+            let recents = JSON.parse(localStorage.getItem('recent-mobile-searches') || '["RELIANCE", "TCS", "INFY", "TATASTEEL"]');
+            recents = [symbol, ...recents.filter(s => s !== symbol)].slice(0, 5);
+            localStorage.setItem('recent-mobile-searches', JSON.stringify(recents));
+
+            const searchInput = document.getElementById('analyzer-search-input');
+            const searchBtn = document.getElementById('analyzer-search-btn');
+            if (searchInput && searchBtn) {
+                searchInput.value = symbol;
+                searchBtn.click();
+            }
+
+            sheetEl.classList.remove('active');
+            playHaptic(15);
+            window.switchTab('analyzer');
+        }
+
+        // 4. TradingView Mobile Touch Options
+        function configureChartMobileTouchOptions() {
+            if (window.lightweightChartInstance) {
+                try {
+                    window.lightweightChartInstance.applyOptions({
+                        handleScroll: { touchMouseMove: true },
+                        handleScale: { pinchTrigger: true },
+                        kineticScroll: { touch: true }
+                    });
+                    console.log("[Chart Mobile Touch] Interactive options applied.");
+                } catch(e) {}
+            }
+        }
+
+        // 5. Live Neon Ticks Flares
+        function triggerLiveNeonPriceFlares(ticksData) {
+            const watchlistBody = document.getElementById('watchlist-table-body');
+            if (!watchlistBody) return;
+            
+            for (const symbol in ticksData) {
+                const cleanSymbol = symbol.replace('.NS', '').trim();
+                Array.from(watchlistBody.rows).forEach(row => {
+                    const symbolCell = row.cells[0];
+                    if (symbolCell && symbolCell.textContent.trim().replace('.NS', '') === cleanSymbol) {
+                        const data = ticksData[symbol];
+                        const isPositive = data.change >= 0;
+                        const flareClass = isPositive ? 'glow-flare-green' : 'glow-flare-red';
+                        
+                        row.classList.add(flareClass);
+                        setTimeout(() => {
+                            row.classList.remove(flareClass);
+                        }, 800);
+                    }
+                });
+            }
+        }
+
+        // Attach listeners and tick hooks if mobile
+        if (isMobile()) {
+            setupSwipeableWatchlistRows();
+            setupMobileTearsheet();
+            injectMobileHeaderSearch();
+            configureChartMobileTouchOptions();
+        }
+
+        const originalHandleTick = window.handleLiveTickMessage;
+        if (originalHandleTick) {
+            window.handleLiveTickMessage = function(ticksData) {
+                originalHandleTick(ticksData);
+                if (isMobile()) {
+                    updateMobileTearsheetContent();
+                    triggerLiveNeonPriceFlares(ticksData);
+                }
+            };
+        }
+
+        // Periodic chart verification
+        setInterval(configureChartMobileTouchOptions, 3000);
+
+        function initSleekFooterSettings() {
+            const disclaimerToggle = document.getElementById('setting-disclaimers-toggle');
+            const telemetryToggle = document.getElementById('setting-telemetry-toggle');
+            const disclaimerEl = document.querySelector('.footer-disclaimer');
+            const telemetryEl = document.querySelector('.footer-diagnostics');
+
+            // Load saved state (default true if not set)
+            const showDisclaimers = localStorage.getItem('settings-show-disclaimers') !== 'false';
+            const showTelemetry = localStorage.getItem('settings-show-telemetry') !== 'false';
+
+            // Set initial UI state
+            if (disclaimerToggle) {
+                disclaimerToggle.checked = showDisclaimers;
+                disclaimerToggle.addEventListener('change', (e) => {
+                    const checked = e.target.checked;
+                    localStorage.setItem('settings-show-disclaimers', checked);
+                    if (disclaimerEl) {
+                        disclaimerEl.style.setProperty('display', checked ? '' : 'none', 'important');
+                    }
+                });
+            }
+            if (disclaimerEl) {
+                disclaimerEl.style.setProperty('display', showDisclaimers ? '' : 'none', 'important');
+            }
+
+            if (telemetryToggle) {
+                telemetryToggle.checked = showTelemetry;
+                telemetryToggle.addEventListener('change', (e) => {
+                    const checked = e.target.checked;
+                    localStorage.setItem('settings-show-telemetry', checked);
+                    if (telemetryEl) {
+                        telemetryEl.style.setProperty('display', checked ? '' : 'none', 'important');
+                    }
+                });
+            }
+            if (telemetryEl) {
+                telemetryEl.style.setProperty('display', showTelemetry ? '' : 'none', 'important');
+            }
+        }
+
+        initSleekFooterSettings();
+        initPINKeypadLock();
+
+        // Capacitor Lifecycle Hooks
+        if (window.Capacitor) {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log("[Mobile Lifecycle] Backgrounded. Disconnecting WebSocket ticks.");
+                    if (window.liveTicksWS && window.liveTicksWS.readyState === WebSocket.OPEN) {
+                        window.liveTicksWS.close(1000, "Backgrounding");
+                    }
+                } else {
+                    console.log("[Mobile Lifecycle] Foregrounded. Reconnecting WebSocket ticks.");
+                    if (window.connectLiveTicksWS) {
+                        window.connectLiveTicksWS();
+                    }
+                }
+            });
+        }
+    }
+
     // Initialize all visual modernization layers safely
     const initModernizer = () => {
         const safeCall = (name, fn) => {
@@ -1294,6 +2389,7 @@
         safeCall('setupCatalystAudioControls', setupCatalystAudioControls);
         safeCall('setupCatalystModalListeners', setupCatalystModalListeners);
         safeCall('setupSettingsSearchToggle', setupSettingsSearchToggle);
+        safeCall('setupMobileUpgrades', setupMobileUpgrades);
     };
 
     if (document.readyState === 'loading') {

@@ -616,30 +616,17 @@ table tbody tr:hover {
     .aurora-container {
         display: none !important;
     }
+    /* Keep glassmorphic effects on mobile, disable only desktop-hover transformations */
     .card {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        background: var(--bg-card) !important;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15) !important;
         transform: none !important;
     }
     .card:hover {
         transform: none !important;
+        border-color: rgba(var(--primary-rgb), 0.25) !important;
     }
-    .main-header {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        background: var(--bg-main) !important;
-    }
-    .glow-card::before {
-        display: none !important;
-    }
+    /* Disable mouse cursor spotlight hover card overlays */
     .card::after {
         display: none !important;
-    }
-    .skeleton::after {
-        animation: none !important;
-        background: none !important;
     }
     table:hover tbody tr {
         opacity: 1 !important;

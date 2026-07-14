@@ -154,8 +154,45 @@
     <header class="mobile-header no-print">
         <button id="mobile-menu-toggle" class="mobile-menu-toggle">☰</button>
         <div class="mobile-logo" id="mobile-logo-reset" style="cursor: pointer;" title="Click to Reset Workspace">APEX AGENTIC AI</div>
-        <button id="mobile-theme-toggle" class="theme-toggle-btn">🌓</button>
+        <div id="mobile-ws-dot" class="mobile-ws-dot-indicator" title="WebSocket Live Status" style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 6px #ef4444; margin-left: auto; margin-right: 12px; display: inline-block;"></div>
+        <button id="mobile-theme-toggle" class="theme-toggle-btn" style="margin-left: 0;">🌓</button>
     </header>
+
+    <!-- Offline Alert Banner -->
+    <div id="network-offline-banner" class="network-offline-banner">
+        <span class="network-offline-dot"></span>
+        <span>Network Connection Lost. Using cached data offline.</span>
+    </div>
+
+    <!-- Biometric Fallback PIN Overlay Shield -->
+    <div id="portfolio-pin-overlay" class="portfolio-pin-overlay" style="display: none;">
+        <div class="pin-lock-header">
+            <div class="pin-lock-icon">🔒</div>
+            <h2 class="pin-lock-title">Security Shield</h2>
+            <p class="pin-lock-subtitle">Verify your secure passcode PIN to unlock Portfolio Optimization Doctor.</p>
+        </div>
+        <div class="pin-dots-container">
+            <div class="pin-dot" id="pin-dot-1"></div>
+            <div class="pin-dot" id="pin-dot-2"></div>
+            <div class="pin-dot" id="pin-dot-3"></div>
+            <div class="pin-dot" id="pin-dot-4"></div>
+        </div>
+        <div class="pin-keyboard">
+            <button class="pin-key" data-value="1">1</button>
+            <button class="pin-key" data-value="2">2</button>
+            <button class="pin-key" data-value="3">3</button>
+            <button class="pin-key" data-value="4">4</button>
+            <button class="pin-key" data-value="5">5</button>
+            <button class="pin-key" data-value="6">6</button>
+            <button class="pin-key" data-value="7">7</button>
+            <button class="pin-key" data-value="8">8</button>
+            <button class="pin-key" data-value="9">9</button>
+            <button class="pin-key key-action" id="pin-action-biometric" title="Attempt Biometrics">🧬</button>
+            <button class="pin-key" data-value="0">0</button>
+            <button class="pin-key key-action" id="pin-action-delete" title="Backspace">⌫</button>
+        </div>
+        <button class="rs-bottom-sheet-close" id="pin-action-cancel" style="margin-top: 30px; background: transparent; border: 1px solid rgba(255,255,255,0.15); color: var(--text-secondary);">Cancel</button>
+    </div>
 
     <div class="app-container">
         <!-- Sidebar Workspace Navigation -->
@@ -432,6 +469,14 @@
                                 <div class="setting-row">
                                     <label>AI Background Alerts</label>
                                     <input type="checkbox" id="setting-alerts-toggle" checked style="cursor:pointer; transform: scale(1.15);">
+                                </div>
+                                <div class="setting-row">
+                                    <label>Regulatory Disclaimers</label>
+                                    <input type="checkbox" id="setting-disclaimers-toggle" checked style="cursor:pointer; transform: scale(1.15);">
+                                </div>
+                                <div class="setting-row">
+                                    <label>System Telemetry</label>
+                                    <input type="checkbox" id="setting-telemetry-toggle" checked style="cursor:pointer; transform: scale(1.15);">
                                 </div>
                                 <div class="setting-row">
                                     <label>Refresh Cycle</label>
@@ -7617,10 +7662,14 @@
 
     <!-- Institutional Footer -->
     <footer class="main-footer no-print">
-        <div class="footer-disclaimer">
-            <strong>⚠️ SEBI Investment Advisory Disclaimer:</strong>
-            Apex Agentic AI acts strictly as an automated quantitative research terminal. We are not SEBI registered investment advisors. All composite scoring metrics, Piotroski matrix diagnostic summaries, Altman scores, and DCF sandboxes are computed based on historical NSE market datasets and mathematical models, representing simulations rather than direct buy/sell endorsements.
-        </div>
+        <details class="footer-disclaimer" style="cursor: pointer; font-size: 11px; color: var(--text-muted); background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: block; outline: none;">
+            <summary style="font-weight: 700; color: var(--text-secondary); outline: none; user-select: none;">
+                ⚠️ SEBI Investment Advisory Disclaimer (Tap to Expand/Collapse)
+            </summary>
+            <div style="margin-top: 8px; line-height: 1.5; color: var(--text-muted); font-size: 10.5px; font-weight: 500;">
+                Apex Agentic AI acts strictly as an automated quantitative research terminal. We are not SEBI registered investment advisors. All composite scoring metrics, Piotroski matrix diagnostic summaries, Altman scores, and DCF sandboxes are computed based on historical NSE market datasets and mathematical models, representing simulations rather than direct buy/sell endorsements.
+            </div>
+        </details>
         <div class="footer-diagnostics">
             <span class="diag-item"><span class="status-indicator"></span> Database Cache: <strong class="green-text">Active</strong></span>
             <span class="diag-item">Latency: <strong id="footer-latency" class="green-text">34ms</strong></span>

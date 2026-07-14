@@ -15984,7 +15984,6 @@ details[open] .academy-hud-arrow {
         transform: translateX(-50%) translateY(0) !important;
         opacity: 1 !important;
     }
-    }
 }
 
 /* ────────────────── Custom Indicator AI Insights Styles ─────────────────── */
@@ -17420,5 +17419,465 @@ select option {
     }
     .layman-column {
         flex: 1 1 100% !important;
+    }
+}
+
+/* Hide mobile-only components on desktop viewports */
+.mobile-bottom-nav,
+.portfolio-pin-overlay,
+.network-offline-banner,
+.pull-to-refresh-indicator,
+.mobile-header,
+.mobile-tearsheet {
+    display: none !important;
+}
+
+/* ==========================================================
+   ENTERPRISE MOBILE APP UI STYLES (Screen size <= 768px)
+   ========================================================== */
+@media (max-width: 768px) {
+    /* Enable mobile elements */
+    .mobile-header {
+        display: flex !important;
+    }
+    .mobile-bottom-nav {
+        display: flex !important;
+    }
+    .pull-to-refresh-indicator {
+        display: flex !important;
+    }
+    .network-offline-banner.active {
+        display: flex !important;
+    }
+    .mobile-tearsheet {
+        display: flex !important;
+    }
+    /* Safe Area & Body Tweaks */
+    body {
+        padding-bottom: calc(60px + env(safe-area-inset-bottom)) !important;
+    }
+
+    /* 1. Mobile Bottom Navigation Bar */
+    .mobile-bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: calc(56px + env(safe-area-inset-bottom));
+        background: rgba(15, 23, 42, 0.85) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        display: flex !important;
+        justify-content: space-around;
+        align-items: center;
+        padding-bottom: env(safe-area-inset-bottom);
+        z-index: 9998;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .mobile-bottom-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        border: none;
+        color: var(--text-secondary);
+        font-family: var(--font-body), sans-serif;
+        font-size: 10px;
+        font-weight: 500;
+        padding: 6px 0;
+        flex: 1;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        outline: none;
+        gap: 3px;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-bottom-nav-item svg,
+    .mobile-bottom-nav-item i {
+        width: 20px;
+        height: 20px;
+        stroke-width: 2px;
+        stroke: currentColor;
+        transition: transform 0.2s ease;
+    }
+
+    .mobile-bottom-nav-item.active {
+        color: var(--color-primary, #6366f1) !important;
+        text-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
+    }
+
+    .mobile-bottom-nav-item.active svg,
+    .mobile-bottom-nav-item.active i {
+        transform: scale(1.1);
+        stroke: var(--color-primary, #6366f1) !important;
+    }
+
+    /* 2. Biometric & PIN Fallback Lock Screen Overlay */
+    .portfolio-pin-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(10, 15, 30, 0.96) !important;
+        backdrop-filter: blur(25px) !important;
+        -webkit-backdrop-filter: blur(25px) !important;
+        z-index: 100000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-primary);
+        padding: 20px;
+        box-sizing: border-box;
+    }
+
+    .pin-lock-header {
+        text-align: center;
+        margin-bottom: 40px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .pin-lock-icon {
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        background: rgba(99, 102, 241, 0.1);
+        border: 1px solid rgba(99, 102, 241, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--color-primary, #6366f1);
+        font-size: 24px;
+        margin-bottom: 10px;
+    }
+
+    .pin-lock-title {
+        font-family: 'Outfit', sans-serif;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+
+    .pin-lock-subtitle {
+        font-size: 12px;
+        color: var(--text-secondary);
+        max-width: 240px;
+        margin-top: 4px;
+        line-height: 1.4;
+    }
+
+    .pin-dots-container {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 40px;
+    }
+
+    .pin-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .pin-dot.filled {
+        background: var(--color-primary, #6366f1);
+        border-color: var(--color-primary, #6366f1);
+        box-shadow: 0 0 10px var(--color-primary-glow);
+        transform: scale(1.15);
+    }
+
+    .pin-keyboard {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px 24px;
+        width: 100%;
+        max-width: 280px;
+    }
+
+    .pin-key {
+        width: 68px;
+        height: 68px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        color: var(--text-primary);
+        font-family: 'Outfit', sans-serif;
+        font-size: 24px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.1s ease;
+        outline: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .pin-key:active {
+        background: rgba(99, 102, 241, 0.2);
+        border-color: var(--color-primary, #6366f1);
+        transform: scale(0.92);
+    }
+
+    .pin-key.key-action {
+        font-size: 12px;
+        font-weight: 600;
+        background: transparent;
+        border-color: transparent;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-secondary);
+    }
+
+    .pin-key.key-action:active {
+        background: transparent;
+        transform: scale(0.92);
+        color: var(--text-primary);
+    }
+
+    .pin-shake-animate {
+        animation: pin-shake 0.35s ease-in-out;
+    }
+
+    @keyframes pin-shake {
+        0%, 100% { transform: translateX(0); }
+        20%, 60% { transform: translateX(-8px); }
+        40%, 80% { transform: translateX(8px); }
+    }
+
+    /* 3. Pull-To-Refresh loader design */
+    .pull-to-refresh-indicator {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: rgba(20, 26, 46, 0.95);
+        border: 1px solid var(--border-glass);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: -46px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 999;
+        pointer-events: none;
+        transition: transform 0.1s ease, opacity 0.15s ease;
+        opacity: 0;
+    }
+
+    .pull-to-refresh-indicator svg {
+        width: 18px;
+        height: 18px;
+        stroke: var(--color-primary);
+        animation: spin-loader 1s linear infinite;
+        animation-play-state: paused;
+    }
+
+    .pull-to-refresh-indicator.refreshing svg {
+        animation-play-state: running;
+    }
+
+    /* 4. Connectivity Offline status top banner */
+    .network-offline-banner {
+        position: fixed;
+        top: calc(50px + env(safe-area-inset-top));
+        left: 12px;
+        right: 12px;
+        background: rgba(239, 68, 68, 0.15) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+        border: 1px solid rgba(239, 68, 68, 0.3) !important;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-family: var(--font-body), sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        color: #fca5a5 !important;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        z-index: 9999;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transform: translateY(-80px);
+        opacity: 0;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        pointer-events: none;
+    }
+
+    .network-offline-banner.active {
+        transform: translateY(0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .network-offline-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: #ef4444;
+        box-shadow: 0 0 8px #ef4444;
+        animation: livePulse 1.5s infinite;
+    }
+
+    /* 5. Mobile Equities Tear-Sheet price range slider & layout */
+    .mobile-tearsheet {
+        display: flex;
+        flex-direction: column;
+        background: rgba(255, 255, 255, 0.02) !important;
+        border: 1px solid var(--border-glass) !important;
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 16px;
+        gap: 8px;
+    }
+
+    .tearsheet-meta-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .tearsheet-price-area {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    .tearsheet-range-slider {
+        position: relative;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 2px;
+        margin: 12px 0 4px 0;
+    }
+
+    .tearsheet-range-marker {
+        position: absolute;
+        top: 50%;
+        width: 8px;
+        height: 8px;
+        background: #ffffff;
+        border: 2px solid var(--color-primary);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 0 6px rgba(99, 102, 241, 0.8);
+    }
+
+    .tearsheet-range-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        color: var(--text-secondary);
+    }
+
+    /* 6. Live tick row pulsing shadows (Bloomberg Flare) */
+    @keyframes glowFlareGreen {
+        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+        50% { box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.2); }
+        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .glow-flare-green {
+        animation: glowFlareGreen 0.8s ease-out;
+    }
+
+    @keyframes glowFlareRed {
+        0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+        50% { box-shadow: 0 0 8px 2px rgba(239, 68, 68, 0.2); }
+        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .glow-flare-red {
+        animation: glowFlareRed 0.8s ease-out;
+    }
+
+    /* 7. Swipe-To-Action list rows styles */
+    .swipeable-row-container {
+        position: relative;
+        overflow: hidden;
+        width: 100%;
+        touch-action: pan-y;
+    }
+
+    .swipeable-row-content {
+        position: relative;
+        z-index: 2;
+        background: var(--bg-card);
+        transition: transform 0.15s ease-out;
+        will-change: transform;
+    }
+
+    .swipe-actions {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        z-index: 1;
+        font-size: 11px;
+        font-weight: 600;
+        color: white;
+    }
+
+    .swipe-actions.action-left {
+        left: 0;
+        background: rgba(16, 185, 129, 0.8);
+        padding-left: 15px;
+        border-radius: 8px 0 0 8px;
+    }
+
+    .swipe-actions.action-right {
+        right: 0;
+        background: rgba(239, 68, 68, 0.8);
+        padding-right: 15px;
+        border-radius: 0 8px 8px 0;
+    }
+
+    /* 8. Inertial overflow touch scrolling */
+    .data-table-wrapper,
+    .dashboard-grid,
+    .subtabs-scroll-container,
+    .watchlist-scroll-wrapper {
+        -webkit-overflow-scrolling: touch !important;
+        overflow-x: auto;
+    }
+
+    /* 9. Touch interactive active scaling highlights */
+    .touch-active {
+        transform: scale(0.96) !important;
+        filter: brightness(1.1) !important;
+        transition: transform 0.1s ease !important;
+    }
+
+    /* Mobile safe-area adjustments for Header */
+    .mobile-header {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 9999 !important;
+        background: rgba(15, 23, 42, 0.85) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding-top: env(safe-area-inset-top) !important;
+        height: calc(50px + env(safe-area-inset-top)) !important;
+        display: flex !important;
+        align-items: center;
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .app-container {
+        padding-top: calc(50px + env(safe-area-inset-top)) !important;
     }
 }
