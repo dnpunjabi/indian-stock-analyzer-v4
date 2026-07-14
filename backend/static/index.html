@@ -16,7 +16,7 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <!-- TradingView Advanced Widget -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <link rel="stylesheet" href="styles.css?v=1.7.6">
+    <link rel="stylesheet" href="styles.css?v=1.8.0">
     <link rel="stylesheet" href="modernizer.css?v=1.3">
     <style>
         /* Light mode strategy guides visibility override */
@@ -1505,36 +1505,77 @@
                 <div class="empty-state-card" id="analyzer-empty-state">
                     <!-- Desktop & Shared Institutional Hero Command Center -->
                     <div class="desktop-empty-state inst-hero-card">
-                        <div class="inst-hero-badge-strip">
-                            <span class="inst-hero-badge"><span class="inst-pulse-dot"></span> APEX MULTI-AGENT QUANT ENGINE v3.0</span>
-                            <span class="inst-hero-status-pill">INSTITUTIONAL CONSOLE | READY</span>
-                        </div>
-                        <h2 class="inst-hero-title">Institutional Equity Research & AI Analytics</h2>
-                        <p class="inst-hero-subtitle">
-                            Deploy multi-agent diagnostics across intrinsic DCF valuations, forensic accounting, quarterly concall sentiment, momentum radar, and automated target pricing.
-                        </p>
+                        <!-- Two-Column Dashboard Cockpit Grid -->
+                        <div class="desktop-cockpit-grid">
+                            <!-- Left Column: Heatmap, Today's Top Gainers & Losers -->
+                            <div class="desktop-cmd-left">
+                                <!-- Sector Heatmap Card -->
+                                <div class="desktop-cmd-card">
+                                    <div class="desktop-cmd-card-header">
+                                        <div class="header-left">
+                                            <span class="header-icon">📊</span>
+                                            <span class="header-title">NSE Sector Heatmap</span>
+                                        </div>
+                                        <div class="header-right">
+                                            <span class="badge-status-dot green"></span>
+                                            <span class="badge-status-text">LIVE SENSING</span>
+                                        </div>
+                                    </div>
+                                    <div class="desktop-sector-grid" id="desktop-sectors-container">
+                                        <div class="recent-research-empty">Fetching sector rotations...</div>
+                                    </div>
+                                </div>
 
-                        <!-- Live Pipeline Capabilities Grid -->
-                        <div class="inst-hero-features-grid">
-                            <div class="inst-feature-chip">
-                                <span class="chip-icon">🧮</span>
-                                <div class="chip-text">
-                                    <strong>DCF Intrinsic Valuation</strong>
-                                    <span>Multi-scenario 3-stage model</span>
+                                <!-- Today's Top 5 Gainers & Losers -->
+                                <div class="desktop-cmd-card" style="margin-bottom: 0;">
+                                    <div class="desktop-cmd-card-header">
+                                        <div class="header-left">
+                                            <span class="header-icon">📈</span>
+                                            <span class="header-title">Today's Market Leaders (Nifty 500)</span>
+                                        </div>
+                                        <div class="header-right">
+                                            <span class="badge-status-dot green pulse"></span>
+                                            <span class="badge-status-text">LIVE VALUES</span>
+                                        </div>
+                                    </div>
+                                    <div class="desktop-movers-split-grid">
+                                        <!-- Top 5 Gainers -->
+                                        <div class="mover-column gainer-column">
+                                            <div class="mover-column-title">🔥 TOP GAINERS</div>
+                                            <div class="mover-stocks-list" id="desktop-top-gainers-list">
+                                                <div class="recent-research-empty">Fetching top gainers...</div>
+                                            </div>
+                                        </div>
+                                        <!-- Divider -->
+                                        <div class="mover-column-divider"></div>
+                                        <!-- Top 5 Losers -->
+                                        <div class="mover-column loser-column">
+                                            <div class="mover-column-title">❄️ TOP LOSERS</div>
+                                            <div class="mover-stocks-list" id="desktop-top-losers-list">
+                                                <div class="recent-research-empty">Fetching top losers...</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="inst-feature-chip">
-                                <span class="chip-icon">🛡️</span>
-                                <div class="chip-text">
-                                    <strong>Forensic Audit Scan</strong>
-                                    <span>Altman Z & Beneish M Score</span>
-                                </div>
-                            </div>
-                            <div class="inst-feature-chip">
-                                <span class="chip-icon">🎙️</span>
-                                <div class="chip-text">
-                                    <strong>Concall Sentiment AI</strong>
-                                    <span>Quarterly executive tone breakdown</span>
+
+                            <!-- Right Column: Bloomberg News stream -->
+                            <div class="desktop-cmd-right">
+                                <!-- Bloomberg-Style Live News Stream -->
+                                <div class="desktop-cmd-card" style="margin-bottom: 0;">
+                                    <div class="desktop-cmd-card-header">
+                                        <div class="header-left">
+                                            <span class="header-icon">📰</span>
+                                            <span class="header-title">Bloomberg Terminal Live News Stream</span>
+                                        </div>
+                                        <div class="header-right">
+                                            <span class="badge-status-dot green pulse"></span>
+                                            <span class="badge-status-text">STREAMING</span>
+                                        </div>
+                                    </div>
+                                    <div class="desktop-news-stream" id="desktop-news-container">
+                                        <div class="news-placeholder-item">Aggregating market news from institutional feeds...</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -8315,7 +8356,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modernization Custom Layer -->
-    <script src="modernizer.js?v=7.4"></script>
+    <script src="modernizer.js?v=7.5"></script>
 </body>
 </html>
 

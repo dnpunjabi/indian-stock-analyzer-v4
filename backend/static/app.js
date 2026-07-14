@@ -19352,13 +19352,23 @@ function setupAnalyzerSubtabs() {
 
     if (prevBtn) {
         prevBtn.addEventListener('click', () => {
-            container.scrollBy({ left: -200, behavior: 'smooth' });
+            if (typeof container.scrollBy === 'function') {
+                container.scrollBy({ left: -200, behavior: 'smooth' });
+            } else {
+                container.scrollLeft -= 200;
+            }
+            setTimeout(updateNavButtons, 250);
         });
     }
 
     if (nextBtn) {
         nextBtn.addEventListener('click', () => {
-            container.scrollBy({ left: 200, behavior: 'smooth' });
+            if (typeof container.scrollBy === 'function') {
+                container.scrollBy({ left: 200, behavior: 'smooth' });
+            } else {
+                container.scrollLeft += 200;
+            }
+            setTimeout(updateNavButtons, 250);
         });
     }
 

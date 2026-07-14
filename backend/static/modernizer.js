@@ -6,6 +6,11 @@
 (function() {
     console.log("APEX Modernizer: Initializing core visual upgrades...");
 
+    const isCapacitor = window.hasOwnProperty('Capacitor') ||
+        (window.Capacitor !== undefined) ||
+        (window.parent && window.parent.hasOwnProperty('Capacitor'));
+    const apiBaseUrl = isCapacitor ? 'https://my-stock-advisor.duckdns.org' : '';
+
     // Helper to parse numeric values from text
     function parseNumericValue(text) {
         if (!text) return 0;
@@ -872,7 +877,7 @@
         const useSerpApi = localStorage.getItem('use_serpapi') !== 'false'; // default to true
         const useBrave = localStorage.getItem('use_brave_search') !== 'false'; // default to true
         
-        const url = `/api/stock-catalysts?symbol=${encodeURIComponent(currentCatalystSymbol)}&sector=${encodeURIComponent(currentCatalystSector)}&is_sector=${currentCatalystIsSector}&ai_engine=${aiEngine}&timeframe=${searchHorizon}&use_tavily_search=${useTavily}&use_serpapi=${useSerpApi}&use_brave=${useBrave}&direction=${currentCatalystDirection}`;
+        const url = apiBaseUrl + `/api/stock-catalysts?symbol=${encodeURIComponent(currentCatalystSymbol)}&sector=${encodeURIComponent(currentCatalystSector)}&is_sector=${currentCatalystIsSector}&ai_engine=${aiEngine}&timeframe=${searchHorizon}&use_tavily_search=${useTavily}&use_serpapi=${useSerpApi}&use_brave=${useBrave}&direction=${currentCatalystDirection}`;
 
         fetch(url)
             .then(res => res.json())
@@ -1254,7 +1259,7 @@
             if (storedTavily !== null) {
                 tavilyToggle.checked = storedTavily === 'true';
             } else {
-                fetch('/api/llm-config')
+                fetch(apiBaseUrl + '/api/llm-config')
                     .then(res => res.json())
                     .then(config => {
                         tavilyToggle.checked = !!config.has_tavily_key || !!localStorage.getItem('tavily_api_key');
@@ -1276,7 +1281,7 @@
             if (storedSerp !== null) {
                 serpapiToggle.checked = storedSerp === 'true';
             } else {
-                fetch('/api/llm-config')
+                fetch(apiBaseUrl + '/api/llm-config')
                     .then(res => res.json())
                     .then(config => {
                         serpapiToggle.checked = !!config.has_serpapi_key || !!localStorage.getItem('serpapi_api_key');
@@ -1298,7 +1303,7 @@
             if (storedBrave !== null) {
                 braveToggle.checked = storedBrave === 'true';
             } else {
-                fetch('/api/llm-config')
+                fetch(apiBaseUrl + '/api/llm-config')
                     .then(res => res.json())
                     .then(config => {
                         braveToggle.checked = !!config.has_brave_key;
@@ -1700,7 +1705,7 @@
 
                     searchDebounceTimer = setTimeout(async () => {
                         try {
-                            const res = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`);
+                            const res = await fetch(apiBaseUrl + `/api/search/suggestions?q=${encodeURIComponent(query)}`);
                             if (res.ok) {
                                 const data = await res.json();
                                 suggestionsDiv.innerHTML = '';
@@ -2619,7 +2624,7 @@
 
                                 const dataId = mQtyInput.getAttribute('data-id');
                                 try {
-                                    const res = await fetch(`/api/portfolio/${dataId}`, {
+                                    const res = await fetch(apiBaseUrl + `/api/portfolio/${dataId}`, {
                                         method: 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ quantity: qtyValNew, purchase_price: priceValNew })
@@ -3265,7 +3270,8 @@
                 return;
             }
 
-            const hour = new Date().getHours();
+            const istHourString = new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false });
+            const hour = parseInt(istHourString, 10) || new Date().getHours();
             let greetingText = "Good Evening";
             if (hour < 12) greetingText = "Good Morning";
             else if (hour < 17) greetingText = "Good Afternoon";
@@ -3512,7 +3518,7 @@
 
                     searchDebounceTimer = setTimeout(async () => {
                         try {
-                            const res = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`);
+                            const res = await fetch(apiBaseUrl + `/api/search/suggestions?q=${encodeURIComponent(query)}`);
                             if (res.ok) {
                                 const data = await res.json();
                                 suggestionsDiv.innerHTML = '';
@@ -3663,7 +3669,7 @@
                 `;
 
                 try {
-                    const moversRes = await fetch('/api/market-movers');
+                    const moversRes = await fetch(apiBaseUrl + '/api/market-movers');
                     if (moversRes.ok) {
                         const moversData = await moversRes.json();
                         
@@ -3874,7 +3880,7 @@
                 `;
 
                 try {
-                    const sectorRes = await fetch('/api/screener/sector-regime');
+                    const sectorRes = await fetch(apiBaseUrl + '/api/screener/sector-regime');
                     if (sectorRes.ok) {
                         const sectorsList = await sectorRes.json();
                         if (Array.isArray(sectorsList) && sectorsList.length > 0) {
@@ -4004,7 +4010,7 @@
                 }
 
                 try {
-                    const newsRes = await fetch('/api/market-news?refresh=false&run_llm=false');
+                    const newsRes = await fetch(apiBaseUrl + '/api/market-news?refresh=false&run_llm=false');
                     if (newsRes.ok) {
                         const newsData = await newsRes.json();
                         if (newsData.news_items && newsData.news_items.length > 0) {
@@ -4200,6 +4206,222 @@
         });
     };
 
+    // Setup Bloomberg-grade Desktop Homepage Command Center
+    const setupDesktopHomepageCommandCenter = () => {
+        const grid = document.querySelector('.desktop-cockpit-grid');
+        if (!grid) return;
+
+        // 1. Fetch & Render Live News Feed
+        const loadNews = async () => {
+            const container = document.getElementById('desktop-news-container');
+            if (!container) return;
+
+            try {
+                const res = await fetch(apiBaseUrl + '/api/market-news?refresh=false&run_llm=false');
+                if (!res.ok) throw new Error("News load failed");
+                const data = await res.json();
+                
+                if (data.news_items && data.news_items.length > 0) {
+                    container.innerHTML = data.news_items.slice(0, 8).map((item, idx) => {
+                        let timeStr = "Just now";
+                        if (item.published_at) {
+                            try {
+                                const diffMs = new Date() - new Date(item.published_at);
+                                const diffMins = Math.floor(diffMs / 60000);
+                                const diffHrs = Math.floor(diffMins / 60);
+                                if (diffHrs > 0) {
+                                    timeStr = `${diffHrs}h ago`;
+                                } else if (diffMins > 0) {
+                                    timeStr = `${diffMins}m ago`;
+                                }
+                            } catch (e) {}
+                        }
+
+                        let sent = (item.sentiment || "neutral").toLowerCase();
+                        let sentLabel = "Neutral";
+                        let sentClass = "neutral";
+                        if (sent.includes("pos") || sent.includes("bull") || item.title.toLowerCase().match(/(grow|gain|hike|positive|record|soar)/)) {
+                            sentLabel = "🟢 Positive";
+                            sentClass = "positive";
+                        } else if (sent.includes("neg") || sent.includes("bear") || item.title.toLowerCase().match(/(loss|drop|fall|negative|slump|hit)/)) {
+                            sentLabel = "🔴 Negative";
+                            sentClass = "negative";
+                        } else {
+                            sentLabel = "⚪ Neutral";
+                            sentClass = "neutral";
+                        }
+
+                        const summary = item.summary || item.description || "No full summary available. Click to analyze market volatility impact.";
+                        const impactDetails = `AI has evaluated this bulletin as ${sentClass.toUpperCase()} for relevant NSE stocks. Monitor breakout volume levels on major constituent boards.`;
+
+                        return `
+                            <div class="news-card-item" data-index="${idx}">
+                                <div class="news-card-top">
+                                    <div class="news-source-wrap">
+                                        <span class="news-source">${item.source || "REUTERS"}</span>
+                                        <span class="news-time">${timeStr}</span>
+                                    </div>
+                                    <span class="news-sentiment-badge ${sentClass}">${sentLabel}</span>
+                                </div>
+                                <div class="news-card-title">${item.title}</div>
+                                <div class="news-card-details" id="news-details-${idx}">
+                                    <p class="news-summary-text">${summary}</p>
+                                    <div class="news-impact-box">
+                                        <div class="news-impact-title">
+                                            <span>⚡</span>
+                                            <span>AI IMPACT ANALYSIS</span>
+                                        </div>
+                                        <p class="news-impact-desc">${impactDetails}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    container.querySelectorAll('.news-card-item').forEach(card => {
+                        card.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const idx = card.getAttribute('data-index');
+                            const detailPanel = document.getElementById(`news-details-${idx}`);
+                            if (detailPanel) {
+                                const isExpanded = detailPanel.classList.contains('expanded');
+                                container.querySelectorAll('.news-card-details').forEach(p => p.classList.remove('expanded'));
+                                if (!isExpanded) {
+                                    detailPanel.classList.add('expanded');
+                                }
+                            }
+                        });
+                    });
+                } else {
+                    container.innerHTML = `<div class="recent-research-empty">No dynamic headlines available at this moment.</div>`;
+                }
+            } catch (err) {
+                console.error("Desktop news load error:", err);
+                container.innerHTML = `<div class="recent-research-empty">Failed to query live Bloomberg news streams.</div>`;
+            }
+        };
+
+        // 2. Fetch & Render Top Gainers & Losers
+        const loadMarketMovers = async () => {
+            const gainersContainer = document.getElementById('desktop-top-gainers-list');
+            const losersContainer = document.getElementById('desktop-top-losers-list');
+            if (!gainersContainer || !losersContainer) return;
+
+            try {
+                const res = await fetch(apiBaseUrl + '/api/market-movers');
+                if (!res.ok) throw new Error("Market movers fetch failed");
+                const data = await res.json();
+
+                const renderStockList = (container, list, isGainer) => {
+                    if (!list || list.length === 0) {
+                        container.innerHTML = `<div class="recent-research-empty">No stocks cached.</div>`;
+                        return;
+                    }
+                    container.innerHTML = list.slice(0, 5).map(stock => {
+                        const sign = isGainer ? "+" : "";
+                        const changeVal = parseFloat(stock.change_pct || 0);
+                        const changeStr = `${sign}${changeVal.toFixed(2)}%`;
+                        const displayName = stock.company_name || stock.symbol;
+                        const cleanSym = stock.symbol.replace('.NS', '');
+
+                        return `
+                            <div class="mover-stock-item" data-symbol="${cleanSym}">
+                                <div class="mover-stock-left">
+                                    <span class="mover-stock-symbol">${cleanSym}</span>
+                                    <span class="mover-stock-name" title="${displayName}">${displayName}</span>
+                                </div>
+                                <div class="mover-stock-right">
+                                    <span class="mover-stock-price">₹${parseFloat(stock.price || 0).toFixed(2)}</span>
+                                    <span class="mover-stock-change">${changeStr}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    container.querySelectorAll('.mover-stock-item').forEach(item => {
+                        item.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const symbol = item.getAttribute('data-symbol');
+                            const searchInput = document.getElementById('analyzer-search-input');
+                            const searchBtn = document.getElementById('analyzer-search-btn');
+                            if (searchInput) {
+                                searchInput.value = symbol;
+                                if (searchBtn) {
+                                    searchBtn.click();
+                                }
+                            }
+                        });
+                    });
+                };
+
+                renderStockList(gainersContainer, data.gainers ? data.gainers.all : [], true);
+                renderStockList(losersContainer, data.losers ? data.losers.all : [], false);
+
+            } catch (err) {
+                console.error("Desktop market movers load error:", err);
+                gainersContainer.innerHTML = `<div class="recent-research-empty">Failed to load gainers</div>`;
+                losersContainer.innerHTML = `<div class="recent-research-empty">Failed to load losers</div>`;
+            }
+        };
+
+        // 3. Dynamic Sector Heatmap Loader
+        const loadSectorHeatmap = async () => {
+            const sectorGrid = document.getElementById('desktop-sectors-container');
+            if (!sectorGrid) return;
+
+            try {
+                const sectorRes = await fetch(apiBaseUrl + '/api/screener/sector-regime');
+                if (!sectorRes.ok) throw new Error("Sectors fetch failed");
+                const sectorsList = await sectorRes.json();
+                
+                if (Array.isArray(sectorsList) && sectorsList.length > 0) {
+                    // Sort by return_1d descending (highest to lowest)
+                    const sortedSectors = [...sectorsList].sort((a, b) => (b.return_1d || 0) - (a.return_1d || 0));
+                    
+                    // Render top 6 sectors inside the grid
+                    sectorGrid.innerHTML = sortedSectors.slice(0, 6).map(item => {
+                        const ret = item.return_1d || 0;
+                        const trendClass = ret > 0.05 ? 'bullish' : (ret < -0.05 ? 'bearish' : 'neutral');
+                        const sign = ret >= 0 ? '+' : '';
+                        return `
+                            <div class="sector-block ${trendClass}" data-sector="${item.sector}">
+                                <span class="sector-name">${item.sector}</span>
+                                <span class="sector-change">${sign}${ret.toFixed(2)}%</span>
+                            </div>
+                        `;
+                    }).join('');
+
+                    // Bind click actions to the newly rendered sector blocks
+                    sectorGrid.querySelectorAll('.sector-block').forEach(block => {
+                        block.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            const sector = block.getAttribute('data-sector');
+                            const searchInput = document.getElementById('analyzer-search-input');
+                            const searchBtn = document.getElementById('analyzer-search-btn');
+                            if (searchInput) {
+                                searchInput.value = sector;
+                                searchInput.focus();
+                                if (searchBtn) {
+                                    searchBtn.click();
+                                }
+                            }
+                        });
+                    });
+                } else {
+                    sectorGrid.innerHTML = `<div class="recent-research-empty">No sector data cached.</div>`;
+                }
+            } catch (err) {
+                console.error("Desktop sectors load error:", err);
+                sectorGrid.innerHTML = `<div class="recent-research-empty">Failed to load sector rotations.</div>`;
+            }
+        };
+
+        // Run cockpit routines
+        loadNews();
+        loadMarketMovers();
+        loadSectorHeatmap();
+    };
+
     // Initialize all visual modernization layers safely
     const initModernizer = () => {
         const safeCall = (name, fn) => {
@@ -4234,6 +4456,7 @@
         safeCall('setupSettingsSearchToggle', setupSettingsSearchToggle);
         safeCall('setupMobileUpgrades', setupMobileUpgrades);
         safeCall('setupQuickLauncherPills', setupQuickLauncherPills);
+        safeCall('setupDesktopHomepageCommandCenter', setupDesktopHomepageCommandCenter);
     };
 
     if (document.readyState === 'loading') {
