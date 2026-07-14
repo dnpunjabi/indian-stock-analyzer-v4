@@ -989,7 +989,7 @@
                                     <span class="catalyst-driver-badge ${badgeSentimentClass}">${icon} ${d.category}</span>
                                     <span class="catalyst-driver-badge ${badgeSentimentClass}" style="opacity: 0.85;">${badgeText}</span>
                                 </div>
-                                <strong style="font-size: 12px; color: var(--text-primary); font-family: 'Outfit'; flex: 1; min-width: 150px; text-align: left;">${d.title}</strong>
+                                <strong style="font-size: 12px; color: var(--text-primary); font-family:var(--font-heading); flex: 1; min-width: 150px; text-align: left;">${d.title}</strong>
                             </div>
                             <p style="margin: 0; font-size: 11.5px; line-height: 1.55; color: var(--text-secondary); font-family: 'Inter';">${d.desc}</p>
                         `;
@@ -1646,7 +1646,7 @@
                         <div id="mobile-quick-suggestions" class="watchlist-autocomplete-box" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:9999; max-height:220px; overflow-y:auto; margin-top:4px;"></div>
                     </div>
                     <div>
-                        <h5 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit;">Recent Searches</h5>
+                        <h5 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading);">Recent Searches</h5>
                         <div style="display:flex; flex-wrap:wrap; gap:8px;">
             `;
             
@@ -2283,11 +2283,11 @@
             tearsheet.innerHTML = `
                 <div class="tearsheet-meta-row" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                     <div>
-                        <h3 style="margin:0;font-family:'Outfit';font-size:16px;font-weight:800;color:var(--text-primary);">${ticker}</h3>
+                        <h3 style="margin:0;font-family:var(--font-heading);font-size:16px;font-weight:800;color:var(--text-primary);">${ticker}</h3>
                         <span style="font-size:10px;color:var(--text-secondary);">${name}</span>
                     </div>
                     <div class="tearsheet-price-area" style="text-align:right;">
-                        <span style="font-size:18px;font-family:'Outfit';font-weight:800;color:var(--text-primary);">${formatRupees(price)}</span>
+                        <span style="font-size:18px;font-family:var(--font-heading);font-weight:800;color:var(--text-primary);">${formatRupees(price)}</span>
                         <span class="${isPositive ? 'green-text' : 'red-text'}" style="font-size:11px;font-weight:700;margin-left:6px;">
                             ${sign}${changePct.toFixed(2)}%
                         </span>
@@ -3297,7 +3297,7 @@
                             <span>VOLATILITY RADAR</span>
                             <div style="display:flex; align-items:center; gap:5px;">
                                 <span id="vix-indicator-dot" style="width:5.5px; height:5.5px; border-radius:50%; background:#10b981; display:inline-block; box-shadow:0 0 5px #10b981; transition: all 0.3s ease;"></span>
-                                <span id="vix-indicator-val" style="color:var(--text-primary); font-family:'Outfit'; font-size:9px; font-weight:800;">VIX: --</span>
+                                <span id="vix-indicator-val" style="color:var(--text-primary); font-family:var(--font-heading); font-size:9px; font-weight:800;">VIX: --</span>
                             </div>
                         </div>
                     </div>
@@ -3325,7 +3325,7 @@
                 </div>
 
                 <!-- Quick Action Shortcuts -->
-                <h5 style="margin:0 0 12px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight: 700; letter-spacing: 0.05em;">Quick Analysis Workspaces</h5>
+                <h5 style="margin:0 0 12px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">Quick Analysis Workspaces</h5>
                 <div class="mobile-cmd-grid">
                     <div class="mobile-cmd-card inst-card-screener" id="cmd-btn-screener">
                         <div class="mobile-cmd-card-header">
@@ -3446,21 +3446,32 @@
             const suggestionsDiv = document.getElementById('mobile-home-suggestions');
 
             // Wire Immersive Search Focus Overlay
+            const searchWrap = document.querySelector('.mobile-search-section-wrap');
             let backdrop = document.getElementById('mobile-search-focus-backdrop');
-            if (!backdrop) {
+            if (searchWrap && !backdrop) {
                 backdrop = document.createElement('div');
                 backdrop.id = 'mobile-search-focus-backdrop';
-                backdrop.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(6,9,19,0.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:999; opacity:0; pointer-events:none; transition:opacity 0.25s ease;';
-                document.body.appendChild(backdrop);
+                backdrop.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(6,9,19,0.7); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:1; opacity:0; pointer-events:none; transition:opacity 0.25s ease;';
+                searchWrap.appendChild(backdrop);
             }
-            const searchWrap = document.querySelector('.mobile-search-section-wrap');
             if (inputEl && searchWrap && backdrop) {
+                // Ensure sibling elements have a higher z-index than the backdrop (z-index: 1)
+                if (inputEl.parentNode) {
+                    inputEl.parentNode.style.position = 'relative';
+                    inputEl.parentNode.style.zIndex = '10';
+                }
+                const micWrap = searchWrap.querySelector('.voice-catalyst-wrap');
+                if (micWrap) {
+                    micWrap.style.position = 'relative';
+                    micWrap.style.zIndex = '10';
+                }
+
                 inputEl.addEventListener('focus', () => {
                     backdrop.style.opacity = '1';
                     backdrop.style.pointerEvents = 'auto';
                     searchWrap.style.zIndex = '1000';
                     searchWrap.style.transform = 'scale(1.02)';
-                    searchWrap.style.boxShadow = '0 8px 30px rgba(0,0,0,0.4)';
+                    searchWrap.style.boxShadow = '0 8px 30px rgba(0,0,0,0.5)';
                     
                     const query = inputEl.value.trim();
                     if (query.length >= 2 && suggestionsDiv) {
@@ -3476,7 +3487,8 @@
                     searchWrap.style.boxShadow = '';
                 };
 
-                backdrop.onclick = () => {
+                backdrop.onclick = (e) => {
+                    e.stopPropagation();
                     dismissSearchFocus();
                     if (suggestionsDiv) suggestionsDiv.style.display = 'none';
                 };
@@ -3642,11 +3654,11 @@
             // 2. Fetch & Render Gainers and Losers
             if (gainersContainer && losersContainer) {
                 gainersContainer.innerHTML = `
-                    <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>
+                    <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>
                     <div style="opacity:0.65; height:32px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
                 `;
                 losersContainer.innerHTML = `
-                    <h5 style="margin:15px 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>
+                    <h5 style="margin:15px 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>
                     <div style="opacity:0.65; height:32px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
                 `;
 
@@ -3736,18 +3748,18 @@
                         // Render Gainers
                         const gainersList = moversData.gainers?.all?.slice(0, 5) || [];
                         if (gainersList.length > 0) {
-                            let gHtml = `<h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>`;
+                            let gHtml = `<h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>`;
                             gainersList.forEach(item => {
                                 const sym = item.symbol.replace(".NS", "");
                                 gHtml += `
                                     <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-green);">
                                         <div>
-                                            <strong style="color: var(--text-primary); font-size:12px; font-family:'Outfit';">${sym}</strong>
+                                            <strong style="color: var(--text-primary); font-size:12px; font-family:var(--font-heading);">${sym}</strong>
                                             <div style="font-size:9.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
                                         </div>
                                         <div style="display:flex; align-items:center; gap:12px;">
                                             <canvas id="gainer-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
-                                            <span style="font-size:11px; font-family:'Outfit'; font-weight:700; color:var(--neon-green); background:rgba(16,185,129,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">+${item.change_pct.toFixed(2)}%</span>
+                                            <span style="font-size:11px; font-family:var(--font-heading); font-weight:700; color:var(--neon-green); background:rgba(16,185,129,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">+${item.change_pct.toFixed(2)}%</span>
                                         </div>
                                     </div>
                                 `;
@@ -3794,18 +3806,18 @@
                         // Render Losers
                         const losersList = moversData.losers?.all?.slice(0, 5) || [];
                         if (losersList.length > 0) {
-                            let lHtml = `<h5 style="margin:15px 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>`;
+                            let lHtml = `<h5 style="margin:15px 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>`;
                             losersList.forEach(item => {
                                 const sym = item.symbol.replace(".NS", "");
                                 lHtml += `
                                     <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-red);">
                                         <div>
-                                            <strong style="color: var(--text-primary); font-size:12px; font-family:'Outfit';">${sym}</strong>
+                                            <strong style="color: var(--text-primary); font-size:12px; font-family:var(--font-heading);">${sym}</strong>
                                             <div style="font-size:9.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
                                         </div>
                                         <div style="display:flex; align-items:center; gap:12px;">
                                             <canvas id="loser-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
-                                            <span style="font-size:11px; font-family:'Outfit'; font-weight:700; color:var(--neon-red); background:rgba(239,68,68,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">${item.change_pct.toFixed(2)}%</span>
+                                            <span style="font-size:11px; font-family:var(--font-heading); font-weight:700; color:var(--neon-red); background:rgba(239,68,68,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">${item.change_pct.toFixed(2)}%</span>
                                         </div>
                                     </div>
                                 `;
@@ -3857,7 +3869,7 @@
             // 2. Fetch & Render Sectors Leader and Laggard
             if (sectorsContainer) {
                 sectorsContainer.innerHTML = `
-                    <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
+                    <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
                     <div style="opacity:0.65; height:32px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
                 `;
 
@@ -3889,12 +3901,12 @@
                                 leaderboardHtml += `
                                     <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; margin-bottom:6px;">
                                         <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
-                                            <span style="font-weight:700; color:var(--text-primary); font-family:'Outfit';">${item.sector}</span>
+                                            <span style="font-weight:700; color:var(--text-primary); font-family:var(--font-heading);">${item.sector}</span>
                                             <div style="position:relative; width:80px; height:3px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:1.5px; overflow:hidden;">
                                                 <div style="height:100%; width:${barPct}%; background:${barColor};"></div>
                                             </div>
                                         </div>
-                                        <span style="font-weight:800; color:${barColor}; font-family:'Outfit';">${sign}${ret.toFixed(2)}%</span>
+                                        <span style="font-weight:800; color:${barColor}; font-family:var(--font-heading);">${sign}${ret.toFixed(2)}%</span>
                                     </div>
                                 `;
                             });
@@ -3910,30 +3922,30 @@
                                 leaderboardHtml += `
                                     <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; margin-bottom:6px;">
                                         <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
-                                            <span style="font-weight:700; color:var(--text-primary); font-family:'Outfit';">${item.sector}</span>
+                                            <span style="font-weight:700; color:var(--text-primary); font-family:var(--font-heading);">${item.sector}</span>
                                             <div style="position:relative; width:80px; height:3px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:1.5px; overflow:hidden;">
                                                 <div style="height:100%; width:${barPct}%; background:${barColor};"></div>
                                             </div>
                                         </div>
-                                        <span style="font-weight:800; color:${barColor}; font-family:'Outfit';">${sign}${ret.toFixed(2)}%</span>
+                                        <span style="font-weight:800; color:${barColor}; font-family:var(--font-heading);">${sign}${ret.toFixed(2)}%</span>
                                     </div>
                                 `;
                             });
 
                             sectorsContainer.innerHTML = `
-                                <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
+                                <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
                                 <div class="sector-rotations-card" id="home-sector-rotations-trigger" style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:12px; padding:15px; cursor:pointer; transition:background 0.2s ease;">
                                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                                         <!-- Leader -->
                                         <div style="background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.15); padding:10px; border-radius:8px;">
                                             <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:800; letter-spacing:0.02em;">Leader Sector</div>
-                                            <div style="font-size:12.5px; font-weight:800; color:var(--neon-green, #10b981); margin-top:4px; font-family:'Outfit';">${leader.sector}</div>
+                                            <div style="font-size:12.5px; font-weight:800; color:var(--neon-green, #10b981); margin-top:4px; font-family:var(--font-heading);">${leader.sector}</div>
                                             <div style="font-size:10.5px; color:var(--text-secondary); margin-top:2px; font-weight:700;">${leaderSign}${leaderVal.toFixed(2)}%</div>
                                         </div>
                                         <!-- Laggard -->
                                         <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); padding:10px; border-radius:8px;">
                                             <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:800; letter-spacing:0.02em;">Laggard Sector</div>
-                                            <div style="font-size:12.5px; font-weight:800; color:var(--color-crimson, #ef4444); margin-top:4px; font-family:'Outfit';">${laggard.sector}</div>
+                                            <div style="font-size:12.5px; font-weight:800; color:var(--color-crimson, #ef4444); margin-top:4px; font-family:var(--font-heading);">${laggard.sector}</div>
                                             <div style="font-size:10.5px; color:var(--text-secondary); margin-top:2px; font-weight:700;">${laggardVal.toFixed(2)}%</div>
                                         </div>
                                     </div>
@@ -3984,7 +3996,7 @@
             if (newsContainer) {
                 if (!newsContainer.innerHTML.includes('bloomberg-news-card') && !newsContainer.innerHTML.includes('shimmer-sweep')) {
                     newsContainer.innerHTML = `
-                        <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>
+                        <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>
                         <div style="display:flex; flex-direction:column; gap:10px; opacity:0.65;">
                             <div class="shimmer-sweep" style="height:48px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
                         </div>
@@ -3999,7 +4011,7 @@
                             const isExpanded = newsContainer.dataset.expanded === 'true';
                             const newsToShow = isExpanded ? newsData.news_items.slice(0, 10) : newsData.news_items.slice(0, 3);
 
-                            let newsHtml = `<h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>`;
+                            let newsHtml = `<h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>`;
                             newsToShow.forEach(item => {
                                 const cleanTitle = item.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
                                 const sentiment = item.sentiment || 'Neutral';
@@ -4035,7 +4047,7 @@
                                             <span style="font-size:8.5px; color:var(--text-muted); font-weight:700;">${item.source || 'News'} • ${item.date || 'Today'}</span>
                                             ${sentimentBadge}
                                         </div>
-                                        <div style="font-size:11px; font-family:'Outfit'; font-weight:600; color:var(--text-primary); line-height:1.45;">${cleanTitle}</div>
+                                        <div style="font-size:11px; font-family:var(--font-heading); font-weight:600; color:var(--text-primary); line-height:1.45;">${cleanTitle}</div>
                                         
                                         <!-- Bloomberg Impact Weight Indicator -->
                                         <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06)); font-size:8.5px; color:var(--text-muted);">
@@ -4044,7 +4056,7 @@
                                                 <div style="position:relative; width:45px; height:3px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:1.5px; overflow:hidden;">
                                                     <div style="height:100%; width:${impactVal}%; background:${accentColor};"></div>
                                                 </div>
-                                                <span style="font-weight:800; color:${accentColor}; font-family:'Outfit'; font-size:9px;">${(impactVal/10).toFixed(1)}</span>
+                                                <span style="font-weight:800; color:${accentColor}; font-family:var(--font-heading); font-size:9px;">${(impactVal/10).toFixed(1)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -4053,7 +4065,7 @@
 
                             if (newsData.news_items.length > 3) {
                                 newsHtml += `
-                                    <button id="btn-toggle-news-expansion" style="width:100%; padding:10px; margin-top:5px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:8px; color:var(--text-secondary); font-family:'Outfit'; font-size:11px; font-weight:700; cursor:pointer; text-align:center; transition: all 0.2s ease;">
+                                    <button id="btn-toggle-news-expansion" style="width:100%; padding:10px; margin-top:5px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:8px; color:var(--text-secondary); font-family:var(--font-heading); font-size:11px; font-weight:700; cursor:pointer; text-align:center; transition: all 0.2s ease;">
                                         ${isExpanded ? 'Show Less Catalyst News ▴' : 'Show More Catalyst News ▾'}
                                     </button>
                                 `;

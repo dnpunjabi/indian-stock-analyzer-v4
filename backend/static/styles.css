@@ -17568,7 +17568,7 @@ select option {
     }
 
     .pin-lock-title {
-        font-family: 'Outfit', sans-serif;
+        font-family: var(--font-heading);
         font-size: 20px;
         font-weight: 700;
         letter-spacing: 0.5px;
@@ -17618,7 +17618,7 @@ select option {
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(255, 255, 255, 0.06);
         color: var(--text-primary);
-        font-family: 'Outfit', sans-serif;
+        font-family: var(--font-heading);
         font-size: 24px;
         font-weight: 500;
         display: flex;
@@ -18235,11 +18235,13 @@ select option {
     #mobile-homepage-command-center {
         display: none;
         width: 100% !important;
+        min-height: calc(100vh - 130px) !important;
         text-align: left;
         box-sizing: border-box !important;
+        flex-direction: column;
     }
     .homepage-active #mobile-homepage-command-center {
-        display: block !important;
+        display: flex !important;
     }
     .homepage-active #analyzer-dashboard,
     .homepage-active .stock-meta-banner,
@@ -18276,7 +18278,7 @@ select option {
         border: 1px solid rgba(99, 102, 241, 0.1);
         border-left: 4px solid var(--color-primary);
         border-radius: 8px;
-        font-family: 'Outfit', sans-serif;
+        font-family: var(--font-heading);
     }
 
     /* Centered search box with aura */
@@ -18369,7 +18371,7 @@ select option {
         font-size: 16px;
     }
     .mobile-cmd-card-title {
-        font-family: 'Outfit', sans-serif;
+        font-family: var(--font-heading);
         font-size: 12px;
         font-weight: 700;
         color: var(--text-primary);
