@@ -36,6 +36,7 @@
         },
 
         playTick() {
+            if (localStorage.getItem('apex-audio-muted') === 'true') return;
             if (!this.ctx) return;
             try {
                 // Ensure context is running (resume if suspended by browser)
@@ -58,6 +59,7 @@
         },
 
         playChime() {
+            if (localStorage.getItem('apex-audio-muted') === 'true') return;
             if (!this.ctx) return;
             try {
                 if (this.ctx.state === 'suspended') this.ctx.resume();
@@ -90,6 +92,7 @@
         },
 
         playAlert() {
+            if (localStorage.getItem('apex-audio-muted') === 'true') return;
             if (!this.ctx) return;
             try {
                 if (this.ctx.state === 'suspended') this.ctx.resume();
@@ -1431,8 +1434,22 @@
         window.addEventListener('resize', () => {
             if (isMobile()) {
                 injectMobileBottomNav();
+                decorateWatchlistRowsForMobile();
+                decoratePortfolioRowsForMobile();
+                decorateUniverseRowsForMobile();
+                decorateAlertsRowsForMobile();
+                decorateRuleScannerRowsForMobile();
+                decorateScreenerRowsForMobile();
+                decorateSectorRadarRowsForMobile();
             } else {
                 removeMobileBottomNav();
+                decorateWatchlistRowsForMobile();
+                decoratePortfolioRowsForMobile();
+                decorateUniverseRowsForMobile();
+                decorateAlertsRowsForMobile();
+                decorateRuleScannerRowsForMobile();
+                decorateScreenerRowsForMobile();
+                decorateSectorRadarRowsForMobile();
             }
         });
 
@@ -1443,18 +1460,25 @@
         let touchendX = 0;
         let touchstartY = 0;
         let touchendY = 0;
+        let touchStartTarget = null;
         const swipeMinDistance = 75;
         const swipeMaxCrossDistance = 45;
 
         function handleSwipeGesture(e) {
-            if (e.target.closest('#tv-chart-workstation, input, textarea, select, button, .pin-key, .rs-bottom-sheet, tr, .swipeable-row-container, .swipeable-row-content, .swipe-actions, .tearsheet-range-slider, .tearsheet-range-marker, .watchlist-scroll-wrapper, .data-table-wrapper')) {
+            const currentHash = location.hash.substring(1) || 'analyzer';
+            // Disable page swipe transitions on Watchlist and Portfolio tabs to resolve gesture conflicts
+            if (currentHash === 'watchlist' || currentHash === 'portfolio') {
+                return;
+            }
+
+            const target = touchStartTarget || (e ? e.target : null);
+            if (target && target.closest('#tv-chart-workstation, input, textarea, select, button, .pin-key, .rs-bottom-sheet, tr, td, .swipeable-row-container, .swipeable-row-content, .swipe-actions, .tearsheet-range-slider, .tearsheet-range-marker, .watchlist-scroll-wrapper, .data-table-wrapper')) {
                 return;
             }
             const isSwipeLeft = touchendX < touchstartX - swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
             const isSwipeRight = touchendX > touchstartX + swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
 
             if (isSwipeLeft || isSwipeRight) {
-                const currentHash = location.hash.substring(1) || 'analyzer';
                 const currentIndex = tabsList.indexOf(currentHash);
                 if (currentIndex !== -1) {
                     let nextIndex = currentIndex;
@@ -1474,6 +1498,7 @@
         document.addEventListener('touchstart', e => {
             touchstartX = e.changedTouches[0].screenX;
             touchstartY = e.changedTouches[0].screenY;
+            touchStartTarget = e.target;
         }, { passive: true });
 
         document.addEventListener('touchend', e => {
@@ -1591,6 +1616,165 @@
 
                 openCustomSelectBottomSheet(selectEl);
             }, true);
+        }
+
+        function openQuickSearchBottomSheet() {
+            let sheet = document.getElementById('rs-bottom-sheet');
+            if (!sheet) {
+                sheet = document.createElement('div');
+                sheet.id = 'rs-bottom-sheet';
+                sheet.className = 'rs-bottom-sheet';
+                sheet.innerHTML = `
+                    <div class="rs-bottom-sheet-backdrop"></div>
+                    <div class="rs-bottom-sheet-content">
+                        <div class="rs-bottom-sheet-handle"></div>
+                        <h4 id="rs-bottom-sheet-title">Select Option</h4>
+                        <div id="rs-bottom-sheet-utility"></div>
+                        <button class="rs-bottom-sheet-close" style="margin-top: 15px;">Dismiss</button>
+                    </div>
+                `;
+                document.body.appendChild(sheet);
+            }
+
+            document.getElementById('rs-bottom-sheet-title').innerText = "Quick Asset Search";
+            const recents = JSON.parse(localStorage.getItem('recent-mobile-searches') || '["RELIANCE", "TCS", "INFY", "TATASTEEL"]');
+            
+            let html = `
+                <div style="display:flex; flex-direction:column; gap:16px; margin: 15px 0;">
+                    <div style="position:relative; width:100%;">
+                        <input type="text" id="mobile-quick-search-input" placeholder="Enter stock symbol (e.g. RELIANCE)..." style="width:100% !important; box-sizing:border-box !important; padding:12px 16px !important; font-size:14px !important; background:rgba(255,255,255,0.03) !important; border:1px solid var(--border-glass) !important; color:var(--text-primary) !important; border-radius:8px !important;">
+                        <div id="mobile-quick-suggestions" class="watchlist-autocomplete-box" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:9999; max-height:220px; overflow-y:auto; margin-top:4px;"></div>
+                    </div>
+                    <div>
+                        <h5 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit;">Recent Searches</h5>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            `;
+            
+            recents.forEach(sym => {
+                html += `<button class="quick-search-pill-btn" data-symbol="${sym}" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); color:var(--text-primary); padding:6px 12px; border-radius:15px; font-size:11px; font-weight:600; cursor:pointer;">${sym}</button>`;
+            });
+            
+            html += `
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="mobile-quick-search-submit-btn" style="width:100%; height:40px; border-radius:8px; font-weight:700;">ANALYZE ASSET</button>
+                </div>
+            `;
+
+            const utilityContainer = document.getElementById('rs-bottom-sheet-utility');
+            utilityContainer.innerHTML = html;
+            sheet.classList.add('active');
+
+            // Wire backdrop close
+            const backdrop = sheet.querySelector('.rs-bottom-sheet-backdrop');
+            const closeBtn = sheet.querySelector('.rs-bottom-sheet-close');
+            const closeSheet = () => sheet.classList.remove('active');
+            backdrop.onclick = closeSheet;
+            closeBtn.onclick = closeSheet;
+
+            const inputEl = document.getElementById('mobile-quick-search-input');
+            const suggestionsDiv = document.getElementById('mobile-quick-suggestions');
+
+            setTimeout(() => {
+                if (inputEl) inputEl.focus();
+            }, 300);
+
+            utilityContainer.querySelectorAll('.quick-search-pill-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    executeQuickSearch(btn.getAttribute('data-symbol'), sheet);
+                });
+            });
+
+            // Debounced Autocomplete Logic
+            let searchDebounceTimer = null;
+            if (inputEl && suggestionsDiv) {
+                inputEl.addEventListener('input', () => {
+                    clearTimeout(searchDebounceTimer);
+                    const query = inputEl.value.trim();
+
+                    if (query.length < 2) {
+                        suggestionsDiv.innerHTML = '';
+                        suggestionsDiv.style.display = 'none';
+                        return;
+                    }
+
+                    searchDebounceTimer = setTimeout(async () => {
+                        try {
+                            const res = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`);
+                            if (res.ok) {
+                                const data = await res.json();
+                                suggestionsDiv.innerHTML = '';
+
+                                if (data && data.length > 0) {
+                                    data.forEach(item => {
+                                        const div = document.createElement('div');
+                                        div.className = 'watchlist-autocomplete-item';
+                                        div.style.cssText = 'padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.03);';
+                                        div.innerHTML = `
+                                            <div>
+                                                <span class="ticker-pill" style="font-weight: 700; color: #fff;">${item.base_symbol}</span>
+                                                <span style="font-size: 10px; color: var(--text-muted); margin-left: 6px;">${item.name}</span>
+                                            </div>
+                                            <span class="sector-pill">${item.sector || 'Equity'}</span>
+                                        `;
+                                        div.addEventListener('click', () => {
+                                            executeQuickSearch(item.base_symbol, sheet);
+                                        });
+                                        suggestionsDiv.appendChild(div);
+                                    });
+                                    suggestionsDiv.style.display = 'block';
+                                } else {
+                                    suggestionsDiv.style.display = 'none';
+                                }
+                            }
+                        } catch (err) {
+                            console.error("Autocomplete quick search error:", err);
+                        }
+                    }, 200);
+                });
+
+                // Hide suggestions when clicking outside input or suggestions box
+                document.addEventListener('click', (e) => {
+                    if (e.target !== inputEl && e.target !== suggestionsDiv && !suggestionsDiv.contains(e.target)) {
+                        suggestionsDiv.style.display = 'none';
+                    }
+                });
+            }
+
+            if (inputEl) {
+                inputEl.addEventListener('keypress', e => {
+                    if (e.key === 'Enter') {
+                        executeQuickSearch(inputEl.value.trim(), sheet);
+                    }
+                });
+            }
+
+            const submitBtn = document.getElementById('mobile-quick-search-submit-btn');
+            if (submitBtn && inputEl) {
+                submitBtn.addEventListener('click', () => {
+                    executeQuickSearch(inputEl.value.trim(), sheet);
+                });
+            }
+        }
+
+        function executeQuickSearch(symbol, sheetEl) {
+            if (!symbol) return;
+            symbol = symbol.toUpperCase();
+            
+            let recents = JSON.parse(localStorage.getItem('recent-mobile-searches') || '["RELIANCE", "TCS", "INFY", "TATASTEEL"]');
+            recents = [symbol, ...recents.filter(s => s !== symbol)].slice(0, 5);
+            localStorage.setItem('recent-mobile-searches', JSON.stringify(recents));
+
+            const searchInput = document.getElementById('analyzer-search-input');
+            const searchBtn = document.getElementById('analyzer-search-btn');
+            if (searchInput && searchBtn) {
+                searchInput.value = symbol;
+                searchBtn.click();
+            }
+
+            sheetEl.classList.remove('active');
+            playHaptic(15);
+            window.switchTab('analyzer');
         }
 
         function openCustomSelectBottomSheet(selectEl) {
@@ -2141,101 +2325,7 @@
             searchBtn.addEventListener('click', openQuickSearchBottomSheet);
         }
 
-        function openQuickSearchBottomSheet() {
-            let sheet = document.getElementById('rs-bottom-sheet');
-            if (!sheet) {
-                sheet = document.createElement('div');
-                sheet.id = 'rs-bottom-sheet';
-                sheet.className = 'rs-bottom-sheet';
-                sheet.innerHTML = `
-                    <div class="rs-bottom-sheet-backdrop"></div>
-                    <div class="rs-bottom-sheet-content">
-                        <div class="rs-bottom-sheet-handle"></div>
-                        <h4 id="rs-bottom-sheet-title">Select Option</h4>
-                        <div id="rs-bottom-sheet-utility"></div>
-                        <button class="rs-bottom-sheet-close" style="margin-top: 15px;">Dismiss</button>
-                    </div>
-                `;
-                document.body.appendChild(sheet);
-            }
 
-            document.getElementById('rs-bottom-sheet-title').innerText = "Quick Asset Search";
-            const recents = JSON.parse(localStorage.getItem('recent-mobile-searches') || '["RELIANCE", "TCS", "INFY", "TATASTEEL"]');
-            
-            let html = `
-                <div style="display:flex; flex-direction:column; gap:16px; margin: 15px 0;">
-                    <div style="position:relative; width:100%;">
-                        <input type="text" id="mobile-quick-search-input" placeholder="Enter stock symbol (e.g. RELIANCE)..." style="width:100% !important; box-sizing:border-box !important; padding:12px 16px !important; font-size:14px !important; background:rgba(255,255,255,0.03) !important; border:1px solid var(--border-glass) !important; color:var(--text-primary) !important; border-radius:8px !important;">
-                    </div>
-                    <div>
-                        <h5 style="margin:0 0 8px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit;">Recent Searches</h5>
-                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            `;
-            
-            recents.forEach(sym => {
-                html += `<button class="quick-search-pill-btn" data-symbol="${sym}" style="background:rgba(255,255,255,0.03); border:1px solid var(--border-glass); color:var(--text-primary); padding:6px 12px; border-radius:15px; font-size:11px; font-weight:600; cursor:pointer;">${sym}</button>`;
-            });
-            
-            html += `
-                        </div>
-                    </div>
-                    <button class="btn-primary" id="mobile-quick-search-submit-btn" style="width:100%; height:40px; border-radius:8px; font-weight:700;">ANALYZE ASSET</button>
-                </div>
-            `;
-
-            const utilityContainer = document.getElementById('rs-bottom-sheet-utility');
-            utilityContainer.innerHTML = html;
-            sheet.classList.add('active');
-
-            // Wire backdrop close
-            const backdrop = sheet.querySelector('.rs-bottom-sheet-backdrop');
-            const closeBtn = sheet.querySelector('.rs-bottom-sheet-close');
-            const closeSheet = () => sheet.classList.remove('active');
-            backdrop.onclick = closeSheet;
-            closeBtn.onclick = closeSheet;
-
-            setTimeout(() => {
-                const input = document.getElementById('mobile-quick-search-input');
-                if (input) input.focus();
-            }, 300);
-
-            utilityContainer.querySelectorAll('.quick-search-pill-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    executeQuickSearch(btn.getAttribute('data-symbol'), sheet);
-                });
-            });
-
-            const inputEl = document.getElementById('mobile-quick-search-input');
-            inputEl.addEventListener('keypress', e => {
-                if (e.key === 'Enter') {
-                    executeQuickSearch(inputEl.value.trim(), sheet);
-                }
-            });
-
-            document.getElementById('mobile-quick-search-submit-btn').addEventListener('click', () => {
-                executeQuickSearch(inputEl.value.trim(), sheet);
-            });
-        }
-
-        function executeQuickSearch(symbol, sheetEl) {
-            if (!symbol) return;
-            symbol = symbol.toUpperCase();
-            
-            let recents = JSON.parse(localStorage.getItem('recent-mobile-searches') || '["RELIANCE", "TCS", "INFY", "TATASTEEL"]');
-            recents = [symbol, ...recents.filter(s => s !== symbol)].slice(0, 5);
-            localStorage.setItem('recent-mobile-searches', JSON.stringify(recents));
-
-            const searchInput = document.getElementById('analyzer-search-input');
-            const searchBtn = document.getElementById('analyzer-search-btn');
-            if (searchInput && searchBtn) {
-                searchInput.value = symbol;
-                searchBtn.click();
-            }
-
-            sheetEl.classList.remove('active');
-            playHaptic(15);
-            window.switchTab('analyzer');
-        }
 
         // 4. TradingView Mobile Touch Options
         function configureChartMobileTouchOptions() {
@@ -2336,6 +2426,1712 @@
             }
         }
 
+        function decorateWatchlistRowsForMobile() {
+            const tbody = document.getElementById('watchlist-table-body');
+            if (!tbody) return;
+
+            if (!isMobile()) {
+                tbody.querySelectorAll('.row-expand-trigger').forEach(el => el.remove());
+                tbody.querySelectorAll('.watchlist-details-row').forEach(el => el.remove());
+                return;
+            }
+
+            tbody.querySelectorAll('tr').forEach(tr => {
+                if (tr.classList.contains('watchlist-details-row') || tr.querySelector('.row-expand-trigger') || tr.cells.length < 5) return;
+
+                const firstCell = tr.cells[0];
+                if (!firstCell) return;
+
+                const symbolLinkWrapper = firstCell.querySelector('div > div:first-child');
+                if (!symbolLinkWrapper) return;
+
+                const chevron = document.createElement('span');
+                chevron.className = 'row-expand-trigger';
+                chevron.style.cssText = 'cursor: pointer; padding: 2px 6px; font-size: 10px; color: var(--color-primary-light); user-select: none; transition: transform 0.2s; font-weight: bold; margin-left: 4px;';
+                chevron.innerHTML = '▼';
+                
+                symbolLinkWrapper.appendChild(chevron);
+
+                chevron.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    let nextRow = tr.nextElementSibling;
+                    if (nextRow && nextRow.classList.contains('watchlist-details-row')) {
+                        nextRow.remove();
+                        chevron.innerHTML = '▼';
+                    } else {
+                        const sector = tr.cells[1] ? tr.cells[1].textContent.trim() : 'N/A';
+                        const changeVal = tr.cells[3] ? tr.cells[3].textContent.trim() : 'N/A';
+                        const dayHigh = tr.cells[5] ? tr.cells[5].textContent.trim() : 'N/A';
+                        const dayLow = tr.cells[6] ? tr.cells[6].textContent.trim() : 'N/A';
+
+                        const detailsTr = document.createElement('tr');
+                        detailsTr.className = 'watchlist-details-row no-print';
+                        detailsTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                        detailsTr.innerHTML = `
+                            <td colspan="8" style="padding: 10px 15px; border-top: 1px dashed rgba(255,255,255,0.05); border-bottom: 1px dashed rgba(255,255,255,0.05);">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                                    <div><strong>Sector:</strong> ${sector}</div>
+                                    <div style="text-align: right;"><strong>Day High:</strong> ${dayHigh}</div>
+                                    <div><strong>Daily Change:</strong> ${changeVal}</div>
+                                    <div style="text-align: right;"><strong>Day Low:</strong> ${dayLow}</div>
+                                </div>
+                            </td>
+                        `;
+                        tr.parentNode.insertBefore(detailsTr, tr.nextSibling);
+                        chevron.innerHTML = '▲';
+                    }
+                });
+            });
+        }
+
+        function decoratePortfolioRowsForMobile() {
+            const tbody = document.getElementById('portfolio-ledger-body');
+            if (!tbody) return;
+
+            if (!isMobile()) {
+                tbody.querySelectorAll('.row-expand-trigger').forEach(el => el.remove());
+                tbody.querySelectorAll('.portfolio-details-row').forEach(el => el.remove());
+                tbody.querySelectorAll('.mobile-tranche-meta').forEach(el => el.remove());
+                return;
+            }
+
+            tbody.querySelectorAll('tr').forEach(tr => {
+                if (tr.classList.contains('portfolio-details-row') || tr.querySelector('.row-expand-trigger') || tr.cells.length < 10) return;
+
+                const firstCell = tr.cells[0];
+                if (!firstCell) return;
+
+                // Extract quantity and average price before hiding columns
+                const qtyInput = tr.querySelector('.portfolio-qty-input');
+                const priceInput = tr.querySelector('.portfolio-price-input');
+                const hasInputs = qtyInput !== null && priceInput !== null;
+
+                let qtyVal = '';
+                let priceVal = '';
+
+                if (hasInputs) {
+                    qtyVal = qtyInput.value;
+                    priceVal = priceInput.value;
+                } else {
+                    qtyVal = tr.cells[1] ? tr.cells[1].textContent.trim().replace(' 🔗', '') : '';
+                    priceVal = tr.cells[2] ? tr.cells[2].textContent.trim() : '';
+                }
+
+                // Add mobile static metadata badge under stock name if not present
+                if (!firstCell.querySelector('.mobile-tranche-meta')) {
+                    const metaSpan = document.createElement('span');
+                    metaSpan.className = 'mobile-tranche-meta';
+                    metaSpan.style.cssText = 'font-size: 10px; color: var(--color-primary-light); font-weight: 600; display: block; margin-top: 3px;';
+                    metaSpan.innerHTML = `Holdings: ${qtyVal} @ ${priceVal}`;
+                    firstCell.appendChild(metaSpan);
+                }
+
+                const chevron = document.createElement('span');
+                chevron.className = 'row-expand-trigger';
+                chevron.style.cssText = 'cursor: pointer; padding: 2px 6px; font-size: 10px; color: var(--color-primary-light); user-select: none; transition: transform 0.2s; font-weight: bold; margin-left: 4px;';
+                chevron.innerHTML = '▼';
+                
+                firstCell.appendChild(chevron);
+
+                chevron.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    let nextRow = tr.nextElementSibling;
+                    if (nextRow && nextRow.classList.contains('portfolio-details-row')) {
+                        nextRow.remove();
+                        chevron.innerHTML = '▼';
+                    } else {
+                        const targets = tr.cells[3] ? tr.cells[3].innerHTML : 'N/A';
+                        const dayChg = tr.cells[6] ? tr.cells[6].textContent.trim() : 'N/A';
+                        const investedVal = tr.cells[7] ? tr.cells[7].textContent.trim() : 'N/A';
+                        const currentVal = tr.cells[8] ? tr.cells[8].textContent.trim() : 'N/A';
+                        const target12M = tr.cells[10] ? tr.cells[10].textContent.trim() : 'N/A';
+                        const stopLoss12M = tr.cells[11] ? tr.cells[11].textContent.trim() : 'N/A';
+                        const actionBtn = tr.cells[12] ? tr.cells[12].innerHTML : '';
+
+                        let editControlsHTML = '';
+                        if (hasInputs) {
+                            const dataId = qtyInput.getAttribute('data-id');
+                            const dataSymbol = qtyInput.getAttribute('data-symbol');
+                            editControlsHTML = `
+                                <div style="border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 10px; margin-top: 10px;">
+                                    <div style="font-size: 10px; font-weight: 700; color: var(--color-primary-light); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em;">Edit Holdings Position</div>
+                                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-size: 10px; color: var(--text-secondary);">Qty:</span>
+                                            <input type="number" class="portfolio-qty-input-mobile" data-id="${dataId}" data-symbol="${dataSymbol}" value="${qtyVal}" style="width: 55px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px; text-align: right;">
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-size: 10px; color: var(--text-secondary);">Avg (₹):</span>
+                                            <input type="number" class="portfolio-price-input-mobile" data-id="${dataId}" data-symbol="${dataSymbol}" value="${priceVal}" style="width: 75px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px; text-align: right;">
+                                        </div>
+                                        <button class="btn-primary save-portfolio-item-btn-mobile" style="font-size: 10px; padding: 4px 8px; cursor: pointer; border-radius: 4px; height: 24px; display: flex; align-items: center; justify-content: center; font-weight: bold; background: var(--color-primary);">Save</button>
+                                    </div>
+                                </div>
+                            `;
+                        }
+
+                        const detailsTr = document.createElement('tr');
+                        detailsTr.className = 'portfolio-details-row no-print';
+                        detailsTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                        detailsTr.innerHTML = `
+                            <td colspan="13" style="padding: 12px 15px; border-top: 1px dashed rgba(255,255,255,0.05); border-bottom: 1px dashed rgba(255,255,255,0.05);">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.45; margin-bottom: 8px;">
+                                    <div><strong>Invested Value:</strong> ${investedVal}</div>
+                                    <div style="text-align: right;"><strong>Current Value:</strong> ${currentVal}</div>
+                                    <div><strong>Day Change %:</strong> ${dayChg}</div>
+                                    <div style="text-align: right;"><strong>12M Target Price:</strong> ${target12M}</div>
+                                    <div><strong>12M Stop Loss:</strong> ${stopLoss12M}</div>
+                                    <div style="text-align: right; display: flex; justify-content: flex-end; align-items: center; gap: 4px;"><strong>Ledger Action:</strong> ${actionBtn}</div>
+                                </div>
+                                <div style="font-size: 10px; color: var(--text-muted); margin-top: 6px;">
+                                    <strong>Valuation Target Range:</strong>
+                                    <div style="margin-top: 4px;">${targets}</div>
+                                </div>
+                                ${editControlsHTML}
+                            </td>
+                        `;
+                        tr.parentNode.insertBefore(detailsTr, tr.nextSibling);
+
+                        const delBtn = detailsTr.querySelector('.remove-portfolio-ledger-item-btn');
+                        if (delBtn) {
+                            delBtn.addEventListener('click', (evt) => {
+                                const origDelBtn = tr.cells[12].querySelector('.remove-portfolio-ledger-item-btn');
+                                if (origDelBtn) origDelBtn.click();
+                            });
+                        }
+
+                        const saveBtn = detailsTr.querySelector('.save-portfolio-item-btn-mobile');
+                        if (saveBtn) {
+                            saveBtn.addEventListener('click', async () => {
+                                const mQtyInput = detailsTr.querySelector('.portfolio-qty-input-mobile');
+                                const mPriceInput = detailsTr.querySelector('.portfolio-price-input-mobile');
+                                const qtyValNew = parseFloat(mQtyInput.value) || 0;
+                                const priceValNew = parseFloat(mPriceInput.value) || 0;
+                                
+                                const origQtyInput = tr.querySelector('.portfolio-qty-input');
+                                const origPriceInput = tr.querySelector('.portfolio-price-input');
+                                if (origQtyInput) origQtyInput.value = qtyValNew;
+                                if (origPriceInput) origPriceInput.value = priceValNew;
+
+                                const dataId = mQtyInput.getAttribute('data-id');
+                                try {
+                                    const res = await fetch(`/api/portfolio/${dataId}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ quantity: qtyValNew, purchase_price: priceValNew })
+                                    });
+                                    if (res.ok) {
+                                        if (window.showToast) window.showToast("Holdings updated successfully", "success");
+                                        if (window.loadPortfolioDoctorLedger) {
+                                            await window.loadPortfolioDoctorLedger();
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.error(err);
+                                }
+                            });
+                        }
+
+                        chevron.innerHTML = '▲';
+                    }
+                });
+            });
+        }
+
+        function decorateUniverseRowsForMobile() {
+            const tbody = document.getElementById('universe-explorer-body');
+            if (!tbody) return;
+
+            if (!isMobile()) {
+                tbody.querySelectorAll('.row-expand-trigger').forEach(el => el.remove());
+                tbody.querySelectorAll('.universe-details-row').forEach(el => el.remove());
+                return;
+            }
+
+            tbody.querySelectorAll('tr').forEach(tr => {
+                if (tr.classList.contains('universe-details-row') || tr.querySelector('.row-expand-trigger') || tr.cells.length < 5) return;
+
+                const firstCell = tr.cells[1];
+                if (!firstCell) return;
+
+                const chevron = document.createElement('span');
+                chevron.className = 'row-expand-trigger';
+                chevron.style.cssText = 'cursor: pointer; padding: 2px 6px; font-size: 10px; color: var(--color-primary-light); user-select: none; transition: transform 0.2s; font-weight: bold; margin-left: 4px;';
+                chevron.innerHTML = '▼';
+                
+                const symbolLink = firstCell.querySelector('.universe-symbol-link') || firstCell;
+                symbolLink.appendChild(chevron);
+
+                chevron.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    let nextRow = tr.nextElementSibling;
+                    if (nextRow && nextRow.classList.contains('universe-details-row')) {
+                        nextRow.remove();
+                        chevron.innerHTML = '▼';
+                    } else {
+                        const serialNum = tr.cells[0] ? tr.cells[0].textContent.trim() : '';
+                        const companyName = tr.cells[2] ? tr.cells[2].textContent.trim() : 'N/A';
+                        const sector = tr.cells[3] ? tr.cells[3].textContent.trim() : 'N/A';
+                        const segment = tr.cells[4] ? tr.cells[4].textContent.trim() : 'N/A';
+                        const cacheStatus = tr.cells[5] ? tr.cells[5].innerHTML : 'N/A';
+                        const actionsHtml = tr.cells[6] ? tr.cells[6].innerHTML : '';
+
+                        const detailsTr = document.createElement('tr');
+                        detailsTr.className = 'universe-details-row no-print';
+                        detailsTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                        detailsTr.innerHTML = `
+                            <td colspan="7" style="padding: 10px 15px; border-top: 1px dashed rgba(255,255,255,0.05); border-bottom: 1px dashed rgba(255,255,255,0.05);">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.45;">
+                                    <div style="grid-column: span 2; font-size: 12px; color: var(--color-primary-light); font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; margin-bottom: 4px;">
+                                        ${companyName}
+                                    </div>
+                                    <div><strong>Index Rank:</strong> #${serialNum}</div>
+                                    <div style="text-align: right; display: flex; justify-content: flex-end; align-items: center; gap: 4px;"><strong>Cache Status:</strong> ${cacheStatus}</div>
+                                </div>
+                                <div style="border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <span style="font-size: 10px; color: var(--text-muted);">Explorer Actions:</span>
+                                    <div class="mobile-actions-wrapper" style="display: flex; gap: 6px;">
+                                        ${actionsHtml}
+                                    </div>
+                                </div>
+                            </td>
+                        `;
+                        tr.parentNode.insertBefore(detailsTr, tr.nextSibling);
+
+                        const detailsActions = detailsTr.querySelectorAll('button');
+                        const originalActions = tr.cells[6].querySelectorAll('button');
+                        detailsActions.forEach((btn, idx) => {
+                            btn.addEventListener('click', (evt) => {
+                                if (originalActions[idx]) originalActions[idx].click();
+                            });
+                        });
+
+                        chevron.innerHTML = '▲';
+                    }
+                });
+            });
+        }
+
+        function decorateAlertsRowsForMobile() {
+            const tbody = document.getElementById('alerts-table-body');
+            if (!tbody) return;
+
+            if (!isMobile()) {
+                tbody.querySelectorAll('.row-expand-trigger').forEach(el => el.remove());
+                tbody.querySelectorAll('.alerts-details-row').forEach(el => el.remove());
+                tbody.querySelectorAll('.mobile-alerts-meta').forEach(el => el.remove());
+                return;
+            }
+
+            tbody.querySelectorAll('tr').forEach(tr => {
+                if (tr.classList.contains('alerts-details-row') || tr.querySelector('.row-expand-trigger') || tr.cells.length < 5) return;
+
+                const firstCell = tr.cells[0];
+                if (!firstCell) return;
+
+                const conditionType = tr.cells[1] ? tr.cells[1].textContent.trim() : 'N/A';
+                const targetCondition = tr.cells[2] ? tr.cells[2].textContent.trim() : 'N/A';
+                
+                let combinedText = '';
+                if (conditionType === 'PRICE') {
+                    combinedText = targetCondition;
+                } else {
+                    combinedText = `${conditionType} ${targetCondition}`;
+                }
+
+                if (!firstCell.querySelector('.mobile-alerts-meta')) {
+                    const metaSpan = document.createElement('span');
+                    metaSpan.className = 'mobile-alerts-meta';
+                    metaSpan.style.cssText = 'display: block; margin-top: 3px; font-size: 10px; color: var(--text-secondary); font-family: monospace; font-weight: bold;';
+                    metaSpan.textContent = combinedText;
+                    firstCell.appendChild(metaSpan);
+                }
+
+                const chevron = document.createElement('span');
+                chevron.className = 'row-expand-trigger';
+                chevron.style.cssText = 'cursor: pointer; padding: 2px 6px; font-size: 10px; color: var(--color-primary-light); user-select: none; transition: transform 0.2s; font-weight: bold; margin-left: 4px;';
+                chevron.innerHTML = '▼';
+                
+                const link = firstCell.querySelector('.alert-stock-link') || firstCell;
+                link.appendChild(chevron);
+
+                chevron.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    let nextRow = tr.nextElementSibling;
+                    if (nextRow && nextRow.classList.contains('alerts-details-row')) {
+                        nextRow.remove();
+                        chevron.innerHTML = '▼';
+                    } else {
+                        const targetCondition = tr.cells[2] ? tr.cells[2].innerHTML : 'N/A';
+                        const triggeredAt = tr.cells[4] ? tr.cells[4].innerHTML : 'Active scan...';
+                        const actionBtn = tr.cells[5] ? tr.cells[5].innerHTML : '';
+
+                        const detailsTr = document.createElement('tr');
+                        detailsTr.className = 'alerts-details-row no-print';
+                        detailsTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                        detailsTr.innerHTML = `
+                            <td colspan="6" style="padding: 10px 15px; border-top: 1px dashed rgba(255,255,255,0.05); border-bottom: 1px dashed rgba(255,255,255,0.05);">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.45;">
+                                    <div><strong>Trigger Target:</strong> <code style="font-family: monospace; font-size: 11px; color: var(--color-primary-light); font-weight: bold;">${targetCondition}</code></div>
+                                    <div style="text-align: right;"><strong>Scan Status:</strong> ${triggeredAt}</div>
+                                </div>
+                                <div style="border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 10px; color: var(--text-muted);">Cockpit Operations:</span>
+                                    <div class="mobile-actions-wrapper">
+                                        ${actionBtn}
+                                    </div>
+                                </div>
+                            </td>
+                        `;
+                        tr.parentNode.insertBefore(detailsTr, tr.nextSibling);
+
+                        const detailsDelBtn = detailsTr.querySelector('.btn-translucent-delete');
+                        const originalDelBtn = tr.cells[5].querySelector('.btn-translucent-delete');
+                        if (detailsDelBtn && originalDelBtn) {
+                            detailsDelBtn.addEventListener('click', (evt) => {
+                                originalDelBtn.click();
+                            });
+                        }
+
+                        chevron.innerHTML = '▲';
+                    }
+                });
+            });
+        }
+
+        function setupWatchlistTableObserver() {
+            const tbody = document.getElementById('watchlist-table-body');
+            if (tbody) {
+                decorateWatchlistRowsForMobile();
+                const observer = new MutationObserver(() => decorateWatchlistRowsForMobile());
+                observer.observe(tbody, { childList: true });
+            }
+        }
+
+        function setupPortfolioTableObserver() {
+            const tbody = document.getElementById('portfolio-ledger-body');
+            if (tbody) {
+                decoratePortfolioRowsForMobile();
+                const observer = new MutationObserver(() => decoratePortfolioRowsForMobile());
+                observer.observe(tbody, { childList: true });
+            }
+        }
+
+        function setupUniverseTableObserver() {
+            const tbody = document.getElementById('universe-explorer-body');
+            if (tbody) {
+                decorateUniverseRowsForMobile();
+                const observer = new MutationObserver(() => decorateUniverseRowsForMobile());
+                observer.observe(tbody, { childList: true });
+            }
+        }
+
+        function setupAlertsTableObserver() {
+            const tbody = document.getElementById('alerts-table-body');
+            if (tbody) {
+                decorateAlertsRowsForMobile();
+                const observer = new MutationObserver(() => decorateAlertsRowsForMobile());
+                observer.observe(tbody, { childList: true });
+            }
+        }
+
+        function decorateRuleScannerRowsForMobile() {
+            const tbody = document.getElementById('rule-scanner-results-body');
+            if (!tbody) return;
+
+            if (!isMobile()) {
+                tbody.querySelectorAll('.row-expand-trigger').forEach(el => el.remove());
+                tbody.querySelectorAll('.rs-details-row').forEach(el => el.remove());
+                tbody.querySelectorAll('.mobile-rs-meta').forEach(el => el.remove());
+                tbody.querySelectorAll('.mobile-segment-tag').forEach(el => el.remove());
+                return;
+            }
+
+            tbody.querySelectorAll('tr').forEach(tr => {
+                if (tr.classList.contains('rs-details-row') || tr.querySelector('.row-expand-trigger') || tr.cells.length < 8) return;
+
+                const firstCell = tr.cells[0];
+                const priceCell = tr.cells[2];
+                if (!firstCell || !priceCell) return;
+
+                // Add segment meta inline under stock name if not present
+                const spans = firstCell.querySelectorAll('span');
+                const companyNameSpan = spans[1];
+                const segmentText = tr.cells[1] ? tr.cells[1].textContent.trim() : '';
+
+                if (companyNameSpan && segmentText && !companyNameSpan.querySelector('.mobile-segment-tag')) {
+                    const originalText = companyNameSpan.textContent.trim();
+                    companyNameSpan.innerHTML = `${originalText} <span class="mobile-segment-tag" style="color: var(--color-primary-light); font-weight: bold; margin-left: 4px;">• ${segmentText}</span>`;
+                }
+
+                // Add rating meta under price if not present
+                const ratingHtml = tr.cells[6] ? tr.cells[6].innerHTML : '';
+                if (!priceCell.querySelector('.mobile-rs-meta')) {
+                    const metaSpan = document.createElement('span');
+                    metaSpan.className = 'mobile-rs-meta';
+                    metaSpan.style.cssText = 'display: block; margin-top: 3px; font-size: 10px; font-weight: bold;';
+                    metaSpan.innerHTML = ratingHtml;
+                    priceCell.appendChild(metaSpan);
+                }
+
+                const chevron = document.createElement('span');
+                chevron.className = 'row-expand-trigger';
+                chevron.style.cssText = 'cursor: pointer; padding: 2px 6px; font-size: 10px; color: var(--color-primary-light); user-select: none; transition: transform 0.2s; font-weight: bold; margin-left: 4px;';
+                chevron.innerHTML = '▼';
+
+                const stockNameSpan = firstCell.querySelector('span');
+                if (stockNameSpan) {
+                    stockNameSpan.appendChild(chevron);
+                }
+
+                chevron.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+
+                    let nextRow = tr.nextElementSibling;
+                    if (nextRow && nextRow.classList.contains('rs-details-row')) {
+                        nextRow.remove();
+                        chevron.innerHTML = '▼';
+                    } else {
+                        const segment = tr.cells[1] ? tr.cells[1].textContent.trim() : 'N/A';
+                        const peVal = tr.cells[3] ? tr.cells[3].textContent.trim() : 'N/A';
+                        const triggerVal = tr.cells[5] ? tr.cells[5].innerHTML : 'N/A';
+                        const sector = tr.cells[7] ? tr.cells[7].textContent.trim() : 'N/A';
+
+                        const detailsCanvasId = `rs-details-sparkline-${Math.random().toString(36).substr(2, 9)}`;
+
+                        const detailsTr = document.createElement('tr');
+                        detailsTr.className = 'rs-details-row no-print';
+                        detailsTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                        detailsTr.innerHTML = `
+                            <td colspan="8" style="padding: 12px 15px; border-top: 1px dashed rgba(255,255,255,0.05); border-bottom: 1px dashed rgba(255,255,255,0.05);">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.45;">
+                                    <div><strong>Segment:</strong> ${segment}</div>
+                                    <div style="text-align: right;"><strong>P/E:</strong> ${peVal}</div>
+                                    <div style="grid-column: span 2;"><strong>Sector:</strong> ${sector}</div>
+                                    <div style="grid-column: span 2; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 6px; margin-top: 4px;">
+                                        <strong>Trigger Value:</strong>
+                                        <div style="color: var(--color-primary-light); font-weight: bold; margin-top: 2px;">${triggerVal}</div>
+                                    </div>
+                                </div>
+                                <div style="border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                                    <span style="font-size: 10px; color: var(--text-muted);">Sparkline Trend:</span>
+                                    <div style="background: rgba(0,0,0,0.15); padding: 4px; border-radius: 4px; border: 1px solid var(--border-glass);">
+                                        <canvas id="${detailsCanvasId}" width="90" height="30" style="display: block;"></canvas>
+                                    </div>
+                                </div>
+                            </td>
+                        `;
+                        tr.parentNode.insertBefore(detailsTr, tr.nextSibling);
+
+                        const originalCanvas = tr.cells[4].querySelector('canvas');
+                        const detailsCanvas = detailsTr.querySelector(`#${detailsCanvasId}`);
+                        if (originalCanvas && detailsCanvas) {
+                            const detailsCtx = detailsCanvas.getContext('2d');
+                            detailsCtx.drawImage(originalCanvas, 0, 0, detailsCanvas.width, detailsCanvas.height);
+                        }
+
+                        chevron.innerHTML = '▲';
+                    }
+                });
+            });
+        }
+
+        function setupRuleScannerTableObserver() {
+            const tbody = document.getElementById('rule-scanner-results-body');
+            if (tbody) {
+                decorateRuleScannerRowsForMobile();
+                const observer = new MutationObserver(() => decorateRuleScannerRowsForMobile());
+                observer.observe(tbody, { childList: true });
+            }
+        }
+
+        function decorateScreenerRowsForMobile() {
+            const tbody = document.getElementById('screener-results-body');
+            if (!tbody) return;
+
+            if (!isMobile()) {
+                tbody.querySelectorAll('.row-expand-trigger').forEach(el => el.remove());
+                tbody.querySelectorAll('.screener-details-row').forEach(el => el.remove());
+                tbody.querySelectorAll('.mobile-screener-segment').forEach(el => el.remove());
+                return;
+            }
+
+            tbody.querySelectorAll('tr').forEach(tr => {
+                if (tr.classList.contains('screener-details-row') || tr.querySelector('.row-expand-trigger') || tr.cells.length < 9) return;
+
+                const firstCell = tr.cells[1];
+                if (!firstCell) return;
+
+                // Add segment meta inline next to symbol if not present
+                const symbolLink = firstCell.querySelector('.screener-symbol-link');
+                const segmentText = tr.cells[3] ? tr.cells[3].textContent.trim() : '';
+
+                if (symbolLink && segmentText && !symbolLink.querySelector('.mobile-screener-segment')) {
+                    const symbolSpan = symbolLink.querySelector('span');
+                    if (symbolSpan) {
+                        const originalText = symbolSpan.textContent.trim();
+                        symbolSpan.innerHTML = `${originalText} <span class="mobile-screener-segment" style="color: var(--color-primary-light); font-weight: bold; margin-left: 4px;">• ${segmentText}</span>`;
+                    }
+                }
+
+                const chevron = document.createElement('span');
+                chevron.className = 'row-expand-trigger';
+                chevron.style.cssText = 'cursor: pointer; padding: 2px 6px; font-size: 10px; color: var(--color-primary-light); user-select: none; transition: transform 0.2s; font-weight: bold; margin-left: 4px;';
+                chevron.innerHTML = '▼';
+
+                const strong = symbolLink ? symbolLink.querySelector('strong') : firstCell.querySelector('strong');
+                if (strong) {
+                    strong.appendChild(chevron);
+                } else if (symbolLink) {
+                    symbolLink.appendChild(chevron);
+                } else {
+                    firstCell.appendChild(chevron);
+                }
+
+                chevron.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+
+                    let nextRow = tr.nextElementSibling;
+                    if (nextRow && nextRow.classList.contains('screener-details-row')) {
+                        nextRow.remove();
+                        chevron.innerHTML = '▼';
+                    } else {
+                        const rank = tr.cells[0] ? tr.cells[0].innerHTML : 'N/A';
+                        const sector = tr.cells[2] ? tr.cells[2].innerHTML : 'N/A';
+                        const fScore = tr.cells[5] ? tr.cells[5].innerHTML : 'N/A';
+                        const vScore = tr.cells[6] ? tr.cells[6].innerHTML : 'N/A';
+                        const tScore = tr.cells[7] ? tr.cells[7].innerHTML : 'N/A';
+
+                        const detailsTr = document.createElement('tr');
+                        detailsTr.className = 'screener-details-row no-print';
+                        detailsTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                        detailsTr.innerHTML = `
+                            <td colspan="9" style="padding: 12px 15px; border-top: 1px dashed rgba(255,255,255,0.05); border-bottom: 1px dashed rgba(255,255,255,0.05);">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.45;">
+                                    <div><strong>Rank:</strong> ${rank}</div>
+                                    <div style="text-align: right;"><strong>Sector:</strong> ${sector}</div>
+                                    <div style="grid-column: span 2; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 6px; margin-top: 4px; display: flex; flex-direction: column; gap: 8px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span><strong>Fundamental Score:</strong></span>
+                                            <span>${fScore}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span><strong>Valuation Score:</strong></span>
+                                            <span>${vScore}</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                                            <span><strong>Technical Score:</strong></span>
+                                            <span>${tScore}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        `;
+                        tr.parentNode.insertBefore(detailsTr, tr.nextSibling);
+                        chevron.innerHTML = '▲';
+                    }
+                });
+            });
+        }
+
+        function setupScreenerTableObserver() {
+            const tbody = document.getElementById('screener-results-body');
+            if (tbody) {
+                decorateScreenerRowsForMobile();
+                const observer = new MutationObserver(() => decorateScreenerRowsForMobile());
+                observer.observe(tbody, { childList: true });
+            }
+        }
+
+        function decorateSectorRadarRowsForMobile() {
+            const tbody = document.getElementById('sector-stocks-table-body');
+            if (!tbody) return;
+
+            if (!isMobile()) {
+                tbody.querySelectorAll('.row-expand-trigger').forEach(el => el.remove());
+                tbody.querySelectorAll('.sector-details-row').forEach(el => el.remove());
+                tbody.querySelectorAll('.mobile-sector-meta').forEach(el => el.remove());
+                return;
+            }
+
+            tbody.querySelectorAll('tr').forEach(tr => {
+                if (tr.classList.contains('sector-details-row') || tr.querySelector('.row-expand-trigger') || tr.cells.length < 11) return;
+
+                const firstCell = tr.cells[0];
+                if (!firstCell) return;
+
+                // Add cap badge metadata inline next to Symbol
+                const capBadgeHtml = tr.cells[2] ? tr.cells[2].innerHTML : '';
+                if (!firstCell.querySelector('.mobile-sector-meta')) {
+                    const metaSpan = document.createElement('span');
+                    metaSpan.className = 'mobile-sector-meta';
+                    metaSpan.style.cssText = 'display: inline-flex; align-items: center; margin-left: 6px;';
+                    metaSpan.innerHTML = capBadgeHtml;
+                    firstCell.appendChild(metaSpan);
+                }
+
+                const chevron = document.createElement('span');
+                chevron.className = 'row-expand-trigger';
+                chevron.style.cssText = 'cursor: pointer; padding: 2px 6px; font-size: 10px; color: var(--color-primary-light); user-select: none; transition: transform 0.2s; font-weight: bold; margin-left: 4px;';
+                chevron.innerHTML = '▼';
+                firstCell.appendChild(chevron);
+
+                chevron.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+
+                    let nextRow = tr.nextElementSibling;
+                    if (nextRow && nextRow.classList.contains('sector-details-row')) {
+                        nextRow.remove();
+                        chevron.innerHTML = '▼';
+                    } else {
+                        const companyName = tr.cells[1] ? tr.cells[1].textContent.trim() : 'N/A';
+                        const ret1d = tr.cells[3] ? tr.cells[3].innerHTML : 'N/A';
+                        const ret5d = tr.cells[4] ? tr.cells[4].innerHTML : 'N/A';
+                        const ret1m = tr.cells[5] ? tr.cells[5].innerHTML : 'N/A';
+                        const ret3m = tr.cells[6] ? tr.cells[6].innerHTML : 'N/A';
+                        const ret6m = tr.cells[7] ? tr.cells[7].innerHTML : 'N/A';
+                        const ret1y = tr.cells[8] ? tr.cells[8].innerHTML : 'N/A';
+                        const ret5y = tr.cells[9] ? tr.cells[9].innerHTML : 'N/A';
+                        const actionsHtml = tr.cells[10] ? tr.cells[10].innerHTML : '';
+
+                        const detailsTr = document.createElement('tr');
+                        detailsTr.className = 'sector-details-row no-print';
+                        detailsTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                        detailsTr.innerHTML = `
+                            <td colspan="11" style="padding: 12px 15px; border-top: 1px dashed rgba(255,255,255,0.05); border-bottom: 1px dashed rgba(255,255,255,0.05);">
+                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.45;">
+                                    <div style="font-size: 12px; color: var(--color-primary-light); font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; margin-bottom: 4px;">
+                                        ${companyName}
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-family: monospace; font-size: 10px; margin-top: 4px; border-bottom: 1px dashed rgba(255,255,255,0.06); padding-bottom: 8px;">
+                                        <div><strong>1D:</strong> ${ret1d}</div>
+                                        <div><strong>5D:</strong> ${ret5d}</div>
+                                        <div><strong>1M:</strong> ${ret1m}</div>
+                                        <div><strong>3M:</strong> ${ret3m}</div>
+                                        <div><strong>6M:</strong> ${ret6m}</div>
+                                        <div><strong>1Y:</strong> ${ret1y}</div>
+                                        <div style="grid-column: span 3; margin-top: 2px;"><strong>5Y:</strong> ${ret5y}</div>
+                                    </div>
+                                </div>
+                                <div style="border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <span style="font-size: 10px; color: var(--text-muted);">Screener Actions:</span>
+                                    <div class="mobile-actions-wrapper" style="display: flex; gap: 6px;">
+                                        ${actionsHtml}
+                                    </div>
+                                </div>
+                            </td>
+                        `;
+                        tr.parentNode.insertBefore(detailsTr, tr.nextSibling);
+
+                        const detailsActions = detailsTr.querySelectorAll('button');
+                        const originalActions = tr.cells[10].querySelectorAll('button');
+                        detailsActions.forEach((btn, idx) => {
+                            btn.addEventListener('click', (evt) => {
+                                if (originalActions[idx]) originalActions[idx].click();
+                            });
+                        });
+
+                        chevron.innerHTML = '▲';
+                    }
+                });
+            });
+        }
+
+        function setupSectorRadarTableObserver() {
+            const tbody = document.getElementById('sector-stocks-table-body');
+            if (tbody) {
+                decorateSectorRadarRowsForMobile();
+                const observer = new MutationObserver(() => decorateSectorRadarRowsForMobile());
+                observer.observe(tbody, { childList: true });
+            }
+        }
+
+        function setupSectorRadarTableObserver() {
+            const tbody = document.getElementById('sector-stocks-table-body');
+            if (tbody) {
+                decorateSectorRadarRowsForMobile();
+                const observer = new MutationObserver(() => decorateSectorRadarRowsForMobile());
+                observer.observe(tbody, { childList: true });
+            }
+        }
+
+        // 6. Mobile Homepage Command Center Dashboard
+        function initMobileHomepageCommandCenter() {
+            const emptyState = document.getElementById('analyzer-empty-state');
+            const analyzerTab = document.getElementById('tab-analyzer');
+            if (!emptyState || !analyzerTab) return;
+
+            // MutationObserver to watch empty state visibility and toggle homepage-active class
+            const toggleActiveMode = () => {
+                if (!isMobile()) {
+                    analyzerTab.classList.remove('homepage-active');
+                    document.body.classList.remove('homepage-active');
+                    const cc = document.getElementById('mobile-homepage-command-center');
+                    if (cc) cc.style.display = 'none';
+                    return;
+                }
+
+                if (emptyState.style.display !== 'none') {
+                    analyzerTab.classList.add('homepage-active');
+                    document.body.classList.add('homepage-active');
+                    const cc = document.getElementById('mobile-homepage-command-center');
+                    if (cc) {
+                        cc.style.display = 'block';
+                        renderMobileHomepageCommandCenter();
+                    }
+                    // Explicit JS Safeguards: hide dashboard and reset search input text
+                    const dashboard = document.getElementById('analyzer-dashboard');
+                    if (dashboard) dashboard.style.display = 'none';
+                    const mobileSearchInput = document.getElementById('mobile-home-search-input');
+                    if (mobileSearchInput) mobileSearchInput.value = '';
+                } else {
+                    analyzerTab.classList.remove('homepage-active');
+                    document.body.classList.remove('homepage-active');
+                    const cc = document.getElementById('mobile-homepage-command-center');
+                    if (cc) cc.style.display = 'none';
+                }
+            };
+
+            const observer = new MutationObserver(toggleActiveMode);
+            observer.observe(emptyState, { attributes: true, attributeFilter: ['style'] });
+            
+            // Initial call
+            toggleActiveMode();
+            
+            // Re-check on resize
+            window.addEventListener('resize', toggleActiveMode);
+        }
+
+        function deriveMarketBreadthGreeting() {
+            try {
+                // Try to read Nifty change from marquee
+                const niftyEl = document.getElementById('ticker-nifty');
+                if (niftyEl) {
+                    const changeSpan = niftyEl.querySelector('.change');
+                    if (changeSpan) {
+                        const txt = changeSpan.textContent.trim();
+                        const val = parseFloat(txt.replace(/[^\d.-]/g, ''));
+                        const isDown = txt.includes('▼') || txt.includes('-') || changeSpan.classList.contains('red-text');
+                        if (!isNaN(val)) {
+                            if (isDown) {
+                                return `Nifty indices show defensive consolidated pressure today (${txt}). Defensive overlays are recommended.`;
+                            } else {
+                                return `Nifty indices show positive structural strength today (${txt}). Momentum radar highlights constructive rotation bias.`;
+                            }
+                        }
+                    }
+                }
+                
+                // Try reading advances/declines from Sector Radar breadth
+                const advLbl = document.getElementById('breadth-advances-lbl');
+                const decLbl = document.getElementById('breadth-declines-lbl');
+                if (advLbl && decLbl) {
+                    const advMatch = advLbl.innerText.match(/\d+/);
+                    const decMatch = decLbl.innerText.match(/\d+/);
+                    if (advMatch && decMatch) {
+                        const adv = parseInt(advMatch[0]);
+                        const dec = parseInt(decMatch[0]);
+                        if (adv > dec) {
+                            return `Indian equities display positive breadth today with ${adv} advances over ${dec} declines. Constructive breakout setups are active.`;
+                        } else if (adv < dec) {
+                            return `Indian equities display defensive breadth today with ${dec} declines over ${adv} advances. Caution is advised.`;
+                        }
+                    }
+                }
+            } catch(e) {
+                console.error("Error deriving market breadth:", e);
+            }
+            return "Market indices are active. Run the screener or check momentum radar to identify breakout candidates.";
+        }
+
+        function renderMobileHomepageCommandCenter() {
+            const container = document.getElementById('mobile-homepage-command-center');
+            if (!container) return;
+            
+            // Avoid double render
+            if (container.dataset.rendered === "true") {
+                updateDynamicCommandCenterContent();
+                return;
+            }
+
+            const hour = new Date().getHours();
+            let greetingText = "Good Evening";
+            if (hour < 12) greetingText = "Good Morning";
+            else if (hour < 17) greetingText = "Good Afternoon";
+
+            const derivedGreeting = deriveMarketBreadthGreeting();
+
+            container.innerHTML = `
+                <!-- Dynamic Greeting & Live Market Bias Summary -->
+                <div class="mobile-copilot-greeting">
+                    <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 800; color: var(--text-primary); letter-spacing: 0.02em; display: flex; justify-content: space-between; align-items: center;">
+                        <span>${greetingText}, Analyst</span>
+                        <button id="btn-audio-mute-toggle" style="background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 14px; outline: none; transition: transform 0.1s; padding: 0 4px;">🔊</button>
+                    </h4>
+                    <p style="margin: 0; font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;" id="mobile-home-copilot-summary">
+                        ${derivedGreeting}
+                    </p>
+                    <div class="breadth-gauge-wrap" id="mobile-home-breadth-gauge" style="margin-top: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); padding: 10px; border-radius: 8px; display: none;">
+                        <div style="display:flex; justify-content:space-between; font-size:9.5px; font-weight:800; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;">
+                            <span style="color:var(--neon-green, #10b981);">Advances: <span id="breadth-advances-count">0</span></span>
+                            <span style="color:var(--color-crimson, #ef4444);">Declines: <span id="breadth-declines-count">0</span></span>
+                        </div>
+                        <div style="position:relative; height:5px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:2.5px; overflow:hidden; display:flex;">
+                            <div id="breadth-advances-bar" style="height:100%; background:var(--neon-green, #10b981); width:50%; transition:width 0.5s ease; box-shadow:0 0 6px var(--neon-green, #10b981);"></div>
+                            <div id="breadth-declines-bar" style="height:100%; background:var(--color-crimson, #ef4444); width:50%; transition:width 0.5s ease; box-shadow:0 0 6px var(--color-crimson, #ef4444);"></div>
+                        </div>
+
+                        <!-- Volatility Indicator -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06)); font-size:9px; font-weight:700; color:var(--text-muted);">
+                            <span>VOLATILITY RADAR</span>
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <span id="vix-indicator-dot" style="width:5.5px; height:5.5px; border-radius:50%; background:#10b981; display:inline-block; box-shadow:0 0 5px #10b981; transition: all 0.3s ease;"></span>
+                                <span id="vix-indicator-val" style="color:var(--text-primary); font-family:'Outfit'; font-size:9px; font-weight:800;">VIX: --</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Central Search Experience -->
+                <div class="mobile-search-section-wrap" style="margin-bottom: 12px; position: relative; transition: all 0.25s ease;">
+                    <div class="search-glowing-aura"></div>
+                    <div style="position:relative; width:100%;">
+                        <input type="text" id="mobile-home-search-input" placeholder="Search Indian Stocks (e.g. RELIANCE)..." style="width:100% !important; box-sizing:border-box !important; padding:13px 16px !important; font-size:13.5px !important; background:rgba(255,255,255,0.03) !important; border:1px solid var(--border-glass) !important; color:var(--text-primary) !important; border-radius:8px !important; outline:none !important; text-align:center;">
+                        <div id="mobile-home-suggestions" class="watchlist-autocomplete-box" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:9999; max-height:220px; overflow-y:auto; margin-top:4px;"></div>
+                    </div>
+                    <div class="voice-catalyst-wrap">
+                        <button class="voice-catalyst-btn" id="mobile-home-mic-btn" title="Speak Ticker to Research">
+                            <span class="voice-catalyst-pulse"></span>
+                            🎙️
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Recent Searches Scrollable Pills -->
+                <div id="mobile-home-recent-pills-container" style="margin-bottom: 20px; display: none;">
+                    <div id="mobile-home-recent-pills-title" style="font-size: 9px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 6px;">Recent Searches</div>
+                    <div id="mobile-home-recent-pills" style="display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 2px 0;"></div>
+                </div>
+
+                <!-- Quick Action Shortcuts -->
+                <h5 style="margin:0 0 12px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight: 700; letter-spacing: 0.05em;">Quick Analysis Workspaces</h5>
+                <div class="mobile-cmd-grid">
+                    <div class="mobile-cmd-card inst-card-screener" id="cmd-btn-screener">
+                        <div class="mobile-cmd-card-header">
+                            <div class="cmd-svg-icon svg-screener">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="3" y="14" width="4" height="7" rx="1" fill="#3b82f6" opacity="0.8"/>
+                                    <rect x="10" y="8" width="4" height="13" rx="1" fill="#3b82f6"/>
+                                    <rect x="17" y="3" width="4" height="18" rx="1" fill="#60a5fa"/>
+                                    <path d="M2 7L9 4L15 8L22 2" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <span class="cmd-badge badge-blue">ACTIVE</span>
+                        </div>
+                        <span class="mobile-cmd-card-title">Quant Screener</span>
+                        <span class="mobile-cmd-card-desc">Execute multi-factor scoring scans & target overlays.</span>
+                    </div>
+                    <div class="mobile-cmd-card inst-card-radar" id="cmd-btn-radar">
+                        <div class="mobile-cmd-card-header">
+                            <div class="cmd-svg-icon svg-radar">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="12" cy="12" r="9" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.6"/>
+                                    <circle cx="12" cy="12" r="5" stroke="#10b981" stroke-width="1.5"/>
+                                    <circle cx="12" cy="12" r="2" fill="#10b981"/>
+                                    <path d="M12 12L19 5" stroke="#34d399" stroke-width="2" stroke-linecap="round"/>
+                                    <circle cx="16" cy="8" r="1.5" fill="#34d399"/>
+                                </svg>
+                            </div>
+                            <span class="cmd-badge badge-green">LIVE</span>
+                        </div>
+                        <span class="mobile-cmd-card-title">Momentum Radar</span>
+                        <span class="mobile-cmd-card-desc">Real-time sector heatmaps & rotation diagnostics.</span>
+                    </div>
+                    <div class="mobile-cmd-card inst-card-scanner" id="cmd-btn-scanner">
+                        <div class="mobile-cmd-card-header">
+                            <div class="cmd-svg-icon svg-scanner">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M4 4H8M16 4H20M4 20H8M16 20H20" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+                                    <line x1="2" y1="12" x2="22" y2="12" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="2 2"/>
+                                    <path d="M6 16L10 11L14 14L18 8" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                            <span class="cmd-badge badge-amber">SCANS</span>
+                        </div>
+                        <span class="mobile-cmd-card-title">Rule Scanner</span>
+                        <span class="mobile-cmd-card-desc">AI catalyst scans & indicators breakout logs.</span>
+                    </div>
+                    <div class="mobile-cmd-card inst-card-alerts" id="cmd-btn-alerts">
+                        <div class="mobile-cmd-card-header">
+                            <div class="cmd-svg-icon svg-alerts">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M18 8A6 6 0 0 0 6 8C6 15 3 17 3 17H21S18 15 18 8Z" stroke="#ef4444" stroke-width="1.5" stroke-linejoin="round"/>
+                                    <path d="M13.73 21A2 2 0 0 1 10.27 21" stroke="#f87171" stroke-width="1.5" stroke-linecap="round"/>
+                                    <circle cx="18" cy="5" r="3" fill="#ef4444"/>
+                                </svg>
+                            </div>
+                            <span class="cmd-badge badge-red">3 ACTIVE</span>
+                        </div>
+                        <span class="mobile-cmd-card-title">Alert Center</span>
+                        <span class="mobile-cmd-card-desc">Manage trigger alerts and target rule updates.</span>
+                    </div>
+                </div>
+
+                <!-- Today's Market Movers Section -->
+                <div class="movers-container">
+                    <div id="mobile-home-gainers-container"></div>
+                    <div id="mobile-home-losers-container"></div>
+                </div>
+
+                <!-- Today's Sector Rotations Section -->
+                <div id="mobile-home-sectors-container" style="margin-bottom: 20px;"></div>
+
+                <!-- Live Catalyst News Feed Section -->
+                <div class="mobile-cmd-news-section" id="mobile-home-news-container">
+                    <!-- Populated dynamically -->
+                </div>
+            `;
+
+            container.dataset.rendered = "true";
+
+            // Wire Tab Switches
+            document.getElementById('cmd-btn-screener').onclick = () => window.switchTab('screener');
+            document.getElementById('cmd-btn-radar').onclick = () => window.switchTab('sector-radar');
+            document.getElementById('cmd-btn-scanner').onclick = () => window.switchTab('rule-scanner');
+            document.getElementById('cmd-btn-alerts').onclick = () => window.switchTab('alerts');
+
+            // Wire Voice Catalyst Click
+            const homeMic = document.getElementById('mobile-home-mic-btn');
+            homeMic.addEventListener('click', () => {
+                const originalMic = document.getElementById('analyzer-voice-search-btn');
+                if (originalMic) {
+                    window.activeSpeechRecognizerTarget = 'analyzer';
+                    originalMic.click();
+                }
+            });
+
+            // Wire Audio Mute Toggle Button
+            const muteBtn = document.getElementById('btn-audio-mute-toggle');
+            if (muteBtn) {
+                const updateIcon = () => {
+                    const isMuted = localStorage.getItem('apex-audio-muted') === 'true';
+                    muteBtn.innerHTML = isMuted ? '🔇' : '🔊';
+                    muteBtn.style.color = isMuted ? 'var(--text-muted)' : 'var(--color-primary)';
+                };
+                updateIcon();
+                muteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const isMuted = localStorage.getItem('apex-audio-muted') === 'true';
+                    localStorage.setItem('apex-audio-muted', (!isMuted).toString());
+                    updateIcon();
+                    if (!isMuted) {
+                        AudioCueManager.playTick();
+                    }
+                };
+            }
+
+            // Wire Autocomplete logic for Homepage input
+            const inputEl = document.getElementById('mobile-home-search-input');
+            const suggestionsDiv = document.getElementById('mobile-home-suggestions');
+
+            // Wire Immersive Search Focus Overlay
+            let backdrop = document.getElementById('mobile-search-focus-backdrop');
+            if (!backdrop) {
+                backdrop = document.createElement('div');
+                backdrop.id = 'mobile-search-focus-backdrop';
+                backdrop.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(6,9,19,0.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); z-index:999; opacity:0; pointer-events:none; transition:opacity 0.25s ease;';
+                document.body.appendChild(backdrop);
+            }
+            const searchWrap = document.querySelector('.mobile-search-section-wrap');
+            if (inputEl && searchWrap && backdrop) {
+                inputEl.addEventListener('focus', () => {
+                    backdrop.style.opacity = '1';
+                    backdrop.style.pointerEvents = 'auto';
+                    searchWrap.style.zIndex = '1000';
+                    searchWrap.style.transform = 'scale(1.02)';
+                    searchWrap.style.boxShadow = '0 8px 30px rgba(0,0,0,0.4)';
+                    
+                    const query = inputEl.value.trim();
+                    if (query.length >= 2 && suggestionsDiv) {
+                        suggestionsDiv.style.display = 'block';
+                    }
+                });
+
+                const dismissSearchFocus = () => {
+                    backdrop.style.opacity = '0';
+                    backdrop.style.pointerEvents = 'none';
+                    searchWrap.style.zIndex = '';
+                    searchWrap.style.transform = '';
+                    searchWrap.style.boxShadow = '';
+                };
+
+                backdrop.onclick = () => {
+                    dismissSearchFocus();
+                    if (suggestionsDiv) suggestionsDiv.style.display = 'none';
+                };
+
+                inputEl.addEventListener('blur', () => {
+                    setTimeout(dismissSearchFocus, 180);
+                });
+            }
+
+            let searchDebounceTimer = null;
+            if (inputEl && suggestionsDiv) {
+                inputEl.addEventListener('input', () => {
+                    clearTimeout(searchDebounceTimer);
+                    const query = inputEl.value.trim();
+
+                    if (query.length < 2) {
+                        suggestionsDiv.innerHTML = '';
+                        suggestionsDiv.style.display = 'none';
+                        return;
+                    }
+
+                    searchDebounceTimer = setTimeout(async () => {
+                        try {
+                            const res = await fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`);
+                            if (res.ok) {
+                                const data = await res.json();
+                                suggestionsDiv.innerHTML = '';
+
+                                if (data && data.length > 0) {
+                                    data.forEach(item => {
+                                        const div = document.createElement('div');
+                                        div.className = 'watchlist-autocomplete-item';
+                                        div.style.cssText = 'padding: 10px 14px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.03);';
+                                        div.innerHTML = `
+                                            <div>
+                                                <span class="ticker-pill" style="font-weight: 700; color: #fff;">${item.base_symbol}</span>
+                                                <span style="font-size: 10px; color: var(--text-muted); margin-left: 6px;">${item.name}</span>
+                                            </div>
+                                            <span class="sector-pill">${item.sector || 'Equity'}</span>
+                                        `;
+                                        div.addEventListener('click', () => {
+                                            saveRecentSearch(item.base_symbol);
+                                            const searchInput = document.getElementById('analyzer-search-input');
+                                            const searchBtn = document.getElementById('analyzer-search-btn');
+                                            if (searchInput && searchBtn) {
+                                                searchInput.value = item.base_symbol;
+                                                searchBtn.click();
+                                            }
+                                            suggestionsDiv.style.display = 'none';
+                                            inputEl.value = '';
+                                        });
+                                        suggestionsDiv.appendChild(div);
+                                    });
+                                    suggestionsDiv.style.display = 'block';
+                                } else {
+                                    suggestionsDiv.style.display = 'none';
+                                }
+                            }
+                        } catch (err) {
+                            console.error("Autocomplete homepage error:", err);
+                        }
+                    }, 200);
+                });
+ 
+                document.addEventListener('click', (e) => {
+                    if (e.target !== inputEl && e.target !== suggestionsDiv && !suggestionsDiv.contains(e.target)) {
+                        suggestionsDiv.style.display = 'none';
+                    }
+                });
+ 
+                inputEl.addEventListener('keypress', e => {
+                    if (e.key === 'Enter') {
+                        const val = inputEl.value.trim();
+                        if (val) {
+                            saveRecentSearch(val);
+                            const searchInput = document.getElementById('analyzer-search-input');
+                            const searchBtn = document.getElementById('analyzer-search-btn');
+                            if (searchInput && searchBtn) {
+                                searchInput.value = val;
+                                searchBtn.click();
+                            }
+                            inputEl.value = '';
+                        }
+                    }
+                });
+            }
+
+            function saveRecentSearch(symbol) {
+                try {
+                    symbol = symbol.trim().toUpperCase();
+                    if (!symbol) return;
+                    let list = JSON.parse(localStorage.getItem('recent-mobile-searches') || '["RELIANCE", "TCS", "INFY"]');
+                    list = list.filter(s => s !== symbol);
+                    list.unshift(symbol);
+                    list = list.slice(0, 3);
+                    localStorage.setItem('recent-mobile-searches', JSON.stringify(list));
+                    updateDynamicCommandCenterContent();
+                } catch(e) {
+                    console.error("Error saving recent search:", e);
+                }
+            }
+
+            // Initial render of dynamic lists
+            updateDynamicCommandCenterContent();
+        }
+
+        async function updateDynamicCommandCenterContent() {
+            const gainersContainer = document.getElementById('mobile-home-gainers-container');
+            const losersContainer = document.getElementById('mobile-home-losers-container');
+            const sectorsContainer = document.getElementById('mobile-home-sectors-container');
+            const newsContainer = document.getElementById('mobile-home-news-container');
+
+            // 1. Render Recent Search Pills
+            const pillsContainer = document.getElementById('mobile-home-recent-pills-container');
+            const pillsWrap = document.getElementById('mobile-home-recent-pills');
+            const pillsTitle = document.getElementById('mobile-home-recent-pills-title');
+            if (pillsContainer && pillsWrap) {
+                let recents = [];
+                try {
+                    recents = JSON.parse(localStorage.getItem('recent-mobile-searches') || '[]');
+                } catch(e) {
+                    recents = [];
+                }
+                
+                let isDefault = false;
+                if (recents.length === 0) {
+                    recents = ["RELIANCE", "TCS", "INFY"];
+                    isDefault = true;
+                }
+                
+                if (pillsTitle) {
+                    pillsTitle.innerText = isDefault ? "Popular Stocks" : "Recent Searches";
+                }
+                
+                let pillsHtml = '';
+                recents.forEach(sym => {
+                    pillsHtml += `
+                        <span class="recent-pill-item" data-symbol="${sym}" style="font-size: 11px; font-weight: 700; color: var(--text-primary); background: rgba(255,255,255,0.03); border: 1px solid var(--border-glass); border-radius: 20px; padding: 5px 12px; cursor: pointer; white-space: nowrap; transition: all 0.2s ease;">
+                            ${sym}
+                        </span>
+                    `;
+                });
+                pillsWrap.innerHTML = pillsHtml;
+                pillsContainer.style.display = 'block';
+
+                // Bind pill click actions
+                pillsWrap.querySelectorAll('.recent-pill-item').forEach(pill => {
+                    pill.onclick = () => {
+                        const sym = pill.dataset.symbol;
+                        const mobileInput = document.getElementById('mobile-home-search-input');
+                        if (mobileInput) mobileInput.value = sym;
+                        
+                        const searchInput = document.getElementById('analyzer-search-input');
+                        const searchBtn = document.getElementById('analyzer-search-btn');
+                        if (searchInput && searchBtn) {
+                            searchInput.value = sym;
+                            searchBtn.click();
+                        }
+                    };
+                });
+            }
+
+            // 2. Fetch & Render Gainers and Losers
+            if (gainersContainer && losersContainer) {
+                gainersContainer.innerHTML = `
+                    <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>
+                    <div style="opacity:0.65; height:32px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
+                `;
+                losersContainer.innerHTML = `
+                    <h5 style="margin:15px 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>
+                    <div style="opacity:0.65; height:32px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
+                `;
+
+                try {
+                    const moversRes = await fetch('/api/market-movers');
+                    if (moversRes.ok) {
+                        const moversData = await moversRes.json();
+                        
+                        // Render Advances & Declines Breadth Gauge
+                        const advCount = moversData.advances || 0;
+                        const decCount = moversData.declines || 0;
+                        const advEl = document.getElementById('breadth-advances-count');
+                        const decEl = document.getElementById('breadth-declines-count');
+                        const advBar = document.getElementById('breadth-advances-bar');
+                        const decBar = document.getElementById('breadth-declines-bar');
+                        const gaugeWrap = document.getElementById('mobile-home-breadth-gauge');
+
+                        if (advEl && decEl && advBar && decBar && gaugeWrap) {
+                            if (advCount > 0 || decCount > 0) {
+                                advEl.innerText = advCount;
+                                decEl.innerText = decCount;
+                                const total = advCount + decCount;
+                                const advPct = (advCount / total) * 100;
+                                const decPct = 100 - advPct;
+                                advBar.style.width = advPct + '%';
+                                decBar.style.width = decPct + '%';
+                                gaugeWrap.style.display = 'block';
+                            } else {
+                                const advLbl = document.getElementById('breadth-advances-lbl');
+                                const decLbl = document.getElementById('breadth-declines-lbl');
+                                if (advLbl && decLbl) {
+                                    const advMatch = advLbl.innerText.match(/\d+/);
+                                    const decMatch = decLbl.innerText.match(/\d+/);
+                                    if (advMatch && decMatch) {
+                                        const adv = parseInt(advMatch[0]);
+                                        const dec = parseInt(decMatch[0]);
+                                        advEl.innerText = adv;
+                                        decEl.innerText = dec;
+                                        const total = adv + dec;
+                                        const advPct = (adv / total) * 100;
+                                        const decPct = 100 - advPct;
+                                        advBar.style.width = advPct + '%';
+                                        decBar.style.width = decPct + '%';
+                                        gaugeWrap.style.display = 'block';
+                                    }
+                                }
+                            }
+                        }
+
+                        // Update VIX Volatility Radar Indicator
+                        let vixVal = 13.2;
+                        const changeSpan = document.getElementById('ticker-nifty')?.querySelector('.change');
+                        if (changeSpan) {
+                            const txt = changeSpan.textContent;
+                            const val = parseFloat(txt.replace(/[^\d.-]/g, ''));
+                            const isDown = txt.includes('▼') || txt.includes('-');
+                            if (!isNaN(val)) {
+                                if (isDown) {
+                                    vixVal = 13.5 + (val * 1.5);
+                                } else {
+                                    vixVal = 13.5 - (val * 1.2);
+                                }
+                            }
+                        }
+                        vixVal = Math.max(10.5, Math.min(28.0, vixVal));
+                        
+                        const vixDot = document.getElementById('vix-indicator-dot');
+                        const vixValEl = document.getElementById('vix-indicator-val');
+                        if (vixDot && vixValEl) {
+                            let riskLabel = "Low Risk";
+                            let riskColor = "var(--neon-green, #10b981)";
+                            if (vixVal >= 20.0) {
+                                riskLabel = "High Risk";
+                                riskColor = "var(--color-crimson, #ef4444)";
+                            } else if (vixVal >= 15.0) {
+                                riskLabel = "Moderate Risk";
+                                riskColor = "var(--color-amber, #f59e0b)";
+                            }
+                            
+                            vixDot.style.background = riskColor;
+                            vixDot.style.boxShadow = `0 0 6px ${riskColor}`;
+                            vixValEl.innerText = `VIX: ${vixVal.toFixed(1)} (${riskLabel})`;
+                            vixValEl.style.color = riskColor;
+                        }
+                        
+                        
+                        // Render Gainers
+                        const gainersList = moversData.gainers?.all?.slice(0, 5) || [];
+                        if (gainersList.length > 0) {
+                            let gHtml = `<h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>`;
+                            gainersList.forEach(item => {
+                                const sym = item.symbol.replace(".NS", "");
+                                gHtml += `
+                                    <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-green);">
+                                        <div>
+                                            <strong style="color: var(--text-primary); font-size:12px; font-family:'Outfit';">${sym}</strong>
+                                            <div style="font-size:9.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:12px;">
+                                            <canvas id="gainer-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
+                                            <span style="font-size:11px; font-family:'Outfit'; font-weight:700; color:var(--neon-green); background:rgba(16,185,129,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">+${item.change_pct.toFixed(2)}%</span>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            gainersContainer.innerHTML = gHtml;
+
+                            // Draw Gainer Sparklines and bind clicks
+                            gainersList.forEach(item => {
+                                const sym = item.symbol.replace(".NS", "");
+                                const card = gainersContainer.querySelector(`.recent-stock-card[data-symbol="${sym}"]`);
+                                if (card) {
+                                    card.onclick = () => {
+                                        const searchInput = document.getElementById('analyzer-search-input');
+                                        const searchBtn = document.getElementById('analyzer-search-btn');
+                                        if (searchInput && searchBtn) {
+                                            searchInput.value = sym;
+                                            searchBtn.click();
+                                        }
+                                    };
+                                }
+                                const canvas = document.getElementById(`gainer-sparkline-${sym}`);
+                                if (canvas) {
+                                    const ctx = canvas.getContext('2d');
+                                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                    ctx.beginPath();
+                                    ctx.lineWidth = 1.5;
+                                    ctx.strokeStyle = '#10b981';
+                                    ctx.lineJoin = 'round';
+                                    const points = [10, 12, 9, 15, 17];
+                                    const step = canvas.width / (points.length - 1);
+                                    points.forEach((val, i) => {
+                                        const x = i * step;
+                                        const y = canvas.height - (val / 20) * canvas.height;
+                                        if (i === 0) ctx.moveTo(x, y);
+                                        else ctx.lineTo(x, y);
+                                    });
+                                    ctx.stroke();
+                                }
+                            });
+                        } else {
+                            gainersContainer.innerHTML = '';
+                        }
+
+                        // Render Losers
+                        const losersList = moversData.losers?.all?.slice(0, 5) || [];
+                        if (losersList.length > 0) {
+                            let lHtml = `<h5 style="margin:15px 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>`;
+                            losersList.forEach(item => {
+                                const sym = item.symbol.replace(".NS", "");
+                                lHtml += `
+                                    <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-red);">
+                                        <div>
+                                            <strong style="color: var(--text-primary); font-size:12px; font-family:'Outfit';">${sym}</strong>
+                                            <div style="font-size:9.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:12px;">
+                                            <canvas id="loser-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
+                                            <span style="font-size:11px; font-family:'Outfit'; font-weight:700; color:var(--neon-red); background:rgba(239,68,68,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">${item.change_pct.toFixed(2)}%</span>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            losersContainer.innerHTML = lHtml;
+
+                            // Draw Loser Sparklines and bind clicks
+                            losersList.forEach(item => {
+                                const sym = item.symbol.replace(".NS", "");
+                                const card = losersContainer.querySelector(`.recent-stock-card[data-symbol="${sym}"]`);
+                                if (card) {
+                                    card.onclick = () => {
+                                        const searchInput = document.getElementById('analyzer-search-input');
+                                        const searchBtn = document.getElementById('analyzer-search-btn');
+                                        if (searchInput && searchBtn) {
+                                            searchInput.value = sym;
+                                            searchBtn.click();
+                                        }
+                                    };
+                                }
+                                const canvas = document.getElementById(`loser-sparkline-${sym}`);
+                                if (canvas) {
+                                    const ctx = canvas.getContext('2d');
+                                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                    ctx.beginPath();
+                                    ctx.lineWidth = 1.5;
+                                    ctx.strokeStyle = '#ef4444';
+                                    ctx.lineJoin = 'round';
+                                    const points = [16, 13, 14, 9, 7];
+                                    const step = canvas.width / (points.length - 1);
+                                    points.forEach((val, i) => {
+                                        const x = i * step;
+                                        const y = canvas.height - (val / 20) * canvas.height;
+                                        if (i === 0) ctx.moveTo(x, y);
+                                        else ctx.lineTo(x, y);
+                                    });
+                                    ctx.stroke();
+                                }
+                            });
+                        } else {
+                            losersContainer.innerHTML = '';
+                        }
+                    }
+                } catch(e) {
+                    console.error("Error loading movers:", e);
+                }
+            }
+
+            // 2. Fetch & Render Sectors Leader and Laggard
+            if (sectorsContainer) {
+                sectorsContainer.innerHTML = `
+                    <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
+                    <div style="opacity:0.65; height:32px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
+                `;
+
+                try {
+                    const sectorRes = await fetch('/api/screener/sector-regime');
+                    if (sectorRes.ok) {
+                        const sectorsList = await sectorRes.json();
+                        if (Array.isArray(sectorsList) && sectorsList.length > 0) {
+                            const sortedSectors = [...sectorsList].sort((a, b) => (b.return_1d || 0) - (a.return_1d || 0));
+                            const leader = sortedSectors[0];
+                            const laggard = sortedSectors[sortedSectors.length - 1];
+
+                            const leaderVal = leader.return_1d || 0;
+                            const laggardVal = laggard.return_1d || 0;
+                            const leaderSign = leaderVal >= 0 ? '+' : '';
+                            const laggardSign = laggardVal >= 0 ? '+' : '';
+
+                            // Compile Leaderboard Html (Top 4 leaders and Bottom 4 laggards)
+                            const leadersList = sortedSectors.slice(0, 4);
+                            const laggardsList = sortedSectors.slice(-4).reverse();
+                            let leaderboardHtml = `
+                                <div style="font-size:8px; font-weight:800; color:var(--neon-green, #10b981); text-transform:uppercase; letter-spacing:0.02em; margin-bottom:6px;">Leading Regimes (Top 4)</div>
+                            `;
+                            leadersList.forEach(item => {
+                                const ret = item.return_1d || 0;
+                                const sign = ret >= 0 ? '+' : '';
+                                const barColor = 'var(--neon-green, #10b981)';
+                                const barPct = Math.min(100, Math.max(10, Math.abs(ret) * 30));
+                                leaderboardHtml += `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; margin-bottom:6px;">
+                                        <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                            <span style="font-weight:700; color:var(--text-primary); font-family:'Outfit';">${item.sector}</span>
+                                            <div style="position:relative; width:80px; height:3px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:1.5px; overflow:hidden;">
+                                                <div style="height:100%; width:${barPct}%; background:${barColor};"></div>
+                                            </div>
+                                        </div>
+                                        <span style="font-weight:800; color:${barColor}; font-family:'Outfit';">${sign}${ret.toFixed(2)}%</span>
+                                    </div>
+                                `;
+                            });
+
+                            leaderboardHtml += `
+                                <div style="font-size:8px; font-weight:800; color:var(--color-crimson, #ef4444); text-transform:uppercase; letter-spacing:0.02em; margin-top:10px; margin-bottom:6px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06));">Laggard Regimes (Bottom 4)</div>
+                            `;
+                            laggardsList.forEach(item => {
+                                const ret = item.return_1d || 0;
+                                const sign = ret >= 0 ? '+' : '';
+                                const barColor = 'var(--color-crimson, #ef4444)';
+                                const barPct = Math.min(100, Math.max(10, Math.abs(ret) * 30));
+                                leaderboardHtml += `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; margin-bottom:6px;">
+                                        <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                            <span style="font-weight:700; color:var(--text-primary); font-family:'Outfit';">${item.sector}</span>
+                                            <div style="position:relative; width:80px; height:3px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:1.5px; overflow:hidden;">
+                                                <div style="height:100%; width:${barPct}%; background:${barColor};"></div>
+                                            </div>
+                                        </div>
+                                        <span style="font-weight:800; color:${barColor}; font-family:'Outfit';">${sign}${ret.toFixed(2)}%</span>
+                                    </div>
+                                `;
+                            });
+
+                            sectorsContainer.innerHTML = `
+                                <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
+                                <div class="sector-rotations-card" id="home-sector-rotations-trigger" style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:12px; padding:15px; cursor:pointer; transition:background 0.2s ease;">
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                                        <!-- Leader -->
+                                        <div style="background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.15); padding:10px; border-radius:8px;">
+                                            <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:800; letter-spacing:0.02em;">Leader Sector</div>
+                                            <div style="font-size:12.5px; font-weight:800; color:var(--neon-green, #10b981); margin-top:4px; font-family:'Outfit';">${leader.sector}</div>
+                                            <div style="font-size:10.5px; color:var(--text-secondary); margin-top:2px; font-weight:700;">${leaderSign}${leaderVal.toFixed(2)}%</div>
+                                        </div>
+                                        <!-- Laggard -->
+                                        <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); padding:10px; border-radius:8px;">
+                                            <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:800; letter-spacing:0.02em;">Laggard Sector</div>
+                                            <div style="font-size:12.5px; font-weight:800; color:var(--color-crimson, #ef4444); margin-top:4px; font-family:'Outfit';">${laggard.sector}</div>
+                                            <div style="font-size:10.5px; color:var(--text-secondary); margin-top:2px; font-weight:700;">${laggardVal.toFixed(2)}%</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Dynamic Leaderboard Drawer -->
+                                    <div id="mobile-sector-leaderboard-drawer" style="max-height:0; opacity:0; overflow:hidden; transition:all 0.35s cubic-bezier(0.16, 1, 0.3, 1); margin-top:0;">
+                                        <div style="margin-top:15px; padding-top:12px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06)); display:flex; flex-direction:column; gap:6px;">
+                                            ${leaderboardHtml}
+                                        </div>
+                                    </div>
+                                    <div id="btn-toggle-sector-leaderboard" style="margin-top:12px; text-align:center; font-size:9.5px; font-weight:800; color:var(--color-primary); text-transform:uppercase; letter-spacing:0.05em; border-top:1px solid var(--border-glass); padding-top:8px;">
+                                        View Full Rotations ▾
+                                    </div>
+                                </div>
+                            `;
+
+                            const trigger = document.getElementById('home-sector-rotations-trigger');
+                            if (trigger) {
+                                trigger.onclick = () => window.switchTab('sector-radar');
+                            }
+                            const toggleBtn = document.getElementById('btn-toggle-sector-leaderboard');
+                            const drawer = document.getElementById('mobile-sector-leaderboard-drawer');
+                            if (toggleBtn && drawer) {
+                                toggleBtn.onclick = (e) => {
+                                    e.stopPropagation();
+                                    const isExpanded = drawer.style.maxHeight !== '0px' && drawer.style.maxHeight !== '';
+                                    if (!isExpanded) {
+                                        drawer.style.maxHeight = '480px';
+                                        drawer.style.opacity = '1';
+                                        toggleBtn.innerText = 'Collapse Standings ▴';
+                                    } else {
+                                        drawer.style.maxHeight = '0px';
+                                        drawer.style.opacity = '0';
+                                        toggleBtn.innerText = 'View Full Rotations ▾';
+                                    }
+                                };
+                            }
+                        } else {
+                            sectorsContainer.innerHTML = '';
+                        }
+                    }
+                } catch(e) {
+                    console.error("Error loading sectors standings:", e);
+                }
+            }
+
+            // 3. Fetch & Render Bloomberg-style News Alerts
+            if (newsContainer) {
+                if (!newsContainer.innerHTML.includes('bloomberg-news-card') && !newsContainer.innerHTML.includes('shimmer-sweep')) {
+                    newsContainer.innerHTML = `
+                        <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>
+                        <div style="display:flex; flex-direction:column; gap:10px; opacity:0.65;">
+                            <div class="shimmer-sweep" style="height:48px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
+                        </div>
+                    `;
+                }
+
+                try {
+                    const newsRes = await fetch('/api/market-news?refresh=false&run_llm=false');
+                    if (newsRes.ok) {
+                        const newsData = await newsRes.json();
+                        if (newsData.news_items && newsData.news_items.length > 0) {
+                            const isExpanded = newsContainer.dataset.expanded === 'true';
+                            const newsToShow = isExpanded ? newsData.news_items.slice(0, 10) : newsData.news_items.slice(0, 3);
+
+                            let newsHtml = `<h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:Outfit; font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>`;
+                            newsToShow.forEach(item => {
+                                const cleanTitle = item.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+                                const sentiment = item.sentiment || 'Neutral';
+                                let accentColor = '#3b82f6';
+                                let sentimentBadge = '';
+                                if (sentiment === 'Bullish') {
+                                    accentColor = '#10b981';
+                                    sentimentBadge = `<span style="font-size:8px; font-weight:800; padding:2px 6px; border-radius:3px; background:rgba(16,185,129,0.12); color:var(--neon-green); border:1px solid rgba(16,185,129,0.25); text-transform:uppercase; letter-spacing:0.02em;">Bullish Catalyst</span>`;
+                                } else if (sentiment === 'Bearish') {
+                                    accentColor = '#ef4444';
+                                    sentimentBadge = `<span style="font-size:8px; font-weight:800; padding:2px 6px; border-radius:3px; background:rgba(239,68,68,0.12); color:var(--neon-red); border:1px solid rgba(239,68,68,0.25); text-transform:uppercase; letter-spacing:0.02em;">Bearish Catalyst</span>`;
+                                } else {
+                                    sentimentBadge = `<span style="font-size:8px; font-weight:800; padding:2px 6px; border-radius:3px; background:rgba(255,255,255,0.04); color:var(--text-secondary); border:1px solid var(--border-glass); text-transform:uppercase; letter-spacing:0.02em;">Market Catalyst</span>`;
+                                }
+
+                                // Seed stable pseudo-random impact value from title hash
+                                let titleHash = 0;
+                                for (let ch = 0; ch < cleanTitle.length; ch++) {
+                                    titleHash += cleanTitle.charCodeAt(ch);
+                                }
+                                let impactVal = 50;
+                                if (sentiment === 'Bullish') {
+                                    impactVal = 70 + (titleHash % 26);
+                                } else if (sentiment === 'Bearish') {
+                                    impactVal = 72 + (titleHash % 24);
+                                } else {
+                                    impactVal = 40 + (titleHash % 25);
+                                }
+
+                                newsHtml += `
+                                    <div class="bloomberg-news-card" style="--news-sentiment-color:${accentColor};" onclick="window.open('${item.link}', '_blank')">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                            <span style="font-size:8.5px; color:var(--text-muted); font-weight:700;">${item.source || 'News'} • ${item.date || 'Today'}</span>
+                                            ${sentimentBadge}
+                                        </div>
+                                        <div style="font-size:11px; font-family:'Outfit'; font-weight:600; color:var(--text-primary); line-height:1.45;">${cleanTitle}</div>
+                                        
+                                        <!-- Bloomberg Impact Weight Indicator -->
+                                        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06)); font-size:8.5px; color:var(--text-muted);">
+                                            <span style="font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Catalyst Impact Weight</span>
+                                            <div style="display:flex; align-items:center; gap:6px; width:70px; justify-content:flex-end;">
+                                                <div style="position:relative; width:45px; height:3px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:1.5px; overflow:hidden;">
+                                                    <div style="height:100%; width:${impactVal}%; background:${accentColor};"></div>
+                                                </div>
+                                                <span style="font-weight:800; color:${accentColor}; font-family:'Outfit'; font-size:9px;">${(impactVal/10).toFixed(1)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+
+                            if (newsData.news_items.length > 3) {
+                                newsHtml += `
+                                    <button id="btn-toggle-news-expansion" style="width:100%; padding:10px; margin-top:5px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:8px; color:var(--text-secondary); font-family:'Outfit'; font-size:11px; font-weight:700; cursor:pointer; text-align:center; transition: all 0.2s ease;">
+                                        ${isExpanded ? 'Show Less Catalyst News ▴' : 'Show More Catalyst News ▾'}
+                                    </button>
+                                `;
+                            }
+
+                            newsContainer.innerHTML = newsHtml;
+
+                            // Wire expansion click
+                            const btnToggle = document.getElementById('btn-toggle-news-expansion');
+                            if (btnToggle) {
+                                btnToggle.onclick = () => {
+                                    const nextExpanded = !isExpanded;
+                                    newsContainer.dataset.expanded = nextExpanded ? 'true' : 'false';
+                                    updateDynamicCommandCenterContent();
+                                    if (nextExpanded) {
+                                        setTimeout(() => {
+                                            btnToggle.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                                        }, 50);
+                                    }
+                                };
+                            }
+                        } else {
+                            newsContainer.innerHTML = '';
+                        }
+                    }
+                } catch(e) {
+                    console.error("Error loading homepage news:", e);
+                    newsContainer.innerHTML = '';
+                }
+            }
+
+            // 4. Update dynamic summaries
+            const summaryEl = document.getElementById('mobile-home-copilot-summary');
+            if (summaryEl) {
+                summaryEl.innerHTML = deriveMarketBreadthGreeting();
+            }
+        }
+
+        // Wire android mic listener relay
+        const originalSpeechStart = window.onAndroidSpeechStart;
+        window.onAndroidSpeechStart = function() {
+            if (originalSpeechStart) originalSpeechStart();
+            const homeMic = document.getElementById('mobile-home-mic-btn');
+            if (homeMic) {
+                homeMic.innerHTML = '🔴';
+                homeMic.classList.add('mic-listening');
+            }
+        };
+
+        const originalSpeechEnd = window.onAndroidSpeechEnd;
+        window.onAndroidSpeechEnd = function() {
+            if (originalSpeechEnd) originalSpeechEnd();
+            const homeMic = document.getElementById('mobile-home-mic-btn');
+            if (homeMic) {
+                homeMic.innerHTML = '🎙️';
+                homeMic.classList.remove('mic-listening');
+            }
+        };
+
+        const originalSpeechError = window.onAndroidSpeechError;
+        window.onAndroidSpeechError = function(err) {
+            if (originalSpeechError) originalSpeechError(err);
+            const homeMic = document.getElementById('mobile-home-mic-btn');
+            if (homeMic) {
+                homeMic.innerHTML = '🎙️';
+                homeMic.classList.remove('mic-listening');
+            }
+        };
+
+        setupWatchlistTableObserver();
+        setupPortfolioTableObserver();
+        setupUniverseTableObserver();
+        setupAlertsTableObserver();
+        setupRuleScannerTableObserver();
+        setupScreenerTableObserver();
+        setupSectorRadarTableObserver();
+        initMobileHomepageCommandCenter();
+
         initSleekFooterSettings();
         initPINKeypadLock();
 
@@ -2356,6 +4152,41 @@
             });
         }
     }
+
+    // Setup Quick Launcher Pills for Hero Card & Mobile Workstation
+    const setupQuickLauncherPills = () => {
+        document.body.addEventListener('click', (e) => {
+            const pill = e.target.closest('.hero-quick-pill');
+            if (!pill) return;
+            const symbol = pill.getAttribute('data-symbol');
+            if (!symbol) return;
+            
+            const cleanSymbol = symbol.replace('.NS', '');
+            
+            // 1. Populate desktop search input & click desktop analyze button
+            const desktopSearchInput = document.getElementById('analyzer-search-input');
+            const desktopSearchBtn = document.getElementById('analyzer-search-btn');
+            if (desktopSearchInput) desktopSearchInput.value = cleanSymbol;
+            
+            if (desktopSearchBtn && desktopSearchBtn.offsetParent !== null) {
+                desktopSearchBtn.click();
+                return;
+            }
+
+            // 2. Populate mobile search input & trigger Enter keypress
+            const mobileSearchInput = document.getElementById('mobile-home-search-input');
+            if (mobileSearchInput) {
+                mobileSearchInput.value = cleanSymbol;
+                const enterEvent = new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
+                mobileSearchInput.dispatchEvent(enterEvent);
+            }
+
+            // 3. Fallback: call desktop search button click directly
+            if (desktopSearchBtn) {
+                desktopSearchBtn.click();
+            }
+        });
+    };
 
     // Initialize all visual modernization layers safely
     const initModernizer = () => {
@@ -2390,6 +4221,7 @@
         safeCall('setupCatalystModalListeners', setupCatalystModalListeners);
         safeCall('setupSettingsSearchToggle', setupSettingsSearchToggle);
         safeCall('setupMobileUpgrades', setupMobileUpgrades);
+        safeCall('setupQuickLauncherPills', setupQuickLauncherPills);
     };
 
     if (document.readyState === 'loading') {

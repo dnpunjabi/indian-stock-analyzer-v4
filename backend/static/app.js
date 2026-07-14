@@ -2057,7 +2057,6 @@ function setupTabNavigation() {
 }
 
 function switchTab(tabKey) {
-    if (activeTab === tabKey) return;
     activeTab = tabKey;
     localStorage.setItem('active-tab', tabKey);
 
@@ -2069,7 +2068,6 @@ function switchTab(tabKey) {
             const overlay = document.getElementById('portfolio-lock-overlay');
             if (overlay) overlay.classList.remove('hidden');
             if (window.triggerBiometricVerification) {
-                // Introduce a small delay to avoid native lifecycle/context conflicts during Android layout transitions
                 setTimeout(() => {
                     if (activeTab === 'portfolio' && !window.portfolioUnlocked) {
                         window.triggerBiometricVerification();
@@ -2118,6 +2116,37 @@ function switchTab(tabKey) {
         }
     });
 
+    if (tabKey === 'analyzer') {
+        const hasStock = activeStockProfile && activeStockProfile.ticker;
+        if (hasStock && !window.forceHomepageMode) {
+            const dashboard = document.getElementById('analyzer-dashboard');
+            if (dashboard) dashboard.style.display = 'block';
+            const emptyState = document.getElementById('analyzer-empty-state');
+            if (emptyState) emptyState.style.display = 'none';
+            const analyzerTab = document.getElementById('tab-analyzer');
+            if (analyzerTab) analyzerTab.classList.remove('homepage-active');
+            document.body.classList.remove('homepage-active');
+            const cc = document.getElementById('mobile-homepage-command-center');
+            if (cc) cc.style.display = 'none';
+        } else {
+            const dashboard = document.getElementById('analyzer-dashboard');
+            if (dashboard) dashboard.style.display = 'none';
+            const emptyState = document.getElementById('analyzer-empty-state');
+            if (emptyState) emptyState.style.display = 'block';
+            const analyzerTab = document.getElementById('tab-analyzer');
+            if (analyzerTab) analyzerTab.classList.add('homepage-active');
+            document.body.classList.add('homepage-active');
+            const cc = document.getElementById('mobile-homepage-command-center');
+            if (cc) {
+                cc.style.display = 'block';
+                if (typeof renderMobileHomepageCommandCenter === 'function') {
+                    renderMobileHomepageCommandCenter();
+                }
+            }
+        }
+        window.forceHomepageMode = false;
+    }
+
     // Expose switchTab globally
     window.switchTab = switchTab;
 
@@ -2163,18 +2192,42 @@ function switchTab(tabKey) {
     }
 }
 
+function showHomepageView() {
+    window.forceHomepageMode = true;
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.remove('open');
+
+    if (window.switchTab) {
+        window.switchTab('analyzer');
+    } else {
+        switchTab('analyzer');
+    }
+}
+
+function showTerminalView() {
+    window.forceHomepageMode = false;
+    if (window.switchTab) {
+        window.switchTab('analyzer');
+    } else {
+        switchTab('analyzer');
+    }
+}
+
+window.showHomepageView = showHomepageView;
+window.showTerminalView = showTerminalView;
+
 function setupBrandReset() {
     const brand = document.getElementById('logo-brand-reset');
     if (brand) {
         brand.addEventListener('click', () => {
-            resetWorkspace();
+            showHomepageView();
         });
     }
 
     const mobileBrand = document.getElementById('mobile-logo-reset');
     if (mobileBrand) {
         mobileBrand.addEventListener('click', () => {
-            resetWorkspace();
+            showHomepageView();
         });
     }
 }
@@ -2258,6 +2311,21 @@ function resetWorkspace() {
     const conviction = document.getElementById('meta-ai-conviction-text');
     if (conviction) conviction.innerText = 'Score: --/100';
 
+    // Reset Day Range and 52-Week Range in the header
+    const dayLowEl = document.getElementById('meta-day-low');
+    if (dayLowEl) dayLowEl.innerText = 'L: --';
+    const dayHighEl = document.getElementById('meta-day-high');
+    if (dayHighEl) dayHighEl.innerText = 'H: --';
+    const dayBarEl = document.getElementById('meta-day-bar');
+    if (dayBarEl) dayBarEl.style.width = '0%';
+    
+    const w52LowEl = document.getElementById('meta-52w-low');
+    if (w52LowEl) w52LowEl.innerText = 'L: --';
+    const w52HighEl = document.getElementById('meta-52w-high');
+    if (w52HighEl) w52HighEl.innerText = 'H: --';
+    const w52BarEl = document.getElementById('meta-52w-bar');
+    if (w52BarEl) w52BarEl.style.width = '0%';
+
     // Toggles dashboard visibility back to empty state
     const dashboard = document.getElementById('analyzer-dashboard');
     if (dashboard) dashboard.style.display = 'none';
@@ -2274,6 +2342,10 @@ function resetWorkspace() {
     if (pitchbookContentPane) pitchbookContentPane.innerHTML = '';
     const pitchbookBtn = document.getElementById('export-pitchbook-btn');
     if (pitchbookBtn) pitchbookBtn.style.display = 'none';
+
+    // Clear mobile tearsheet (dynamically injected by modernizer.js)
+    const mobileTearsheet = document.getElementById('mobile-tearsheet-container');
+    if (mobileTearsheet) mobileTearsheet.innerHTML = '';
 
     // Navigate back to the Equity Research Terminal
     switchTab('analyzer');
@@ -5292,10 +5364,15 @@ async function loadStockAnalyzer(query, force_llm = false, silent = false) {
             loadStockEvents(profile.ticker);
         }
 
-        // Handle Institutional Pitchbook Button
+        // Handle Institutional Pitchbook & PDF Buttons
         const pitchbookBtn = document.getElementById('export-pitchbook-btn');
         if (pitchbookBtn) {
-            pitchbookBtn.style.display = 'flex';
+            pitchbookBtn.style.display = 'inline-flex';
+        }
+        const exportBtn = document.getElementById('export-pdf-btn');
+        if (exportBtn) {
+            exportBtn.removeAttribute('disabled');
+            exportBtn.style.display = 'inline-flex';
         }
 
         // Handle AI Prospectus Upgrade Banner
@@ -5818,7 +5895,10 @@ function renderStockDashboard(p) {
     }
 
     const exportBtn = document.getElementById('export-pdf-btn');
-    if (exportBtn) exportBtn.removeAttribute('disabled');
+    if (exportBtn) {
+        exportBtn.removeAttribute('disabled');
+        exportBtn.style.display = 'inline-flex';
+    }
 
     // Explicitly align search input with active stock
     const searchInput = document.getElementById('analyzer-search-input');
@@ -16205,6 +16285,9 @@ function setupThemeToggle() {
         localStorage.setItem('theme-accent', 'slate-quantitative');
     }
 
+    const savedTypography = localStorage.getItem('typography-preset') || 'modern';
+    document.documentElement.setAttribute('data-typography', savedTypography);
+
     document.documentElement.setAttribute('data-mode', savedMode);
     if (savedMode === 'light') {
         document.documentElement.setAttribute('data-theme', 'light');
@@ -16217,6 +16300,15 @@ function setupThemeToggle() {
     // Wire dropdown selectors
     const modeSelect = document.getElementById('setting-theme-mode');
     const accentSelect = document.getElementById('setting-theme-accent');
+    const typographySelect = document.getElementById('setting-typography-preset');
+
+    if (typographySelect) {
+        typographySelect.value = savedTypography;
+        typographySelect.addEventListener('change', (e) => {
+            const newTypography = e.target.value;
+            setTypographyPreset(newTypography);
+        });
+    }
 
     if (modeSelect) {
         modeSelect.value = savedMode;
@@ -16342,6 +16434,18 @@ function setWorkstationAccent(accent) {
     }
 
     refreshChartThemeColors();
+}
+
+function setTypographyPreset(preset) {
+    document.documentElement.setAttribute('data-typography', preset);
+    localStorage.setItem('typography-preset', preset);
+    const typographySelect = document.getElementById('setting-typography-preset');
+    if (typographySelect) typographySelect.value = preset;
+    
+    let label = 'Apex Modern';
+    if (preset === 'terminal') label = 'Institutional';
+    if (preset === 'developer') label = 'Quantitative';
+    showToast(`Typography set to ${label}`, 'success');
 }
 
 function refreshChartThemeColors() {
@@ -31968,6 +32072,10 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
         const closeBtn = document.getElementById('sector-stocks-modal-close-btn');
 
         if (!modal || !tableBody) return;
+
+        // Reset and set active-period class for mobile column filtering
+        modal.className = modal.className.replace(/\bactive-period-\S+/g, '');
+        modal.classList.add(`active-period-${period}`);
 
         // Reset search input
         if (searchInput) searchInput.value = '';

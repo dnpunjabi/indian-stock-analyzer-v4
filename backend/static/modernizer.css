@@ -726,3 +726,318 @@ table tbody tr:hover {
     color: var(--color-primary);
 }
 
+/* ==========================================================================
+   INSTITUTIONAL TIER-1 HOMEPAGE ARCHITECTURE (OPTION A)
+   ========================================================================== */
+.inst-hero-card {
+    position: relative;
+    padding: 28px 32px;
+    background: radial-gradient(120% 120% at 50% 0%, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    margin-bottom: 24px;
+    text-align: left;
+    overflow: hidden;
+}
+
+.inst-hero-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: 20%;
+    width: 60%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+.inst-hero-badge-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.inst-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: #60a5fa;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    padding: 3px 10px;
+    border-radius: 99px;
+    text-transform: uppercase;
+}
+
+.inst-pulse-dot {
+    width: 6px;
+    height: 6px;
+    background: #3b82f6;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #3b82f6;
+    animation: instPulse 1.8s infinite;
+}
+
+@keyframes instPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.inst-hero-status-pill {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.05em;
+}
+
+.inst-hero-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    color: #f8fafc;
+    margin: 0 0 8px 0;
+    line-height: 1.25;
+    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.inst-hero-subtitle {
+    font-size: 12.5px;
+    color: #94a3b8;
+    line-height: 1.55;
+    margin: 0 0 20px 0;
+    max-width: 780px;
+}
+
+/* Quick Stock Launcher Pills */
+.inst-hero-launcher-container {
+    margin-bottom: 22px;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 12px 14px;
+    border-radius: 12px;
+}
+
+.launcher-label {
+    display: block;
+    font-size: 9.5px;
+    font-weight: 800;
+    color: #3b82f6;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+}
+
+.launcher-pills-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.hero-quick-pill {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e2e8f0;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    outline: none;
+}
+
+.hero-quick-pill .pill-sector {
+    font-size: 8.5px;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.hero-quick-pill:hover {
+    background: rgba(59, 130, 246, 0.18);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.hero-quick-pill:hover .pill-sector {
+    color: #93c5fd;
+}
+
+/* Features Grid */
+.inst-hero-features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.inst-feature-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+
+.chip-icon {
+    font-size: 16px;
+}
+
+.chip-text strong {
+    display: block;
+    font-size: 11px;
+    color: #f1f5f9;
+}
+
+.chip-text span {
+    font-size: 9.5px;
+    color: #64748b;
+}
+
+/* 4 Quick Analysis Workspaces Box Styling */
+.mobile-cmd-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.cmd-svg-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.cmd-badge {
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.badge-blue { background: rgba(59, 130, 246, 0.12); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); }
+.badge-green { background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+.badge-amber { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-red { background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+.inst-card-screener:hover { border-color: rgba(59, 130, 246, 0.4); box-shadow: 0 6px 20px rgba(59, 130, 246, 0.15); }
+.inst-card-radar:hover { border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.15); }
+.inst-card-scanner:hover { border-color: rgba(245, 158, 11, 0.4); box-shadow: 0 6px 20px rgba(245, 158, 11, 0.15); }
+.inst-card-alerts:hover { border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 6px 20px rgba(239, 68, 68, 0.15); }
+
+/* ==========================================================================
+   HIGH-GRADE ENTERPRISE HEADER BRANDING (APEX QUANT AI)
+   ========================================================================== */
+.inst-brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    border-radius: 99px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: all 0.25s ease;
+    user-select: none;
+}
+
+.inst-brand-badge:hover {
+    background: rgba(30, 41, 59, 0.75);
+    border-color: rgba(56, 189, 248, 0.45);
+    transform: scale(1.02);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+}
+
+.inst-brand-icon-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
+}
+
+.inst-logo-svg {
+    animation: logoPulse 3s ease-in-out infinite alternate;
+}
+
+@keyframes logoPulse {
+    0% { filter: drop-shadow(0 0 3px #0284c7); }
+    100% { filter: drop-shadow(0 0 8px #38bdf8); }
+}
+
+.inst-brand-text {
+    font-family: 'Outfit', sans-serif;
+    font-size: 13.5px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    line-height: 1;
+}
+
+.brand-part-apex {
+    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.brand-part-quant {
+    background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+}
+
+/* Light Theme High Contrast Overrides */
+[data-mode="light"] .inst-brand-badge,
+[data-theme="light"] .inst-brand-badge,
+body.light-theme .inst-brand-badge {
+    background: rgba(241, 245, 249, 0.95);
+    border: 1px solid rgba(2, 132, 199, 0.35);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+[data-mode="light"] .brand-part-apex,
+[data-theme="light"] .brand-part-apex,
+body.light-theme .brand-part-apex {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+[data-mode="light"] .brand-part-quant,
+[data-theme="light"] .brand-part-quant,
+body.light-theme .brand-part-quant {
+    background: linear-gradient(135deg, #0284c7 0%, #3730a3 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 900;
+    text-shadow: none;
+}
+
+

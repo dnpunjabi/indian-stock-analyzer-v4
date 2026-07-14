@@ -9,15 +9,15 @@
     <!-- Fonts from Google -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- TradingView Lightweight Charts -->
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <!-- TradingView Advanced Widget -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <link rel="stylesheet" href="styles.css?v=1.6.6">
-    <link rel="stylesheet" href="modernizer.css">
+    <link rel="stylesheet" href="styles.css?v=1.7.2">
+    <link rel="stylesheet" href="modernizer.css?v=1.2">
     <style>
         /* Light mode strategy guides visibility override */
         [data-mode="light"] #rule-scanner-strategy-guide,
@@ -153,7 +153,25 @@
     <!-- Mobile Header -->
     <header class="mobile-header no-print">
         <button id="mobile-menu-toggle" class="mobile-menu-toggle">☰</button>
-        <div class="mobile-logo" id="mobile-logo-reset" style="cursor: pointer;" title="Click to Reset Workspace">APEX AGENTIC AI</div>
+        <div class="mobile-logo inst-brand-badge" id="mobile-logo-reset" style="cursor: pointer;" title="Click to Reset Workspace">
+            <div class="inst-brand-icon-wrap">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="inst-logo-svg">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#brandGrad1)" stroke="#38bdf8" stroke-width="1.2"/>
+                    <path d="M2 17L12 22L22 17" stroke="#38bdf8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="#818cf8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="brandGrad1" x1="2" y1="2" x2="22" y2="12" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#0284c7"/>
+                            <stop offset="1" stop-color="#6366f1"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <span class="inst-brand-text">
+                <span class="brand-part-apex">APEX</span>
+                <span class="brand-part-quant">QUANT AI</span>
+            </span>
+        </div>
         <div id="mobile-ws-dot" class="mobile-ws-dot-indicator" title="WebSocket Live Status" style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 6px #ef4444; margin-left: auto; margin-right: 12px; display: inline-block;"></div>
         <button id="mobile-theme-toggle" class="theme-toggle-btn" style="margin-left: 0;">🌓</button>
     </header>
@@ -526,6 +544,14 @@
                                             <option value="solarized-light">☀️ Solarized Light</option>
                                             <option value="github-light">🐙 GitHub Light</option>
                                         </optgroup>
+                                    </select>
+                                </div>
+                                <div class="setting-row">
+                                    <label>Typography Mode</label>
+                                    <select id="setting-typography-preset" style="background:#000; color:#fff; border:1px solid var(--border-glass); border-radius:4px; padding:2px 4px; font-size:10px; cursor: pointer;">
+                                        <option value="modern" selected>📐 Apex Modern</option>
+                                        <option value="terminal">🏛️ Institutional</option>
+                                        <option value="developer">💻 Quantitative</option>
                                     </select>
                                 </div>
                                 <div class="setting-row">
@@ -1468,18 +1494,51 @@
                             </select>
                             <button id="add-to-watchlist-btn">Add</button>
                         </div>
-                        
-                        <button class="btn-secondary" id="export-pdf-btn" disabled><span>📄</span> Export Research PDF</button>
                     </div>
                 </div>
 
 
 
                 <!-- Empty State -->
-                <div class="empty-state-card card" id="analyzer-empty-state">
-                    <div class="empty-icon">📊</div>
-                    <h2>No Indian Stock Loaded</h2>
-                    <p>Enter a company name in the search bar above or choose a stock from the screener to run the multi-agent AI research pipeline.</p>
+                <div class="empty-state-card" id="analyzer-empty-state">
+                    <!-- Desktop & Shared Institutional Hero Command Center -->
+                    <div class="desktop-empty-state inst-hero-card">
+                        <div class="inst-hero-badge-strip">
+                            <span class="inst-hero-badge"><span class="inst-pulse-dot"></span> APEX MULTI-AGENT QUANT ENGINE v3.0</span>
+                            <span class="inst-hero-status-pill">INSTITUTIONAL CONSOLE | READY</span>
+                        </div>
+                        <h2 class="inst-hero-title">Institutional Equity Research & AI Analytics</h2>
+                        <p class="inst-hero-subtitle">
+                            Deploy multi-agent diagnostics across intrinsic DCF valuations, forensic accounting, quarterly concall sentiment, momentum radar, and automated target pricing.
+                        </p>
+
+                        <!-- Live Pipeline Capabilities Grid -->
+                        <div class="inst-hero-features-grid">
+                            <div class="inst-feature-chip">
+                                <span class="chip-icon">🧮</span>
+                                <div class="chip-text">
+                                    <strong>DCF Intrinsic Valuation</strong>
+                                    <span>Multi-scenario 3-stage model</span>
+                                </div>
+                            </div>
+                            <div class="inst-feature-chip">
+                                <span class="chip-icon">🛡️</span>
+                                <div class="chip-text">
+                                    <strong>Forensic Audit Scan</strong>
+                                    <span>Altman Z & Beneish M Score</span>
+                                </div>
+                            </div>
+                            <div class="inst-feature-chip">
+                                <span class="chip-icon">🎙️</span>
+                                <div class="chip-text">
+                                    <strong>Concall Sentiment AI</strong>
+                                    <span>Quarterly executive tone breakdown</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Mobile-only Command Center Dashboard -->
+                    <div id="mobile-homepage-command-center" style="display: none;"></div>
                 </div>
 
                 <!-- Active Dashboard -->
@@ -1505,8 +1564,13 @@
                                 <div id="meta-fs-alert-container" style="display: inline-flex; align-items: center; gap: 4px; height: 18px;"></div>
                                 
                                 <!-- Export Pitchbook Button -->
-                                <button id="export-pitchbook-btn" class="header-action-btn" style="display: none; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); font-size: 9.5px; font-weight: bold; color: var(--color-primary-light); cursor: pointer; height: 18px; line-height: 1.1; margin-left: 0; outline: none; border-radius: 99px;">
+                                <button id="export-pitchbook-btn" class="header-action-btn" style="display: none; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); font-size: 9.5px; font-weight: bold; color: var(--color-primary-light); cursor: pointer; height: 18px; line-height: 1.1; margin-left: 0; outline: none;">
                                     📄 Pitchbook
+                                </button>
+                                
+                                <!-- Export PDF Report Button -->
+                                <button id="export-pdf-btn" class="header-action-btn" disabled style="display: none; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); font-size: 9.5px; font-weight: bold; color: #10b981; cursor: pointer; height: 18px; line-height: 1.1; margin-left: 0; outline: none; transition: all 0.2s;">
+                                    📄 PDF Report
                                 </button>
 
                                 <button id="meta-banner-toggle-btn" style="font-size: 9px; padding: 2px 6px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border-glass); background: rgba(255,255,255,0.03); color: var(--text-secondary); display: inline-flex; align-items: center; gap: 3px; font-weight: 600; outline: none; transition: all 0.2s;">
@@ -6001,11 +6065,9 @@
                 </div>
             </section>
 
-            <!-- SECTION 5: PERSONAL WATCHLISTS -->
             <section class="workspace-tab" id="tab-watchlist" style="display: none;">
                 <div class="section-header">
-                    <h2>Watchlist Registry</h2>
-                    <p>Manage watchlists with real-time quantitative monitoring. Persisted and audited automatically in the local database.</p>
+                     <h2>Watchlist Registry</h2>
                 </div>
 
                 <!-- Watchlist Telemetry Grid -->
@@ -8242,7 +8304,7 @@
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
     <script src="export_manager.js?v=1.1.7"></script>
-    <script src="app.js?v=1.7.6"></script>
+    <script src="app.js?v=1.8.1"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
@@ -8251,7 +8313,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
 
     <!-- Modernization Custom Layer -->
-    <script src="modernizer.js?v=6.7"></script>
+    <script src="modernizer.js?v=7.3"></script>
 </body>
 </html>
 
