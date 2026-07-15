@@ -258,7 +258,7 @@ class ConnectionManager:
             result.update(symbols)
         return result
 
-    async def broadcast_ticks(self, ticks: Dict[str, Dict]):
+    async def broadcast_ticks(self, ticks: Dict[str, Dict], source: str = "yfinance_fallback"):
         """Send tick updates to each client, filtered by their subscription set."""
         disconnected = []
         indices = {"^NSEI", "^BSESN", "^NSEBANK", "^CNXIT", "^CNXINFRA", "^CNXAUTO"}
@@ -268,7 +268,7 @@ class ConnectionManager:
             if not client_ticks:
                 continue
             try:
-                await ws.send_json({"type": "ticks", "data": client_ticks})
+                await ws.send_json({"type": "ticks", "data": client_ticks, "source": source})
             except Exception:
                 disconnected.append(ws)
 
@@ -823,7 +823,14 @@ async def _broadcast_loop():
             if all_symbols:
                 ticks = tick_store.get_batch(list(all_symbols))
                 if ticks:
-                    await connection_manager.broadcast_ticks(ticks)
+                    is_angel_active = (
+                        _angel_connector 
+                        and _angel_connector.is_authenticated() 
+                        and _angel_thread is not None 
+                        and _angel_thread.is_alive()
+                    )
+                    current_source = "angel" if is_angel_active else "yfinance_fallback"
+                    await connection_manager.broadcast_ticks(ticks, source=current_source)
 
             # 2. Broadcast any triggered alerts
             if alert_evaluator:

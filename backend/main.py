@@ -4,6 +4,7 @@ import sqlite3
 import asyncio
 import time
 import uuid
+import threading
 
 # Dynamic IPv6/IPv4 selector to support both normal networks and restricted environments (e.g. Oracle VM)
 try:
@@ -1443,16 +1444,119 @@ def update_nse_bulk_block_deals():
     except Exception as e:
         print(f"Failed to fetch/parse NSE Block Deals: {e}")
 
+# Global concurrency lock for sector regime recalculations
+_SECTOR_REGIME_LOCK = threading.Lock()
+_SECTOR_1D_LOCK = threading.Lock()
+
+def update_sector_1d_stats():
+    """
+    Lightweight intraday refresher: fetches only 5-day daily bars to calculate today's 1d % change
+    and updates stock_regime_stats.return_1d & sector_regime_stats.return_1d without wiping
+    or re-computing historical multi-period stats (5d, 1m, 3m, 6m, 1y, 5y, YTD).
+    Runs every ~60-90s during market hours (09:15-15:30 IST).
+    """
+    if not _SECTOR_1D_LOCK.acquire(blocking=False):
+        print("Intraday sector 1D refresh already in progress. Skipping duplicate execution.")
+        return
+        
+    try:
+        import yfinance as yf
+        import pandas as pd
+        from datetime import datetime
+        print("Running lightweight intraday 1D sector stats refresh...")
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT symbol, sector FROM screener_universe WHERE symbol NOT LIKE '%DUMMY%'")
+            stocks = []
+            for r in cursor.fetchall():
+                if isinstance(r, (dict, sqlite3.Row)) or (hasattr(r, "keys") and "symbol" in r.keys()):
+                    stocks.append({"symbol": r["symbol"], "sector": r["sector"]})
+                else:
+                    stocks.append({"symbol": r[0], "sector": r[1]})
+            
+        if not stocks:
+            return
+            
+        tickers = [s["symbol"] for s in stocks]
+        
+        # Download only 5 days history in batch (fast quote fetch)
+        data = yf.download(tickers, period="5d", progress=False)
+        
+        returns_1d = {}
+        for s in stocks:
+            sym = s["symbol"]
+            try:
+                if isinstance(data.columns, pd.MultiIndex):
+                    if sym in data.columns.levels[1]:
+                        close_col = data['Close'][sym].dropna()
+                    else:
+                        close_col = pd.Series()
+                else:
+                    close_col = data['Close'].dropna()
+                
+                length = len(close_col)
+                if length >= 2:
+                    p_end = float(close_col.iloc[-1])
+                    p_1d = float(close_col.iloc[-2]) if length >= 2 else float(close_col.iloc[0])
+                    returns_1d[sym] = ((p_end - p_1d) / p_1d) * 100.0 if p_1d > 0 else 0.0
+            except Exception:
+                continue
+
+        if not returns_1d:
+            return
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Compute updated sector averages for 1d
+        sector_1d_lists = {}
+        for s in stocks:
+            sec = s["sector"]
+            sym = s["symbol"]
+            if sym in returns_1d:
+                if sec not in sector_1d_lists:
+                    sector_1d_lists[sec] = []
+                sector_1d_lists[sec].append(returns_1d[sym])
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+            # Update individual stock 1d returns
+            for sym, ret in returns_1d.items():
+                cursor.execute("""
+                    UPDATE stock_regime_stats 
+                    SET return_1d = ?, updated_at = ?
+                    WHERE symbol = ?
+                """, (round(ret, 2), now_str, sym))
+            
+            # Update sector 1d averages
+            for sec, vals in sector_1d_lists.items():
+                avg_1d = sum(vals) / len(vals) if vals else 0.0
+                cursor.execute("""
+                    UPDATE sector_regime_stats 
+                    SET return_1d = ?, updated_at = ?
+                    WHERE sector = ?
+                """, (round(avg_1d, 2), now_str, sec))
+            conn.commit()
+        print("Intraday sector 1D refresh completed successfully.")
+    except Exception as e:
+        print(f"Error in update_sector_1d_stats: {e}")
+    finally:
+        _SECTOR_1D_LOCK.release()
+
 
 def update_sector_regime_stats():
     """
     Computes the average sector returns for 1d, 5d, 1m, 3m, 6m, 1y, 5y, and YTD lookbacks
     and saves them to the sector_regime_stats table.
+    Guarded by a single-flight mutex to prevent concurrent execution.
     """
-    import yfinance as yf
-    import pandas as pd
-    from datetime import datetime
+    if not _SECTOR_REGIME_LOCK.acquire(blocking=False):
+        print("Full sector regime update already in progress. Skipping duplicate execution.")
+        return
+
     try:
+        import yfinance as yf
+        import pandas as pd
+        from datetime import datetime
         print("Computing sector relative strength regime stats (1d, 5d, 1m, 3m, 6m, 1y, 5y, YTD)...")
         with get_db() as conn:
             cursor = conn.cursor()
@@ -1584,6 +1688,78 @@ def update_sector_regime_stats():
         print("Sector and stock relative strength regime stats computed successfully.")
     except Exception as e:
         print(f"Error computing sector relative strength regime stats: {e}")
+    finally:
+        _SECTOR_REGIME_LOCK.release()
+
+
+@app.get("/api/screener/sector-regime")
+async def get_sector_regime_stats():
+    """
+    Returns calculated sector relative strength performance rankings nested with constituent stocks.
+    If the last updated timestamp is older than today's 4:00 PM IST target,
+    spawns a single-flight background thread to refresh full stats post-close,
+    or a 1D refresher during market hours (09:15-15:30 IST).
+    """
+    try:
+        from datetime import datetime, time, timedelta
+        try:
+            from zoneinfo import ZoneInfo
+            IST = ZoneInfo("Asia/Kolkata")
+        except ImportError:
+            import pytz
+            IST = pytz.timezone("Asia/Kolkata")
+        
+        # Check last updated timestamp
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT MIN(updated_at) as min_ts FROM sector_regime_stats")
+            row = cursor.fetchone()
+            
+        needs_full_refresh = False
+        needs_1d_refresh = False
+
+        now_ist = datetime.now(IST)
+        today_4pm_ist = datetime.combine(now_ist.date(), time(16, 0)).replace(tzinfo=IST)
+        market_open_ist = datetime.combine(now_ist.date(), time(9, 15)).replace(tzinfo=IST)
+        market_close_ist = datetime.combine(now_ist.date(), time(15, 30)).replace(tzinfo=IST)
+        is_market_hours = (market_open_ist <= now_ist <= market_close_ist) and (now_ist.weekday() < 5)
+
+        if row and row["min_ts"]:
+            try:
+                # Parse min_ts assuming IST local wall clock
+                naive_ts = datetime.strptime(row["min_ts"], "%Y-%m-%d %H:%M:%S")
+                last_update_ist = naive_ts.replace(tzinfo=IST)
+                
+                if now_ist >= today_4pm_ist:
+                    # After 4:00 PM today: full update needed if last full update was before today's 4:00 PM IST
+                    if last_update_ist < today_4pm_ist:
+                        needs_full_refresh = True
+                else:
+                    # Before 4:00 PM today: full update needed if last full update was before yesterday's 4:00 PM IST
+                    yesterday_4pm_ist = today_4pm_ist - timedelta(days=1)
+                    if last_update_ist < yesterday_4pm_ist:
+                        needs_full_refresh = True
+                    elif is_market_hours and (now_ist - last_update_ist > timedelta(seconds=90)):
+                        needs_1d_refresh = True
+            except Exception as parse_err:
+                print(f"Error parsing sector updated_at: {parse_err}")
+                needs_full_refresh = True
+        else:
+            needs_full_refresh = True
+                
+        if needs_full_refresh:
+            print("Sector regime data is stale (4:00 PM IST boundary). Spawning async single-flight update task...")
+            asyncio.create_task(asyncio.to_thread(update_sector_regime_stats))
+        elif needs_1d_refresh:
+            print("Intraday 1D sector stats stale during market hours. Spawning lightweight 1D update task...")
+            asyncio.create_task(asyncio.to_thread(update_sector_1d_stats))
+            
+        # Fetch current enriched standings
+        with get_db() as conn:
+            rows = fetch_enriched_sector_regime(conn)
+        return rows
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch sector regime: {str(e)}")
         
     with get_db() as conn:
         conn.row_factory = sqlite3.Row
@@ -5227,13 +5403,16 @@ async def run_fs_evaluation_internal(symbol: str, view: str = "consolidated", fo
     ebit = latest_pbt + latest_interest
     mcap_crores = (latest_sales * 1.5) / 1e7
     
-    # Get actual market cap if possible
-    with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT market_cap FROM screener_universe WHERE UPPER(symbol) = ? OR UPPER(base_symbol) = ?", (base_symbol, base_symbol))
-        mcap_row = cursor.fetchone()
-        if mcap_row and mcap_row["market_cap"]:
-            mcap_crores = float(mcap_row["market_cap"])
+    # Get actual market cap if available in schema
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT market_cap FROM screener_universe WHERE UPPER(symbol) = ? OR UPPER(base_symbol) = ?", (base_symbol, base_symbol))
+            mcap_row = cursor.fetchone()
+            if mcap_row and "market_cap" in mcap_row.keys() and mcap_row["market_cap"]:
+                mcap_crores = float(mcap_row["market_cap"])
+    except Exception:
+        pass
             
     total_liab = latest_debt + latest_ol
     A = working_capital / latest_ta if latest_ta > 0 else 0

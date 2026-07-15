@@ -490,6 +490,10 @@ function connectLiveTicksWS() {
         try {
             const msg = JSON.parse(event.data);
             if (msg.type === 'ticks') {
+                if (msg.source) {
+                    const st = (msg.source === 'angel') ? 'live' : 'polling';
+                    updateConnectionIndicator(st, msg.source);
+                }
                 handleLiveTickMessage(msg.data);
             } else if (msg.type === 'alert_triggered') {
                 handleWsAlertTriggered(msg.alert);
@@ -830,7 +834,7 @@ function updateMetaRangeProgress(current, low, high, barId) {
     bar.style.width = `${pct}%`;
 }
 
-function updateConnectionIndicator(status) {
+function updateConnectionIndicator(status, source) {
     let indicator = document.getElementById('ws-connection-indicator');
     if (!indicator) {
         // Create the indicator inside the header-utils section
@@ -844,18 +848,18 @@ function updateConnectionIndicator(status) {
     }
     if (!indicator) return;
 
-    if (status === 'live') {
-        indicator.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span> LIVE';
+    if (status === 'live' && source !== 'yfinance_fallback') {
+        indicator.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981;"></span> LIVE (Angel One)';
         indicator.style.background = 'rgba(16,185,129,0.15)';
         indicator.style.color = '#10b981';
         indicator.style.border = '1px solid rgba(16,185,129,0.3)';
         indicator.title = 'Angel One WebSocket: Connected — Real-time streaming active';
-    } else if (status === 'polling') {
-        indicator.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;"></span> POLLING';
+    } else if (status === 'polling' || source === 'yfinance_fallback') {
+        indicator.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#f59e0b;"></span> POLLING (yfinance)';
         indicator.style.background = 'rgba(245,158,11,0.15)';
         indicator.style.color = '#f59e0b';
         indicator.style.border = '1px solid rgba(245,158,11,0.3)';
-        indicator.title = 'Using yfinance polling — WebSocket disconnected';
+        indicator.title = 'Angel One feed offline. Active fallback: Polling yfinance every 3s';
     } else {
         indicator.innerHTML = '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#ef4444;"></span> OFFLINE';
         indicator.style.background = 'rgba(239,68,68,0.15)';
