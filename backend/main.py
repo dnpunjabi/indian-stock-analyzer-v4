@@ -1479,28 +1479,45 @@ def update_sector_1d_stats():
             
         tickers = [s["symbol"] for s in stocks]
         
-        # Download only 5 days history in batch (fast quote fetch)
-        data = yf.download(tickers, period="5d", progress=False)
-        
+        # Try fetching live ticks from TickStore first (Angel One upstream primary, yfinance polling fallback)
+        try:
+            from backend.websocket_server import tick_store
+            live_store_data = tick_store.get_all()
+        except Exception:
+            live_store_data = {}
+
         returns_1d = {}
+        missing_tickers = []
+
         for s in stocks:
             sym = s["symbol"]
-            try:
-                if isinstance(data.columns, pd.MultiIndex):
-                    if sym in data.columns.levels[1]:
-                        close_col = data['Close'][sym].dropna()
+            clean_sym = sym.replace('.NS', '').replace('.BO', '')
+            live_tick = live_store_data.get(sym) or live_store_data.get(clean_sym)
+            if live_tick and isinstance(live_tick, dict) and live_tick.get("change_pct") is not None:
+                returns_1d[sym] = float(live_tick["change_pct"])
+            else:
+                missing_tickers.append(sym)
+
+        # Download missing 5 days history in batch (fallback for tickers not in active live tick store)
+        if missing_tickers:
+            data = yf.download(missing_tickers, period="5d", progress=False)
+            for sym in missing_tickers:
+                try:
+                    if isinstance(data.columns, pd.MultiIndex):
+                        if sym in data.columns.levels[1]:
+                            close_col = data['Close'][sym].dropna()
+                        else:
+                            close_col = pd.Series()
                     else:
-                        close_col = pd.Series()
-                else:
-                    close_col = data['Close'].dropna()
-                
-                length = len(close_col)
-                if length >= 2:
-                    p_end = float(close_col.iloc[-1])
-                    p_1d = float(close_col.iloc[-2]) if length >= 2 else float(close_col.iloc[0])
-                    returns_1d[sym] = ((p_end - p_1d) / p_1d) * 100.0 if p_1d > 0 else 0.0
-            except Exception:
-                continue
+                        close_col = data['Close'].dropna()
+                    
+                    length = len(close_col)
+                    if length >= 2:
+                        p_end = float(close_col.iloc[-1])
+                        p_1d = float(close_col.iloc[-2]) if length >= 2 else float(close_col.iloc[0])
+                        returns_1d[sym] = ((p_end - p_1d) / p_1d) * 100.0 if p_1d > 0 else 0.0
+                except Exception:
+                    continue
 
         if not returns_1d:
             return
