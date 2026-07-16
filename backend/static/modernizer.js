@@ -6,10 +6,18 @@
 (function() {
     console.log("APEX Modernizer: Initializing core visual upgrades...");
 
-    const isCapacitor = window.hasOwnProperty('Capacitor') ||
-        (window.Capacitor !== undefined) ||
-        (window.parent && window.parent.hasOwnProperty('Capacitor'));
+    const isCapacitor = (window.hasOwnProperty('Capacitor') || 
+                         (window.Capacitor !== undefined) || 
+                         (window.parent && window.parent.hasOwnProperty('Capacitor'))) && 
+                        !( (location.hostname === 'localhost' || location.hostname === '127.0.0.1') && 
+                           (location.port === '8000' || location.port === '8001' || location.port === '8002' || location.port === '5000') );
     const apiBaseUrl = isCapacitor ? 'https://my-stock-advisor.duckdns.org' : '';
+
+    // Helper to format rupees safely IIFE-wide
+    const formatRupees = (val) => {
+        if (typeof safeFormatRupees === 'function') return safeFormatRupees(val, 2);
+        return '₹' + (val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
 
     // Helper to parse numeric values from text
     function parseNumericValue(text) {
@@ -1471,6 +1479,35 @@
 
         function handleSwipeGesture(e) {
             const currentHash = location.hash.substring(1) || 'analyzer';
+            const isSwipeLeft = touchendX < touchstartX - swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
+            const isSwipeRight = touchendX > touchstartX + swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
+
+            if (currentHash === 'analyzer' && (isSwipeLeft || isSwipeRight)) {
+                const subtabs = ['summary', 'valuation', 'technical', 'tv-chart', 'tv-advanced', 'fundamental', 'peers', 'financials', 'margin-bridge', 'audit', 'volume', 'trades', 'events'];
+                const activeSubtabBtn = document.querySelector('.subtab-btn.active');
+                if (activeSubtabBtn) {
+                    const currentSubtab = activeSubtabBtn.getAttribute('data-subtab');
+                    const currentIndex = subtabs.indexOf(currentSubtab);
+                    if (currentIndex !== -1) {
+                        let nextIndex = currentIndex;
+                        if (isSwipeLeft && currentIndex < subtabs.length - 1) {
+                            nextIndex = currentIndex + 1;
+                        } else if (isSwipeRight && currentIndex > 0) {
+                            nextIndex = currentIndex - 1;
+                        }
+                        if (nextIndex !== currentIndex) {
+                            playHaptic(12);
+                            const nextBtn = document.querySelector(`[data-subtab="${subtabs[nextIndex]}"]`);
+                            if (nextBtn) {
+                                nextBtn.click();
+                                nextBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
             // Disable page swipe transitions on Watchlist and Portfolio tabs to resolve gesture conflicts
             if (currentHash === 'watchlist' || currentHash === 'portfolio') {
                 return;
@@ -1480,16 +1517,16 @@
             if (target && target.closest('#tv-chart-workstation, input, textarea, select, button, .pin-key, .rs-bottom-sheet, tr, td, .swipeable-row-container, .swipeable-row-content, .swipe-actions, .tearsheet-range-slider, .tearsheet-range-marker, .watchlist-scroll-wrapper, .data-table-wrapper')) {
                 return;
             }
-            const isSwipeLeft = touchendX < touchstartX - swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
-            const isSwipeRight = touchendX > touchstartX + swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
+            const isSwipeLeftTab = touchendX < touchstartX - swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
+            const isSwipeRightTab = touchendX > touchstartX + swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
 
-            if (isSwipeLeft || isSwipeRight) {
+            if (isSwipeLeftTab || isSwipeRightTab) {
                 const currentIndex = tabsList.indexOf(currentHash);
                 if (currentIndex !== -1) {
                     let nextIndex = currentIndex;
-                    if (isSwipeLeft && currentIndex < tabsList.length - 1) {
+                    if (isSwipeLeftTab && currentIndex < tabsList.length - 1) {
                         nextIndex = currentIndex + 1;
-                    } else if (isSwipeRight && currentIndex > 0) {
+                    } else if (isSwipeRightTab && currentIndex > 0) {
                         nextIndex = currentIndex - 1;
                     }
                     if (nextIndex !== currentIndex) {
@@ -2129,11 +2166,7 @@
 
         // ==================== PREMIUM MOBILE ENHANCEMENTS ====================
         
-        // Helper to format rupees safely
-        const formatRupees = (val) => {
-            if (typeof safeFormatRupees === 'function') return safeFormatRupees(val, 2);
-            return '₹' + (val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        };
+        // Helper to format rupees safely (reusing IIFE scope formatRupees)
 
         // 1. Swipe-to-Action Rows on Lists (Watchlist & Portfolio)
         function setupSwipeableWatchlistRows() {
@@ -3922,7 +3955,7 @@
             // 2. Fetch & Render Sectors Leader and Laggard
             if (sectorsContainer) {
                 sectorsContainer.innerHTML = `
-                    <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
+                    <h5 style="margin:0 0 10px 0; font-size:14px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
                     <div style="opacity:0.65; height:32px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
                 `;
 
@@ -3944,7 +3977,7 @@
                             const leadersList = sortedSectors.slice(0, 4);
                             const laggardsList = sortedSectors.slice(-4).reverse();
                             let leaderboardHtml = `
-                                <div style="font-size:8px; font-weight:800; color:var(--neon-green, #10b981); text-transform:uppercase; letter-spacing:0.02em; margin-bottom:6px;">Leading Regimes (Top 4)</div>
+                                <div style="font-size:11px; font-weight:800; color:var(--neon-green, #10b981); text-transform:uppercase; letter-spacing:0.02em; margin-bottom:6px;">Leading Regimes (Top 4)</div>
                             `;
                             leadersList.forEach(item => {
                                 const ret = item.return_1d || 0;
@@ -3952,7 +3985,7 @@
                                 const barColor = 'var(--neon-green, #10b981)';
                                 const barPct = Math.min(100, Math.max(10, Math.abs(ret) * 30));
                                 leaderboardHtml += `
-                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; margin-bottom:6px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:6px;">
                                         <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
                                             <span style="font-weight:700; color:var(--text-primary); font-family:var(--font-heading);">${item.sector}</span>
                                             <div style="position:relative; width:80px; height:3px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:1.5px; overflow:hidden;">
@@ -3965,7 +3998,7 @@
                             });
 
                             leaderboardHtml += `
-                                <div style="font-size:8px; font-weight:800; color:var(--color-crimson, #ef4444); text-transform:uppercase; letter-spacing:0.02em; margin-top:10px; margin-bottom:6px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06));">Laggard Regimes (Bottom 4)</div>
+                                <div style="font-size:11px; font-weight:800; color:var(--color-crimson, #ef4444); text-transform:uppercase; letter-spacing:0.02em; margin-top:10px; margin-bottom:6px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06));">Laggard Regimes (Bottom 4)</div>
                             `;
                             laggardsList.forEach(item => {
                                 const ret = item.return_1d || 0;
@@ -3973,7 +4006,7 @@
                                 const barColor = 'var(--color-crimson, #ef4444)';
                                 const barPct = Math.min(100, Math.max(10, Math.abs(ret) * 30));
                                 leaderboardHtml += `
-                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; margin-bottom:6px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:6px;">
                                         <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
                                             <span style="font-weight:700; color:var(--text-primary); font-family:var(--font-heading);">${item.sector}</span>
                                             <div style="position:relative; width:80px; height:3px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:1.5px; overflow:hidden;">
@@ -3986,20 +4019,20 @@
                             });
 
                             sectorsContainer.innerHTML = `
-                                <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
+                                <h5 style="margin:0 0 10px 0; font-size:14px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Sector Rotations</h5>
                                 <div class="sector-rotations-card" id="home-sector-rotations-trigger" style="background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:12px; padding:15px; cursor:pointer; transition:background 0.2s ease;">
                                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                                         <!-- Leader -->
                                         <div style="background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.15); padding:10px; border-radius:8px;">
-                                            <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:800; letter-spacing:0.02em;">Leader Sector</div>
-                                            <div style="font-size:12.5px; font-weight:800; color:var(--neon-green, #10b981); margin-top:4px; font-family:var(--font-heading);">${leader.sector}</div>
-                                            <div style="font-size:10.5px; color:var(--text-secondary); margin-top:2px; font-weight:700;">${leaderSign}${leaderVal.toFixed(2)}%</div>
+                                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:800; letter-spacing:0.02em;">Leader Sector</div>
+                                            <div style="font-size:14.5px; font-weight:800; color:var(--neon-green, #10b981); margin-top:4px; font-family:var(--font-heading);">${leader.sector}</div>
+                                            <div style="font-size:12.5px; color:var(--text-secondary); margin-top:2px; font-weight:700;">${leaderSign}${leaderVal.toFixed(2)}%</div>
                                         </div>
                                         <!-- Laggard -->
                                         <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); padding:10px; border-radius:8px;">
-                                            <div style="font-size:9px; color:var(--text-muted); text-transform:uppercase; font-weight:800; letter-spacing:0.02em;">Laggard Sector</div>
-                                            <div style="font-size:12.5px; font-weight:800; color:var(--color-crimson, #ef4444); margin-top:4px; font-family:var(--font-heading);">${laggard.sector}</div>
-                                            <div style="font-size:10.5px; color:var(--text-secondary); margin-top:2px; font-weight:700;">${laggardVal.toFixed(2)}%</div>
+                                            <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:800; letter-spacing:0.02em;">Laggard Sector</div>
+                                            <div style="font-size:14.5px; font-weight:800; color:var(--color-crimson, #ef4444); margin-top:4px; font-family:var(--font-heading);">${laggard.sector}</div>
+                                            <div style="font-size:12.5px; color:var(--text-secondary); margin-top:2px; font-weight:700;">${laggardVal.toFixed(2)}%</div>
                                         </div>
                                     </div>
 
@@ -4009,7 +4042,7 @@
                                             ${leaderboardHtml}
                                         </div>
                                     </div>
-                                    <div id="btn-toggle-sector-leaderboard" style="margin-top:12px; text-align:center; font-size:9.5px; font-weight:800; color:var(--color-primary); text-transform:uppercase; letter-spacing:0.05em; border-top:1px solid var(--border-glass); padding-top:8px;">
+                                    <div id="btn-toggle-sector-leaderboard" style="margin-top:12px; text-align:center; font-size:11.5px; font-weight:800; color:var(--color-primary); text-transform:uppercase; letter-spacing:0.05em; border-top:1px solid var(--border-glass); padding-top:8px;">
                                         View Full Rotations ▾
                                     </div>
                                 </div>
@@ -4534,10 +4567,480 @@
         safeCall('setupDesktopHomepageCommandCenter', setupDesktopHomepageCommandCenter);
     };
 
+
+    // ==================== INDEXEDDB OFFLINE PROSPECTUS STORAGE ====================
+    window.StockCacheDB = {
+        dbName: 'StockAnalyzerCache',
+        dbVersion: 1,
+        storeName: 'stockProfiles',
+
+        open() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(this.dbName, this.dbVersion);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(this.storeName)) {
+                        db.createObjectStore(this.storeName, { keyPath: 'ticker' });
+                    }
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e.target.error);
+            });
+        },
+
+        async put(profile) {
+            if (!profile || !profile.ticker) return;
+            try {
+                const db = await this.open();
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(this.storeName, 'readwrite');
+                    const store = transaction.objectStore(this.storeName);
+                    const request = store.put(profile);
+                    request.onsuccess = () => resolve();
+                    request.onerror = (e) => reject(e.target.error);
+                });
+            } catch (e) {
+                console.error("IndexedDB Put Error:", e);
+            }
+        },
+
+        async get(ticker) {
+            if (!ticker) return null;
+            try {
+                const db = await this.open();
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(this.storeName, 'readonly');
+                    const store = transaction.objectStore(this.storeName);
+                    const request = store.get(ticker);
+                    request.onsuccess = (e) => resolve(e.target.result);
+                    request.onerror = (e) => reject(e.target.error);
+                });
+            } catch (e) {
+                console.error("IndexedDB Get Error:", e);
+                return null;
+            }
+        }
+    };
+
+    // ==================== SUBTAB GLANCE BADGES DYNAMIC UPDATES ====================
+    // ==================== STICKY PRICE HUD BAR INITIALIZATION ====================
+    window.initStickyPriceHUD = function() {
+        const hudBar = document.getElementById('sticky-price-hud-bar');
+        const targetBanner = document.querySelector('.stock-meta-banner');
+        if (!hudBar || !targetBanner) return;
+
+        window.addEventListener('scroll', () => {
+            const activeTabEl = document.querySelector('.workspace-tab.active-tab-content');
+            const activeTab = activeTabEl ? activeTabEl.id.replace('tab-', '') : 'analyzer';
+            if (activeTab !== 'analyzer') {
+                hudBar.classList.remove('visible');
+                return;
+            }
+            const bannerRect = targetBanner.getBoundingClientRect();
+            if (bannerRect.bottom < 0) {
+                const ticker = document.getElementById('meta-ticker')?.innerText || '--';
+                const company = document.getElementById('meta-company-name')?.innerText || '--';
+                const price = document.getElementById('meta-price')?.innerText || '--';
+                const change = document.getElementById('meta-change')?.innerText || '--';
+                const changeClass = document.getElementById('meta-change')?.className || '';
+
+                const hudTicker = document.getElementById('hud-ticker');
+                const hudCompany = document.getElementById('hud-company');
+                const hudPrice = document.getElementById('hud-price');
+                const hudChange = document.getElementById('hud-change');
+
+                if (hudTicker) hudTicker.innerText = ticker;
+                if (hudCompany) hudCompany.innerText = company;
+                if (hudPrice) hudPrice.innerText = price;
+                if (hudChange) {
+                    hudChange.innerText = change;
+                    hudChange.className = 'hud-change ' + changeClass;
+                }
+                hudBar.classList.add('visible');
+            } else {
+                hudBar.classList.remove('visible');
+            }
+        }, { passive: true });
+    };
+
+
+    // ==================== MULTI-AGENT AI CONFLUENCE RADAR CHART ====================
+    window.drawAIRadarChart = function(scores) {
+        const canvas = document.getElementById('ai-radar-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxRadius = Math.min(width, height) / 2 - 18;
+
+        const numAxes = 5;
+        const labels = ["Technical", "Forensic", "Intrinsic", "Industry", "Flow"];
+
+        // Draw grid lines
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        for (let r = 1; r <= 4; r++) {
+            const radius = (r / 4) * maxRadius;
+            ctx.beginPath();
+            for (let i = 0; i < numAxes; i++) {
+                const angle = (i * 2 * Math.PI) / numAxes - Math.PI / 2;
+                const x = centerX + radius * Math.cos(angle);
+                const y = centerY + radius * Math.sin(angle);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        // Draw axes
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        for (let i = 0; i < numAxes; i++) {
+            const angle = (i * 2 * Math.PI) / numAxes - Math.PI / 2;
+            const x = centerX + maxRadius * Math.cos(angle);
+            const y = centerY + maxRadius * Math.sin(angle);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+
+            // Label rendering
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+            ctx.font = '7.5px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const labelX = centerX + (maxRadius + 14) * Math.cos(angle);
+            const labelY = centerY + (maxRadius + 10) * Math.sin(angle);
+            ctx.fillText(labels[i], labelX, labelY);
+        }
+
+        // Draw scores polygon
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.85)';
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.2)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i < numAxes; i++) {
+            const score = scores[i] || 50; 
+            const radius = (score / 100) * maxRadius;
+            const angle = (i * 2 * Math.PI) / numAxes - Math.PI / 2;
+            const x = centerX + radius * Math.cos(angle);
+            const y = centerY + radius * Math.sin(angle);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw points
+        ctx.fillStyle = '#3b82f6';
+        for (let i = 0; i < numAxes; i++) {
+            const score = scores[i] || 50;
+            const radius = (score / 100) * maxRadius;
+            const angle = (i * 2 * Math.PI) / numAxes - Math.PI / 2;
+            const x = centerX + radius * Math.cos(angle);
+            const y = centerY + radius * Math.sin(angle);
+            ctx.beginPath();
+            ctx.arc(x, y, 2.5, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+    };
+
+    // ==================== QUARTERLY FINANCIAL PERFORMANCE TRENDS ====================
+    window.drawFinancialTrendChart = function(data) {
+        const canvas = document.getElementById('financial-trend-canvas');
+        if (!canvas || !data || !data.quarters) return;
+        const quarters = data.quarters;
+        if (!quarters.rows || !quarters.headers) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const isMobile = window.innerWidth < 480;
+        const rawHeaders = quarters.headers.slice(1);
+        const limit = isMobile ? 4 : 6;
+        const headers = rawHeaders.slice(-limit);
+
+        const salesRow = quarters.rows.find(r => (r.label || '').toLowerCase().includes('sales') || (r.label || '').toLowerCase().includes('revenue'));
+        const profitRow = quarters.rows.find(r => (r.label || '').toLowerCase().includes('net profit'));
+        const opmRow = quarters.rows.find(r => (r.label || '').toLowerCase() === 'opm %' || (r.label || '').toLowerCase() === 'opm');
+
+        if (!salesRow || !profitRow) return;
+
+        const salesValues = salesRow.values.slice(-limit).map(v => parseFloat(v) || 0);
+        const profitValues = profitRow.values.slice(-limit).map(v => parseFloat(v) || 0);
+        const opmValues = opmRow ? opmRow.values.slice(-limit).map(v => parseFloat(v.toString().replace('%','')) || 0) : [];
+
+        // Set dimensions & scale for high density displays
+        const dpr = window.devicePixelRatio || 1;
+        const W = canvas.parentElement.clientWidth;
+        const H = 200;
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+        canvas.style.width = W + 'px';
+        canvas.style.height = H + 'px';
+        ctx.scale(dpr, dpr);
+
+        const paddingLeft = 40;
+        const paddingRight = 40;
+        const paddingTop = 25;
+        const paddingBottom = 25;
+        const chartW = W - paddingLeft - paddingRight;
+        const chartH = H - paddingTop - paddingBottom;
+
+        const maxSales = Math.max(...salesValues) * 1.15 || 100;
+        const maxProfit = Math.max(...profitValues) * 1.15 || 10;
+        const maxOPM = opmValues.length > 0 ? Math.max(...opmValues) * 1.15 || 100 : 100;
+
+        // Draw grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 1;
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = '8px sans-serif';
+        ctx.textAlign = 'center';
+
+        const numPeriods = headers.length;
+        const stepX = chartW / numPeriods;
+
+        for (let i = 0; i < numPeriods; i++) {
+            const x = paddingLeft + i * stepX + stepX / 2;
+            ctx.beginPath();
+            ctx.moveTo(x, paddingTop);
+            ctx.lineTo(x, paddingTop + chartH);
+            ctx.stroke();
+
+            // X label
+            ctx.fillText(headers[i], x, paddingTop + chartH + 12);
+        }
+
+        // Draw horizontal grid & left Y scale
+        ctx.textAlign = 'right';
+        for (let r = 0; r <= 4; r++) {
+            const y = paddingTop + chartH - (r / 4) * chartH;
+            ctx.beginPath();
+            ctx.moveTo(paddingLeft, y);
+            ctx.lineTo(paddingLeft + chartW, y);
+            ctx.stroke();
+
+            const valSales = (r / 4) * maxSales;
+            ctx.fillText(Math.round(valSales), paddingLeft - 8, y + 3);
+        }
+
+        // Draw Revenue & Profit Bars
+        const barSpacing = stepX * 0.15;
+        const barWidth = (stepX - barSpacing * 3) / 2;
+
+        for (let i = 0; i < numPeriods; i++) {
+            const xSales = paddingLeft + i * stepX + barSpacing;
+            const valSales = salesValues[i];
+            const barH = (valSales / maxSales) * chartH;
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.65)'; 
+            ctx.fillRect(xSales, paddingTop + chartH - barH, barWidth, barH);
+
+            const xProfit = xSales + barWidth + barSpacing;
+            const valProfit = profitValues[i];
+            const profitH = (valProfit / maxSales) * chartH; 
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.65)'; 
+            ctx.fillRect(xProfit, paddingTop + chartH - profitH, barWidth, profitH);
+        }
+
+        // Draw OPM Line Graph
+        if (opmValues.length > 0) {
+            ctx.strokeStyle = '#f59e0b'; 
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            for (let i = 0; i < numPeriods; i++) {
+                const x = paddingLeft + i * stepX + stepX / 2;
+                const valOPM = opmValues[i];
+                const y = paddingTop + chartH - (valOPM / 100) * chartH; 
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // OPM Points & Text
+            ctx.fillStyle = '#f59e0b';
+            ctx.font = 'bold 7.5px sans-serif';
+            ctx.textAlign = 'center';
+            for (let i = 0; i < numPeriods; i++) {
+                const x = paddingLeft + i * stepX + stepX / 2;
+                const valOPM = opmValues[i];
+                const y = paddingTop + chartH - (valOPM / 100) * chartH;
+                ctx.beginPath();
+                ctx.arc(x, y, 2.5, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.fillText(Math.round(valOPM) + '%', x, y - 6);
+            }
+        }
+    };
+
+    // ==================== MOBILE SOLVENCY HUD TAB CONTROLLER ====================
+    window.initSolvencyHUD = function() {
+        const pBox = document.getElementById('piotroski-box');
+        const aBox = document.getElementById('altman-box');
+        const pBtn = document.querySelector('[data-solvency="piotroski"]');
+        
+        if (!pBox || !aBox || !pBtn) return;
+
+        const updateVisibility = () => {
+            const currentPBtn = document.querySelector('[data-solvency="piotroski"]');
+            const currentPBox = document.getElementById('piotroski-box');
+            const currentABox = document.getElementById('altman-box');
+            if (!currentPBtn || !currentPBox || !currentABox) return;
+
+            if (window.innerWidth <= 768) {
+                if (currentPBtn.classList.contains('active')) {
+                    currentPBox.style.setProperty('display', 'flex', 'important');
+                    currentABox.style.setProperty('display', 'none', 'important');
+                } else {
+                    currentABox.style.setProperty('display', 'flex', 'important');
+                    currentPBox.style.setProperty('display', 'none', 'important');
+                }
+            } else {
+                currentPBox.style.removeProperty('display');
+                currentABox.style.removeProperty('display');
+            }
+        };
+
+        // Event Delegation for Solvency Toggles click handling
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-solvency]');
+            if (!btn) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const type = btn.getAttribute('data-solvency');
+            const pBtn = document.querySelector('[data-solvency="piotroski"]');
+            const aBtn = document.querySelector('[data-solvency="altman"]');
+            
+            if (!pBtn || !aBtn) return;
+            
+            if (type === 'piotroski') {
+                pBtn.classList.add('active');
+                aBtn.classList.remove('active');
+            } else if (type === 'altman') {
+                aBtn.classList.add('active');
+                pBtn.classList.remove('active');
+            }
+            
+            updateVisibility();
+        });
+
+        window.addEventListener('resize', updateVisibility);
+        
+        // Initial default set
+        updateVisibility();
+    };
+
+    // ==================== MOBILE FAB SPEED DIAL MENU SETUP ====================
+    window.setupMobileFABSpeedDial = function() {
+        const trigger = document.getElementById('mobile-fab-trigger');
+        const menu = document.getElementById('mobile-fab-menu');
+        if (!trigger || !menu) return;
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            trigger.classList.toggle('active');
+            menu.classList.toggle('active');
+            if (window.navigator && window.navigator.vibrate) {
+                try { window.navigator.vibrate(10); } catch(e){}
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!trigger.contains(e.target) && !menu.contains(e.target)) {
+                trigger.classList.remove('active');
+                menu.classList.remove('active');
+            }
+        });
+
+        // Watchlist Toggle shortcut
+        const wlAction = document.getElementById('fab-action-watchlist');
+        if (wlAction) {
+            wlAction.addEventListener('click', () => {
+                const originalWlBtn = document.getElementById('explanation-watchlist-btn') || document.querySelector('.meta-sub button[onclick*="watchlist"]');
+                if (originalWlBtn) {
+                    originalWlBtn.click();
+                } else if (typeof toggleWatchlistSymbol === 'function' && window.activeStockProfile) {
+                    toggleWatchlistSymbol(window.activeStockProfile.ticker);
+                } else {
+                    window.showToast("Bookmark watchlist triggered", "info");
+                }
+                trigger.classList.remove('active');
+                menu.classList.remove('active');
+            });
+        }
+
+        // Create Alert shortcut
+        const alertAction = document.getElementById('fab-action-alert');
+        if (alertAction) {
+            alertAction.addEventListener('click', () => {
+                window.switchTab('alerts');
+                trigger.classList.remove('active');
+                menu.classList.remove('active');
+            });
+        }
+
+        // Share Prospectus shortcut
+        const shareAction = document.getElementById('fab-action-share');
+        if (shareAction) {
+            shareAction.addEventListener('click', () => {
+                const text = window.activeStockProfile ? `Analysis prospectus for ${window.activeStockProfile.company_name} (${window.activeStockProfile.ticker}) via Institutional AI Workstation` : "Indian Stock Analyzer Prospectus";
+                const url = window.location.href;
+                if (navigator.share) {
+                    navigator.share({ title: 'Stock Advisor Prospectus', text: text, url: url })
+                        .catch(err => console.log('Share canceled/failed:', err));
+                } else {
+                    navigator.clipboard.writeText(`${text}: ${url}`)
+                        .then(() => window.showToast("Copied prospectus link to clipboard!", "success"))
+                        .catch(() => window.showToast("Unable to share prospectus", "error"));
+                }
+                trigger.classList.remove('active');
+                menu.classList.remove('active');
+            });
+        }
+
+        // Export PDF shortcut
+        const pdfAction = document.getElementById('fab-action-pdf');
+        if (pdfAction) {
+            pdfAction.addEventListener('click', () => {
+                const originalPdfBtn = document.getElementById('export-pdf-btn');
+                if (originalPdfBtn) {
+                    originalPdfBtn.click();
+                } else {
+                    window.showToast("Exporting PDF report...", "info");
+                }
+                trigger.classList.remove('active');
+                menu.classList.remove('active');
+            });
+        }
+    };
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initModernizer);
     } else {
         initModernizer();
+    }
+
+    // Initialize additions
+    try {
+        if (typeof initStickyPriceHUD === 'function') initStickyPriceHUD();
+        if (typeof setupMobileFABSpeedDial === 'function') setupMobileFABSpeedDial();
+        if (typeof initSolvencyHUD === 'function') initSolvencyHUD();
+    } catch(e) {
+        console.error("Error invoking Phase 2 additions:", e);
     }
 
 })();

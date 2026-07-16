@@ -19162,3 +19162,181 @@ select option {
 .mobile-nav-dock-item .dock-icon {
     font-size: 18px !important;
 }
+
+/* Sticky Price HUD Bar */
+.sticky-price-hud-bar {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 52px !important;
+    background: rgba(11, 15, 29, 0.9) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 0 20px !important;
+    box-sizing: border-box !important;
+    z-index: 9996 !important;
+    transform: translateY(100%) !important;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+.sticky-price-hud-bar.visible {
+    transform: translateY(0) !important;
+}
+@media (max-width: 768px) {
+    .sticky-price-hud-bar {
+        bottom: 56px !important; /* Positioned directly above the mobile navigation footer */
+        height: 48px !important;
+        padding: 0 14px !important;
+    }
+}
+.hud-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+.hud-ticker {
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    color: #fff !important;
+    font-family: var(--font-heading) !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+.hud-company {
+    font-size: 12px !important;
+    color: var(--text-secondary) !important;
+    font-weight: 500 !important;
+    max-width: 140px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+.hud-right {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+.hud-price {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    color: #fff !important;
+    font-family: 'Outfit', sans-serif !important;
+}
+.hud-change {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    padding: 1px 4px !important;
+    border-radius: 3px !important;
+}
+
+/* Mobile FAB Speed Dial Styles */
+.mobile-fab-container {
+    position: fixed !important;
+    bottom: 80px !important; /* Anchored above bottom nav dock */
+    right: 20px !important;
+    z-index: 9997 !important;
+    display: none !important; /* Controlled by media query */
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+@media (max-width: 768px) {
+    .mobile-fab-container {
+        display: flex !important;
+    }
+}
+.mobile-fab-trigger {
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 50% !important;
+    background: var(--color-primary, #3b82f6) !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4) !important;
+    color: #fff !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    outline: none !important;
+}
+.mobile-fab-trigger.active {
+    transform: rotate(135deg) !important;
+    background: #ef4444 !important;
+    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4) !important;
+}
+.mobile-fab-menu {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateY(15px) scale(0.9) !important;
+    transition: all 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+}
+.mobile-fab-menu.active {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translateY(0) scale(1) !important;
+}
+.fab-menu-item {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+    background: rgba(15, 23, 42, 0.85) !important;
+    border: 1px solid var(--border-glass) !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    color: #fff !important;
+    font-size: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: background 0.2s, transform 0.1s !important;
+    outline: none !important;
+}
+.fab-menu-item:active {
+    transform: scale(0.92) !important;
+}
+
+
+/* ==================== PHASE 3 RESPONSIVE LAYOUTS & STYLES ==================== */
+.prospectus-top-grid {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 15px;
+    align-items: start;
+    margin-bottom: 15px;
+}
+
+@media (max-width: 768px) {
+    .prospectus-top-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .meta-right {
+        width: 100% !important;
+        display: block !important;
+    }
+    .meta-banner-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 8px !important;
+    }
+    .solvency-mobile-nav {
+        display: flex !important;
+        gap: 6px;
+    }
+    .solvency-tab-hidden {
+        display: none !important;
+    }
+}

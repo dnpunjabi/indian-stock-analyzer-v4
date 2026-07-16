@@ -6,10 +6,11 @@
 
 // ==================== GLOBAL INTERCEPTOR & CAPACITOR ROUTER ====================
 (function() {
-    const isCapacitor = window.hasOwnProperty('Capacitor') || 
-                        (window.Capacitor !== undefined) || 
-                        ((location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'capacitor:') && 
-                         (location.port !== '8000' && location.port !== '8001' && location.port !== '8002' && location.port !== '5000'));
+    const isCapacitor = (window.hasOwnProperty('Capacitor') || 
+                         (window.Capacitor !== undefined) || 
+                         (window.parent && window.parent.hasOwnProperty('Capacitor'))) && 
+                        !( (location.hostname === 'localhost' || location.hostname === '127.0.0.1') && 
+                           (location.port === '8000' || location.port === '8001' || location.port === '8002' || location.port === '5000') );
     const apiBaseUrl = isCapacitor ? 'https://my-stock-advisor.duckdns.org' : '';
     
     // Expose print fallback if running inside native Android WebView
@@ -4803,6 +4804,78 @@ function renderStockDashboard(p) {
         }
     }
 
+    // Dual Health Gauges: Alignment Score update
+    const alignNum = document.getElementById('cio-alignment-num');
+    const alignFill = document.getElementById('cio-alignment-fill');
+    
+    // Compute alignment score
+    const fPass = (scoring.fundamental_score || 0) >= 18;
+    const eqPass = (scoring.earnings_quality_score || 0) >= 9;
+    const vPass = (scoring.valuation_score || 0) >= 12;
+    const tPass = (scoring.technical_score || 0) >= 12;
+    const gPass = (scoring.growth_score || 0) >= 6;
+    const sPass = (scoring.sentiment_score || 0) >= 3;
+    
+    const tScore = scoring.technical_score || 0;
+    const eqScore = scoring.earnings_quality_score || 0;
+    const vScore = scoring.valuation_score || 0;
+    const gScore = scoring.growth_score || 0;
+    const sScore = scoring.sentiment_score || 0;
+    
+    let passesCount = 0;
+    if (fPass) passesCount++;
+    if (eqPass) passesCount++;
+    if (vPass) passesCount++;
+    if (tPass) passesCount++;
+    if (gPass) passesCount++;
+    if (sPass) passesCount++;
+    const alignmentPct = Math.round((passesCount / 6) * 100) || 50;
+    
+    if (alignNum) {
+        alignNum.innerText = alignmentPct + "%";
+    }
+    if (alignFill) {
+        const strokeCircumference = 251.2;
+        const strokeOffset = strokeCircumference - (alignmentPct / 100) * strokeCircumference;
+        alignFill.style.strokeDasharray = strokeCircumference;
+        alignFill.style.strokeDashoffset = strokeOffset.toFixed(1);
+        
+        if (alignmentPct >= 70) {
+            alignFill.style.stroke = '#3b82f6'; // primary blue
+        } else if (alignmentPct >= 50) {
+            alignFill.style.stroke = '#f59e0b'; // amber
+        } else {
+            alignFill.style.stroke = '#ef4444'; // crimson
+        }
+    }
+
+    // Update multi-agent radar chart scores
+    const normTech = Math.round((tScore / 15) * 100);
+    const normForensic = Math.round((eqScore / 12) * 100);
+    const normIntrinsic = Math.round((vScore / 15) * 100);
+    const normIndustry = Math.round((gScore / 10) * 100);
+    const normFlow = Math.round((sScore / 5) * 100);
+    
+    const radarTech = document.getElementById('agent-val-tech');
+    const radarForensic = document.getElementById('agent-val-forensic');
+    const radarIntrinsic = document.getElementById('agent-val-intrinsic');
+    const radarIndustry = document.getElementById('agent-val-industry');
+    const radarFlow = document.getElementById('agent-val-flow');
+    const radarConfluence = document.getElementById('radar-confluence-num');
+
+    if (radarTech) radarTech.innerText = normTech + "/100";
+    if (radarForensic) radarForensic.innerText = normForensic + "/100";
+    if (radarIntrinsic) radarIntrinsic.innerText = normIntrinsic + "/100";
+    if (radarIndustry) radarIndustry.innerText = normIndustry + "/100";
+    if (radarFlow) radarFlow.innerText = normFlow + "/100";
+    
+    const compositeConfluence = Math.round((normTech + normForensic + normIntrinsic + normIndustry + normFlow) / 5);
+    if (radarConfluence) radarConfluence.innerText = compositeConfluence + "%";
+    
+    if (typeof window.drawAIRadarChart === 'function') {
+        window.drawAIRadarChart([normTech, normForensic, normIntrinsic, normIndustry, normFlow]);
+    }
+
     // Reset/update top banner conviction trigger badge with the score calculated from profile
     const triggerText = document.getElementById('meta-ai-conviction-text');
     const triggerBadge = document.getElementById('meta-ai-conviction-trigger');
@@ -5660,6 +5733,7 @@ function renderStockDashboard(p) {
     if (window.loadRiskFactorsData) {
         window.loadRiskFactorsData(p.ticker);
     }
+
 }
 
 function renderSWOTAndPerformance(p) {
