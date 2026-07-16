@@ -6018,6 +6018,12 @@ function renderStockDashboard(p) {
             </div>
         `;
     }
+
+    // Trigger segment donut chart rendering
+    if (typeof window.drawSegmentDonutChart === 'function' && typeof window.getSegmentsFromProfile === 'function') {
+        const segments = window.getSegmentsFromProfile(p);
+        window.drawSegmentDonutChart(segments);
+    }
     const bsContent = document.getElementById('business-summary-content');
     const bsArrow = document.getElementById('business-summary-arrow');
     if (bsContent) bsContent.style.maxHeight = '0px';
@@ -6452,11 +6458,69 @@ function renderStockDashboard(p) {
             row.innerHTML = `
                 <div style="display: flex; align-items: center; width: 100%; user-select: none;">
                     <span style="font-size:13px; display:inline-flex; align-items:center; justify-content:center;">${iconText}</span>
-                    <span style="color:var(--text-primary); margin-left:8px; flex: 1; font-size: 11px;">${item.text}</span>
-                    <span class="cio-expand-arrow" style="font-size: 7px; color: var(--text-muted); transition: transform 0.2s ease; margin-left: auto;">▼</span>
+                    <span style="color:var(--text-primary); margin-left:8px; flex: 1; font-size: 11px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${item.text}</span>
+                    <!-- Interactive Sandbox Switch -->
+                    <label class="sandbox-switch" style="margin-left: auto; margin-right: 8px; display: inline-flex; align-items: center; cursor: pointer; flex-shrink:0;">
+                        <input type="checkbox" class="sandbox-checkbox" ${isPassed ? 'checked' : ''} style="cursor: pointer; width: 13px; height: 13px; accent-color: var(--color-primary);" data-idx="${idx}" />
+                    </label>
+                    <span class="cio-expand-arrow" style="font-size: 7px; color: var(--text-muted); transition: transform 0.2s ease;">▼</span>
                 </div>
                 ${item.detailsHtml}
             `;
+
+            // Attach interactive checkbox click listeners
+            setTimeout(() => {
+                const checkbox = row.querySelector('.sandbox-checkbox');
+                if (checkbox) {
+                    checkbox.addEventListener('click', (e) => {
+                        e.stopPropagation(); // prevent details card expand toggle
+                        
+                        const stateIdx = parseInt(checkbox.getAttribute('data-idx'));
+                        passStateMap[stateIdx] = checkbox.checked;
+                        
+                        // Recalculate alignment pct
+                        let passedCount = 0;
+                        passStateMap.forEach(state => { if (state) passedCount++; });
+                        const newAlignmentPct = Math.round((passedCount / 6) * 100);
+                        
+                        // Update UI icon
+                        const iconEl = row.querySelector('span:first-child');
+                        if (iconEl) {
+                            if (stateIdx === 5) {
+                                iconEl.innerText = '📰';
+                            } else {
+                                iconEl.innerText = checkbox.checked ? '✅' : '⚠️';
+                            }
+                        }
+                        
+                        // Update background styling
+                        if (stateIdx !== 5) {
+                            row.style.background = checkbox.checked ? 'rgba(16, 185, 129, 0.04)' : 'rgba(245, 158, 11, 0.04)';
+                            row.style.border = checkbox.checked ? '1px solid rgba(16, 185, 129, 0.15)' : '1px solid rgba(245, 158, 11, 0.15)';
+                        }
+                        
+                        // Recalculate & animate gauges
+                        const alignNum = document.getElementById('cio-alignment-num');
+                        const alignFill = document.getElementById('cio-alignment-fill');
+                        if (alignNum) {
+                            alignNum.innerText = newAlignmentPct + "%";
+                        }
+                        if (alignFill) {
+                            const strokeCircumference = 251.2;
+                            const strokeOffset = strokeCircumference - (newAlignmentPct / 100) * strokeCircumference;
+                            alignFill.style.strokeDashoffset = strokeOffset.toFixed(1);
+                            
+                            if (newAlignmentPct >= 70) {
+                                alignFill.style.stroke = '#3b82f6';
+                            } else if (newAlignmentPct >= 50) {
+                                alignFill.style.stroke = '#f59e0b';
+                            } else {
+                                alignFill.style.stroke = '#ef4444';
+                            }
+                        }
+                    });
+                }
+            }, 0);
 
             // Hover interactions for desktop (screen widths > 768px)
             row.addEventListener('mouseenter', () => {

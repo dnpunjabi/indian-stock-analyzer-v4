@@ -16,7 +16,7 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <!-- TradingView Advanced Widget -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <link rel="stylesheet" href="styles.css?v=1.8.7">
+    <link rel="stylesheet" href="styles.css?v=1.8.8">
     <link rel="stylesheet" href="modernizer.css?v=1.3">
     <style>
         /* Light mode strategy guides visibility override */
@@ -1876,11 +1876,25 @@
                                         <div class="corp-sheet-row"><span class="corp-sheet-label">Website</span><span class="corp-sheet-value" id="corp-website">N/A</span></div>
                                     </div>
                                     <!-- Right Column: Narrative Summary -->
-                                    <div>
+                                    <div style="min-width: 0;">
                                         <div style="font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px;">Business Overview & Strategic Segments</div>
                                         <p id="business-summary-text" style="font-size: 12px; line-height: 1.55; color: var(--text-muted); margin: 0;">
                                             Loading company business summary...
                                         </p>
+                                    </div>
+                                    <!-- Third Column: Segment Revenue Donut Chart -->
+                                    <div class="segment-donut-column" style="border-left: 1px dashed var(--border-glass); padding-left: 20px; display: flex; flex-direction: column; align-items: center; min-width: 240px; box-sizing: border-box;">
+                                        <div style="font-size: 9.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; text-align: left; width: 100%;">AI Operating Segment Revenue</div>
+                                        <div style="position: relative; width: 110px; height: 110px; margin-bottom: 10px;">
+                                            <canvas id="segment-donut-canvas" width="110" height="110" style="display: block; width: 110px; height: 110px;"></canvas>
+                                            <div id="segment-donut-center-pct" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;">
+                                                <div style="font-size: 13px; font-weight: 800; color: var(--text-primary); line-height: 1;" id="segment-center-val">--%</div>
+                                                <div style="font-size: 5.5px; color: var(--text-muted); text-transform: uppercase; margin-top: 1px; letter-spacing: 0.03em;">Largest</div>
+                                            </div>
+                                        </div>
+                                        <div id="segment-legend" style="width: 100%; display: flex; flex-direction: column; gap: 4px; font-size: 8.5px; color: var(--text-secondary);">
+                                            <!-- Dynamic Legend segments -->
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1986,7 +2000,7 @@
                             <!-- SWOT 2x2 Quadrant Grid -->
                             <div style="padding: 20px;">
                                 <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 15px;">SWOT Diagnostic Assessment</div>
-                                <div class="swot-grid-2x2" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                                <div class="swot-grid-2x2">
                                     
                                     <!-- Strengths (Emerald) -->
                                     <div class="swot-card" id="swot-strengths-card" style="border: 1px solid rgba(16, 185, 129, 0.25); background: rgba(16, 185, 129, 0.02); border-radius: 8px; overflow: hidden; transition: all 0.3s ease;">
@@ -2047,7 +2061,13 @@
                                             </ul>
                                         </div>
                                     </div>
-                                    
+                                    <!-- Mobile SWOT Carousel Navigation Dots -->
+                                    <div class="swot-carousel-dots no-print" style="display: none; justify-content: center; gap: 8px; margin-top: 15px; margin-bottom: 5px;">
+                                        <span class="swot-dot active" data-idx="0"></span>
+                                        <span class="swot-dot" data-idx="1"></span>
+                                        <span class="swot-dot" data-idx="2"></span>
+                                        <span class="swot-dot" data-idx="3"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -2057,6 +2077,7 @@
                             <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
                                 <h3>CIO INVESTMENT PROSPECTUS</h3>
                                 <div style="display:flex; gap:8px; align-items:center;">
+                                    <button id="prospectus-copy-btn" class="action-btn" style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-glass); color: var(--text-secondary); font-size: 8.5px; padding: 2px 6px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; transition: all 0.2s;">📋 Copy Prospectus</button>
                                     <span class="badge-rec" id="cio-badge-rec">HOLD 🟡</span>
                                 </div>
                             </div>
@@ -2145,9 +2166,35 @@
                                 <div class="cio-thesis-text" style="margin-top: 15px; padding: 10px 12px; background: rgba(59, 130, 246, 0.03); border-left: 3.5px solid var(--color-primary); border-radius: 0 6px 6px 0; border-top: 1px solid rgba(255,255,255,0.02); border-right: 1px solid rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.02); box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box;">
                                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
                                         <h4 style="margin: 0; font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">⚖️ CIO Strategic Investment Thesis</h4>
-                                        <button class="section-speak-btn" data-target="cio-investment-thesis" data-title="CIO Strategic Thesis">🔊</button>
                                     </div>
                                     <p id="cio-investment-thesis" style="font-size: 11.5px; line-height: 1.5; color: var(--text-muted); margin: 0;">...</p>
+                                    
+                                    <!-- Podcast-Style Audio Player HUD -->
+                                    <div class="podcast-audio-hud" style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                                        <!-- Play / Pause / Stop -->
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <button id="thesis-audio-play-btn" style="background: var(--color-primary, #3b82f6); color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none; transition: transform 0.2s;"><span style="font-size: 10px; padding-left: 1.5px;">▶</span></button>
+                                            <button id="thesis-audio-pause-btn" style="background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border-glass); border-radius: 50%; width: 24px; height: 24px; display: none; align-items: center; justify-content: center; cursor: pointer; outline: none; transition: transform 0.2s;"><span style="font-size: 10px;">⏸</span></button>
+                                            <button id="thesis-audio-stop-btn" style="background: rgba(255,255,255,0.04); color: var(--text-muted); border: none; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; outline: none;"><span style="font-size: 8px;">⏹</span></button>
+                                        </div>
+                                        
+                                        <!-- Progress Bar Track -->
+                                        <div style="flex: 1; min-width: 100px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; position: relative;">
+                                            <div id="thesis-audio-progress-bar" style="position: absolute; height: 100%; width: 0%; background: var(--color-primary, #3b82f6); transition: width 0.1s linear;"></div>
+                                        </div>
+                                        
+                                        <!-- Speed Selector Rate -->
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-size: 8px; color: var(--text-secondary); text-transform: uppercase; font-family: 'Outfit', sans-serif;">Speed:</span>
+                                            <select id="thesis-audio-rate-select" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; font-size: 9px; padding: 1px 3px; outline: none; cursor: pointer; font-family: 'Outfit', sans-serif;">
+                                                <option value="0.75">0.75x</option>
+                                                <option value="1.0" selected>1.0x</option>
+                                                <option value="1.25">1.25x</option>
+                                                <option value="1.5">1.5x</option>
+                                                <option value="2.0">2.0x</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div id="prospectus-ai-upgrade-container" style="display: none; margin-top: 12px; padding: 10px; background: rgba(168, 85, 247, 0.03); border: 1px dashed rgba(168, 85, 247, 0.3); border-radius: 6px; text-align: center; box-sizing: border-box; width: 100%;">
@@ -8408,7 +8455,7 @@
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
     <script src="export_manager.js?v=1.1.7"></script>
-    <script src="app.js?v=1.8.7"></script>
+    <script src="app.js?v=1.8.8"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>

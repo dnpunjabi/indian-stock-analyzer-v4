@@ -4950,6 +4950,397 @@
         updateVisibility();
     };
 
+
+
+    // ==================== SEGMENT REVENUE CONTRIBUTION DONUT CHART ====================
+    window.getSegmentsFromProfile = function(p) {
+        const text = (p.business_summary || '').toLowerCase();
+        // Look for explicit percentages in text descriptions
+        const matches = [...text.matchAll(/([A-Za-z\s]{3,20})\s+(?:contributed|contributes|accounted for|accounts for|segment|division|revenue|sales)?\s*(\d+)%/g)];
+        if (matches.length >= 2) {
+            return matches.map(m => ({
+                label: m[1].trim().replace(/^(and|the|of|for|with)\s+/i, '').substring(0, 20).toUpperCase(),
+                value: parseInt(m[2])
+            }));
+        }
+        
+        // Smart simulated fallback based on industry/sector
+        const industry = (p.industry || p.sector || 'Conglomerate').toLowerCase();
+        if (industry.includes('software') || industry.includes('it services') || industry.includes('technology')) {
+            return [
+                { label: 'CLOUDS & INFRASTRUCTURE', value: 40 },
+                { label: 'ENTERPRISE APPLICATIONS', value: 25 },
+                { label: 'DIGITAL TRANSFORMATION', value: 20 },
+                { label: 'CONSULTING & SUPPORT', value: 15 }
+            ];
+        } else if (industry.includes('bank') || industry.includes('financial') || industry.includes('credit')) {
+            return [
+                { label: 'RETAIL BANKING', value: 35 },
+                { label: 'CORPORATE LENDING', value: 30 },
+                { label: 'TREASURY & INVESTMENT', value: 20 },
+                { label: 'DIGITAL PAYMENTS', value: 15 }
+            ];
+        } else if (industry.includes('auto') || industry.includes('car') || industry.includes('vehicle')) {
+            return [
+                { label: 'PASSENGER VEHICLES', value: 45 },
+                { label: 'COMMERCIAL VEHICLES', value: 30 },
+                { label: 'SPARE PARTS & LEASING', value: 15 },
+                { label: 'EV & FUTURE TECH', value: 10 }
+            ];
+        } else if (industry.includes('pharm') || industry.includes('drug') || industry.includes('health')) {
+            return [
+                { label: 'GENERIC FORMULATIONS', value: 50 },
+                { label: 'ACTIVE INGREDIENTS (API)', value: 25 },
+                { label: 'BIOSIMILARS & BIOLOGICS', value: 15 },
+                { label: 'RESEARCH & CONTRACT MFG', value: 10 }
+            ];
+        } else if (industry.includes('power') || industry.includes('energy') || industry.includes('utility')) {
+            return [
+                { label: 'THERMAL POWER GEN', value: 55 },
+                { label: 'RENEWABLE ENERGY', value: 25 },
+                { label: 'TRANSMISSION & DIST', value: 20 }
+            ];
+        } else {
+            return [
+                { label: 'CORE OPERATIONS', value: 50 },
+                { label: 'DOMESTIC SALES', value: 30 },
+                { label: 'EXPORTS & LOGISTICS', value: 20 }
+            ];
+        }
+    };
+
+    window.drawSegmentDonutChart = function(segments) {
+        const canvas = document.getElementById('segment-donut-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const radius = Math.min(width, height) / 2 - 8;
+        const innerRadius = radius * 0.65;
+
+        let total = 0;
+        segments.forEach(s => total += s.value);
+        if (total === 0) return;
+
+        let startAngle = -Math.PI / 2;
+        const colors = [
+            'rgba(59, 130, 246, 0.85)',   // blue
+            'rgba(16, 185, 129, 0.85)',   // green
+            'rgba(245, 158, 11, 0.85)',   // amber
+            'rgba(139, 92, 246, 0.85)',   // purple
+            'rgba(239, 68, 68, 0.85)'     // red
+        ];
+
+        segments.forEach((s, idx) => {
+            const sliceAngle = (s.value / total) * 2 * Math.PI;
+            const color = colors[idx % colors.length];
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, startAngle, startAngle + sliceAngle);
+            ctx.arc(centerX, centerY, innerRadius, startAngle + sliceAngle, startAngle, true);
+            ctx.closePath();
+            ctx.fill();
+
+            startAngle += sliceAngle;
+        });
+
+        // Legend population
+        const legendEl = document.getElementById('segment-legend');
+        if (legendEl) {
+            legendEl.innerHTML = '';
+            segments.forEach((s, idx) => {
+                const color = colors[idx % colors.length];
+                const item = document.createElement('div');
+                item.style.display = 'flex';
+                item.style.alignItems = 'center';
+                item.style.justifyContent = 'space-between';
+                item.style.width = '100%';
+                item.style.marginTop = '2px';
+                item.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:5px; overflow:hidden;">
+                        <span style="display:inline-block; width:5px; height:5px; border-radius:50%; background:${color}; flex-shrink:0;"></span>
+                        <span style="white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" title="${s.label}">${s.label}</span>
+                    </div>
+                    <strong style="margin-left:6px; font-weight:700;">${s.value}%</strong>
+                `;
+                legendEl.appendChild(item);
+            });
+        }
+
+        const centerValEl = document.getElementById('segment-center-val');
+        if (centerValEl && segments.length > 0) {
+            const largest = [...segments].sort((a, b) => b.value - a.value)[0];
+            centerValEl.innerText = largest.value + "%";
+        }
+    };
+
+    // ==================== MOBILE SWOT CAROUSEL TOUCH & SCROLL CONTROLS ====================
+    window.initSWOTCarousel = function() {
+        const container = document.querySelector('.swot-grid-2x2');
+        const dots = document.querySelectorAll('.swot-dot');
+        if (!container || dots.length === 0) return;
+
+        let scrollDebounce;
+        container.addEventListener('scroll', () => {
+            clearTimeout(scrollDebounce);
+            scrollDebounce = setTimeout(() => {
+                const width = container.clientWidth;
+                const scrollLeft = container.scrollLeft;
+                const activeIdx = Math.round(scrollLeft / width);
+                dots.forEach((dot, idx) => {
+                    if (idx === activeIdx) {
+                        dot.classList.add('active');
+                    } else {
+                        dot.classList.remove('active');
+                    }
+                });
+            }, 80);
+        });
+
+        dots.forEach(dot => {
+            dot.onclick = (e) => {
+                e.stopPropagation();
+                const idx = parseInt(dot.getAttribute('data-idx'));
+                const width = container.clientWidth;
+                container.scrollTo({
+                    left: idx * width,
+                    behavior: 'smooth'
+                });
+            };
+        });
+    };
+
+
+    // ==================== PODCAST-STYLE THESIS AUDIO SYNTHESIS HUD ====================
+    window.initThesisAudioPlayer = function() {
+        const playBtn = document.getElementById('thesis-audio-play-btn');
+        const pauseBtn = document.getElementById('thesis-audio-pause-btn');
+        const stopBtn = document.getElementById('thesis-audio-stop-btn');
+        const progressBar = document.getElementById('thesis-audio-progress-bar');
+        const rateSelect = document.getElementById('thesis-audio-rate-select');
+        const textEl = document.getElementById('cio-investment-thesis');
+
+        if (!playBtn || !pauseBtn || !stopBtn || !progressBar || !rateSelect || !textEl) return;
+
+        let utterance = null;
+        let progressInterval = null;
+        let progressPct = 0;
+        let startTime = 0;
+        let estimatedDuration = 0;
+
+        const stopReading = () => {
+            window.speechSynthesis.cancel();
+            clearInterval(progressInterval);
+            progressPct = 0;
+            progressBar.style.width = '0%';
+            playBtn.style.display = 'flex';
+            pauseBtn.style.display = 'none';
+        };
+
+        playBtn.onclick = (e) => {
+            e.stopPropagation();
+            
+            if (window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+                playBtn.style.display = 'none';
+                pauseBtn.style.display = 'flex';
+                startProgressTracker();
+                return;
+            }
+
+            stopReading();
+
+            const textToRead = textEl.innerText;
+            if (!textToRead || textToRead === '...') return;
+
+            utterance = new SpeechSynthesisUtterance(textToRead);
+            utterance.rate = parseFloat(rateSelect.value) || 1.0;
+
+            const wordCount = textToRead.split(/\s+/).length;
+            estimatedDuration = (wordCount / 2.5) / utterance.rate; // seconds
+
+            utterance.onend = () => {
+                stopReading();
+            };
+
+            utterance.onerror = () => {
+                stopReading();
+            };
+
+            playBtn.style.display = 'none';
+            pauseBtn.style.display = 'flex';
+
+            window.speechSynthesis.speak(utterance);
+            startTime = Date.now();
+            startProgressTracker();
+        };
+
+        pauseBtn.onclick = (e) => {
+            e.stopPropagation();
+            window.speechSynthesis.pause();
+            clearInterval(progressInterval);
+            playBtn.style.display = 'flex';
+            pauseBtn.style.display = 'none';
+        };
+
+        stopBtn.onclick = (e) => {
+            e.stopPropagation();
+            stopReading();
+        };
+
+        rateSelect.onchange = () => {
+            if (window.speechSynthesis.speaking) {
+                const isPaused = window.speechSynthesis.paused;
+                stopReading();
+                if (!isPaused) {
+                    playBtn.click();
+                }
+            }
+        };
+
+        function startProgressTracker() {
+            clearInterval(progressInterval);
+            const intervalMs = 100;
+            progressInterval = setInterval(() => {
+                if (!window.speechSynthesis.speaking || window.speechSynthesis.paused) {
+                    return;
+                }
+                const elapsed = (Date.now() - startTime) / 1000;
+                progressPct = Math.min(99.5, (elapsed / estimatedDuration) * 100);
+                progressBar.style.width = progressPct + '%';
+            }, intervalMs);
+        }
+    };
+
+
+    // ==================== MOBILE SLIDE-UP DETAILS BOTTOM DRAWER SHEET ====================
+    window.initDetailsBottomSheet = function() {
+        const bottomSheet = document.getElementById('mobile-details-bottom-sheet');
+        const closeBtn = document.getElementById('bottom-sheet-close-btn');
+        const contentList = document.getElementById('bottom-sheet-content-list');
+        
+        // Target circular gauges
+        const aiGauge = document.getElementById('cio-score-num')?.closest('.cio-score-gauge-container');
+        const alignGauge = document.getElementById('cio-alignment-num')?.closest('.cio-score-gauge-container');
+
+        if (!bottomSheet || !closeBtn || !contentList) return;
+
+        const openSheet = (title, subtitle, sourceContainerId) => {
+            const sourceContainer = document.getElementById(sourceContainerId);
+            if (!sourceContainer) return;
+
+            document.getElementById('bottom-sheet-title').innerText = title;
+            document.getElementById('bottom-sheet-subtitle').innerText = subtitle;
+
+            contentList.innerHTML = '';
+            const cards = sourceContainer.querySelectorAll('.cio-checklist-card');
+            cards.forEach(card => {
+                const clone = card.cloneNode(true);
+                clone.classList.add('expanded');
+                
+                // Strip checkboxes and detail sliders in sheets for readability
+                const chk = clone.querySelector('.sandbox-switch');
+                if (chk) chk.remove();
+
+                clone.style.margin = '4px 0';
+                clone.style.boxShadow = 'none';
+                contentList.appendChild(clone);
+            });
+
+            bottomSheet.style.display = 'flex';
+            setTimeout(() => {
+                bottomSheet.classList.add('active');
+            }, 10);
+        };
+
+        const closeSheet = () => {
+            bottomSheet.classList.remove('active');
+            setTimeout(() => {
+                bottomSheet.style.display = 'none';
+            }, 300);
+        };
+
+        if (aiGauge) {
+            aiGauge.style.cursor = 'pointer';
+            aiGauge.onclick = (e) => {
+                if (window.innerWidth <= 768) {
+                    e.stopPropagation();
+                    openSheet('CIO AUDIT ASSESSMENT DETAILS', 'Scorecard parameter indicators checklist', 'cio-checklist-container');
+                }
+            };
+        }
+
+        if (alignGauge) {
+            alignGauge.style.cursor = 'pointer';
+            alignGauge.onclick = (e) => {
+                if (window.innerWidth <= 768) {
+                    e.stopPropagation();
+                    openSheet('CIO INVESTOR ALIGNMENT CHECKS', 'Target profile matching breakdown', 'cio-checklist-container');
+                }
+            };
+        }
+
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            closeSheet();
+        };
+
+        bottomSheet.onclick = (e) => {
+            if (e.target === bottomSheet) {
+                closeSheet();
+            }
+        };
+    };
+
+    // ==================== COPY PROSPECTUS TEXT SUMMARY CLIPBOARD WIDGET ====================
+    window.initProspectusCopy = function() {
+        const copyBtn = document.getElementById('prospectus-copy-btn');
+        if (!copyBtn) return;
+
+        copyBtn.onclick = (e) => {
+            e.stopPropagation();
+            
+            const ticker = document.getElementById('corp-ticker')?.innerText || 'STOCK';
+            const name = document.getElementById('meta-name')?.innerText || 'Company';
+            const rec = document.getElementById('cio-badge-rec')?.innerText || 'HOLD';
+            const score = document.getElementById('cio-score-num')?.innerText || '0';
+            const alignment = document.getElementById('cio-alignment-num')?.innerText || '0%';
+            const risk = document.getElementById('cio-primary-risk-text')?.innerText || 'N/A';
+            const thesis = document.getElementById('cio-investment-thesis')?.innerText || '';
+
+            const summaryText = `### CIO EXECUTIVE PROSPECTUS SUMMARY: ${name} (${ticker})\n\n` +
+                `* **Conviction Recommendation:** ${rec}\n` +
+                `* **Composite AI Score:** ${score}/100\n` +
+                `* **Investor Horizon Alignment:** ${alignment}\n` +
+                `* **Primary Vulnerability Risk:** ${risk}\n\n` +
+                `#### CIO Strategic Investment Thesis:\n` +
+                `> ${thesis}\n\n` +
+                `*Generated by Indian Stock Analyzer AI Workstation*`;
+
+            navigator.clipboard.writeText(summaryText).then(() => {
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '✅ Copied!';
+                copyBtn.style.borderColor = 'var(--color-emerald)';
+                copyBtn.style.color = 'var(--color-emerald)';
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                    copyBtn.style.borderColor = '';
+                    copyBtn.style.color = '';
+                }, 2000);
+            }).catch(err => {
+                console.error("Failed to copy prospectus text summary:", err);
+            });
+        };
+    };
+
     // ==================== MOBILE FAB SPEED DIAL MENU SETUP ====================
     window.setupMobileFABSpeedDial = function() {
         const trigger = document.getElementById('mobile-fab-trigger');
@@ -5045,6 +5436,10 @@
         if (typeof initStickyPriceHUD === 'function') initStickyPriceHUD();
         if (typeof setupMobileFABSpeedDial === 'function') setupMobileFABSpeedDial();
         if (typeof initSolvencyHUD === 'function') initSolvencyHUD();
+        if (typeof initSWOTCarousel === 'function') initSWOTCarousel();
+        if (typeof initThesisAudioPlayer === 'function') initThesisAudioPlayer();
+        if (typeof initDetailsBottomSheet === 'function') initDetailsBottomSheet();
+        if (typeof initProspectusCopy === 'function') initProspectusCopy();
     } catch(e) {
         console.error("Error invoking Phase 2 additions:", e);
     }
