@@ -6462,7 +6462,7 @@ function renderStockDashboard(p) {
             row.innerHTML = `
                 <div style="display: flex; align-items: center; width: 100%; user-select: none;">
                     <span style="font-size:13px; display:inline-flex; align-items:center; justify-content:center;">${iconText}</span>
-                    <span style="color:var(--text-primary); margin-left:8px; flex: 1; font-size: 11px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;">${item.text}</span>
+                    <span style="color:var(--text-primary); margin-left:8px; flex: 1; font-size: 11px; line-height: 1.4; word-break: break-word; white-space: normal;">${item.text}</span>
                     <!-- Interactive Sandbox Switch -->
                     <label class="sandbox-switch" style="margin-left: auto; margin-right: 8px; display: inline-flex; align-items: center; cursor: pointer; flex-shrink:0;">
                         <input type="checkbox" class="sandbox-checkbox" ${isPassed ? 'checked' : ''} style="cursor: pointer; width: 13px; height: 13px; accent-color: var(--color-primary);" data-idx="${idx}" />

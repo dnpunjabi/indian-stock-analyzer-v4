@@ -5130,6 +5130,16 @@
 
         if (!playBtn || !pauseBtn || !stopBtn || !progressBar || !rateSelect || !textEl) return;
 
+        // Force Android WebView to initialize TTS voices on load
+        if (window.speechSynthesis) {
+            window.speechSynthesis.getVoices();
+            if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = () => {
+                    window.speechSynthesis.getVoices();
+                };
+            }
+        }
+
         let utterance = null;
         let progressInterval = null;
         let progressPct = 0;
@@ -5137,7 +5147,9 @@
         let estimatedDuration = 0;
 
         const stopReading = () => {
-            window.speechSynthesis.cancel();
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
             clearInterval(progressInterval);
             progressPct = 0;
             progressBar.style.width = '0%';
@@ -5148,6 +5160,13 @@
         playBtn.onclick = (e) => {
             e.stopPropagation();
             
+            if (!window.speechSynthesis) {
+                if (typeof window.showToast === 'function') {
+                    window.showToast("Web Speech TTS is not supported on this device.", "error");
+                }
+                return;
+            }
+
             if (window.speechSynthesis.paused) {
                 window.speechSynthesis.resume();
                 playBtn.style.display = 'none';
@@ -5161,7 +5180,16 @@
             const textToRead = textEl.innerText;
             if (!textToRead || textToRead === '...') return;
 
+            // Trigger another getVoices check to ensure voice list is updated before speaking
+            const voices = window.speechSynthesis.getVoices();
             utterance = new SpeechSynthesisUtterance(textToRead);
+            
+            // Explicitly map voice if list exists (workaround for default voice fails in Android WebViews)
+            if (voices && voices.length > 0) {
+                const defaultVoice = voices.find(v => v.default) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+                if (defaultVoice) utterance.voice = defaultVoice;
+            }
+
             utterance.rate = parseFloat(rateSelect.value) || 1.0;
 
             const wordCount = textToRead.split(/\s+/).length;
@@ -5171,7 +5199,11 @@
                 stopReading();
             };
 
-            utterance.onerror = () => {
+            utterance.onerror = (err) => {
+                console.error("SpeechSynthesisUtterance error:", err);
+                if (typeof window.showToast === 'function') {
+                    window.showToast("Speech synthesis failed. Check device TTS volume/settings.", "error");
+                }
                 stopReading();
             };
 

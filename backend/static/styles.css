@@ -19775,3 +19775,162 @@ select option {
 .swot-list-card.threats {
     border-left: 3px solid #ef4444 !important;
 }
+
+/* ==================== PHASE 3 MOBILE ALIGNMENT OVERRIDES ==================== */
+.spectrum-legend-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+}
+
+@media (max-width: 768px) {
+    /* Prevent card headers from horizontal overflow */
+    .card-header {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+        padding-bottom: 12px !important;
+    }
+    .card-header > div {
+        width: 100% !important;
+        justify-content: flex-start !important;
+        gap: 10px !important;
+    }
+    .card-header h3 {
+        font-size: 13px !important;
+        margin: 0 !important;
+    }
+    
+    /* SWOT buttons padding adjustments to prevent clipping */
+    .swot-tab-btn {
+        font-size: 10.5px !important;
+        padding: 6px 1px !important;
+        gap: 2.5px !important;
+    }
+    .swot-tab-count {
+        font-size: 8px !important;
+        padding: 1px 4.5px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Stack Prospectus separate breakdowns vertically to prevent squishing */
+    .prospectus-breakdown {
+        flex-direction: column !important;
+        gap: 6px !important;
+    }
+    .prospectus-breakdown > div {
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Stack Price spectrum markers as 2x2 grid to prevent horizontal pricing overlap */
+    .spectrum-legend-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        row-gap: 8px !important;
+        column-gap: 12px !important;
+    }
+    .spectrum-legend-grid > div {
+        text-align: left !important;
+    }
+    .spectrum-legend-grid > div:nth-child(even) {
+        text-align: right !important;
+    }
+}
+
+/* Symmetrical left-accent bars via ::before to prevent parenthetical curved left borders */
+.swot-list-card {
+    position: relative !important;
+    overflow: hidden !important;
+    padding-left: 24px !important; /* Make room for the accent bar + icon */
+    border-left: none !important; /* Remove old curved border */
+}
+.swot-list-card::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 4px !important;
+    height: 100% !important;
+}
+.swot-list-card.strengths::before {
+    background: #10b981 !important;
+}
+.swot-list-card.opportunities::before {
+    background: #3b82f6 !important;
+}
+.swot-list-card.weaknesses::before {
+    background: #f97316 !important;
+}
+.swot-list-card.threats::before {
+    background: #ef4444 !important;
+}
+
+/* ==================== LIGHT THEME OVERRIDES FOR SEGMENTED SWOT CONTROL ==================== */
+[data-theme="light"] .swot-balance-bar,
+[data-mode="light"] .swot-balance-bar {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+[data-theme="light"] .legend-item,
+[data-mode="light"] .legend-item {
+    color: #475569 !important;
+}
+[data-theme="light"] .legend-item strong,
+[data-mode="light"] .legend-item strong {
+    color: #0f172a !important;
+}
+[data-theme="light"] .swot-tabs-control,
+[data-mode="light"] .swot-tabs-control {
+    background: #e2e8f0 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+[data-theme="light"] .swot-tab-btn,
+[data-mode="light"] .swot-tab-btn {
+    color: #475569 !important;
+}
+[data-theme="light"] .swot-tab-btn.active,
+[data-mode="light"] .swot-tab-btn.active {
+    color: #0f172a !important;
+}
+[data-theme="light"] .swot-tab-count,
+[data-mode="light"] .swot-tab-count {
+    background: rgba(0, 0, 0, 0.06) !important;
+    color: #475569 !important;
+}
+[data-theme="light"] .swot-tab-btn.active .swot-tab-count,
+[data-mode="light"] .swot-tab-btn.active .swot-tab-count {
+    background: rgba(15, 23, 42, 0.1) !important;
+    color: #0f172a !important;
+}
+[data-theme="light"] .swot-tab-slide-bg,
+[data-mode="light"] .swot-tab-slide-bg {
+    background: #ffffff !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important;
+}
+[data-theme="light"] .swot-list-card,
+[data-mode="light"] .swot-list-card {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    color: #334155 !important;
+}
+[data-theme="light"] .swot-list-card:hover,
+[data-mode="light"] .swot-list-card:hover {
+    background: #f1f5f9 !important;
+}
+[data-theme="light"] .swot-list-card.strengths,
+[data-mode="light"] .swot-list-card.strengths {
+    background: rgba(16, 185, 129, 0.03) !important;
+}
+[data-theme="light"] .swot-list-card.opportunities,
+[data-mode="light"] .swot-list-card.opportunities {
+    background: rgba(59, 130, 246, 0.03) !important;
+}
+[data-theme="light"] .swot-list-card.weaknesses,
+[data-mode="light"] .swot-list-card.weaknesses {
+    background: rgba(249, 115, 22, 0.03) !important;
+}
+[data-theme="light"] .swot-list-card.threats,
+[data-mode="light"] .swot-list-card.threats {
+    background: rgba(239, 68, 68, 0.03) !important;
+}
