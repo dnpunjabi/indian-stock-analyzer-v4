@@ -3396,6 +3396,12 @@
 
                 <!-- Today's Market Movers Section -->
                 <div class="movers-container">
+                    <div class="mobile-movers-cap-selector-container" style="display: flex; gap: 8px; margin: 10px 0 15px 0; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px;">
+                        <button class="mobile-movers-cap-tab active" data-cap="all" style="flex-shrink:0;">All Cap</button>
+                        <button class="mobile-movers-cap-tab" data-cap="large" style="flex-shrink:0;">Large Cap</button>
+                        <button class="mobile-movers-cap-tab" data-cap="mid" style="flex-shrink:0;">Mid Cap</button>
+                        <button class="mobile-movers-cap-tab" data-cap="small" style="flex-shrink:0;">Small Cap</button>
+                    </div>
                     <div id="mobile-home-gainers-container"></div>
                     <div id="mobile-home-losers-container"></div>
                 </div>
@@ -3765,121 +3771,148 @@
                             return;
                         }
 
-                        // Render Gainers
-                        const gainersList = moversData.gainers?.all?.slice(0, 5) || [];
-                        if (gainersList.length > 0) {
-                            let gHtml = `<h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>`;
-                            gainersList.forEach(item => {
-                                const sym = item.symbol.replace(".NS", "");
-                                gHtml += `
-                                    <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-green);">
-                                        <div>
-                                            <strong style="color: var(--text-primary); font-size:12px; font-family:var(--font-heading);">${sym}</strong>
-                                            <div style="font-size:9.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
-                                        </div>
-                                        <div style="display:flex; align-items:center; gap:12px;">
-                                            <canvas id="gainer-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
-                                            <span style="font-size:11px; font-family:var(--font-heading); font-weight:700; color:var(--neon-green); background:rgba(16,185,129,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">+${item.change_pct.toFixed(2)}%</span>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                            gainersContainer.innerHTML = gHtml;
+                        // Cache movers data globally
+                        window.mobileMoversCachedData = moversData;
+                        const activeCap = window.activeMobileMoversCap || 'all';
 
-                            // Draw Gainer Sparklines and bind clicks
-                            gainersList.forEach(item => {
-                                const sym = item.symbol.replace(".NS", "");
-                                const card = gainersContainer.querySelector(`.recent-stock-card[data-symbol="${sym}"]`);
-                                if (card) {
-                                    card.onclick = () => {
-                                        const searchInput = document.getElementById('analyzer-search-input');
-                                        const searchBtn = document.getElementById('analyzer-search-btn');
-                                        if (searchInput && searchBtn) {
-                                            searchInput.value = sym;
-                                            searchBtn.click();
-                                        }
-                                    };
-                                }
-                                const canvas = document.getElementById(`gainer-sparkline-${sym}`);
-                                if (canvas) {
-                                    const ctx = canvas.getContext('2d');
-                                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                    ctx.beginPath();
-                                    ctx.lineWidth = 1.5;
-                                    ctx.strokeStyle = '#10b981';
-                                    ctx.lineJoin = 'round';
-                                    const points = [10, 12, 9, 15, 17];
-                                    const step = canvas.width / (points.length - 1);
-                                    points.forEach((val, i) => {
-                                        const x = i * step;
-                                        const y = canvas.height - (val / 20) * canvas.height;
-                                        if (i === 0) ctx.moveTo(x, y);
-                                        else ctx.lineTo(x, y);
-                                    });
-                                    ctx.stroke();
-                                }
-                            });
-                        } else {
-                            gainersContainer.innerHTML = '';
-                        }
+                        const renderMobileList = (cap) => {
+                            const activeData = window.mobileMoversCachedData;
+                            if (!activeData) return;
 
-                        // Render Losers
-                        const losersList = moversData.losers?.all?.slice(0, 5) || [];
-                        if (losersList.length > 0) {
-                            let lHtml = `<h5 style="margin:15px 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>`;
-                            losersList.forEach(item => {
-                                const sym = item.symbol.replace(".NS", "");
-                                lHtml += `
-                                    <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-red);">
-                                        <div>
-                                            <strong style="color: var(--text-primary); font-size:12px; font-family:var(--font-heading);">${sym}</strong>
-                                            <div style="font-size:9.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
+                            // Render Gainers
+                            const gainersList = activeData.gainers ? (activeData.gainers[cap] || []).slice(0, 5) : [];
+                            if (gainersList.length > 0) {
+                                let gHtml = `<h5 style="margin:0 0 10px 0; font-size:13px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>`;
+                                gainersList.forEach(item => {
+                                    const sym = item.symbol.replace(".NS", "");
+                                    gHtml += `
+                                        <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-green); padding: 12px 14px;">
+                                            <div>
+                                                <strong style="color: var(--text-primary); font-size:14px; font-family:var(--font-heading);">${sym}</strong>
+                                                <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
+                                            </div>
+                                            <div style="display:flex; align-items:center; gap:12px;">
+                                                <canvas id="gainer-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
+                                                <span style="font-size:13px; font-family:var(--font-heading); font-weight:700; color:var(--neon-green); background:rgba(16,185,129,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">+${item.change_pct.toFixed(2)}%</span>
+                                            </div>
                                         </div>
-                                        <div style="display:flex; align-items:center; gap:12px;">
-                                            <canvas id="loser-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
-                                            <span style="font-size:11px; font-family:var(--font-heading); font-weight:700; color:var(--neon-red); background:rgba(239,68,68,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">${item.change_pct.toFixed(2)}%</span>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                            losersContainer.innerHTML = lHtml;
+                                    `;
+                                });
+                                gainersContainer.innerHTML = gHtml;
 
-                            // Draw Loser Sparklines and bind clicks
-                            losersList.forEach(item => {
-                                const sym = item.symbol.replace(".NS", "");
-                                const card = losersContainer.querySelector(`.recent-stock-card[data-symbol="${sym}"]`);
-                                if (card) {
-                                    card.onclick = () => {
-                                        const searchInput = document.getElementById('analyzer-search-input');
-                                        const searchBtn = document.getElementById('analyzer-search-btn');
-                                        if (searchInput && searchBtn) {
-                                            searchInput.value = sym;
-                                            searchBtn.click();
-                                        }
-                                    };
-                                }
-                                const canvas = document.getElementById(`loser-sparkline-${sym}`);
-                                if (canvas) {
-                                    const ctx = canvas.getContext('2d');
-                                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                    ctx.beginPath();
-                                    ctx.lineWidth = 1.5;
-                                    ctx.strokeStyle = '#ef4444';
-                                    ctx.lineJoin = 'round';
-                                    const points = [16, 13, 14, 9, 7];
-                                    const step = canvas.width / (points.length - 1);
-                                    points.forEach((val, i) => {
-                                        const x = i * step;
-                                        const y = canvas.height - (val / 20) * canvas.height;
-                                        if (i === 0) ctx.moveTo(x, y);
-                                        else ctx.lineTo(x, y);
-                                    });
-                                    ctx.stroke();
-                                }
-                            });
-                        } else {
-                            losersContainer.innerHTML = '';
-                        }
+                                // Draw Gainer Sparklines and bind clicks
+                                gainersList.forEach(item => {
+                                    const sym = item.symbol.replace(".NS", "");
+                                    const card = gainersContainer.querySelector(`.recent-stock-card[data-symbol="${sym}"]`);
+                                    if (card) {
+                                        card.onclick = () => {
+                                            const searchInput = document.getElementById('analyzer-search-input');
+                                            const searchBtn = document.getElementById('analyzer-search-btn');
+                                            if (searchInput && searchBtn) {
+                                                searchInput.value = sym;
+                                                searchBtn.click();
+                                            }
+                                        };
+                                    }
+                                    const canvas = document.getElementById(`gainer-sparkline-${sym}`);
+                                    if (canvas) {
+                                        const ctx = canvas.getContext('2d');
+                                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                        ctx.beginPath();
+                                        ctx.lineWidth = 1.5;
+                                        ctx.strokeStyle = '#10b981';
+                                        ctx.lineJoin = 'round';
+                                        const points = [10, 12, 9, 15, 17];
+                                        const step = canvas.width / (points.length - 1);
+                                        points.forEach((val, i) => {
+                                            const x = i * step;
+                                            const y = canvas.height - (val / 20) * canvas.height;
+                                            if (i === 0) ctx.moveTo(x, y);
+                                            else ctx.lineTo(x, y);
+                                        });
+                                        ctx.stroke();
+                                    }
+                                });
+                            } else {
+                                gainersContainer.innerHTML = '';
+                            }
+
+                            // Render Losers
+                            const losersList = activeData.losers ? (activeData.losers[cap] || []).slice(0, 5) : [];
+                            if (losersList.length > 0) {
+                                let lHtml = `<h5 style="margin:15px 0 10px 0; font-size:13px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>`;
+                                losersList.forEach(item => {
+                                    const sym = item.symbol.replace(".NS", "");
+                                    lHtml += `
+                                        <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-red); padding: 12px 14px;">
+                                            <div>
+                                                <strong style="color: var(--text-primary); font-size:14px; font-family:var(--font-heading);">${sym}</strong>
+                                                <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
+                                            </div>
+                                            <div style="display:flex; align-items:center; gap:12px;">
+                                                <canvas id="loser-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
+                                                <span style="font-size:13px; font-family:var(--font-heading); font-weight:700; color:var(--neon-red); background:rgba(239,68,68,0.1); padding:2px 6px; border-radius:4px; min-width: 50px; text-align: right;">${item.change_pct.toFixed(2)}%</span>
+                                            </div>
+                                        </div>
+                                    `;
+                                });
+                                losersContainer.innerHTML = lHtml;
+
+                                // Draw Loser Sparklines and bind clicks
+                                losersList.forEach(item => {
+                                    const sym = item.symbol.replace(".NS", "");
+                                    const card = losersContainer.querySelector(`.recent-stock-card[data-symbol="${sym}"]`);
+                                    if (card) {
+                                        card.onclick = () => {
+                                            const searchInput = document.getElementById('analyzer-search-input');
+                                            const searchBtn = document.getElementById('analyzer-search-btn');
+                                            if (searchInput && searchBtn) {
+                                                searchInput.value = sym;
+                                                searchBtn.click();
+                                            }
+                                        };
+                                    }
+                                    const canvas = document.getElementById(`loser-sparkline-${sym}`);
+                                    if (canvas) {
+                                        const ctx = canvas.getContext('2d');
+                                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                        ctx.beginPath();
+                                        ctx.lineWidth = 1.5;
+                                        ctx.strokeStyle = '#ef4444';
+                                        ctx.lineJoin = 'round';
+                                        const points = [16, 13, 14, 9, 7];
+                                        const step = canvas.width / (points.length - 1);
+                                        points.forEach((val, i) => {
+                                            const x = i * step;
+                                            const y = canvas.height - (val / 20) * canvas.height;
+                                            if (i === 0) ctx.moveTo(x, y);
+                                            else ctx.lineTo(x, y);
+                                        });
+                                        ctx.stroke();
+                                    }
+                                });
+                            } else {
+                                losersContainer.innerHTML = '';
+                            }
+                        };
+
+                        // Initial mobile render
+                        renderMobileList(activeCap);
+
+                        // Setup mobile tab selectors click handlers
+                        const mobTabs = document.querySelectorAll('.mobile-movers-cap-tab');
+                        mobTabs.forEach(tab => {
+                            if (!tab.dataset.wired) {
+                                tab.dataset.wired = "true";
+                                tab.addEventListener('click', () => {
+                                    mobTabs.forEach(t => t.classList.remove('active'));
+                                    tab.classList.add('active');
+                                    const cap = tab.getAttribute('data-cap');
+                                    window.activeMobileMoversCap = cap;
+                                    renderMobileList(cap);
+                                });
+                            }
+                        });
                     }
                 } catch(e) {
                     console.error("Error loading movers:", e);
@@ -4328,7 +4361,7 @@
 
                 const renderStockList = (container, list, isGainer) => {
                     if (!list || list.length === 0) {
-                        container.innerHTML = `<div class="recent-research-empty">No stocks cached.</div>`;
+                        container.innerHTML = `<div class="recent-research-empty" style="font-size:12px;">No stocks cached.</div>`;
                         return;
                     }
                     container.innerHTML = list.slice(0, 5).map(stock => {
@@ -4369,19 +4402,40 @@
                 };
 
                 if (data.status === "pending" || (!data.gainers?.all || data.gainers.all.length === 0)) {
-                    gainersContainer.innerHTML = `<div class="recent-research-empty">Warming market cache...</div>`;
-                    losersContainer.innerHTML = `<div class="recent-research-empty">Warming market cache...</div>`;
+                    gainersContainer.innerHTML = `<div class="recent-research-empty" style="font-size:12px;">Warming market cache...</div>`;
+                    losersContainer.innerHTML = `<div class="recent-research-empty" style="font-size:12px;">Warming market cache...</div>`;
                     setTimeout(loadMarketMovers, 3000);
                     return;
                 }
 
-                renderStockList(gainersContainer, data.gainers ? data.gainers.all : [], true);
-                renderStockList(losersContainer, data.losers ? data.losers.all : [], false);
+                window.desktopMoversCachedData = data;
+                const activeCap = window.activeMoversCap || 'all';
+
+                renderStockList(gainersContainer, data.gainers ? data.gainers[activeCap] : [], true);
+                renderStockList(losersContainer, data.losers ? data.losers[activeCap] : [], false);
+
+                // Setup tab buttons click handlers
+                const tabs = document.querySelectorAll('.movers-cap-tab');
+                tabs.forEach(tab => {
+                    if (!tab.dataset.wired) {
+                        tab.dataset.wired = "true";
+                        tab.addEventListener('click', () => {
+                            tabs.forEach(t => t.classList.remove('active'));
+                            tab.classList.add('active');
+                            const cap = tab.getAttribute('data-cap');
+                            window.activeMoversCap = cap;
+                            if (window.desktopMoversCachedData) {
+                                renderStockList(gainersContainer, window.desktopMoversCachedData.gainers ? window.desktopMoversCachedData.gainers[cap] : [], true);
+                                renderStockList(losersContainer, window.desktopMoversCachedData.losers ? window.desktopMoversCachedData.losers[cap] : [], false);
+                            }
+                        });
+                    }
+                });
 
             } catch (err) {
-                console.error("Desktop market movers load error:", err);
-                gainersContainer.innerHTML = `<div class="recent-research-empty">Failed to load gainers</div>`;
-                losersContainer.innerHTML = `<div class="recent-research-empty">Failed to load losers</div>`;
+                print("Desktop market movers load error:", err);
+                gainersContainer.innerHTML = `<div class="recent-research-empty" style="font-size:12px;">Failed to load gainers</div>`;
+                losersContainer.innerHTML = `<div class="recent-research-empty" style="font-size:12px;">Failed to load losers</div>`;
             }
         };
 
