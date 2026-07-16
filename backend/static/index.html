@@ -16,7 +16,7 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <!-- TradingView Advanced Widget -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <link rel="stylesheet" href="styles.css?v=1.8.9">
+    <link rel="stylesheet" href="styles.css?v=1.9.1">
     <link rel="stylesheet" href="modernizer.css?v=1.3">
     <style>
         /* Light mode strategy guides visibility override */
@@ -1998,76 +1998,52 @@
                             </div>
                             
                             <!-- SWOT 2x2 Quadrant Grid -->
+                            <!-- Segmented SWOT Balance Control (Webull/Enterprise Style) -->
                             <div style="padding: 20px;">
                                 <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 15px;">SWOT Diagnostic Assessment</div>
-                                <div class="swot-grid-2x2">
-                                    
-                                    <!-- Strengths (Emerald) -->
-                                    <div class="swot-card" id="swot-strengths-card" style="border: 1px solid rgba(16, 185, 129, 0.25); background: rgba(16, 185, 129, 0.02); border-radius: 8px; overflow: hidden; transition: all 0.3s ease;">
-                                        <div class="swot-header" id="swot-strengths-header" style="background: rgba(16, 185, 129, 0.1); border-bottom: 1px solid rgba(16, 185, 129, 0.25); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                                            <span style="font-size: 12px; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 6px;">
-                                                <span>💪</span> STRENGTHS
-                                            </span>
-                                            <span class="swot-badge" id="swot-strengths-badge" style="background: #10b981; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700;">0</span>
-                                        </div>
-                                        <div class="swot-content" id="swot-strengths-content" style="padding: 15px; max-height: none; overflow-y: visible; transition: max-height 0.3s ease-in-out;">
-                                            <ul id="swot-strengths-list" style="margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
-                                                <!-- Dyn content -->
-                                            </ul>
-                                        </div>
+                                
+                                <!-- Symmetrical Balance Indicator Bar -->
+                                <div class="swot-balance-wrapper no-print">
+                                    <div class="swot-balance-bar">
+                                        <div id="swot-bar-s" class="swot-bar-segment" style="width: 25%; background: #10b981;"></div>
+                                        <div id="swot-bar-o" class="swot-bar-segment" style="width: 25%; background: #3b82f6;"></div>
+                                        <div id="swot-bar-w" class="swot-bar-segment" style="width: 25%; background: #f97316;"></div>
+                                        <div id="swot-bar-t" class="swot-bar-segment" style="width: 25%; background: #ef4444;"></div>
                                     </div>
-                                    
-                                    <!-- Weaknesses (Orange) -->
-                                    <div class="swot-card" id="swot-weaknesses-card" style="border: 1px solid rgba(249, 115, 22, 0.25); background: rgba(249, 115, 22, 0.02); border-radius: 8px; overflow: hidden; transition: all 0.3s ease;">
-                                        <div class="swot-header" id="swot-weaknesses-header" style="background: rgba(249, 115, 22, 0.1); border-bottom: 1px solid rgba(249, 115, 22, 0.25); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                                            <span style="font-size: 12px; font-weight: 700; color: #f97316; display: flex; align-items: center; gap: 6px;">
-                                                <span>⚠️</span> WEAKNESSES
-                                            </span>
-                                            <span class="swot-badge" id="swot-weaknesses-badge" style="background: #f97316; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700;">0</span>
-                                        </div>
-                                        <div class="swot-content" id="swot-weaknesses-content" style="padding: 15px; max-height: none; overflow-y: visible; transition: max-height 0.3s ease-in-out;">
-                                            <ul id="swot-weaknesses-list" style="margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
-                                                <!-- Dyn content -->
-                                            </ul>
-                                        </div>
+                                    <div class="swot-balance-legend">
+                                        <span class="legend-item strengths"><span class="legend-color" style="background:#10b981;"></span>Strengths <strong id="swot-leg-s">--</strong></span>
+                                        <span class="legend-item opps"><span class="legend-color" style="background:#3b82f6;"></span>Opps <strong id="swot-leg-o">--</strong></span>
+                                        <span class="legend-item weaknesses"><span class="legend-color" style="background:#f97316;"></span>Weaknesses <strong id="swot-leg-w">--</strong></span>
+                                        <span class="legend-item threats"><span class="legend-color" style="background:#ef4444;"></span>Threats <strong id="swot-leg-t">--</strong></span>
                                     </div>
-                                    
-                                    <!-- Opportunities (Blue) -->
-                                    <div class="swot-card" id="swot-opportunities-card" style="border: 1px solid rgba(59, 130, 246, 0.25); background: rgba(59, 130, 246, 0.02); border-radius: 8px; overflow: hidden; transition: all 0.3s ease;">
-                                        <div class="swot-header" id="swot-opportunities-header" style="background: rgba(59, 130, 246, 0.1); border-bottom: 1px solid rgba(59, 130, 246, 0.25); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                                            <span style="font-size: 12px; font-weight: 700; color: #3b82f6; display: flex; align-items: center; gap: 6px;">
-                                                <span>🚀</span> OPPORTUNITIES
-                                            </span>
-                                            <span class="swot-badge" id="swot-opportunities-badge" style="background: #3b82f6; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700;">0</span>
-                                        </div>
-                                        <div class="swot-content" id="swot-opportunities-content" style="padding: 15px; max-height: none; overflow-y: visible; transition: max-height 0.3s ease-in-out;">
-                                            <ul id="swot-opportunities-list" style="margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
-                                                <!-- Dyn content -->
-                                            </ul>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Threats (Red) -->
-                                    <div class="swot-card" id="swot-threats-card" style="border: 1px solid rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.02); border-radius: 8px; overflow: hidden; transition: all 0.3s ease;">
-                                        <div class="swot-header" id="swot-threats-header" style="background: rgba(239, 68, 68, 0.1); border-bottom: 1px solid rgba(239, 68, 68, 0.25); padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none;">
-                                            <span style="font-size: 12px; font-weight: 700; color: #ef4444; display: flex; align-items: center; gap: 6px;">
-                                                <span>🔥</span> THREATS
-                                            </span>
-                                            <span class="swot-badge" id="swot-threats-badge" style="background: #ef4444; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700;">0</span>
-                                        </div>
-                                        <div class="swot-content" id="swot-threats-content" style="padding: 15px; max-height: none; overflow-y: visible; transition: max-height 0.3s ease-in-out;">
-                                            <ul id="swot-threats-list" style="margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 8px;">
-                                                <!-- Dyn content -->
-                                            </ul>
-                                        </div>
-                                    </div>
-                                    <!-- Mobile SWOT Carousel Navigation Dots -->
-                                    <div class="swot-carousel-dots no-print" style="display: none; justify-content: center; gap: 8px; margin-top: 15px; margin-bottom: 5px;">
-                                        <span class="swot-dot active" data-idx="0"></span>
-                                        <span class="swot-dot" data-idx="1"></span>
-                                        <span class="swot-dot" data-idx="2"></span>
-                                        <span class="swot-dot" data-idx="3"></span>
-                                    </div>
+                                </div>
+                                
+                                <!-- iOS-Style Segmented Tab Switcher -->
+                                <div class="swot-tabs-control no-print">
+                                    <div class="swot-tab-slide-bg" id="swot-tab-slider"></div>
+                                    <button class="swot-tab-btn active" data-tab="strengths">Strengths <span class="swot-tab-count" id="tab-count-s">0</span></button>
+                                    <button class="swot-tab-btn" data-tab="opportunities">Opportunities <span class="swot-tab-count" id="tab-count-o">0</span></button>
+                                    <button class="swot-tab-btn" data-tab="weaknesses">Weaknesses <span class="swot-tab-count" id="tab-count-w">0</span></button>
+                                    <button class="swot-tab-btn" data-tab="threats">Threats <span class="swot-tab-count" id="tab-count-t">0</span></button>
+                                </div>
+                                
+                                <!-- Dynamic List Container -->
+                                <div class="swot-details-panel">
+                                    <ul id="swot-active-list" style="margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;">
+                                        <!-- Dynamic items will be rendered here via app.js -->
+                                    </ul>
+                                </div>
+
+                                <!-- Hidden source lists so app.js can parse data from HTML easily -->
+                                <div style="display: none;">
+                                    <ul id="swot-strengths-list"></ul>
+                                    <ul id="swot-opportunities-list"></ul>
+                                    <ul id="swot-weaknesses-list"></ul>
+                                    <ul id="swot-threats-list"></ul>
+                                    <span id="swot-strengths-badge">0</span>
+                                    <span id="swot-opportunities-badge">0</span>
+                                    <span id="swot-weaknesses-badge">0</span>
+                                    <span id="swot-threats-badge">0</span>
                                 </div>
                             </div>
                         </div>
@@ -8455,7 +8431,7 @@
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
     <script src="export_manager.js?v=1.1.7"></script>
-    <script src="app.js?v=1.8.8"></script>
+    <script src="app.js?v=1.9.0"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
@@ -8489,7 +8465,7 @@
     </div>
 
     <!-- Modernization Custom Layer -->
-    <script src="modernizer.js?v=7.15"></script>
+    <script src="modernizer.js?v=7.16"></script>
 
     <!-- Mobile Frosted Glass Slide-up Details Bottom Sheet -->
     <div id="mobile-details-bottom-sheet" class="bottom-sheet-overlay no-print" style="display: none;">

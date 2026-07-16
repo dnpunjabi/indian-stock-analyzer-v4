@@ -1235,14 +1235,18 @@ function drawSparkline(svgId, dataPoints, color) {
     const svg = document.getElementById(svgId);
     if (!svg) return;
     svg.innerHTML = '';
+    if (!dataPoints || !Array.isArray(dataPoints)) return;
+    const cleanPoints = dataPoints.map(v => parseFloat(v)).filter(v => !isNaN(v));
+    if (cleanPoints.length < 2) return;
+    
     const width = svg.clientWidth || 50;
     const height = svg.clientHeight || 16;
     const padding = 2;
-    const minVal = Math.min(...dataPoints);
-    const maxVal = Math.max(...dataPoints);
+    const minVal = Math.min(...cleanPoints);
+    const maxVal = Math.max(...cleanPoints);
     const range = maxVal - minVal;
-    const points = dataPoints.map((val, idx) => {
-        const x = padding + (idx / (dataPoints.length - 1)) * (width - 2 * padding);
+    const points = cleanPoints.map((val, idx) => {
+        const x = padding + (idx / (cleanPoints.length - 1)) * (width - 2 * padding);
         const y = range === 0
             ? height / 2
             : height - padding - ((val - minVal) / range) * (height - 2 * padding);
@@ -7318,7 +7322,7 @@ function renderSWOTAndPerformance(p) {
 
         if (barEl) {
             const limitVal = Math.min(Math.abs(val), 100.0);
-            const halfWidth = limitVal / 2.0; // scale 0-100% to 0-50% width
+            const halfWidth = limitVal / 2.0;
 
             if (val >= 0) {
                 barEl.style.left = '50%';
@@ -7332,101 +7336,162 @@ function renderSWOTAndPerformance(p) {
         }
     });
 
-    // 2. Render SWOT Quadrants
+    // 2. Render Hidden SWOT lists for speech and other utilities
     const quadrants = ['strengths', 'weaknesses', 'opportunities', 'threats'];
     quadrants.forEach(quad => {
         const items = swot[quad] || [];
         const badgeEl = document.getElementById(`swot-${quad}-badge`);
         const listEl = document.getElementById(`swot-${quad}-list`);
 
-        if (badgeEl) {
-            badgeEl.innerText = items.length;
-        }
-
+        if (badgeEl) badgeEl.innerText = items.length;
         if (listEl) {
             listEl.innerHTML = '';
-            if (items.length === 0) {
+            items.forEach(item => {
                 const li = document.createElement('li');
-                li.innerText = quad === 'threats' ? 'No Threat for this stock' : 'No metrics detected';
-                li.style.color = 'var(--text-muted)';
+                li.innerText = item;
                 listEl.appendChild(li);
-            } else {
-                items.forEach(item => {
-                    const li = document.createElement('li');
-                    li.style.listStyleType = 'none';
-                    li.style.position = 'relative';
-                    li.style.paddingLeft = '18px';
-                    li.style.marginBottom = '6px';
-
-                    const dot = document.createElement('span');
-                    dot.style.position = 'absolute';
-                    dot.style.left = '0';
-                    dot.style.top = '1px';
-
-                    if (quad === 'strengths') {
-                        dot.innerText = '🟢';
-                    } else if (quad === 'weaknesses') {
-                        dot.innerText = '🔴';
-                    } else if (quad === 'opportunities') {
-                        dot.innerText = '🔵';
-                    } else {
-                        dot.innerText = '⚫';
-                    }
-                    dot.style.fontSize = '9px';
-
-                    li.appendChild(dot);
-                    li.appendChild(document.createTextNode(item));
-                    listEl.appendChild(li);
-                });
-            }
+            });
         }
     });
 
-    // 3. Set up interactive click toggles for SWOT cards
-    quadrants.forEach(quad => {
-        const header = document.getElementById(`swot-${quad}-header`);
-        const content = document.getElementById(`swot-${quad}-content`);
-        const card = document.getElementById(`swot-${quad}-card`);
+    // 3. Dynamic Confluence & Segmented SWOT balance calculations
+    const sCount = swot.strengths?.length || 0;
+    const oCount = swot.opportunities?.length || 0;
+    const wCount = swot.weaknesses?.length || 0;
+    const tCount = swot.threats?.length || 0;
+    const total = sCount + oCount + wCount + tCount;
 
-        if (header && content) {
-            // Remove any old event listeners
-            const newHeader = header.cloneNode(true);
-            header.parentNode.replaceChild(newHeader, header);
+    // Ratios for horizontal bar
+    let sPct = 25, oPct = 25, wPct = 25, tPct = 25;
+    if (total > 0) {
+        sPct = (sCount / total) * 100;
+        oPct = (oCount / total) * 100;
+        wPct = (wCount / total) * 100;
+        tPct = (tCount / total) * 100;
+    }
 
-            // Set initial state: fully open, dynamic height, overflow visible to prevent cutting off text
-            content.style.transition = 'max-height 0.3s ease-out, padding 0.3s ease-out';
-            content.style.maxHeight = 'none';
-            content.style.overflow = 'visible';
+    // Set bar segments
+    const barS = document.getElementById('swot-bar-s');
+    const barO = document.getElementById('swot-bar-o');
+    const barW = document.getElementById('swot-bar-w');
+    const barT = document.getElementById('swot-bar-t');
+    if (barS) barS.style.width = `${sPct}%`;
+    if (barO) barO.style.width = `${oPct}%`;
+    if (barW) barW.style.width = `${wPct}%`;
+    if (barT) barT.style.width = `${tPct}%`;
 
-            newHeader.addEventListener('click', () => {
-                const isCollapsed = content.style.maxHeight === '0px' || content.style.maxHeight === '0';
+    // Set dynamic legend indicators
+    const legS = document.getElementById('swot-leg-s');
+    const legO = document.getElementById('swot-leg-o');
+    const legW = document.getElementById('swot-leg-w');
+    const legT = document.getElementById('swot-leg-t');
+    if (legS) legS.innerText = `${sCount} (${Math.round(sPct)}%)`;
+    if (legO) legO.innerText = `${oCount} (${Math.round(oPct)}%)`;
+    if (legW) legW.innerText = `${wCount} (${Math.round(wPct)}%)`;
+    if (legT) legT.innerText = `${tCount} (${Math.round(tPct)}%)`;
 
-                if (isCollapsed) {
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                    content.style.padding = '15px';
-                    if (card) card.style.opacity = '1';
+    // Set switcher tab counts
+    const countS = document.getElementById('tab-count-s');
+    const countO = document.getElementById('tab-count-o');
+    const countW = document.getElementById('tab-count-w');
+    const countT = document.getElementById('tab-count-t');
+    if (countS) countS.innerText = sCount;
+    if (countO) countO.innerText = oCount;
+    if (countW) countW.innerText = wCount;
+    if (countT) countT.innerText = tCount;
 
-                    // Reset to none and overflow visible after the transition completes
-                    setTimeout(() => {
-                        if (content.style.maxHeight !== '0px') {
-                            content.style.maxHeight = 'none';
-                            content.style.overflow = 'visible';
-                        }
-                    }, 300);
-                } else {
-                    // Set from none to scrollHeight to start transition
-                    content.style.maxHeight = content.scrollHeight + 'px';
-                    content.style.overflow = 'hidden';
+    // 4. Tab selection rendering list function
+    const activeList = document.getElementById('swot-active-list');
+    const tabSlider = document.getElementById('swot-tab-slider');
 
-                    // Force a reflow
-                    content.offsetHeight;
+    const renderActiveTabList = (tabName) => {
+        if (!activeList) return;
+        activeList.innerHTML = '';
+        activeList.style.opacity = '0';
+        
+        let items = [];
+        let icon = '🛡️';
+        let className = 'strengths';
+        let fallbackText = 'No metrics detected';
 
-                    content.style.maxHeight = '0px';
-                    content.style.padding = '0px 15px';
-                    if (card) card.style.opacity = '0.85';
-                }
+        if (tabName === 'strengths') {
+            items = swot.strengths || [];
+            icon = '🛡️';
+            className = 'strengths';
+        } else if (tabName === 'opportunities') {
+            items = swot.opportunities || [];
+            icon = '🎯';
+            className = 'opportunities';
+        } else if (tabName === 'weaknesses') {
+            items = swot.weaknesses || [];
+            icon = '⚠️';
+            className = 'weaknesses';
+        } else if (tabName === 'threats') {
+            items = swot.threats || [];
+            icon = '🚩';
+            className = 'threats';
+            fallbackText = 'No Threat for this stock';
+        }
+
+        if (items.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'swot-list-card';
+            li.style.justifyContent = 'center';
+            li.innerText = fallbackText;
+            activeList.appendChild(li);
+        } else {
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.className = `swot-list-card ${className}`;
+                
+                const iconSpan = document.createElement('span');
+                iconSpan.className = 'swot-card-icon';
+                iconSpan.innerText = icon;
+
+                const textSpan = document.createElement('span');
+                textSpan.className = 'swot-card-text';
+                textSpan.innerText = item;
+
+                li.appendChild(iconSpan);
+                li.appendChild(textSpan);
+                activeList.appendChild(li);
             });
         }
+
+        // Trigger smooth fade-in
+        setTimeout(() => {
+            activeList.style.transition = 'opacity 0.25s ease';
+            activeList.style.opacity = '1';
+        }, 30);
+    };
+
+    // Initialize default tab to strengths
+    renderActiveTabList('strengths');
+    if (tabSlider) tabSlider.style.transform = 'translateX(0%)';
+
+    // Bind tab button click listeners
+    const tabButtons = document.querySelectorAll('.swot-tab-btn');
+    tabButtons.forEach((btn, index) => {
+        // Remove old click listeners if any
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+
+        newBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            // Set active class
+            document.querySelectorAll('.swot-tab-btn').forEach(b => b.classList.remove('active'));
+            newBtn.classList.add('active');
+
+            // Slide selector background
+            if (tabSlider) {
+                tabSlider.style.transform = `translateX(${index * 100}%)`;
+            }
+
+            // Render active list content
+            const tabName = newBtn.getAttribute('data-tab');
+            renderActiveTabList(tabName);
+        });
     });
 }
 

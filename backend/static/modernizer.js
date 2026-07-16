@@ -5223,21 +5223,34 @@
 
     // ==================== MOBILE SLIDE-UP DETAILS BOTTOM DRAWER SHEET ====================
     window.initDetailsBottomSheet = function() {
+        console.log("INITIALIZING BOTTOM SHEET DIAGNOSTICS...");
         const bottomSheet = document.getElementById('mobile-details-bottom-sheet');
         const closeBtn = document.getElementById('bottom-sheet-close-btn');
         const contentList = document.getElementById('bottom-sheet-content-list');
         
-        if (!bottomSheet || !closeBtn || !contentList) return;
+        console.log("mobile-details-bottom-sheet node exists:", !!bottomSheet);
+        console.log("bottom-sheet-close-btn node exists:", !!closeBtn);
+        console.log("bottom-sheet-content-list node exists:", !!contentList);
+
+        if (!bottomSheet || !closeBtn || !contentList) {
+            console.error("DIAGNOSTIC FAILURE: One or more bottom sheet nodes not found in DOM.");
+            return;
+        }
 
         const openSheet = (title, subtitle, sourceContainerId) => {
+            console.log("Triggering openSheet:", title, "from source container:", sourceContainerId);
             const sourceContainer = document.getElementById(sourceContainerId);
-            if (!sourceContainer) return;
+            if (!sourceContainer) {
+                console.error("sourceContainer not found in DOM:", sourceContainerId);
+                return;
+            }
 
             document.getElementById('bottom-sheet-title').innerText = title;
             document.getElementById('bottom-sheet-subtitle').innerText = subtitle;
 
             contentList.innerHTML = '';
             const cards = sourceContainer.querySelectorAll('.cio-checklist-card');
+            console.log("Found checklist cards count to clone:", cards.length);
             cards.forEach(card => {
                 const clone = card.cloneNode(true);
                 clone.classList.add('expanded');
@@ -5253,31 +5266,35 @@
             bottomSheet.style.setProperty('display', 'flex', 'important');
             setTimeout(() => {
                 bottomSheet.classList.add('active');
+                console.log("Set display: flex and active class on overlay.");
             }, 10);
         };
 
         const closeSheet = () => {
+            console.log("Triggering closeSheet.");
             bottomSheet.classList.remove('active');
             setTimeout(() => {
                 bottomSheet.style.setProperty('display', 'none', 'important');
             }, 300);
         };
 
-        // Event Delegation for mobile circular gauge clicks
+        // Event Delegation for circular gauge clicks (Universal Modal / Bottom Sheet)
         document.addEventListener('click', (e) => {
             const gauge = e.target.closest('.cio-score-gauge-container');
-            if (!gauge) return;
+            if (!gauge) {
+                return;
+            }
 
-            if (window.innerWidth <= 768) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const hasAlignment = gauge.querySelector('#cio-alignment-num') !== null;
-                if (hasAlignment) {
-                    openSheet('CIO INVESTOR ALIGNMENT CHECKS', 'Target profile matching breakdown', 'cio-checklist-container');
-                } else {
-                    openSheet('CIO AUDIT ASSESSMENT DETAILS', 'Scorecard parameter indicators checklist', 'cio-checklist-container');
-                }
+            console.log("CIRCLE GAUGE DETECTED CLICK. Element:", gauge);
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const hasAlignment = gauge.querySelector('#cio-alignment-num') !== null;
+            console.log("Checking gauge target type. Is Alignment Gauge?", hasAlignment);
+            if (hasAlignment) {
+                openSheet('CIO INVESTOR ALIGNMENT CHECKS', 'Target profile matching breakdown', 'cio-checklist-container');
+            } else {
+                openSheet('CIO AUDIT ASSESSMENT DETAILS', 'Scorecard parameter indicators checklist', 'cio-checklist-container');
             }
         });
 
@@ -5438,8 +5455,18 @@
         if (typeof initSolvencyHUD === 'function') initSolvencyHUD();
         if (typeof initSWOTCarousel === 'function') initSWOTCarousel();
         if (typeof initThesisAudioPlayer === 'function') initThesisAudioPlayer();
-        if (typeof initDetailsBottomSheet === 'function') initDetailsBottomSheet();
-        if (typeof initProspectusCopy === 'function') initProspectusCopy();
+        
+        // Defer bottom sheet and copy buttons to guarantee DOM elements are fully loaded
+        const runDeferredAdditions = () => {
+            if (typeof initDetailsBottomSheet === 'function') initDetailsBottomSheet();
+            if (typeof initProspectusCopy === 'function') initProspectusCopy();
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', runDeferredAdditions);
+        } else {
+            runDeferredAdditions();
+        }
     } catch(e) {
         console.error("Error invoking Phase 2 additions:", e);
     }
