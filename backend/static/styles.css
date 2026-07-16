@@ -19024,7 +19024,7 @@ select option {
     color: var(--text-secondary) !important;
     padding: 6px 14px !important;
     border-radius: 20px !important;
-    font-size: 12px !important;
+    font-size: 12.5px !important;
     font-weight: 700 !important;
     cursor: pointer !important;
     font-family: var(--font-heading) !important;
@@ -19044,7 +19044,7 @@ select option {
 
 /* Home Page Content Font Size Adjustments */
 .header-title {
-    font-size: 15.5px !important;
+    font-size: 16px !important;
     letter-spacing: 0.5px !important;
 }
 .sector-name {
@@ -19056,31 +19056,63 @@ select option {
     font-weight: 700 !important;
 }
 .mover-column-title {
-    font-size: 12.5px !important;
+    font-size: 13.5px !important;
     letter-spacing: 0.5px !important;
 }
 .mover-stock-symbol {
-    font-size: 13.5px !important;
+    font-size: 14px !important;
 }
 .mover-stock-name {
-    font-size: 11.5px !important;
+    font-size: 12px !important;
     max-width: 170px !important;
 }
 .mover-stock-price {
-    font-size: 13.5px !important;
+    font-size: 14px !important;
 }
 .mover-stock-change {
-    font-size: 12px !important;
+    font-size: 12.5px !important;
 }
 .news-card-title {
-    font-size: 14px !important;
+    font-size: 15px !important;
     line-height: 1.45 !important;
 }
 .news-card-meta {
-    font-size: 11px !important;
+    font-size: 11.5px !important;
 }
 .news-sentiment-badge {
-    font-size: 10px !important;
+    font-size: 10.5px !important;
+}
+
+/* Greeting welcome card scaling */
+.mobile-copilot-greeting h4 {
+    font-size: 17px !important;
+}
+.mobile-copilot-greeting p {
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+}
+.mobile-copilot-greeting .breadth-gauge-wrap div {
+    font-size: 11.5px !important;
+}
+.mobile-copilot-greeting .breadth-gauge-wrap span {
+    font-size: 11px !important;
+}
+
+/* Quick Analysis Workspaces scaling */
+.mobile-cmd-card-title {
+    font-size: 14.5px !important;
+}
+.mobile-cmd-card-desc {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+}
+
+/* Live Catalyst News cards scaling */
+.bloomberg-news-card div {
+    font-size: 14px !important;
+}
+.bloomberg-news-card span {
+    font-size: 11px !important;
 }
 
 /* Mobile Fixed Bottom App Dock Navigation */
@@ -19115,7 +19147,7 @@ select option {
     justify-content: center !important;
     color: var(--text-secondary) !important;
     text-decoration: none !important;
-    font-size: 10px !important;
+    font-size: 10.5px !important;
     font-weight: 600 !important;
     gap: 4px !important;
     background: transparent !important;

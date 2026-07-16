@@ -3281,15 +3281,15 @@
             container.innerHTML = `
                 <!-- Dynamic Greeting & Live Market Bias Summary -->
                 <div class="mobile-copilot-greeting">
-                    <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 800; color: var(--text-primary); letter-spacing: 0.02em; display: flex; justify-content: space-between; align-items: center;">
+                    <h4 style="margin: 0 0 6px 0; font-size: 17px; font-weight: 800; color: var(--text-primary); letter-spacing: 0.02em; display: flex; justify-content: space-between; align-items: center;">
                         <span>${greetingText}, Analyst</span>
-                        <button id="btn-audio-mute-toggle" style="background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 14px; outline: none; transition: transform 0.1s; padding: 0 4px;">🔊</button>
+                        <button id="btn-audio-mute-toggle" style="background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 17px; outline: none; transition: transform 0.1s; padding: 0 4px;">🔊</button>
                     </h4>
-                    <p style="margin: 0; font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;" id="mobile-home-copilot-summary">
+                    <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.45;" id="mobile-home-copilot-summary">
                         ${derivedGreeting}
                     </p>
                     <div class="breadth-gauge-wrap" id="mobile-home-breadth-gauge" style="margin-top: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-glass); padding: 10px; border-radius: 8px; display: none;">
-                        <div style="display:flex; justify-content:space-between; font-size:9.5px; font-weight:800; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;">
+                        <div style="display:flex; justify-content:space-between; font-size:11.5px; font-weight:800; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px;">
                             <span style="color:var(--neon-green, #10b981);">Advances: <span id="breadth-advances-count">0</span></span>
                             <span style="color:var(--color-crimson, #ef4444);">Declines: <span id="breadth-declines-count">0</span></span>
                         </div>
@@ -3299,11 +3299,11 @@
                         </div>
 
                         <!-- Volatility Indicator -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06)); font-size:9px; font-weight:700; color:var(--text-muted);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06)); font-size:11px; font-weight:700; color:var(--text-muted);">
                             <span>VOLATILITY RADAR</span>
                             <div style="display:flex; align-items:center; gap:5px;">
                                 <span id="vix-indicator-dot" style="width:5.5px; height:5.5px; border-radius:50%; background:#10b981; display:inline-block; box-shadow:0 0 5px #10b981; transition: all 0.3s ease;"></span>
-                                <span id="vix-indicator-val" style="color:var(--text-primary); font-family:var(--font-heading); font-size:9px; font-weight:800;">VIX: --</span>
+                                <span id="vix-indicator-val" style="color:var(--text-primary); font-family:var(--font-heading); font-size:11px; font-weight:800;">VIX: --</span>
                             </div>
                         </div>
                     </div>
@@ -3331,7 +3331,7 @@
                 </div>
 
                 <!-- Quick Action Shortcuts -->
-                <h5 style="margin:0 0 12px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">Quick Analysis Workspaces</h5>
+                <h5 style="margin:0 0 12px 0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">Quick Analysis Workspaces</h5>
                 <div class="mobile-cmd-grid">
                     <div class="mobile-cmd-card inst-card-screener" id="cmd-btn-screener">
                         <div class="mobile-cmd-card-header">
@@ -4064,7 +4064,7 @@
                             const isExpanded = newsContainer.dataset.expanded === 'true';
                             const newsToShow = isExpanded ? newsData.news_items.slice(0, 10) : newsData.news_items.slice(0, 3);
 
-                            let newsHtml = `<h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>`;
+                            let newsHtml = `<h5 style="margin:0 0 10px 0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>`;
                             newsToShow.forEach(item => {
                                 const cleanTitle = item.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
                                 const sentiment = item.sentiment || 'Neutral';
@@ -4072,12 +4072,12 @@
                                 let sentimentBadge = '';
                                 if (sentiment === 'Bullish') {
                                     accentColor = '#10b981';
-                                    sentimentBadge = `<span style="font-size:8px; font-weight:800; padding:2px 6px; border-radius:3px; background:rgba(16,185,129,0.12); color:var(--neon-green); border:1px solid rgba(16,185,129,0.25); text-transform:uppercase; letter-spacing:0.02em;">Bullish Catalyst</span>`;
+                                    sentimentBadge = `<span style="font-size:11px; font-weight:800; padding:2px 6px; border-radius:3px; background:rgba(16,185,129,0.12); color:var(--neon-green); border:1px solid rgba(16,185,129,0.25); text-transform:uppercase; letter-spacing:0.02em;">Bullish Catalyst</span>`;
                                 } else if (sentiment === 'Bearish') {
                                     accentColor = '#ef4444';
-                                    sentimentBadge = `<span style="font-size:8px; font-weight:800; padding:2px 6px; border-radius:3px; background:rgba(239,68,68,0.12); color:var(--neon-red); border:1px solid rgba(239,68,68,0.25); text-transform:uppercase; letter-spacing:0.02em;">Bearish Catalyst</span>`;
+                                    sentimentBadge = `<span style="font-size:11px; font-weight:800; padding:2px 6px; border-radius:3px; background:rgba(239,68,68,0.12); color:var(--neon-red); border:1px solid rgba(239,68,68,0.25); text-transform:uppercase; letter-spacing:0.02em;">Bearish Catalyst</span>`;
                                 } else {
-                                    sentimentBadge = `<span style="font-size:8px; font-weight:800; padding:2px 6px; border-radius:3px; background:rgba(255,255,255,0.04); color:var(--text-secondary); border:1px solid var(--border-glass); text-transform:uppercase; letter-spacing:0.02em;">Market Catalyst</span>`;
+                                    sentimentBadge = `<span style="font-size:11px; font-weight:800; padding:2px 6px; border-radius:3px; background:rgba(255,255,255,0.04); color:var(--text-secondary); border:1px solid var(--border-glass); text-transform:uppercase; letter-spacing:0.02em;">Market Catalyst</span>`;
                                 }
 
                                 // Seed stable pseudo-random impact value from title hash
@@ -4097,19 +4097,19 @@
                                 newsHtml += `
                                     <div class="bloomberg-news-card" style="--news-sentiment-color:${accentColor};" onclick="window.open('${item.link}', '_blank')">
                                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                            <span style="font-size:8.5px; color:var(--text-muted); font-weight:700;">${item.source || 'News'} • ${item.date || 'Today'}</span>
+                                            <span style="font-size:11.5px; color:var(--text-muted); font-weight:700;">${item.source || 'News'} • ${item.date || 'Today'}</span>
                                             ${sentimentBadge}
                                         </div>
-                                        <div style="font-size:11px; font-family:var(--font-heading); font-weight:600; color:var(--text-primary); line-height:1.45;">${cleanTitle}</div>
+                                        <div style="font-size:14px; font-family:var(--font-heading); font-weight:600; color:var(--text-primary); line-height:1.45;">${cleanTitle}</div>
                                         
                                         <!-- Bloomberg Impact Weight Indicator -->
-                                        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06)); font-size:8.5px; color:var(--text-muted);">
+                                        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:8px; border-top:1px dashed var(--border-glass, rgba(255,255,255,0.06)); font-size:11.5px; color:var(--text-muted);">
                                             <span style="font-weight:700; text-transform:uppercase; letter-spacing:0.02em;">Catalyst Impact Weight</span>
                                             <div style="display:flex; align-items:center; gap:6px; width:70px; justify-content:flex-end;">
                                                 <div style="position:relative; width:45px; height:3px; background:var(--bg-track, rgba(255,255,255,0.06)); border-radius:1.5px; overflow:hidden;">
                                                     <div style="height:100%; width:${impactVal}%; background:${accentColor};"></div>
                                                 </div>
-                                                <span style="font-weight:800; color:${accentColor}; font-family:var(--font-heading); font-size:9px;">${(impactVal/10).toFixed(1)}</span>
+                                                <span style="font-weight:800; color:${accentColor}; font-family:var(--font-heading); font-size:11px;">${(impactVal/10).toFixed(1)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -4118,7 +4118,7 @@
 
                             if (newsData.news_items.length > 3) {
                                 newsHtml += `
-                                    <button id="btn-toggle-news-expansion" style="width:100%; padding:10px; margin-top:5px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:8px; color:var(--text-secondary); font-family:var(--font-heading); font-size:11px; font-weight:700; cursor:pointer; text-align:center; transition: all 0.2s ease;">
+                                    <button id="btn-toggle-news-expansion" style="width:100%; padding:10px; margin-top:5px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:8px; color:var(--text-secondary); font-family:var(--font-heading); font-size:13px; font-weight:700; cursor:pointer; text-align:center; transition: all 0.2s ease;">
                                         ${isExpanded ? 'Show Less Catalyst News ▴' : 'Show More Catalyst News ▾'}
                                     </button>
                                 `;
