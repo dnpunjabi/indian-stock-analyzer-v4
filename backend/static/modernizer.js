@@ -4773,13 +4773,19 @@
 
         const salesRow = quarters.rows.find(r => (r.label || '').toLowerCase().includes('sales') || (r.label || '').toLowerCase().includes('revenue'));
         const profitRow = quarters.rows.find(r => (r.label || '').toLowerCase().includes('net profit'));
-        const opmRow = quarters.rows.find(r => (r.label || '').toLowerCase() === 'opm %' || (r.label || '').toLowerCase() === 'opm');
+        const opmRow = quarters.rows.find(r => (r.label || '').trim().toLowerCase() === 'opm %' || (r.label || '').trim().toLowerCase() === 'opm');
+
+        const cleanVal = (v) => {
+            if (v === null || v === undefined) return 0;
+            const cleanStr = v.toString().replace(/,/g, '').replace(/%/g, '').trim();
+            return parseFloat(cleanStr) || 0;
+        };
 
         if (!salesRow || !profitRow) return;
 
-        const salesValues = salesRow.values.slice(-limit).map(v => parseFloat(v) || 0);
-        const profitValues = profitRow.values.slice(-limit).map(v => parseFloat(v) || 0);
-        const opmValues = opmRow ? opmRow.values.slice(-limit).map(v => parseFloat(v.toString().replace('%','')) || 0) : [];
+        const salesValues = salesRow.values.slice(-limit).map(v => cleanVal(v));
+        const profitValues = profitRow.values.slice(-limit).map(v => cleanVal(v));
+        const opmValues = opmRow ? opmRow.values.slice(-limit).map(v => cleanVal(v)) : [];
 
         // Set dimensions & scale for high density displays
         const dpr = window.devicePixelRatio || 1;

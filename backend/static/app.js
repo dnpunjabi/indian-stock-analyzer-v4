@@ -5453,7 +5453,7 @@ async function loadStockAnalyzer(query, force_llm = false, silent = false) {
         loadShareholdingData(profile.ticker);
         loadStockTrades(profile.ticker);
 
-        if (silent && typeof loadFinancialStatements === 'function') {
+        if (typeof loadFinancialStatements === 'function') {
             loadFinancialStatements(profile.ticker);
         }
 
