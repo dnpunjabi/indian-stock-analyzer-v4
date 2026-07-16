@@ -5227,10 +5227,6 @@
         const closeBtn = document.getElementById('bottom-sheet-close-btn');
         const contentList = document.getElementById('bottom-sheet-content-list');
         
-        // Target circular gauges
-        const aiGauge = document.getElementById('cio-score-num')?.closest('.cio-score-gauge-container');
-        const alignGauge = document.getElementById('cio-alignment-num')?.closest('.cio-score-gauge-container');
-
         if (!bottomSheet || !closeBtn || !contentList) return;
 
         const openSheet = (title, subtitle, sourceContainerId) => {
@@ -5246,7 +5242,6 @@
                 const clone = card.cloneNode(true);
                 clone.classList.add('expanded');
                 
-                // Strip checkboxes and detail sliders in sheets for readability
                 const chk = clone.querySelector('.sandbox-switch');
                 if (chk) chk.remove();
 
@@ -5255,7 +5250,7 @@
                 contentList.appendChild(clone);
             });
 
-            bottomSheet.style.display = 'flex';
+            bottomSheet.style.setProperty('display', 'flex', 'important');
             setTimeout(() => {
                 bottomSheet.classList.add('active');
             }, 10);
@@ -5264,29 +5259,34 @@
         const closeSheet = () => {
             bottomSheet.classList.remove('active');
             setTimeout(() => {
-                bottomSheet.style.display = 'none';
+                bottomSheet.style.setProperty('display', 'none', 'important');
             }, 300);
         };
 
-        if (aiGauge) {
-            aiGauge.style.cursor = 'pointer';
-            aiGauge.onclick = (e) => {
-                if (window.innerWidth <= 768) {
-                    e.stopPropagation();
+        // Event Delegation for mobile circular gauge clicks
+        document.addEventListener('click', (e) => {
+            const gauge = e.target.closest('.cio-score-gauge-container');
+            if (!gauge) return;
+
+            if (window.innerWidth <= 768) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const hasAlignment = gauge.querySelector('#cio-alignment-num') !== null;
+                if (hasAlignment) {
+                    openSheet('CIO INVESTOR ALIGNMENT CHECKS', 'Target profile matching breakdown', 'cio-checklist-container');
+                } else {
                     openSheet('CIO AUDIT ASSESSMENT DETAILS', 'Scorecard parameter indicators checklist', 'cio-checklist-container');
                 }
-            };
-        }
+            }
+        });
 
-        if (alignGauge) {
-            alignGauge.style.cursor = 'pointer';
-            alignGauge.onclick = (e) => {
-                if (window.innerWidth <= 768) {
-                    e.stopPropagation();
-                    openSheet('CIO INVESTOR ALIGNMENT CHECKS', 'Target profile matching breakdown', 'cio-checklist-container');
-                }
-            };
-        }
+        // Set pointer cursor on mobile gauges initially
+        setTimeout(() => {
+            document.querySelectorAll('.cio-score-gauge-container').forEach(g => {
+                g.style.cursor = 'pointer';
+            });
+        }, 1000);
 
         closeBtn.onclick = (e) => {
             e.stopPropagation();
