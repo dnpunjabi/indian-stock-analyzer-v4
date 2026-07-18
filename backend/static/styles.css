@@ -11915,6 +11915,29 @@ tr.active-peer-row td:first-child {
     background: rgba(255, 255, 255, 0.05);
 }
 
+.bottom-sheet-close {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.2s;
+    position: absolute;
+    top: 12px;
+    right: 15px;
+    z-index: 10;
+}
+
+.bottom-sheet-close:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
 .bottom-sheet-body {
     overflow-y: auto;
     width: 100%;
@@ -19239,7 +19262,7 @@ select option {
 /* Mobile FAB Speed Dial Styles */
 .mobile-fab-container {
     position: fixed !important;
-    bottom: 80px !important; /* Anchored above bottom nav dock */
+    bottom: 125px !important; /* Anchored above bottom nav dock and sticky HUD bar */
     right: 20px !important;
     z-index: 9997 !important;
     display: none !important; /* Controlled by media query */
@@ -19529,105 +19552,7 @@ select option {
     }
 }
 
-/* ==================== TASKS 6 & 7: BOTTOM SHEET DRAWER & UTILITIES ==================== */
-.bottom-sheet-overlay {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    background: rgba(0, 0, 0, 0.6) !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-    z-index: 999999 !important;
-    display: flex !important;
-    align-items: flex-end !important;
-    justify-content: center !important;
-    transition: opacity 0.3s ease !important;
-}
-.bottom-sheet-card {
-    width: 100% !important;
-    max-width: 500px !important;
-    background: rgba(18, 18, 22, 0.95) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 16px 16px 0 0 !important;
-    box-shadow: 0 -8px 32px 0 rgba(0, 0, 0, 0.5) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    transform: translateY(100%) !important;
-    transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1) !important;
-    box-sizing: border-box !important;
-    padding-bottom: 25px !important;
-}
-.bottom-sheet-overlay.active .bottom-sheet-card {
-    transform: translateY(0%) !important;
-}
-.bottom-sheet-header {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    padding: 12px 15px 5px 15px !important;
-    position: relative !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-}
-.bottom-sheet-drag-handle {
-    width: 36px !important;
-    height: 4px !important;
-    background: rgba(255, 255, 255, 0.2) !important;
-    border-radius: 2px !important;
-}
-.bottom-sheet-close {
-    position: absolute !important;
-    top: 10px !important;
-    right: 15px !important;
-    background: none !important;
-    border: none !important;
-    color: var(--text-secondary, #9ca3af) !important;
-    font-size: 22px !important;
-    cursor: pointer !important;
-    line-height: 1 !important;
-    outline: none !important;
-}
-.bottom-sheet-body {
-    max-height: 70vh !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-}
-.bottom-sheet-body::-webkit-scrollbar {
-    width: 4px !important;
-}
-.bottom-sheet-body::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1) !important;
-    border-radius: 2px !important;
-}
 
-/* ==================== UNIVERSAL MODAL / BOTTOM SHEET MEDIA TRANSITIONS ==================== */
-@media (min-width: 769px) {
-    .bottom-sheet-overlay {
-        align-items: center !important;
-        justify-content: center !important;
-    }
-    .bottom-sheet-card {
-        border-radius: 12px !important;
-        max-height: 85vh !important;
-        max-width: 460px !important;
-        transform: scale(0.92) translateY(15px) !important;
-        opacity: 0;
-        transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.25s ease !important;
-    }
-    .bottom-sheet-overlay.active .bottom-sheet-card {
-        transform: scale(1) translateY(0%) !important;
-        opacity: 1 !important;
-    }
-    .bottom-sheet-drag-handle {
-        display: none !important; /* Hide drag handle on desktop modal */
-    }
-    .bottom-sheet-close {
-        top: 15px !important;
-        right: 15px !important;
-    }
-}
 
 /* ==================== ENTERPRISE SEGMENTED SWOT CONTROL ==================== */
 .swot-balance-wrapper {
@@ -19933,4 +19858,42 @@ select option {
 [data-theme="light"] .swot-list-card.threats,
 [data-mode="light"] .swot-list-card.threats {
     background: rgba(239, 68, 68, 0.03) !important;
+}
+
+/* --- MOBILE BOTTOM DRAWER STACKING & COVERAGE RULES --- */
+@media (max-width: 768px) {
+    /* Hide the inline absolute dropdown container on mobile to prevent overlay conflicts */
+    .meta-dropdown-panel {
+        display: none !important;
+    }
+
+    /* Hide the sticky bottom nav bar and floating action buttons when a details sheet is active */
+    body.sheet-active .mobile-bottom-nav,
+    .mobile-bottom-sheet.active ~ .mobile-bottom-nav,
+    .bottom-sheet-overlay.active ~ .mobile-bottom-nav {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    body.sheet-active .mobile-fab-container,
+    .mobile-bottom-sheet.active ~ .mobile-fab-container,
+    .bottom-sheet-overlay.active ~ .mobile-fab-container {
+        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .mobile-bottom-sheet {
+        z-index: 9999999 !important;
+    }
+
+    #news-audit-cta-banner {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+    #news-audit-cta-banner #run-groq-audit-btn {
+        width: 100% !important;
+        justify-content: center !important;
+    }
 }

@@ -18814,7 +18814,8 @@ async function setupTaxHarvestingPanel() {
                 showToast("Price must be greater than zero.", "warning");
                 return;
             }
-            if (date > "2026-06-05") {
+            const localDateStr = new Date().toLocaleDateString('en-CA'); // 'YYYY-MM-DD'
+            if (date > localDateStr) {
                 showToast("Trade date cannot be in the future.", "warning");
                 return;
             }
@@ -18852,11 +18853,12 @@ async function setupTaxHarvestingPanel() {
         });
     }
 
-    // Set default date to 2026-06-05
+    // Set default date to current local date
     const taxAddDateInput = document.getElementById('tax-add-date');
     if (taxAddDateInput) {
-        taxAddDateInput.value = "2026-06-05";
-        taxAddDateInput.max = "2026-06-05";
+        const localDateStr = new Date().toLocaleDateString('en-CA');
+        taxAddDateInput.value = localDateStr;
+        taxAddDateInput.max = localDateStr;
     }
 
     // Clear ledger button
@@ -19054,8 +19056,10 @@ async function loadTaxHarvestingLedger() {
 
             let days = 0;
             try {
-                const today = new Date('2026-06-05');
+                const today = new Date();
+                today.setHours(0,0,0,0);
                 const pDate = new Date(item.purchase_date);
+                pDate.setHours(0,0,0,0);
                 const diffTime = Math.abs(today - pDate);
                 days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 if (today < pDate) days = 0;
@@ -19068,6 +19072,7 @@ async function loadTaxHarvestingLedger() {
                 ? `<span class="badge-rec" style="background: rgba(16, 185, 129, 0.1); color: var(--neon-green); border-color: rgba(16, 185, 129, 0.2); font-size: 10px; padding: 2px 6px;">🌳 LTCG</span>`
                 : `<span class="badge-rec" style="background: rgba(239, 68, 68, 0.1); color: var(--neon-red); border-color: rgba(239, 68, 68, 0.2); font-size: 10px; padding: 2px 6px;">⏳ STCG</span>`;
 
+            const localTodayStr = new Date().toLocaleDateString('en-CA');
             tr.innerHTML = `
                 <td style="padding: 8px;">
                     <strong>${item.symbol}</strong><br>
@@ -19075,7 +19080,7 @@ async function loadTaxHarvestingLedger() {
                 </td>
                 <td style="padding: 8px;"><input type="number" class="tax-qty-input" data-id="${item.id}" value="${item.quantity}" style="width: 70px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px;"></td>
                 <td style="padding: 8px;"><input type="number" class="tax-price-input" data-id="${item.id}" value="${item.purchase_price}" style="width: 80px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px;"></td>
-                <td style="padding: 8px;"><input type="date" class="tax-date-input" data-id="${item.id}" value="${item.purchase_date}" max="2026-06-05" style="width: 110px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px;"></td>
+                <td style="padding: 8px;"><input type="date" class="tax-date-input" data-id="${item.id}" value="${item.purchase_date}" max="${localTodayStr}" style="width: 110px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px;"></td>
                 <td style="padding: 8px; color: var(--text-secondary); font-size: 11.5px;">${days} days</td>
                 <td style="padding: 8px;">${statusHTML}</td>
                 <td style="padding: 8px;"><button class="btn-secondary tax-remove-btn" data-id="${item.id}" style="font-size: 10px; padding: 4px 8px; border-color: rgba(239,68,68,0.25); color: var(--color-crimson); background: rgba(239,68,68,0.03); cursor:pointer; font-weight: 600; border-radius: 4px;">Remove 🗑️</button></td>
@@ -19091,7 +19096,7 @@ async function loadTaxHarvestingLedger() {
                 const pVal = parseFloat(priceInput.value) || 0;
                 const dVal = dateInput.value;
 
-                if (dVal > "2026-06-05") {
+                if (dVal > localTodayStr) {
                     showToast("Purchase date cannot be in the future.", "warning");
                     dateInput.value = item.purchase_date;
                     return;

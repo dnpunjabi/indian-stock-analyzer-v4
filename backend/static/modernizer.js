@@ -6,6 +6,51 @@
 (function() {
     console.log("APEX Modernizer: Initializing core visual upgrades...");
 
+    // Global Error and Promise Rejection Handlers for Remote Debugging
+    window.onerror = function(message, source, lineno, colno, error) {
+        const errorText = `JS Error: ${message} at ${source}:${lineno}:${colno}`;
+        console.error(errorText);
+        const toast = document.createElement('div');
+        toast.className = 'remote-debug-error-toast';
+        toast.style.position = 'fixed';
+        toast.style.top = '10px';
+        toast.style.left = '10px';
+        toast.style.right = '10px';
+        toast.style.background = 'rgba(239, 68, 68, 0.95)';
+        toast.style.color = '#ffffff';
+        toast.style.padding = '12px 16px';
+        toast.style.borderRadius = '8px';
+        toast.style.zIndex = '9999999999';
+        toast.style.fontFamily = 'monospace';
+        toast.style.fontSize = '11px';
+        toast.style.wordBreak = 'break-all';
+        toast.innerHTML = `<strong>Error Caught:</strong><br>${message}<br><small>in ${source ? source.split('/').pop() : 'unknown'}:${lineno}:${colno}</small>`;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.remove(); }, 15000);
+        return false;
+    };
+
+    window.addEventListener('unhandledrejection', function(event) {
+        const message = event.reason ? (event.reason.message || event.reason) : 'Unknown Promise Rejection';
+        const toast = document.createElement('div');
+        toast.className = 'remote-debug-error-toast';
+        toast.style.position = 'fixed';
+        toast.style.top = '10px';
+        toast.style.left = '10px';
+        toast.style.right = '10px';
+        toast.style.background = 'rgba(239, 68, 68, 0.95)';
+        toast.style.color = '#ffffff';
+        toast.style.padding = '12px 16px';
+        toast.style.borderRadius = '8px';
+        toast.style.zIndex = '9999999999';
+        toast.style.fontFamily = 'monospace';
+        toast.style.fontSize = '11px';
+        toast.style.wordBreak = 'break-all';
+        toast.innerHTML = `<strong>Promise Rejected:</strong><br>${message}`;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.remove(); }, 15000);
+    });
+
     const isCapacitor = (window.hasOwnProperty('Capacitor') || 
                          (window.Capacitor !== undefined) || 
                          (window.parent && window.parent.hasOwnProperty('Capacitor'))) && 
@@ -183,6 +228,21 @@
                 else if (tabKey === 'portfolio') navId = 'nav-portfolio';
                 const activeBtn = document.getElementById(navId);
                 if (activeBtn) activeBtn.classList.add('active');
+            }
+
+            // Sync visibility of the mobile FAB container
+            const fabContainer = document.querySelector('.mobile-fab-container');
+            if (fabContainer) {
+                if (tabKey === 'analyzer') {
+                    const isSheetActive = document.body.classList.contains('sheet-active');
+                    if (!isSheetActive && window.innerWidth <= 768) {
+                        fabContainer.style.setProperty('display', 'flex', 'important');
+                    } else {
+                        fabContainer.style.setProperty('display', 'none', 'important');
+                    }
+                } else {
+                    fabContainer.style.setProperty('display', 'none', 'important');
+                }
             }
         };
     }
@@ -1479,32 +1539,9 @@
 
         function handleSwipeGesture(e) {
             const currentHash = location.hash.substring(1) || 'analyzer';
-            const isSwipeLeft = touchendX < touchstartX - swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
-            const isSwipeRight = touchendX > touchstartX + swipeMinDistance && Math.abs(touchendY - touchstartY) < swipeMaxCrossDistance;
-
-            if (currentHash === 'analyzer' && (isSwipeLeft || isSwipeRight)) {
-                const subtabs = ['summary', 'valuation', 'technical', 'tv-chart', 'tv-advanced', 'fundamental', 'peers', 'financials', 'margin-bridge', 'audit', 'volume', 'trades', 'events'];
-                const activeSubtabBtn = document.querySelector('.subtab-btn.active');
-                if (activeSubtabBtn) {
-                    const currentSubtab = activeSubtabBtn.getAttribute('data-subtab');
-                    const currentIndex = subtabs.indexOf(currentSubtab);
-                    if (currentIndex !== -1) {
-                        let nextIndex = currentIndex;
-                        if (isSwipeLeft && currentIndex < subtabs.length - 1) {
-                            nextIndex = currentIndex + 1;
-                        } else if (isSwipeRight && currentIndex > 0) {
-                            nextIndex = currentIndex - 1;
-                        }
-                        if (nextIndex !== currentIndex) {
-                            playHaptic(12);
-                            const nextBtn = document.querySelector(`[data-subtab="${subtabs[nextIndex]}"]`);
-                            if (nextBtn) {
-                                nextBtn.click();
-                                nextBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                            }
-                        }
-                    }
-                }
+            
+            // Disable swipe navigation on the Equity Research Terminal tab to prevent scroll conflicts
+            if (currentHash === 'analyzer') {
                 return;
             }
 
@@ -5282,7 +5319,6 @@
 
             contentList.innerHTML = '';
             const cards = sourceContainer.querySelectorAll('.cio-checklist-card');
-            console.log("Found checklist cards count to clone:", cards.length);
             cards.forEach(card => {
                 const clone = card.cloneNode(true);
                 clone.classList.add('expanded');
@@ -5295,47 +5331,46 @@
                 contentList.appendChild(clone);
             });
 
+            document.body.classList.add('sheet-active');
             bottomSheet.style.setProperty('display', 'flex', 'important');
+            
+            // Directly translate the card up inline
+            const cardEl = bottomSheet.querySelector('.bottom-sheet-content');
+            if (cardEl) cardEl.style.setProperty('transform', 'translateY(0%)', 'important');
+
             setTimeout(() => {
                 bottomSheet.classList.add('active');
                 console.log("Set display: flex and active class on overlay.");
+                
+                // Hide mobile bottom navigation and FAB triggers immediately
+                const bottomNav = document.querySelector('.mobile-bottom-nav');
+                if (bottomNav) bottomNav.style.setProperty('display', 'none', 'important');
+                const fabContainer = document.querySelector('.mobile-fab-container');
+                if (fabContainer) fabContainer.style.setProperty('display', 'none', 'important');
             }, 10);
         };
-
+ 
         const closeSheet = () => {
             console.log("Triggering closeSheet.");
             bottomSheet.classList.remove('active');
+            document.body.classList.remove('sheet-active');
+            
+            // Directly translate the card down inline
+            const cardEl = bottomSheet.querySelector('.bottom-sheet-content');
+            if (cardEl) cardEl.style.setProperty('transform', 'translateY(100%)', 'important');
+
+            // Restore mobile bottom navigation and FAB triggers visibility
+            const bottomNav = document.querySelector('.mobile-bottom-nav');
+            if (bottomNav) bottomNav.style.removeProperty('display');
+            const fabContainer = document.querySelector('.mobile-fab-container');
+            if (fabContainer) fabContainer.style.removeProperty('display');
+            
             setTimeout(() => {
                 bottomSheet.style.setProperty('display', 'none', 'important');
             }, 300);
         };
 
-        // Event Delegation for circular gauge clicks (Universal Modal / Bottom Sheet)
-        document.addEventListener('click', (e) => {
-            const gauge = e.target.closest('.cio-score-gauge-container');
-            if (!gauge) {
-                return;
-            }
-
-            console.log("CIRCLE GAUGE DETECTED CLICK. Element:", gauge);
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const hasAlignment = gauge.querySelector('#cio-alignment-num') !== null;
-            console.log("Checking gauge target type. Is Alignment Gauge?", hasAlignment);
-            if (hasAlignment) {
-                openSheet('CIO INVESTOR ALIGNMENT CHECKS', 'Target profile matching breakdown', 'cio-checklist-container');
-            } else {
-                openSheet('CIO AUDIT ASSESSMENT DETAILS', 'Scorecard parameter indicators checklist', 'cio-checklist-container');
-            }
-        });
-
-        // Set pointer cursor on mobile gauges initially
-        setTimeout(() => {
-            document.querySelectorAll('.cio-score-gauge-container').forEach(g => {
-                g.style.cursor = 'pointer';
-            });
-        }, 1000);
+        // Click interactivity on circular gauges has been removed to ensure mobile stability.
 
         closeBtn.onclick = (e) => {
             e.stopPropagation();
@@ -5390,11 +5425,22 @@
         };
     };
 
-    // ==================== MOBILE FAB SPEED DIAL MENU SETUP ====================
     window.setupMobileFABSpeedDial = function() {
         const trigger = document.getElementById('mobile-fab-trigger');
         const menu = document.getElementById('mobile-fab-menu');
         if (!trigger || !menu) return;
+
+        // Initialize visibility: only show on analyzer tab on load
+        const activeTab = document.querySelector('.workspace-tab.active') || document.querySelector('.active-tab-content');
+        const isAnalyzer = activeTab ? (activeTab.id === 'tab-analyzer' || activeTab.classList.contains('tab-analyzer')) : true;
+        const fabContainer = document.querySelector('.mobile-fab-container');
+        if (fabContainer) {
+            if (isAnalyzer && window.innerWidth <= 768) {
+                fabContainer.style.setProperty('display', 'flex', 'important');
+            } else {
+                fabContainer.style.setProperty('display', 'none', 'important');
+            }
+        }
 
         trigger.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -5474,33 +5520,30 @@
         }
     };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initModernizer);
-    } else {
-        initModernizer();
-    }
-
-    // Initialize additions
-    try {
-        if (typeof initStickyPriceHUD === 'function') initStickyPriceHUD();
-        if (typeof setupMobileFABSpeedDial === 'function') setupMobileFABSpeedDial();
-        if (typeof initSolvencyHUD === 'function') initSolvencyHUD();
-        if (typeof initSWOTCarousel === 'function') initSWOTCarousel();
-        if (typeof initThesisAudioPlayer === 'function') initThesisAudioPlayer();
-        
-        // Defer bottom sheet and copy buttons to guarantee DOM elements are fully loaded
-        const runDeferredAdditions = () => {
+    let isInitialized = false;
+    const runAllInit = () => {
+        if (isInitialized) return;
+        isInitialized = true;
+        console.log("RUNNING ALL TERMINAL LAYOUT INITIALIZATIONS...");
+        try {
+            initModernizer();
+            if (typeof initStickyPriceHUD === 'function') initStickyPriceHUD();
+            if (typeof setupMobileFABSpeedDial === 'function') setupMobileFABSpeedDial();
+            if (typeof initSolvencyHUD === 'function') initSolvencyHUD();
+            if (typeof initSWOTCarousel === 'function') initSWOTCarousel();
+            if (typeof initThesisAudioPlayer === 'function') initThesisAudioPlayer();
             if (typeof initDetailsBottomSheet === 'function') initDetailsBottomSheet();
             if (typeof initProspectusCopy === 'function') initProspectusCopy();
-        };
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', runDeferredAdditions);
-        } else {
-            runDeferredAdditions();
+        } catch(e) {
+            console.error("Error invoking additions:", e);
         }
-    } catch(e) {
-        console.error("Error invoking Phase 2 additions:", e);
+    };
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(runAllInit, 10); // 10ms yield to ensure browser parser parses elements below
+    } else {
+        document.addEventListener('DOMContentLoaded', runAllInit);
+        window.addEventListener('load', runAllInit);
     }
 
 })();

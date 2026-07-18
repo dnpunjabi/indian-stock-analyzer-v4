@@ -8145,14 +8145,15 @@ async def add_portfolio_item(data: PortfolioItemCreate):
         except Exception:
             pass
         
-    p_date = data.purchase_date or "2026-06-05"
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    p_date = data.purchase_date or today_str
     t_type = (data.transaction_type or "buy").strip().lower()
     try:
         datetime.strptime(p_date, "%Y-%m-%d")
     except ValueError:
         raise HTTPException(status_code=400, detail="Purchase date must be in YYYY-MM-DD format.")
         
-    if p_date > "2026-06-05":
+    if p_date > today_str:
         raise HTTPException(status_code=400, detail="Purchase date cannot be in the future.")
 
     with get_db() as conn:
@@ -8192,7 +8193,8 @@ async def update_portfolio_item(item_id_or_symbol: str, data: PortfolioItemUpdat
                 datetime.strptime(data.purchase_date, "%Y-%m-%d")
             except ValueError:
                 raise HTTPException(status_code=400, detail="Purchase date must be in YYYY-MM-DD format.")
-            if data.purchase_date > "2026-06-05":
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            if data.purchase_date > today_str:
                 raise HTTPException(status_code=400, detail="Purchase date cannot be in the future.")
             updates.append("purchase_date = ?")
             params.append(data.purchase_date)
@@ -8305,7 +8307,7 @@ async def upload_portfolio_file(file: UploadFile = File(...)):
         
     imported_count = 0
     errors = []
-    today_str = "2026-06-05"
+    today_str = datetime.now().strftime("%Y-%m-%d")
     
     trades = []
     for idx, row in df.iterrows():

@@ -1893,6 +1893,17 @@ function setupMetaBannerToggles() {
     function closeBottomSheet() {
         if (bottomSheet) {
             bottomSheet.classList.remove('active');
+            document.body.classList.remove('sheet-active');
+            
+            // Directly translate the card content down inline
+            const cardEl = bottomSheet.querySelector('.bottom-sheet-content');
+            if (cardEl) cardEl.style.setProperty('transform', 'translateY(100%)', 'important');
+
+            // Restore mobile bottom navigation and FAB triggers visibility
+            const bottomNav = document.querySelector('.mobile-bottom-nav');
+            if (bottomNav) bottomNav.style.removeProperty('display');
+            const fabContainer = document.querySelector('.mobile-fab-container');
+            if (fabContainer) fabContainer.style.removeProperty('display');
         }
     }
 
@@ -1931,6 +1942,17 @@ function setupMetaBannerToggles() {
                 
                 if (bottomSheet) {
                     bottomSheet.classList.add('active');
+                    document.body.classList.add('sheet-active');
+                    
+                    // Directly translate the card content up inline
+                    const cardEl = bottomSheet.querySelector('.bottom-sheet-content');
+                    if (cardEl) cardEl.style.setProperty('transform', 'translateY(0%)', 'important');
+                    
+                    // Hide mobile bottom navigation and FAB triggers immediately
+                    const bottomNav = document.querySelector('.mobile-bottom-nav');
+                    if (bottomNav) bottomNav.style.setProperty('display', 'none', 'important');
+                    const fabContainer = document.querySelector('.mobile-fab-container');
+                    if (fabContainer) fabContainer.style.setProperty('display', 'none', 'important');
                 }
                 
                 // Close any open desktop hover states
@@ -21583,7 +21605,13 @@ async function setupTaxHarvestingPanel() {
                 showToast("Price must be greater than zero.", "warning");
                 return;
             }
-            if (date > "2026-06-05") {
+            const localDate = new Date();
+            const year = localDate.getFullYear();
+            const month = String(localDate.getMonth() + 1).padStart(2, '0');
+            const day = String(localDate.getDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
+
+            if (date > todayStr) {
                 showToast("Trade date cannot be in the future.", "warning");
                 return;
             }
@@ -21621,11 +21649,16 @@ async function setupTaxHarvestingPanel() {
         });
     }
 
-    // Set default date to 2026-06-05
+    // Set default date to current local date
     const taxAddDateInput = document.getElementById('tax-add-date');
     if (taxAddDateInput) {
-        taxAddDateInput.value = "2026-06-05";
-        taxAddDateInput.max = "2026-06-05";
+        const localDate = new Date();
+        const year = localDate.getFullYear();
+        const month = String(localDate.getMonth() + 1).padStart(2, '0');
+        const day = String(localDate.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+        taxAddDateInput.value = todayStr;
+        taxAddDateInput.max = todayStr;
     }
 
     // Clear ledger button
@@ -21817,16 +21850,24 @@ async function loadTaxHarvestingLedger() {
             return;
         }
 
+        const localDate = new Date();
+        const year = localDate.getFullYear();
+        const month = String(localDate.getMonth() + 1).padStart(2, '0');
+        const day = String(localDate.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+
         items.forEach(item => {
             const tr = document.createElement('tr');
             tr.style.borderBottom = '1px solid var(--border-glass)';
 
             let days = 0;
             try {
-                const today = new Date('2026-06-05');
+                const today = new Date();
+                today.setHours(0,0,0,0);
                 const pDate = new Date(item.purchase_date);
-                const diffTime = Math.abs(today - pDate);
-                days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                pDate.setHours(0,0,0,0);
+                const diffTime = today - pDate;
+                days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                 if (today < pDate) days = 0;
             } catch (dErr) {
                 days = 0;
@@ -21844,7 +21885,7 @@ async function loadTaxHarvestingLedger() {
                 </td>
                 <td style="padding: 8px;"><input type="number" class="tax-qty-input" data-id="${item.id}" value="${item.quantity}" style="width: 70px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px;"></td>
                 <td style="padding: 8px;"><input type="number" class="tax-price-input" data-id="${item.id}" value="${item.purchase_price}" style="width: 80px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px;"></td>
-                <td style="padding: 8px;"><input type="date" class="tax-date-input" data-id="${item.id}" value="${item.purchase_date}" max="2026-06-05" style="width: 110px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px;"></td>
+                <td style="padding: 8px;"><input type="date" class="tax-date-input" data-id="${item.id}" value="${item.purchase_date}" max="${todayStr}" style="width: 110px; padding: 4px; border-radius:4px; background:rgba(0,0,0,0.3); border:1px solid var(--border-glass); color:#fff; font-size:11px;"></td>
                 <td style="padding: 8px; color: var(--text-secondary); font-size: 11.5px;">${days} days</td>
                 <td style="padding: 8px;">${statusHTML}</td>
                 <td style="padding: 8px;"><button class="btn-secondary tax-remove-btn" data-id="${item.id}" style="font-size: 10px; padding: 4px 8px; border-color: rgba(239,68,68,0.25); color: var(--color-crimson); background: rgba(239,68,68,0.03); cursor:pointer; font-weight: 600; border-radius: 4px;">Remove 🗑️</button></td>
@@ -21860,7 +21901,7 @@ async function loadTaxHarvestingLedger() {
                 const pVal = parseFloat(priceInput.value) || 0;
                 const dVal = dateInput.value;
 
-                if (dVal > "2026-06-05") {
+                if (dVal > todayStr) {
                     showToast("Purchase date cannot be in the future.", "warning");
                     dateInput.value = item.purchase_date;
                     return;
