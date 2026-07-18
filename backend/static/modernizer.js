@@ -58,11 +58,105 @@
                            (location.port === '8000' || location.port === '8001' || location.port === '8002' || location.port === '5000') );
     const apiBaseUrl = isCapacitor ? 'https://my-stock-advisor.duckdns.org' : '';
 
+    let isinMapping = {};
+    fetch(apiBaseUrl + '/isin_mapping.json?v=1.1')
+        .then(res => res.json())
+        .then(data => {
+            isinMapping = data;
+            if (typeof updateDynamicCommandCenterContent === 'function') {
+                updateDynamicCommandCenterContent();
+            }
+        })
+        .catch(err => console.error("Error loading isin_mapping.json:", err));
+
     // Helper to format rupees safely IIFE-wide
     const formatRupees = (val) => {
         if (typeof safeFormatRupees === 'function') return safeFormatRupees(val, 2);
         return '₹' + (val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
+
+    window.getStockFallbackLogoHtml = function(symbol) {
+        const cleanSym = symbol.replace(".NS", "").toUpperCase();
+        const presetLogos = {
+            "RELIANCE": { bg: "#0a2540", logo: "⚡" }, 
+            "TCS": { bg: "#4f46e5", logo: "⚙️" },
+            "INFY": { bg: "#06b6d4", logo: "💻" }, 
+            "HDFCBANK": { bg: "#1e3a8a", logo: "🏦" }, 
+            "ICICIBANK": { bg: "#ea580c", logo: "💳" }, 
+            "SBIN": { bg: "#0284c7", logo: "💰" },
+            "BHARTIARTL": { bg: "#dc2626", logo: "📶" }, 
+            "ITC": { bg: "#1e40af", logo: "🚬" },
+            "LT": { bg: "#d97706", logo: "🏗️" }, 
+            "JSWSTEEL": { bg: "#10b981", logo: "⚡" }, 
+            "TATASTEEL": { bg: "#2563eb", logo: "🔩" },
+            "TATAPOWER": { bg: "#3b82f6", logo: "🦅" },
+            "ECLERX": { bg: "#0c2340", logo: "💠" },
+            "AIIL": { bg: "#b8860b", logo: "🏗️" },
+            "FEDERALBNK": { bg: "#006400", logo: "🏦" },
+            "KALYANKJIL": { bg: "#d4af37", logo: "💎" },
+            "AFCONS": { bg: "#005ea6", logo: "🏗️" }
+        };
+
+        const preset = presetLogos[cleanSym];
+        if (preset) {
+            return `<div class="stock-circle-logo" style="width:28px; height:28px; border-radius:50%; background:${preset.bg}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800; font-family:Inter,sans-serif; flex-shrink:0;">${preset.logo}</div>`;
+        }
+
+        let hash = 0;
+        for (let i = 0; i < cleanSym.length; i++) {
+            hash = cleanSym.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const colors = ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899", "#14b8a6", "#6366f1"];
+        const selectedColor = colors[Math.abs(hash) % colors.length];
+        const displayChar = cleanSym.charAt(0);
+
+        return `<div class="stock-circle-logo" style="width:28px; height:28px; border-radius:50%; background:${selectedColor}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:800; font-family:var(--font-heading); flex-shrink:0;">${displayChar}</div>`;
+    };
+
+    function getStockLogoHtml(symbol) {
+        const cleanSym = symbol.replace(".NS", "").toUpperCase();
+        const isin = isinMapping[cleanSym];
+        if (isin) {
+            return `
+                <div style="width:28px; height:28px; border-radius:50%; background:#ffffff; border:1px solid var(--border-glass); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; padding:2px; box-sizing:border-box;">
+                    <img src="${apiBaseUrl}/logos/${cleanSym}.png" style="width:100%; height:100%; object-fit:contain; display:block;" onerror="this.onerror=null; this.parentNode.outerHTML=window.getStockFallbackLogoHtml('${cleanSym}');">
+                </div>
+            `;
+        }
+        return window.getStockFallbackLogoHtml(cleanSym);
+    }
+
+    function getNewsAgencyLogoHtml(source) {
+        const cleanSource = (source || '').toLowerCase().trim();
+        
+        if (cleanSource.includes('mint') || cleanSource.includes('livemint')) {
+            return `<span style="background:#fff; border:1px solid #ff9f0a; color:#000; padding:2px 6px; border-radius:3px; font-family:Georgia, serif; font-size:10px; font-weight:900; display:inline-block; vertical-align:middle; letter-spacing:-0.02em; line-height:1;"><span style="color:#000;">live</span><span style="color:#ff9f0a;">mint</span></span>`;
+        }
+        if (cleanSource.includes('bloomberg') || cleanSource.includes('bloom')) {
+            return `<span style="background:#005A36; color:#fff; padding:3px 8px; border-radius:4px; font-weight:900; font-family:var(--font-heading); font-size:10px; display:inline-block; vertical-align:middle; letter-spacing:-0.02em; line-height:1;">Bloomberg</span>`;
+        }
+        if (cleanSource.includes('reuters')) {
+            return `<span style="background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); color:#ff9f0a; padding:2.5px 8px; border-radius:4px; font-weight:800; font-family:var(--font-heading); font-size:10px; display:inline-flex; align-items:center; gap:4px; vertical-align:middle; line-height:1;">🔸 REUTERS</span>`;
+        }
+        if (cleanSource.includes('economic') || cleanSource.includes('et')) {
+            return `<span style="background:#faeada; border:1.5px solid #00444e; color:#00444e; padding:2px 5px; border-radius:3px; font-family:'Times New Roman', Georgia, serif; font-size:11px; font-weight:900; display:inline-block; vertical-align:middle; line-height:1; letter-spacing:0.02em;">ET</span>`;
+        }
+        if (cleanSource.includes('yahoo') || cleanSource.includes('yfinance') || cleanSource.includes('finance')) {
+            return `<span style="background:#fff; border:1px solid #6001d2; color:#6001d2; padding:2px 6px; border-radius:3px; font-family:'Outfit', sans-serif; font-size:10px; font-weight:900; display:inline-block; vertical-align:middle; line-height:1; letter-spacing:-0.03em;"><span style="color:#6001d2;">yahoo!</span><span style="color:#7e1eff; font-weight:600;">finance</span></span>`;
+        }
+        if (cleanSource.includes('cnbc') || cleanSource.includes('tv18')) {
+            return `<span style="background:#0a2540; color:#00d2fe; padding:3px 8px; border-radius:4px; font-weight:900; font-family:var(--font-heading); font-size:10px; display:inline-block; vertical-align:middle; border:1px solid rgba(0,210,254,0.3); line-height:1;">CNBC-TV18</span>`;
+        }
+        if (cleanSource.includes('standard') || cleanSource.includes('business') || cleanSource.includes('bs')) {
+            return `<span style="background:#ffe8d4; border:1.5px solid #a91d22; color:#a91d22; padding:2px 5px; border-radius:3px; font-family:'Times New Roman', Georgia, serif; font-size:11px; font-weight:900; display:inline-block; vertical-align:middle; line-height:1; letter-spacing:0.02em;">BS</span>`;
+        }
+        if (cleanSource.includes('financial') || cleanSource.includes('express')) {
+            return `<span style="background:#fff; color:#000; padding:2px 6px; border-radius:3px; font-family:Georgia, serif; font-weight:900; font-size:10px; border:1px solid #ccc; display:inline-block; vertical-align:middle; text-transform:uppercase; line-height:1;">FE</span>`;
+        }
+        
+        return `<span style="background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); color:var(--text-secondary); padding:3px 8px; border-radius:4px; font-weight:700; font-size:10px; display:inline-block; vertical-align:middle; text-transform:uppercase; letter-spacing:0.03em; line-height:1;">${source}</span>`;
+    }
+
 
     // Helper to parse numeric values from text
     function parseNumericValue(text) {
@@ -678,22 +772,21 @@
 
     // ==================== 12. DYNAMIC TABLE CATALYST TRIGGER INJECTION ====================
     function setupTableCatalystTriggers() {
-        const observer = new MutationObserver(() => {
+        const decorateTablesAndSectors = () => {
             // 1. Gainers, Losers, and Watchlist rows
             document.querySelectorAll('#top-gainers-tbody tr, #top-losers-tbody tr, #watchlist-table-body tr').forEach(row => {
-                // Skip if already parsed or if empty/loading placeholder row
                 if (row.querySelector('.catalyst-trigger-btn') || row.querySelector('td[colspan]')) return;
 
                 const symbolCell = row.querySelector('td:first-child');
                 if (symbolCell) {
                     const text = symbolCell.textContent.trim().split('\n')[0].trim();
-                    // Basic validation to isolate symbols (e.g. TCS, RELIANCE)
                     if (text && text.length > 1 && text.length <= 15 && !text.includes('Select') && !text.includes('No data')) {
                         const trigger = document.createElement('span');
                         trigger.className = 'catalyst-trigger-btn';
                         trigger.setAttribute('data-symbol', text);
                         trigger.setAttribute('title', 'Analyze price catalysts');
                         trigger.style.marginLeft = '8px';
+                        trigger.style.cursor = 'pointer';
                         trigger.innerHTML = '⚡';
                         symbolCell.appendChild(trigger);
                     }
@@ -721,10 +814,24 @@
                     }
                 }
             });
+        };
+
+        const targets = [
+            document.getElementById('top-gainers-tbody'),
+            document.getElementById('top-losers-tbody'),
+            document.getElementById('watchlist-table-body'),
+            document.getElementById('sector-radar-list')
+        ];
+
+        targets.forEach(target => {
+            if (target) {
+                const obs = new MutationObserver(() => decorateTablesAndSectors());
+                obs.observe(target, { childList: true, subtree: true });
+            }
         });
 
-        observer.observe(document.body, { childList: true, subtree: true });
-        console.log("APEX Modernizer: Automated table and sector card catalyst trigger monitors active.");
+        decorateTablesAndSectors();
+        console.log("APEX Modernizer: Automated table and sector card catalyst trigger monitors active (isolated).");
     }
 
     // ==================== 13. SPEECH SYNTHESIS & RECOGNITION (CATALYST CONTROLS) ====================
@@ -3350,7 +3457,7 @@
 
             container.innerHTML = `
                 <!-- Dynamic Greeting & Live Market Bias Summary -->
-                <div class="mobile-copilot-greeting">
+                <div class="mobile-copilot-greeting mobile-glass-card">
                     <h4 style="margin: 0 0 6px 0; font-size: 17px; font-weight: 800; color: var(--text-primary); letter-spacing: 0.02em; display: flex; justify-content: space-between; align-items: center;">
                         <span>${greetingText}, Analyst</span>
                         <button id="btn-audio-mute-toggle" style="background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 17px; outline: none; transition: transform 0.1s; padding: 0 4px;">🔊</button>
@@ -3382,15 +3489,14 @@
                 <!-- Central Search Experience -->
                 <div class="mobile-search-section-wrap" style="margin-bottom: 12px; position: relative; transition: all 0.25s ease;">
                     <div class="search-glowing-aura"></div>
-                    <div style="position:relative; width:100%;">
-                        <input type="text" id="mobile-home-search-input" placeholder="Search Indian Stocks (e.g. RELIANCE)..." style="width:100% !important; box-sizing:border-box !important; padding:13px 16px !important; font-size:13.5px !important; background:rgba(255,255,255,0.03) !important; border:1px solid var(--border-glass) !important; color:var(--text-primary) !important; border-radius:8px !important; outline:none !important; text-align:center;">
+                    <div style="position:relative; width:100%; display: flex; align-items: center;">
+                        <input type="text" id="mobile-home-search-input" placeholder="Search Indian Stocks (e.g. RELIANCE)..." style="width:100% !important; box-sizing:border-box !important; padding:13px 48px 13px 16px !important; font-size:13.5px !important; background:rgba(255,255,255,0.03) !important; border:1px solid var(--border-glass) !important; color:var(--text-primary) !important; border-radius:8px !important; outline:none !important; text-align:left;">
+                        <div class="voice-catalyst-wrap" style="position: absolute !important; right: 12px !important; margin: 0 !important; z-index: 20;">
+                            <button class="voice-catalyst-btn" id="mobile-home-mic-btn" title="Speak Ticker to Research" style="background: none !important; border: none !important; color: var(--color-primary) !important; cursor: pointer; padding: 4px !important; outline: none; font-size: 15px;">
+                                🎙️
+                            </button>
+                        </div>
                         <div id="mobile-home-suggestions" class="watchlist-autocomplete-box" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:9999; max-height:220px; overflow-y:auto; margin-top:4px;"></div>
-                    </div>
-                    <div class="voice-catalyst-wrap">
-                        <button class="voice-catalyst-btn" id="mobile-home-mic-btn" title="Speak Ticker to Research">
-                            <span class="voice-catalyst-pulse"></span>
-                            🎙️
-                        </button>
                     </div>
                 </div>
 
@@ -3465,7 +3571,11 @@
                 </div>
 
                 <!-- Today's Market Movers Section -->
-                <div class="movers-container">
+                <div class="movers-container mobile-glass-card">
+                    <div class="movers-segmented-control">
+                        <button class="movers-segmented-tab active" id="movers-tab-gainers">Gainers</button>
+                        <button class="movers-segmented-tab" id="movers-tab-losers">Losers</button>
+                    </div>
                     <div class="mobile-movers-cap-selector-container" style="display: flex; gap: 8px; margin: 10px 0 15px 0; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px;">
                         <button class="mobile-movers-cap-tab active" data-cap="all" style="flex-shrink:0;">All Cap</button>
                         <button class="mobile-movers-cap-tab" data-cap="large" style="flex-shrink:0;">Large Cap</button>
@@ -3473,19 +3583,60 @@
                         <button class="mobile-movers-cap-tab" data-cap="small" style="flex-shrink:0;">Small Cap</button>
                     </div>
                     <div id="mobile-home-gainers-container"></div>
-                    <div id="mobile-home-losers-container"></div>
+                    <div id="mobile-home-losers-container" style="display: none;"></div>
                 </div>
 
                 <!-- Today's Sector Rotations Section -->
                 <div id="mobile-home-sectors-container" style="margin-bottom: 20px;"></div>
 
                 <!-- Live Catalyst News Feed Section -->
-                <div class="mobile-cmd-news-section" id="mobile-home-news-container">
+                <h5 style="margin:20px 0 10px 0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">Live Catalyst News</h5>
+                <div class="news-categories-scroll-wrapper">
+                    <button class="news-category-pill-btn active" data-category="all">All</button>
+                    <button class="news-category-pill-btn" data-category="earnings">Earnings</button>
+                    <button class="news-category-pill-btn" data-category="m&a">M&A</button>
+                    <button class="news-category-pill-btn" data-category="policy">Policy</button>
+                    <button class="news-category-pill-btn" data-category="global">Global</button>
+                </div>
+                <div class="mobile-cmd-news-section" id="mobile-home-news-container" style="margin-top: 5px;">
                     <!-- Populated dynamically -->
                 </div>
             `;
 
             container.dataset.rendered = "true";
+
+            // Wire Movers Segmented Tab Control
+            const gainerTabBtn = document.getElementById('movers-tab-gainers');
+            const loserTabBtn = document.getElementById('movers-tab-losers');
+            const gainersDiv = document.getElementById('mobile-home-gainers-container');
+            const losersDiv = document.getElementById('mobile-home-losers-container');
+            if (gainerTabBtn && loserTabBtn && gainersDiv && losersDiv) {
+                gainerTabBtn.onclick = () => {
+                    gainerTabBtn.classList.add('active');
+                    loserTabBtn.classList.remove('active');
+                    window.activeMoversTab = 'gainers';
+                    gainersDiv.style.display = 'block';
+                    losersDiv.style.display = 'none';
+                };
+                loserTabBtn.onclick = () => {
+                    loserTabBtn.classList.add('active');
+                    gainerTabBtn.classList.remove('active');
+                    window.activeMoversTab = 'losers';
+                    losersDiv.style.display = 'block';
+                    gainersDiv.style.display = 'none';
+                };
+            }
+
+            // Wire News Category Tab Clicks
+            const newsCategoryTabs = container.querySelectorAll('.news-category-pill-btn');
+            newsCategoryTabs.forEach(tab => {
+                tab.onclick = () => {
+                    newsCategoryTabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    window.activeMobileNewsCategory = tab.dataset.category;
+                    updateDynamicCommandCenterContent();
+                };
+            });
 
             // Wire Tab Switches
             document.getElementById('cmd-btn-screener').onclick = () => window.switchTab('screener');
@@ -3855,11 +4006,15 @@
                                 let gHtml = `<h5 style="margin:0 0 10px 0; font-size:13px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Gainers</h5>`;
                                 gainersList.forEach(item => {
                                     const sym = item.symbol.replace(".NS", "");
+                                    const logoHtml = getStockLogoHtml(sym);
                                     gHtml += `
-                                        <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-green); padding: 12px 14px;">
-                                            <div>
-                                                <strong style="color: var(--text-primary); font-size:14px; font-family:var(--font-heading);">${sym}</strong>
-                                                <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
+                                        <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-green); padding: 12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                                            <div style="display:flex; align-items:center; gap:10px;">
+                                                ${logoHtml}
+                                                <div>
+                                                    <strong style="color: var(--text-primary); font-size:14px; font-family:var(--font-heading);">${sym}</strong>
+                                                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
+                                                </div>
                                             </div>
                                             <div style="display:flex; align-items:center; gap:12px;">
                                                 <canvas id="gainer-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
@@ -3888,12 +4043,33 @@
                                     if (canvas) {
                                         const ctx = canvas.getContext('2d');
                                         ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                        
+                                        const points = [10, 12, 9, 15, 17];
+                                        const step = canvas.width / (points.length - 1);
+                                        
+                                        // Draw gradient area
+                                        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                                        gradient.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
+                                        gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+                                        
+                                        ctx.beginPath();
+                                        points.forEach((val, i) => {
+                                            const x = i * step;
+                                            const y = canvas.height - (val / 20) * canvas.height;
+                                            if (i === 0) ctx.moveTo(x, y);
+                                            else ctx.lineTo(x, y);
+                                        });
+                                        ctx.lineTo(canvas.width, canvas.height);
+                                        ctx.lineTo(0, canvas.height);
+                                        ctx.closePath();
+                                        ctx.fillStyle = gradient;
+                                        ctx.fill();
+
+                                        // Draw stroke line
                                         ctx.beginPath();
                                         ctx.lineWidth = 1.5;
                                         ctx.strokeStyle = '#10b981';
                                         ctx.lineJoin = 'round';
-                                        const points = [10, 12, 9, 15, 17];
-                                        const step = canvas.width / (points.length - 1);
                                         points.forEach((val, i) => {
                                             const x = i * step;
                                             const y = canvas.height - (val / 20) * canvas.height;
@@ -3913,11 +4089,15 @@
                                 let lHtml = `<h5 style="margin:15px 0 10px 0; font-size:13px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Today's Top Losers</h5>`;
                                 losersList.forEach(item => {
                                     const sym = item.symbol.replace(".NS", "");
+                                    const logoHtml = getStockLogoHtml(sym);
                                     lHtml += `
-                                        <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-red); padding: 12px 14px;">
-                                            <div>
-                                                <strong style="color: var(--text-primary); font-size:14px; font-family:var(--font-heading);">${sym}</strong>
-                                                <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
+                                        <div class="recent-stock-card" data-symbol="${sym}" style="border-left: 3.5px solid var(--neon-red); padding: 12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                                            <div style="display:flex; align-items:center; gap:10px;">
+                                                ${logoHtml}
+                                                <div>
+                                                    <strong style="color: var(--text-primary); font-size:14px; font-family:var(--font-heading);">${sym}</strong>
+                                                    <div style="font-size:11.5px; color:var(--text-muted); margin-top:2px;">LTP: ${formatRupees(item.price)}</div>
+                                                </div>
                                             </div>
                                             <div style="display:flex; align-items:center; gap:12px;">
                                                 <canvas id="loser-sparkline-${sym}" width="60" height="20" style="display:block; background:transparent;"></canvas>
@@ -3946,12 +4126,33 @@
                                     if (canvas) {
                                         const ctx = canvas.getContext('2d');
                                         ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                        
+                                        const points = [16, 13, 14, 9, 7];
+                                        const step = canvas.width / (points.length - 1);
+                                        
+                                        // Draw gradient area
+                                        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                                        gradient.addColorStop(0, 'rgba(239, 68, 68, 0.2)');
+                                        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+                                        
+                                        ctx.beginPath();
+                                        points.forEach((val, i) => {
+                                            const x = i * step;
+                                            const y = canvas.height - (val / 20) * canvas.height;
+                                            if (i === 0) ctx.moveTo(x, y);
+                                            else ctx.lineTo(x, y);
+                                        });
+                                        ctx.lineTo(canvas.width, canvas.height);
+                                        ctx.lineTo(0, canvas.height);
+                                        ctx.closePath();
+                                        ctx.fillStyle = gradient;
+                                        ctx.fill();
+
+                                        // Draw stroke line
                                         ctx.beginPath();
                                         ctx.lineWidth = 1.5;
                                         ctx.strokeStyle = '#ef4444';
                                         ctx.lineJoin = 'round';
-                                        const points = [16, 13, 14, 9, 7];
-                                        const step = canvas.width / (points.length - 1);
                                         points.forEach((val, i) => {
                                             const x = i * step;
                                             const y = canvas.height - (val / 20) * canvas.height;
@@ -4119,7 +4320,6 @@
             if (newsContainer) {
                 if (!newsContainer.innerHTML.includes('bloomberg-news-card') && !newsContainer.innerHTML.includes('shimmer-sweep')) {
                     newsContainer.innerHTML = `
-                        <h5 style="margin:0 0 10px 0; font-size:11px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>
                         <div style="display:flex; flex-direction:column; gap:10px; opacity:0.65;">
                             <div class="shimmer-sweep" style="height:48px; background:rgba(255,255,255,0.03); border-radius:6px; animation: skeleton-shimmer 1.5s infinite;"></div>
                         </div>
@@ -4131,10 +4331,32 @@
                     if (newsRes.ok) {
                         const newsData = await newsRes.json();
                         if (newsData.news_items && newsData.news_items.length > 0) {
-                            const isExpanded = newsContainer.dataset.expanded === 'true';
-                            const newsToShow = isExpanded ? newsData.news_items.slice(0, 10) : newsData.news_items.slice(0, 3);
+                            const activeCategory = window.activeMobileNewsCategory || 'all';
+                            
+                            let filteredItems = newsData.news_items;
+                            if (activeCategory !== 'all') {
+                                filteredItems = newsData.news_items.filter(item => {
+                                    const headline = (item.title || '').toLowerCase();
+                                    if (activeCategory === 'earnings') {
+                                        return /profit|results|revenue|loss|dividend|q1|q2|q3|q4|earning|ebitda|income/.test(headline);
+                                    } else if (activeCategory === 'm&a') {
+                                        return /merge|acquisition|buyout|takeover|deal|stake|venture|ipo|shares|buyback|acquisition|allotment/.test(headline);
+                                    } else if (activeCategory === 'policy') {
+                                        return /gst|rbi|tax|policy|regulat|govt|government|sebi|tariff|duty|court|verdict|laws/.test(headline);
+                                    } else if (activeCategory === 'global') {
+                                        return /global|fed|us|china|hongseng|hang seng|oil|nasdaq|brent|yield|inflation|macro|europe|asia/.test(headline);
+                                    }
+                                    return true;
+                                });
+                            }
 
-                            let newsHtml = `<h5 style="margin:0 0 10px 0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight:700; letter-spacing:0.05em;">Live Catalyst News</h5>`;
+                            const isExpanded = newsContainer.dataset.expanded === 'true';
+                            const newsToShow = isExpanded ? filteredItems.slice(0, 10) : filteredItems.slice(0, 3);
+
+                            let newsHtml = '';
+                            if (newsToShow.length === 0) {
+                                newsHtml = `<div class="recent-research-empty" style="font-size:11.5px; padding:12px 0;">No active ${activeCategory} news items found.</div>`;
+                            }
                             newsToShow.forEach(item => {
                                 const cleanTitle = item.title.replace(/&amp;/g, '&').replace(/&quot;/g, '"');
                                 const sentiment = item.sentiment || 'Neutral';
@@ -4165,9 +4387,12 @@
                                 }
 
                                 newsHtml += `
-                                    <div class="bloomberg-news-card" style="--news-sentiment-color:${accentColor};" onclick="window.open('${item.link}', '_blank')">
-                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                            <span style="font-size:11.5px; color:var(--text-muted); font-weight:700;">${item.source || 'News'} • ${item.date || 'Today'}</span>
+                                    <div class="bloomberg-news-card news-card-glass" style="--news-sentiment-color:${accentColor};" onclick="window.open('${item.link}', '_blank')">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                                            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                                                ${(item.source || 'News').split(/[•&|,-]/).map(part => getNewsAgencyLogoHtml(part)).join('<span style="color:var(--text-muted); font-size:10px;">•</span>')}
+                                                <span style="font-size:11px; color:var(--text-muted); font-weight:700; margin-left:4px;">• ${item.date || 'Today'}</span>
+                                            </div>
                                             ${sentimentBadge}
                                         </div>
                                         <div style="font-size:14px; font-family:var(--font-heading); font-weight:600; color:var(--text-primary); line-height:1.45;">${cleanTitle}</div>
@@ -4186,7 +4411,7 @@
                                 `;
                             });
 
-                            if (newsData.news_items.length > 3) {
+                            if (filteredItems.length > 3) {
                                 newsHtml += `
                                     <button id="btn-toggle-news-expansion" style="width:100%; padding:10px; margin-top:5px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); border-radius:8px; color:var(--text-secondary); font-family:var(--font-heading); font-size:13px; font-weight:700; cursor:pointer; text-align:center; transition: all 0.2s ease;">
                                         ${isExpanded ? 'Show Less Catalyst News ▴' : 'Show More Catalyst News ▾'}
@@ -4371,11 +4596,12 @@
                         const summary = item.summary || item.description || "No full summary available. Click to analyze market volatility impact.";
                         const impactDetails = `AI has evaluated this bulletin as ${sentClass.toUpperCase()} for relevant NSE stocks. Monitor breakout volume levels on major constituent boards.`;
 
+                        const sourceHtml = getNewsAgencyLogoHtml(item.source || "REUTERS");
                         return `
                             <div class="news-card-item" data-index="${idx}">
                                 <div class="news-card-top">
-                                    <div class="news-source-wrap">
-                                        <span class="news-source">${item.source || "REUTERS"}</span>
+                                    <div class="news-source-wrap" style="display:flex; align-items:center; gap:8px;">
+                                        <span class="news-source" style="background:transparent; padding:0; border:none; display:inline-block; vertical-align:middle; width:auto; height:auto; text-transform:none;">${sourceHtml}</span>
                                         <span class="news-time">${timeStr}</span>
                                     </div>
                                     <span class="news-sentiment-badge ${sentClass}">${sentLabel}</span>
@@ -4441,13 +4667,15 @@
                         const displayName = stock.company_name || stock.symbol;
                         const cleanSym = stock.symbol.replace('.NS', '');
 
+                        const logoHtml = getStockLogoHtml(cleanSym);
                         return `
-                            <div class="mover-stock-item" data-symbol="${cleanSym}">
-                                <div class="mover-stock-left">
-                                    <span class="mover-stock-symbol">${cleanSym}</span>
-                                    <span class="mover-stock-name" title="${displayName}">${displayName}</span>
+                            <div class="mover-stock-item" data-symbol="${cleanSym}" style="display:flex; align-items:center; gap:10px;">
+                                ${logoHtml}
+                                <div class="mover-stock-left" style="display:flex; flex-direction:column; gap:2px; flex-grow:1; min-width:0;">
+                                    <span class="mover-stock-symbol" style="font-weight:700;">${cleanSym}</span>
+                                    <span class="mover-stock-name" title="${displayName}" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;">${displayName}</span>
                                 </div>
-                                <div class="mover-stock-right">
+                                <div class="mover-stock-right" style="display:flex; flex-direction:column; align-items:flex-end; gap:2px; flex-shrink:0;">
                                     <span class="mover-stock-price">₹${parseFloat(stock.price || 0).toFixed(2)}</span>
                                     <span class="mover-stock-change">${changeStr}</span>
                                 </div>
@@ -5534,6 +5762,875 @@
             if (typeof initThesisAudioPlayer === 'function') initThesisAudioPlayer();
             if (typeof initDetailsBottomSheet === 'function') initDetailsBottomSheet();
             if (typeof initProspectusCopy === 'function') initProspectusCopy();
+            // Autocomplete logo decorator setup
+            const setupSuggestionsObserver = () => {
+                const decorateSuggestions = () => {
+                    const suggestionsBox = document.getElementById('analyzer-suggestions');
+                    if (!suggestionsBox) return;
+                    const items = suggestionsBox.querySelectorAll('.suggestion-item');
+                    items.forEach(item => {
+                        const symSpan = item.querySelector('span');
+                        if (symSpan && !item.querySelector('.stock-circle-logo') && !item.querySelector('img')) {
+                            const sym = symSpan.innerText.trim();
+                            const logoHtml = getStockLogoHtml(sym);
+                            
+                            // Prepend logo directly in a flex wrapper
+                            const logoContainer = document.createElement('div');
+                            logoContainer.style.display = 'inline-flex';
+                            logoContainer.style.alignItems = 'center';
+                            logoContainer.style.gap = '6px';
+                            logoContainer.style.marginRight = '6px';
+                            logoContainer.style.verticalAlign = 'middle';
+                            logoContainer.innerHTML = logoHtml;
+                            
+                            symSpan.parentNode.insertBefore(logoContainer, symSpan);
+                        }
+                    });
+                };
+
+                const suggestionsBox = document.getElementById('analyzer-suggestions');
+                if (suggestionsBox) {
+                    decorateSuggestions();
+                    const obs = new MutationObserver(() => decorateSuggestions());
+                    obs.observe(suggestionsBox, { childList: true });
+                }
+            };
+            setupSuggestionsObserver();
+
+            // Universe Explorer table logo decorator setup
+            const setupUniverseObserver = () => {
+                window.decorateUniverse = () => {
+                    const tbody = document.getElementById('universe-explorer-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        const linkDiv = row.querySelector('.universe-symbol-link');
+                        if (linkDiv && !linkDiv.querySelector('.stock-circle-logo') && !linkDiv.querySelector('img')) {
+                            const strongEl = linkDiv.querySelector('strong');
+                            if (!strongEl) return;
+                            const rawSym = strongEl.innerText.trim();
+                            const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                            if (Object.keys(isinMapping).length === 0) return; // Wait for mapping
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'inline-flex';
+                            wrapper.style.alignItems = 'center';
+                            wrapper.style.gap = '8px';
+                            wrapper.style.verticalAlign = 'middle';
+                            wrapper.style.marginRight = '8px';
+                            wrapper.innerHTML = logoHtml;
+                            
+                            linkDiv.insertBefore(wrapper, strongEl);
+                            linkDiv.style.display = 'inline-flex';
+                            linkDiv.style.alignItems = 'center';
+                        }
+                    });
+                };
+
+                const tbody = document.getElementById('universe-explorer-body');
+                if (tbody) {
+                    window.decorateUniverse();
+                    const obs = new MutationObserver(() => window.decorateUniverse());
+                    obs.observe(tbody, { childList: true });
+                }
+            };
+            setupUniverseObserver();
+
+            // Single Stock Workspace header logo decorator setup
+            const setupWorkspaceHeaderObserver = () => {
+                window.decorateWorkspaceHeader = () => {
+                    const header = document.getElementById('meta-company-name');
+                    const tickerSpan = document.getElementById('meta-ticker');
+                    if (!header || !tickerSpan) return;
+                    if (!header.querySelector('.stock-circle-logo') && !header.querySelector('img')) {
+                        const rawSym = tickerSpan.innerText.trim();
+                        const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                        if (Object.keys(isinMapping).length === 0) return; // Wait for mapping
+                        const logoHtml = getStockLogoHtml(cleanSym);
+                        
+                        const logoWrapper = document.createElement('div');
+                        logoWrapper.style.display = 'inline-flex';
+                        logoWrapper.style.alignItems = 'center';
+                        logoWrapper.style.gap = '10px';
+                        logoWrapper.style.verticalAlign = 'middle';
+                        logoWrapper.style.marginRight = '10px';
+                        logoWrapper.innerHTML = logoHtml;
+                        
+                        const img = logoWrapper.querySelector('img');
+                        const fallbackCircle = logoWrapper.querySelector('.stock-circle-logo');
+                        if (img) {
+                            img.style.width = '32px';
+                            img.style.height = '32px';
+                            img.parentNode.style.width = '32px';
+                            img.parentNode.style.height = '32px';
+                        }
+                        if (fallbackCircle) {
+                            fallbackCircle.style.width = '32px';
+                            fallbackCircle.style.height = '32px';
+                            fallbackCircle.style.fontSize = '14px';
+                        }
+                        
+                        header.style.display = 'flex';
+                        header.style.alignItems = 'center';
+                        header.insertBefore(logoWrapper, header.firstChild);
+                    }
+                };
+
+                const tickerSpan = document.getElementById('meta-ticker');
+                if (tickerSpan) {
+                    window.decorateWorkspaceHeader();
+                    const obs = new MutationObserver(() => window.decorateWorkspaceHeader());
+                    obs.observe(tickerSpan, { characterData: true, childList: true, subtree: true });
+                }
+            };
+            setupWorkspaceHeaderObserver();
+
+            // Watchlist table logo decorator setup
+            const setupWatchlistObserver = () => {
+                window.decorateWatchlist = () => {
+                    const tbody = document.getElementById('watchlist-table-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        const linkDiv = row.querySelector('.watchlist-symbol-link');
+                        if (linkDiv && !linkDiv.querySelector('.stock-circle-logo') && !linkDiv.querySelector('img')) {
+                            const strongEl = linkDiv.querySelector('strong');
+                            if (!strongEl) return;
+                            const rawSym = strongEl.innerText.trim();
+                            const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                            if (Object.keys(isinMapping).length === 0) return; // Wait for mapping
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'inline-flex';
+                            wrapper.style.alignItems = 'center';
+                            wrapper.style.gap = '8px';
+                            wrapper.style.verticalAlign = 'middle';
+                            wrapper.style.marginRight = '8px';
+                            wrapper.innerHTML = logoHtml;
+                            
+                            linkDiv.insertBefore(wrapper, strongEl);
+                            linkDiv.style.display = 'inline-flex';
+                            linkDiv.style.alignItems = 'center';
+                        }
+                    });
+                };
+
+                const tbody = document.getElementById('watchlist-table-body');
+                if (tbody) {
+                    window.decorateWatchlist();
+                    const obs = new MutationObserver(() => window.decorateWatchlist());
+                    obs.observe(tbody, { childList: true });
+                }
+            };
+            setupWatchlistObserver();
+
+            // Portfolio Ledger table logo decorator setup
+            const setupPortfolioObserver = () => {
+                window.decoratePortfolio = () => {
+                    const tbody = document.getElementById('portfolio-ledger-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        const link = row.querySelector('.ledger-stock-analyze-link');
+                        if (link && !link.parentNode.querySelector('.stock-circle-logo') && !link.parentNode.querySelector('img')) {
+                            const rawSym = link.innerText.trim();
+                            const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                            if (Object.keys(isinMapping).length === 0) return; // Wait for mapping
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'inline-flex';
+                            wrapper.style.alignItems = 'center';
+                            wrapper.style.gap = '8px';
+                            wrapper.style.verticalAlign = 'middle';
+                            wrapper.style.marginRight = '8px';
+                            wrapper.innerHTML = logoHtml;
+                            
+                            link.parentNode.insertBefore(wrapper, link);
+                        }
+                    });
+                };
+
+                const tbody = document.getElementById('portfolio-ledger-body');
+                if (tbody) {
+                    window.decoratePortfolio();
+                    const obs = new MutationObserver(() => window.decoratePortfolio());
+                    obs.observe(tbody, { childList: true });
+                }
+            };
+            setupPortfolioObserver();
+
+            // Screener Results table logo decorator setup
+            const setupScreenerObserver = () => {
+                window.decorateScreener = () => {
+                    const tbody = document.getElementById('screener-results-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        const linkDiv = row.querySelector('.screener-symbol-link');
+                        if (linkDiv && !linkDiv.querySelector('.stock-circle-logo') && !linkDiv.querySelector('img')) {
+                            const symSpan = linkDiv.querySelector('span.text-muted');
+                            if (!symSpan) return;
+                            // On mobile, the span may contain appended segment text like "GLENMARK.NS • mid"
+                            const rawSym = symSpan.innerText.split('•')[0].trim();
+                            const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                            if (Object.keys(isinMapping).length === 0) return;
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'inline-flex';
+                            wrapper.style.alignItems = 'center';
+                            wrapper.style.gap = '8px';
+                            wrapper.style.verticalAlign = 'middle';
+                            wrapper.style.marginRight = '8px';
+                            wrapper.innerHTML = logoHtml;
+                            
+                            linkDiv.insertBefore(wrapper, linkDiv.firstChild);
+                            linkDiv.style.display = 'flex';
+                            linkDiv.style.alignItems = 'center';
+                        }
+                    });
+                };
+
+                const tbody = document.getElementById('screener-results-body');
+                if (tbody) {
+                    window.decorateScreener();
+                    const obs = new MutationObserver(() => window.decorateScreener());
+                    obs.observe(tbody, { childList: true });
+                }
+            };
+            setupScreenerObserver();
+
+            // Movers Table logo decorator setup
+            const setupMoversObserver = () => {
+                window.decorateMovers = () => {
+                    const gainersTbody = document.getElementById('top-gainers-tbody');
+                    const losersTbody = document.getElementById('top-losers-tbody');
+                    
+                    const decorateBody = (tbody) => {
+                        if (!tbody) return;
+                        tbody.querySelectorAll('tr').forEach(row => {
+                            const symbolCell = row.cells[0];
+                            if (symbolCell && !symbolCell.querySelector('.stock-circle-logo') && !symbolCell.querySelector('img')) {
+                                const rawText = symbolCell.textContent.trim();
+                                const cleanText = rawText.replace('⚡', '').trim();
+                                const cleanSym = cleanText.replace('.NS', '').toUpperCase();
+                                if (Object.keys(isinMapping).length === 0) return;
+                                const logoHtml = getStockLogoHtml(cleanSym);
+                                
+                                const wrapper = document.createElement('div');
+                                wrapper.style.display = 'inline-flex';
+                                wrapper.style.alignItems = 'center';
+                                wrapper.style.gap = '8px';
+                                wrapper.style.verticalAlign = 'middle';
+                                wrapper.style.marginRight = '8px';
+                                wrapper.innerHTML = logoHtml;
+                                
+                                symbolCell.insertBefore(wrapper, symbolCell.firstChild);
+                                symbolCell.style.display = 'flex';
+                                symbolCell.style.alignItems = 'center';
+                            }
+                        });
+                    };
+
+                    decorateBody(gainersTbody);
+                    decorateBody(losersTbody);
+                };
+
+                const gainers = document.getElementById('top-gainers-tbody');
+                const losers = document.getElementById('top-losers-tbody');
+                
+                if (gainers) {
+                    window.decorateMovers();
+                    const obs = new MutationObserver(() => window.decorateMovers());
+                    obs.observe(gainers, { childList: true });
+                }
+                if (losers) {
+                    const obs = new MutationObserver(() => window.decorateMovers());
+                    obs.observe(losers, { childList: true });
+                }
+            };
+            setupMoversObserver();
+
+            // News Feed logo decorator setup
+            const setupNewsFeedObserver = () => {
+                window.decorateNewsFeed = () => {
+                    const container = document.getElementById('market-news-feed-container');
+                    if (!container) return;
+                    
+                    container.querySelectorAll('.timeline-card').forEach(card => {
+                        const metadata = card.querySelector('.news-card-header .news-card-metadata');
+                        if (metadata) {
+                            const sourceSpan = metadata.querySelector('span:first-child');
+                            if (sourceSpan && sourceSpan.textContent.includes('📰')) {
+                                const source = card.dataset.source || '';
+                                const logoHtml = getNewsAgencyLogoHtml(source);
+                                sourceSpan.innerHTML = logoHtml;
+                            }
+                        }
+                    });
+                };
+
+                const container = document.getElementById('market-news-feed-container');
+                if (container) {
+                    window.decorateNewsFeed();
+                    const obs = new MutationObserver(() => window.decorateNewsFeed());
+                    obs.observe(container, { childList: true });
+                }
+            };
+            setupNewsFeedObserver();
+
+            // Alert Table logo decorator setup
+            const setupAlertsObserver = () => {
+                window.decorateAlerts = () => {
+                    const tbody = document.getElementById('alerts-table-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        const link = row.querySelector('.alert-stock-link');
+                        if (link && !link.parentNode.querySelector('.stock-circle-logo') && !link.parentNode.querySelector('img')) {
+                            // Use data-ticker attribute for reliable symbol extraction on mobile
+                            const rawSym = link.getAttribute('data-ticker') || link.innerText.trim();
+                            const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                            if (Object.keys(isinMapping).length === 0) return;
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'inline-flex';
+                            wrapper.style.alignItems = 'center';
+                            wrapper.style.gap = '8px';
+                            wrapper.style.verticalAlign = 'middle';
+                            wrapper.style.marginRight = '8px';
+                            wrapper.innerHTML = logoHtml;
+                            
+                            // On mobile, insert inside the cell as flex container
+                            const cell = link.closest('td');
+                            if (cell) {
+                                cell.style.display = 'flex';
+                                cell.style.alignItems = 'center';
+                                cell.style.gap = '6px';
+                                cell.insertBefore(wrapper, cell.firstChild);
+                            } else {
+                                link.parentNode.insertBefore(wrapper, link);
+                            }
+                        }
+                    });
+                };
+
+                const tbody = document.getElementById('alerts-table-body');
+                if (tbody) {
+                    window.decorateAlerts();
+                    const obs = new MutationObserver(() => window.decorateAlerts());
+                    obs.observe(tbody, { childList: true });
+                }
+            };
+            setupAlertsObserver();
+
+            // Rule Scanner logo decorator setup
+            const setupRuleScannerObserver = () => {
+                window.decorateRuleScanner = () => {
+                    const tbody = document.getElementById('rule-scanner-results-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        const cell = row.cells[0];
+                        if (cell && !cell.querySelector('.stock-circle-logo') && !cell.querySelector('img')) {
+                            const symbolSpan = cell.querySelector('span[onclick]');
+                            if (!symbolSpan) return;
+                            // Extract symbol from the onclick attribute which is reliable
+                            // e.g. onclick="window.loadStockAnalyzer('RELIANCE.NS')"
+                            const onclickVal = symbolSpan.getAttribute('onclick') || '';
+                            const match = onclickVal.match(/loadStockAnalyzer\(['"](.*?)['"]\)/);
+                            let cleanSym = '';
+                            if (match && match[1]) {
+                                cleanSym = match[1].replace('.NS', '').toUpperCase();
+                            } else {
+                                // Fallback: strip trailing chevron chars and whitespace
+                                cleanSym = symbolSpan.textContent.replace(/[▼▲]/g, '').trim().split('\n')[0].split(' ')[0].replace('.NS', '').toUpperCase();
+                            }
+                            if (!cleanSym || Object.keys(isinMapping).length === 0) return;
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const innerDiv = cell.querySelector('div');
+                            if (innerDiv) {
+                                const wrapper = document.createElement('div');
+                                wrapper.style.display = 'inline-flex';
+                                wrapper.style.alignItems = 'center';
+                                wrapper.style.gap = '8px';
+                                wrapper.style.verticalAlign = 'middle';
+                                wrapper.style.marginRight = '8px';
+                                wrapper.innerHTML = logoHtml;
+                                
+                                const rowWrapper = document.createElement('div');
+                                rowWrapper.style.display = 'flex';
+                                rowWrapper.style.alignItems = 'center';
+                                
+                                cell.appendChild(rowWrapper);
+                                rowWrapper.appendChild(wrapper);
+                                rowWrapper.appendChild(innerDiv);
+                            }
+                        }
+                    });
+                };
+
+                const tbody = document.getElementById('rule-scanner-results-body');
+                if (tbody) {
+                    window.decorateRuleScanner();
+                    const obs = new MutationObserver(() => window.decorateRuleScanner());
+                    obs.observe(tbody, { childList: true });
+                }
+            };
+            setupRuleScannerObserver();
+
+            // Event Calendar logo decorator setup
+            const setupEventsObserver = () => {
+                window.decorateEventsCalendar = () => {
+                    // Desktop table rows
+                    const tbody = document.getElementById('events-market-tbody');
+                    if (tbody) {
+                        tbody.querySelectorAll('tr').forEach(row => {
+                            const cell = row.querySelector('.event-company-cell');
+                            if (cell && !cell.querySelector('.stock-circle-logo') && !cell.querySelector('img')) {
+                                const symbolEl = cell.querySelector('.event-symbol');
+                                if (!symbolEl) return;
+                                const rawSym = symbolEl.innerText.trim();
+                                const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                                if (Object.keys(isinMapping).length === 0) return;
+                                const logoHtml = getStockLogoHtml(cleanSym);
+                                
+                                const wrapper = document.createElement('div');
+                                wrapper.style.display = 'inline-flex';
+                                wrapper.style.alignItems = 'center';
+                                wrapper.style.gap = '8px';
+                                wrapper.style.verticalAlign = 'middle';
+                                wrapper.style.marginRight = '8px';
+                                wrapper.innerHTML = logoHtml;
+                                
+                                const originalHtml = cell.innerHTML;
+                                cell.innerHTML = '';
+                                
+                                const flexDiv = document.createElement('div');
+                                flexDiv.style.display = 'flex';
+                                flexDiv.style.alignItems = 'center';
+                                
+                                const textDiv = document.createElement('div');
+                                textDiv.innerHTML = originalHtml;
+                                
+                                cell.appendChild(flexDiv);
+                                flexDiv.appendChild(wrapper);
+                                flexDiv.appendChild(textDiv);
+                            }
+                        });
+                    }
+
+                    // Mobile event cards
+                    const mobileCards = document.getElementById('events-market-cards');
+                    if (mobileCards) {
+                        mobileCards.querySelectorAll('.event-mobile-card').forEach(card => {
+                            if (card.querySelector('.stock-circle-logo') || card.querySelector('img')) return;
+                            const companyDiv = card.querySelector('.event-mobile-company');
+                            if (!companyDiv) return;
+                            const symSpan = companyDiv.querySelector('span');
+                            if (!symSpan) return;
+                            const rawSym = symSpan.innerText.trim();
+                            const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                            if (Object.keys(isinMapping).length === 0) return;
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'inline-flex';
+                            wrapper.style.alignItems = 'center';
+                            wrapper.style.marginRight = '8px';
+                            wrapper.style.flexShrink = '0';
+                            wrapper.innerHTML = logoHtml;
+                            
+                            const leftDiv = card.querySelector('.event-mobile-left');
+                            if (leftDiv) {
+                                leftDiv.style.display = 'flex';
+                                leftDiv.style.alignItems = 'center';
+                                leftDiv.style.gap = '10px';
+                                
+                                const contentWrapper = document.createElement('div');
+                                contentWrapper.style.flex = '1';
+                                contentWrapper.style.minWidth = '0';
+                                while (leftDiv.firstChild) {
+                                    contentWrapper.appendChild(leftDiv.firstChild);
+                                }
+                                leftDiv.insertBefore(wrapper, leftDiv.firstChild);
+                                leftDiv.appendChild(contentWrapper);
+                            }
+                        });
+                    }
+                };
+
+                const tbody = document.getElementById('events-market-tbody');
+                if (tbody) {
+                    window.decorateEventsCalendar();
+                    const obs = new MutationObserver(() => window.decorateEventsCalendar());
+                    obs.observe(tbody, { childList: true });
+                }
+                const mobileCardsEl = document.getElementById('events-market-cards');
+                if (mobileCardsEl) {
+                    const obs2 = new MutationObserver(() => window.decorateEventsCalendar());
+                    obs2.observe(mobileCardsEl, { childList: true });
+                }
+            };
+            setupEventsObserver();
+
+            // Deals Sweep logo decorator setup
+            const setupDealsObserver = () => {
+                window.decorateDealsSweep = () => {
+                    const container = document.getElementById('global-trades-container');
+                    if (!container) return;
+                    
+                    container.querySelectorAll('.timeline-item-row').forEach(card => {
+                        const symbolSpan = card.querySelector('span[onclick*="loadStockFromTrades"]');
+                        if (symbolSpan) {
+                            const parent = symbolSpan.parentElement;
+                            if (parent && !parent.querySelector('.stock-circle-logo') && !parent.querySelector('img')) {
+                                const rawSym = symbolSpan.innerText.trim();
+                                const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                                if (Object.keys(isinMapping).length === 0) return;
+                                const logoHtml = getStockLogoHtml(cleanSym);
+                                
+                                const wrapper = document.createElement('div');
+                                wrapper.style.display = 'inline-flex';
+                                wrapper.style.alignItems = 'center';
+                                wrapper.style.gap = '8px';
+                                wrapper.style.verticalAlign = 'middle';
+                                wrapper.innerHTML = logoHtml;
+                                
+                                parent.insertBefore(wrapper, symbolSpan);
+                            }
+                        }
+                    });
+                };
+
+                const container = document.getElementById('global-trades-container');
+                if (container) {
+                    window.decorateDealsSweep();
+                    const obs = new MutationObserver(() => window.decorateDealsSweep());
+                    obs.observe(container, { childList: true });
+                }
+            };
+            setupDealsObserver();
+
+            // Swing Scanner logo decorator setup
+            const setupSwingScanObserver = () => {
+                window.decorateSwingScanner = () => {
+                    const tbody = document.getElementById('swing-scan-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        const cell = row.cells[0];
+                        if (cell && !cell.querySelector('.stock-circle-logo') && !cell.querySelector('img')) {
+                            const symbolSpan = cell.querySelector('span[style*="color"]');
+                            if (!symbolSpan) return;
+                            const rawSym = symbolSpan.innerText.trim();
+                            const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                            if (Object.keys(isinMapping).length === 0) return;
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'inline-flex';
+                            wrapper.style.alignItems = 'center';
+                            wrapper.style.gap = '8px';
+                            wrapper.style.verticalAlign = 'middle';
+                            wrapper.innerHTML = logoHtml;
+                            
+                            cell.insertBefore(wrapper, symbolSpan);
+                        }
+                    });
+                };
+
+                const tbody = document.getElementById('swing-scan-body');
+                if (tbody) {
+                    window.decorateSwingScanner();
+                    const obs = new MutationObserver(() => window.decorateSwingScanner());
+                    obs.observe(tbody, { childList: true });
+                }
+            };
+            setupSwingScanObserver();
+
+            // Swing Workspace logo decorator setup
+            const setupSwingWorkspaceObserver = () => {
+                window.decorateSwingWorkspace = () => {
+                    const titleEl = document.getElementById('swing-active-title');
+                    if (!titleEl) return;
+                    
+                    if (titleEl.querySelector('.stock-circle-logo') || titleEl.querySelector('img')) return;
+                    
+                    const rawSym = titleEl.textContent.trim();
+                    if (!rawSym || rawSym === 'Loading candidate...' || rawSym === 'Select a candidate script...') return;
+                    
+                    const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                    if (Object.keys(isinMapping).length === 0) return;
+                    const logoHtml = getStockLogoHtml(cleanSym);
+                    
+                    const wrapper = document.createElement('div');
+                    wrapper.style.display = 'inline-flex';
+                    wrapper.style.alignItems = 'center';
+                    wrapper.style.gap = '8px';
+                    wrapper.style.verticalAlign = 'middle';
+                    wrapper.style.marginRight = '8px';
+                    wrapper.innerHTML = logoHtml;
+                    
+                    const textNode = document.createElement('span');
+                    textNode.innerText = rawSym;
+                    
+                    titleEl.innerHTML = '';
+                    titleEl.style.display = 'flex';
+                    titleEl.style.alignItems = 'center';
+                    
+                    titleEl.appendChild(wrapper);
+                    titleEl.appendChild(textNode);
+                };
+
+                const titleEl = document.getElementById('swing-active-title');
+                if (titleEl) {
+                    window.decorateSwingWorkspace();
+                    const obs = new MutationObserver(() => window.decorateSwingWorkspace());
+                    obs.observe(titleEl, { childList: true, characterData: true, subtree: true });
+                }
+            };
+            setupSwingWorkspaceObserver();
+
+            // Sector Stocks Modal logo decorator setup
+            const setupSectorStocksObserver = () => {
+                window.decorateSectorStocks = () => {
+                    const tbody = document.getElementById('sector-stocks-table-body');
+                    if (!tbody) return;
+                    tbody.querySelectorAll('tr').forEach(row => {
+                        const cell = row.cells[0];
+                        if (cell && !cell.querySelector('.stock-circle-logo') && !cell.querySelector('img')) {
+                            // On mobile, cell may contain extra text from mobile decorators (cap badge, chevron)
+                            // Extract only the first line/word which is the actual symbol
+                            const rawText = cell.innerText.trim();
+                            const cleanSym = rawText.split('\n')[0].split(' ')[0].replace('.NS', '').toUpperCase();
+                            if (Object.keys(isinMapping).length === 0) return;
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'inline-flex';
+                            wrapper.style.alignItems = 'center';
+                            wrapper.style.gap = '8px';
+                            wrapper.style.verticalAlign = 'middle';
+                            wrapper.style.marginRight = '8px';
+                            wrapper.innerHTML = logoHtml;
+                            
+                            const originalText = cell.innerText.split('\n')[0].trim();
+                            cell.innerHTML = '';
+                            cell.style.display = 'flex';
+                            cell.style.alignItems = 'center';
+                            
+                            const textSpan = document.createElement('span');
+                            textSpan.innerText = originalText;
+                            textSpan.style.fontWeight = '700';
+                            textSpan.style.color = 'var(--color-primary)';
+                            
+                            cell.appendChild(wrapper);
+                            cell.appendChild(textSpan);
+                        }
+                    });
+                };
+
+                const tbody = document.getElementById('sector-stocks-table-body');
+                if (tbody) {
+                    window.decorateSectorStocks();
+                    const obs = new MutationObserver(() => window.decorateSectorStocks());
+                    obs.observe(tbody, { childList: true });
+                }
+            };
+            setupSectorStocksObserver();
+
+            // Sector heatmaps leader/laggard logo decorator setup
+            const setupSectorRadarObserver = () => {
+                window.decorateSectorRadar = () => {
+                    const listEl = document.getElementById('sector-radar-list');
+                    if (!listEl) return;
+                    
+                    listEl.querySelectorAll('.sector-heatmap-tile').forEach(tile => {
+                        const drivers = tile.querySelector('.sector-heatmap-tile-drivers');
+                        if (drivers) {
+                            const spans = drivers.querySelectorAll('span');
+                            spans.forEach(span => {
+                                if (span.querySelector('.stock-circle-logo') || span.querySelector('img')) return;
+                                
+                                const text = span.textContent;
+                                if (text.includes('Leader:') || text.includes('Laggard:')) {
+                                    const match = text.match(/(?:Leader|Laggard):\s*([A-Z0-9_\-\.]+)/i);
+                                    if (match) {
+                                        const rawSym = match[1].trim();
+                                        if (rawSym && rawSym !== 'N/A') {
+                                            const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                                            if (Object.keys(isinMapping).length === 0) return;
+                                            const logoHtml = getStockLogoHtml(cleanSym);
+                                            
+                                            const wrapper = document.createElement('span');
+                                            wrapper.style.display = 'inline-flex';
+                                            wrapper.style.alignItems = 'center';
+                                            wrapper.style.verticalAlign = 'middle';
+                                            wrapper.style.marginRight = '4px';
+                                            wrapper.style.marginLeft = '4px';
+                                            wrapper.innerHTML = logoHtml;
+                                            
+                                            const parts = span.innerHTML.split(/(Leader:|Laggard:)/i);
+                                            if (parts.length >= 3) {
+                                                span.innerHTML = parts[0] + parts[1] + wrapper.outerHTML + parts[2];
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    });
+                };
+
+                const listEl = document.getElementById('sector-radar-list');
+                if (listEl) {
+                    window.decorateSectorRadar();
+                    const obs = new MutationObserver(() => window.decorateSectorRadar());
+                    obs.observe(listEl, { childList: true });
+                }
+            };
+            setupSectorRadarObserver();
+
+            // Peer Benchmarking logo decorator setup
+            const setupCompareObserver = () => {
+                window.decorateCompare = () => {
+                    const headerRow = document.getElementById('compare-table-header');
+                    if (!headerRow) return;
+                    
+                    const ths = headerRow.querySelectorAll('th');
+                    if (ths.length <= 1) return;
+                    
+                    const matrix = window.activeCompareMatrix;
+                    if (!matrix || matrix.length === 0) return;
+                    
+                    for (let i = 1; i < ths.length; i++) {
+                        const th = ths[i];
+                        if (th.querySelector('.stock-circle-logo') || th.querySelector('img')) continue;
+                        
+                        const item = matrix[i - 1];
+                        if (!item || !item.symbol) continue;
+                        
+                        const cleanSym = item.symbol.replace('.NS', '').toUpperCase();
+                        if (Object.keys(isinMapping).length === 0) return;
+                        const logoHtml = getStockLogoHtml(cleanSym);
+                        
+                        const wrapper = document.createElement('div');
+                        wrapper.style.display = 'inline-flex';
+                        wrapper.style.alignItems = 'center';
+                        wrapper.style.gap = '8px';
+                        wrapper.style.verticalAlign = 'middle';
+                        wrapper.style.marginRight = '8px';
+                        wrapper.innerHTML = logoHtml;
+                        
+                        const originalHtml = th.innerHTML;
+                        th.innerHTML = '';
+                        th.style.display = 'flex';
+                        th.style.alignItems = 'center';
+                        
+                        const textSpan = document.createElement('span');
+                        textSpan.innerHTML = originalHtml;
+                        
+                        th.appendChild(wrapper);
+                        th.appendChild(textSpan);
+                    }
+                };
+
+                const headerRow = document.getElementById('compare-table-header');
+                if (headerRow) {
+                    window.decorateCompare();
+                    const obs = new MutationObserver(() => window.decorateCompare());
+                    obs.observe(headerRow, { childList: true });
+                }
+            };
+            setupCompareObserver();
+
+            // Sector stocks heatmap tile logo decorator
+            const setupSectorStocksHeatmapObserver = () => {
+                window.decorateSectorStocksHeatmap = () => {
+                    const listEl = document.getElementById('sector-radar-list');
+                    if (!listEl) return;
+                    
+                    listEl.querySelectorAll('.stock-heatmap-tile').forEach(tile => {
+                        if (tile.querySelector('.stock-circle-logo') || tile.querySelector('img')) return;
+                        
+                        const symSpan = tile.querySelector('.stock-heatmap-tile-sym');
+                        const pctSpan = tile.querySelector('.stock-heatmap-tile-pct');
+                        if (symSpan && pctSpan) {
+                            const rawSym = symSpan.innerText.trim();
+                            const cleanSym = rawSym.replace('.NS', '').toUpperCase();
+                            if (Object.keys(isinMapping).length === 0) return;
+                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const wrapper = document.createElement('div');
+                            wrapper.style.display = 'inline-flex';
+                            wrapper.style.alignItems = 'center';
+                            wrapper.style.justifyContent = 'center';
+                            wrapper.innerHTML = logoHtml;
+                            
+                            const rightCol = document.createElement('div');
+                            rightCol.style.display = 'flex';
+                            rightCol.style.flexDirection = 'column';
+                            rightCol.style.alignItems = 'flex-start';
+                            rightCol.style.justifyContent = 'center';
+                            rightCol.style.lineHeight = '1.2';
+                            
+                            symSpan.style.fontSize = '10.5px';
+                            symSpan.style.fontWeight = '700';
+                            symSpan.style.margin = '0';
+                            
+                            pctSpan.style.fontSize = '9px';
+                            pctSpan.style.fontWeight = '600';
+                            pctSpan.style.margin = '0';
+                            
+                            rightCol.appendChild(symSpan);
+                            rightCol.appendChild(pctSpan);
+                            
+                            tile.innerHTML = '';
+                            tile.style.display = 'flex';
+                            tile.style.flexDirection = 'row';
+                            tile.style.alignItems = 'center';
+                            tile.style.justifyContent = 'flex-start';
+                            tile.style.padding = '6px 10px';
+                            tile.style.gap = '8px';
+                            tile.style.boxSizing = 'border-box';
+                            tile.style.height = 'auto';
+                            tile.style.minHeight = '42px';
+                            
+                            tile.appendChild(wrapper);
+                            tile.appendChild(rightCol);
+                        }
+                    });
+                };
+
+                const listEl = document.getElementById('sector-radar-list');
+                if (listEl) {
+                    window.decorateSectorStocksHeatmap();
+                    const obs = new MutationObserver(() => window.decorateSectorStocksHeatmap());
+                    obs.observe(listEl, { childList: true, subtree: true });
+                }
+            };
+            setupSectorStocksHeatmapObserver();
+
+            // Global trigger to redraw all active elements once isinMapping is ready
+            window.decorateAllActiveElements = () => {
+                if (typeof window.decorateSuggestions === 'function') window.decorateSuggestions();
+                if (typeof window.decorateUniverse === 'function') window.decorateUniverse();
+                if (typeof window.decorateWorkspaceHeader === 'function') window.decorateWorkspaceHeader();
+                if (typeof window.decorateWatchlist === 'function') window.decorateWatchlist();
+                if (typeof window.decoratePortfolio === 'function') window.decoratePortfolio();
+                if (typeof window.decorateScreener === 'function') window.decorateScreener();
+                if (typeof window.decorateMovers === 'function') window.decorateMovers();
+                if (typeof window.decorateNewsFeed === 'function') window.decorateNewsFeed();
+                if (typeof window.decorateAlerts === 'function') window.decorateAlerts();
+                if (typeof window.decorateRuleScanner === 'function') window.decorateRuleScanner();
+                if (typeof window.decorateEventsCalendar === 'function') window.decorateEventsCalendar();
+                if (typeof window.decorateDealsSweep === 'function') window.decorateDealsSweep();
+                if (typeof window.decorateSwingScanner === 'function') window.decorateSwingScanner();
+                if (typeof window.decorateSwingWorkspace === 'function') window.decorateSwingWorkspace();
+                if (typeof window.decorateSectorStocks === 'function') window.decorateSectorStocks();
+                if (typeof window.decorateSectorRadar === 'function') window.decorateSectorRadar();
+                if (typeof window.decorateCompare === 'function') window.decorateCompare();
+                if (typeof window.decorateSectorStocksHeatmap === 'function') window.decorateSectorStocksHeatmap();
+            };
         } catch(e) {
             console.error("Error invoking additions:", e);
         }

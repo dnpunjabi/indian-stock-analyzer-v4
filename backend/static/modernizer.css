@@ -995,22 +995,23 @@ table tbody tr:hover {
     font-weight: 800;
     letter-spacing: 0.06em;
     display: flex;
-    align-items: center;
-    gap: 4px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
     line-height: 1;
 }
 
 .brand-part-apex {
-    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-
-.brand-part-quant {
-    background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
+    background: linear-gradient(135deg, #38bdf8 0%, #10b981 100%); /* cyan to emerald green gradient */
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+}
+
+.brand-part-quant {
+    background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 /* Light Theme High Contrast Overrides */
@@ -1025,19 +1026,19 @@ body.light-theme .inst-brand-badge {
 [data-mode="light"] .brand-part-apex,
 [data-theme="light"] .brand-part-apex,
 body.light-theme .brand-part-apex {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    background: linear-gradient(135deg, #0284c7 0%, #10b981 100%); /* blue to emerald */
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    font-weight: 900;
+    text-shadow: none;
 }
 
 [data-mode="light"] .brand-part-quant,
 [data-theme="light"] .brand-part-quant,
 body.light-theme .brand-part-quant {
-    background: linear-gradient(135deg, #0284c7 0%, #3730a3 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    font-weight: 900;
-    text-shadow: none;
 }
 
 
