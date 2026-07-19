@@ -18088,17 +18088,29 @@ select option {
 
     #tab-universe .universe-table-wrapper th:nth-child(2),
     #tab-universe .universe-table-wrapper td:nth-child(2) {
-        width: 30% !important;
+        width: 40% !important;
+        padding-left: 6px !important;
+        padding-right: 4px !important;
     }
 
     #tab-universe .universe-table-wrapper th:nth-child(4),
     #tab-universe .universe-table-wrapper td:nth-child(4) {
-        width: 45% !important;
+        width: 35% !important;
+        font-size: 10.5px !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 0;
     }
 
     #tab-universe .universe-table-wrapper th:nth-child(5),
     #tab-universe .universe-table-wrapper td:nth-child(5) {
         width: 25% !important;
+        text-align: center !important;
+        padding-left: 2px !important;
+        padding-right: 2px !important;
     }
 
     /* Force details row td elements to stay visible on mobile */
@@ -19936,8 +19948,8 @@ select option {
         border-radius: 50% !important;
         background: var(--bg-card) !important;
         border: 1px solid var(--border-glass) !important;
-        backdrop-filter: blur(12px) !important;
-        -webkit-backdrop-filter: blur(12px) !important;
+        /* NOTE: Do NOT add backdrop-filter here — it creates a new containing block
+           which breaks position:fixed on child dropdowns (notification panel) */
         box-shadow: var(--glow-shadow) !important;
     }
     .bell-badge {

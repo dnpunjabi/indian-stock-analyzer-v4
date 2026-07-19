@@ -5003,11 +5003,68 @@ async def parse_nl_alert(data: ParseNLAlertRequest):
         response = response.strip()
         if response.startswith("```json"):
             response = response[7:]
+        if response.startswith("```"):
+            response = response[3:]
         if response.endswith("```"):
             response = response[:-3]
         response = response.strip()
 
-        parsed = json.loads(response)
+        # Extract only the first JSON object — LLM may add extra text after it
+        brace_depth = 0
+        json_start = -1
+        json_end = -1
+        in_string = False
+        escape_next = False
+        for i, ch in enumerate(response):
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == '\\':
+                escape_next = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == '{':
+                if brace_depth == 0:
+                    json_start = i
+                brace_depth += 1
+            elif ch == '}':
+                brace_depth -= 1
+                if brace_depth == 0:
+                    json_end = i + 1
+                    break
+        if json_start >= 0 and json_end > json_start:
+            response = response[json_start:json_end]
+
+        # Sanitise common LLM JSON quirks
+        import re as _re
+        response = _re.sub(r',\s*}', '}', response)   # trailing commas before }
+        response = _re.sub(r',\s*]', ']', response)   # trailing commas before ]
+        response = response.replace('\n', ' ')          # embedded newlines
+
+        try:
+            parsed = json.loads(response)
+        except json.JSONDecodeError:
+            # Last-resort: regex-extract the four fields
+            import re as _re2
+            tq = _re2.search(r'"ticker_query"\s*:\s*"([^"]*)"', response)
+            ct = _re2.search(r'"condition_type"\s*:\s*"([^"]*)"', response)
+            opr = _re2.search(r'"operator"\s*:\s*"([^"]*)"', response)
+            vl = _re2.search(r'"value"\s*:\s*"([^"]*)"', response)
+            if tq:
+                parsed = {
+                    "ticker_query": tq.group(1) if tq else "TCS",
+                    "condition_type": ct.group(1) if ct else "PRICE",
+                    "operator": opr.group(1) if opr else ">",
+                    "value": vl.group(1) if vl else "0.0"
+                }
+            else:
+                logger.error(f"Alert LLM response unparseable: {response}")
+                raise ValueError(f"Could not parse LLM response into alert JSON")
+
         ticker_query = parsed.get("ticker_query", "TCS")
         cond_type = parsed.get("condition_type", "PRICE").upper()
         op = parsed.get("operator", ">")
@@ -11034,11 +11091,68 @@ async def parse_nl_scan(data: ParseNLScanRequest):
         response = response.strip()
         if response.startswith("```json"):
             response = response[7:]
+        if response.startswith("```"):
+            response = response[3:]
         if response.endswith("```"):
             response = response[:-3]
         response = response.strip()
 
-        parsed = json.loads(response)
+        # Extract only the first JSON object — LLM may add extra text after it
+        brace_depth = 0
+        json_start = -1
+        json_end = -1
+        in_string = False
+        escape_next = False
+        for i, ch in enumerate(response):
+            if escape_next:
+                escape_next = False
+                continue
+            if ch == '\\':
+                escape_next = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == '{':
+                if brace_depth == 0:
+                    json_start = i
+                brace_depth += 1
+            elif ch == '}':
+                brace_depth -= 1
+                if brace_depth == 0:
+                    json_end = i + 1
+                    break
+        if json_start >= 0 and json_end > json_start:
+            response = response[json_start:json_end]
+
+        # Sanitise common LLM JSON quirks
+        import re as _re
+        response = _re.sub(r',\s*}', '}', response)   # trailing commas
+        response = _re.sub(r',\s*]', ']', response)
+        response = response.replace('\n', ' ')
+
+        try:
+            parsed = json.loads(response)
+        except json.JSONDecodeError:
+            # Last-resort: regex-extract the four fields
+            import re as _re2
+            ct = _re2.search(r'"condition_type"\s*:\s*"([^"]*)"', response)
+            opr = _re2.search(r'"operator"\s*:\s*"([^"]*)"', response)
+            vl = _re2.search(r'"value"\s*:\s*"([^"]*)"', response)
+            univ = _re2.search(r'"universe"\s*:\s*"([^"]*)"', response)
+            if ct:
+                parsed = {
+                    "condition_type": ct.group(1) if ct else "RSI",
+                    "operator": opr.group(1) if opr else "<",
+                    "value": vl.group(1) if vl else "30",
+                    "universe": univ.group(1) if univ else "all"
+                }
+            else:
+                logger.error(f"Rule Scanner LLM response unparseable: {response}")
+                raise ValueError(f"Could not parse LLM response into scan JSON")
+
         return {
             "status": "success",
             "condition_type": parsed.get("condition_type", "RSI").upper(),

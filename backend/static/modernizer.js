@@ -3147,6 +3147,58 @@
                 return;
             }
 
+            // ─── Inject mobile filter bar if not present ───
+            const resultsBox = document.getElementById('screener-results-box');
+            if (resultsBox && !document.getElementById('mobile-screener-filters')) {
+                const filterBar = document.createElement('div');
+                filterBar.id = 'mobile-screener-filters';
+                filterBar.style.cssText = 'display:flex; gap:6px; padding:8px 12px; overflow-x:auto; -webkit-overflow-scrolling:touch; border-bottom:1px solid rgba(255,255,255,0.06); margin-bottom:4px; flex-wrap:nowrap;';
+                
+                const makeSelect = (id, label, options) => {
+                    const sel = document.createElement('select');
+                    sel.id = id;
+                    sel.style.cssText = 'flex-shrink:0; padding:6px 10px; border-radius:6px; font-size:10px; font-weight:600; font-family:Outfit,sans-serif; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.04); color:var(--text-primary); outline:none; cursor:pointer; min-width:0;';
+                    options.forEach(o => {
+                        const opt = document.createElement('option');
+                        opt.value = o.value;
+                        opt.textContent = o.label;
+                        sel.appendChild(opt);
+                    });
+                    sel.addEventListener('change', () => applyMobileScreenerFilters());
+                    return sel;
+                };
+
+                filterBar.appendChild(makeSelect('mob-scr-score', 'Score', [
+                    {value: 'all', label: '📊 All Scores'},
+                    {value: '90', label: '90+'},
+                    {value: '80', label: '80+'},
+                    {value: '70', label: '70+'},
+                    {value: '60', label: '60+'},
+                    {value: '50', label: '50+'}
+                ]));
+                filterBar.appendChild(makeSelect('mob-scr-cap', 'Cap', [
+                    {value: 'all', label: '⚡ All Caps'},
+                    {value: 'large', label: 'Large'},
+                    {value: 'mid', label: 'Mid'},
+                    {value: 'small', label: 'Small'}
+                ]));
+                filterBar.appendChild(makeSelect('mob-scr-action', 'Action', [
+                    {value: 'all', label: '🎯 All Actions'},
+                    {value: 'STRONG BUY', label: 'Strong Buy'},
+                    {value: 'BUY', label: 'Buy'},
+                    {value: 'HOLD', label: 'Hold'},
+                    {value: 'SELL', label: 'Sell/Avoid'}
+                ]));
+
+                // Insert before the table
+                const tableEl = resultsBox.querySelector('table') || resultsBox.querySelector('.screener-table-wrap');
+                if (tableEl) {
+                    tableEl.parentNode.insertBefore(filterBar, tableEl);
+                } else {
+                    resultsBox.insertBefore(filterBar, resultsBox.firstChild);
+                }
+            }
+
             tbody.querySelectorAll('tr').forEach(tr => {
                 if (tr.classList.contains('screener-details-row') || tr.querySelector('.row-expand-trigger') || tr.cells.length < 9) return;
 
@@ -3188,32 +3240,47 @@
                         nextRow.remove();
                         chevron.innerHTML = '▼';
                     } else {
-                        const rank = tr.cells[0] ? tr.cells[0].innerHTML : 'N/A';
-                        const sector = tr.cells[2] ? tr.cells[2].innerHTML : 'N/A';
-                        const fScore = tr.cells[5] ? tr.cells[5].innerHTML : 'N/A';
-                        const vScore = tr.cells[6] ? tr.cells[6].innerHTML : 'N/A';
-                        const tScore = tr.cells[7] ? tr.cells[7].innerHTML : 'N/A';
+                        const rank = tr.cells[0] ? tr.cells[0].textContent.trim() : 'N/A';
+                        const sector = tr.cells[2] ? tr.cells[2].textContent.trim() : 'N/A';
+                        const capType = tr.cells[3] ? tr.cells[3].textContent.trim() : 'N/A';
+                        const scoreHtml = tr.cells[4] ? tr.cells[4].innerHTML : 'N/A';
+                        const fScoreHtml = tr.cells[5] ? tr.cells[5].innerHTML : 'N/A';
+                        const vScoreHtml = tr.cells[6] ? tr.cells[6].innerHTML : 'N/A';
+                        const tScoreHtml = tr.cells[7] ? tr.cells[7].innerHTML : 'N/A';
+                        const actionHtml = tr.cells[8] ? tr.cells[8].innerHTML : 'N/A';
+                        const capColor = capType.toLowerCase() === 'large' ? '#22d3ee' : capType.toLowerCase() === 'mid' ? '#f59e0b' : '#a78bfa';
 
                         const detailsTr = document.createElement('tr');
                         detailsTr.className = 'screener-details-row no-print';
-                        detailsTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                        detailsTr.style.background = 'rgba(255, 255, 255, 0.015)';
                         detailsTr.innerHTML = `
-                            <td colspan="9" style="padding: 12px 15px; border-top: 1px dashed rgba(255,255,255,0.05); border-bottom: 1px dashed rgba(255,255,255,0.05);">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.45;">
-                                    <div><strong>Rank:</strong> ${rank}</div>
-                                    <div style="text-align: right;"><strong>Sector:</strong> ${sector}</div>
-                                    <div style="grid-column: span 2; border-top: 1px dashed rgba(255,255,255,0.06); padding-top: 6px; margin-top: 4px; display: flex; flex-direction: column; gap: 8px;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                                            <span><strong>Fundamental Score:</strong></span>
-                                            <span>${fScore}</span>
+                            <td colspan="9" style="padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                <div style="display:flex; flex-direction:column; gap:10px;">
+                                    <!-- Row 1: Rank + Sector + Cap + Action -->
+                                    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+                                        <span style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); padding:3px 8px; border-radius:5px; font-size:10px; font-weight:700; color:var(--text-primary); font-family:Outfit,sans-serif;">Rank ${rank}</span>
+                                        <span style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06); padding:3px 8px; border-radius:5px; font-size:9.5px; color:var(--text-secondary); max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${sector}</span>
+                                        <span style="background:${capColor}15; border:1px solid ${capColor}40; color:${capColor}; padding:3px 8px; border-radius:5px; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">${capType}</span>
+                                        <span style="margin-left:auto;">${actionHtml}</span>
+                                    </div>
+                                    <!-- Row 2: Composite Score -->
+                                    <div style="display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.03); border-radius:6px; padding:6px 10px;">
+                                        <span style="font-size:10px; color:var(--text-secondary); font-weight:600;">Composite Score</span>
+                                        <span style="margin-left:auto;">${scoreHtml}</span>
+                                    </div>
+                                    <!-- Row 3: Subscore Gauges -->
+                                    <div style="display:flex; flex-direction:column; gap:6px;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; padding:0 2px;">
+                                            <span style="font-size:9.5px; color:var(--text-muted); font-weight:600;">Fundamental</span>
+                                            <span>${fScoreHtml}</span>
                                         </div>
-                                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                                            <span><strong>Valuation Score:</strong></span>
-                                            <span>${vScore}</span>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; padding:0 2px;">
+                                            <span style="font-size:9.5px; color:var(--text-muted); font-weight:600;">Valuation</span>
+                                            <span>${vScoreHtml}</span>
                                         </div>
-                                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                                            <span><strong>Technical Score:</strong></span>
-                                            <span>${tScore}</span>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; padding:0 2px;">
+                                            <span style="font-size:9.5px; color:var(--text-muted); font-weight:600;">Technical</span>
+                                            <span>${tScoreHtml}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -3225,6 +3292,51 @@
                 });
             });
         }
+
+        // ─── Mobile Screener Filter Logic ───
+        function applyMobileScreenerFilters() {
+            const tbody = document.getElementById('screener-results-body');
+            if (!tbody) return;
+            const scoreFilter = document.getElementById('mob-scr-score');
+            const capFilter = document.getElementById('mob-scr-cap');
+            const actionFilter = document.getElementById('mob-scr-action');
+            if (!scoreFilter) return;
+
+            const minScore = scoreFilter.value === 'all' ? 0 : parseInt(scoreFilter.value);
+            const capVal = capFilter ? capFilter.value : 'all';
+            const actionVal = actionFilter ? actionFilter.value : 'all';
+
+            tbody.querySelectorAll('tr').forEach(tr => {
+                if (tr.classList.contains('screener-details-row')) return;
+                if (tr.cells.length < 9) return;
+
+                const scoreText = tr.cells[4] ? tr.cells[4].textContent.trim() : '0';
+                const score = parseInt(scoreText) || 0;
+                const cap = tr.cells[3] ? tr.cells[3].textContent.trim().toLowerCase() : '';
+                const action = tr.cells[8] ? tr.cells[8].textContent.trim().toUpperCase() : '';
+
+                let show = true;
+                if (score < minScore) show = false;
+                if (capVal !== 'all' && cap !== capVal) show = false;
+                if (actionVal !== 'all') {
+                    if (actionVal === 'SELL') {
+                        if (!action.includes('SELL') && !action.includes('AVOID')) show = false;
+                    } else if (actionVal === 'BUY') {
+                        if (!action.includes('BUY') || action.includes('STRONG')) show = false;
+                    } else {
+                        if (!action.includes(actionVal)) show = false;
+                    }
+                }
+
+                tr.style.display = show ? '' : 'none';
+                // Also hide any expanded detail row
+                const nextRow = tr.nextElementSibling;
+                if (nextRow && nextRow.classList.contains('screener-details-row')) {
+                    nextRow.style.display = show ? '' : 'none';
+                }
+            });
+        }
+        window.applyMobileScreenerFilters = applyMobileScreenerFilters;
 
         function setupScreenerTableObserver() {
             const tbody = document.getElementById('screener-results-body');
@@ -3278,6 +3390,7 @@
                         chevron.innerHTML = '▼';
                     } else {
                         const companyName = tr.cells[1] ? tr.cells[1].textContent.trim() : 'N/A';
+                        const capHtml = tr.cells[2] ? tr.cells[2].innerHTML : '';
                         const ret1d = tr.cells[3] ? tr.cells[3].innerHTML : 'N/A';
                         const ret5d = tr.cells[4] ? tr.cells[4].innerHTML : 'N/A';
                         const ret1m = tr.cells[5] ? tr.cells[5].innerHTML : 'N/A';
@@ -3289,32 +3402,63 @@
 
                         const detailsTr = document.createElement('tr');
                         detailsTr.className = 'sector-details-row no-print';
-                        detailsTr.style.background = 'rgba(255, 255, 255, 0.01)';
+                        detailsTr.style.background = 'rgba(255, 255, 255, 0.015)';
                         detailsTr.innerHTML = `
-                            <td colspan="11" style="padding: 12px 15px; border-top: 1px dashed rgba(255,255,255,0.05); border-bottom: 1px dashed rgba(255,255,255,0.05);">
-                                <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px; color: var(--text-secondary); line-height: 1.45;">
-                                    <div style="font-size: 12px; color: var(--color-primary-light); font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; margin-bottom: 4px;">
-                                        ${companyName}
+                            <td colspan="11" style="padding: 10px 12px; border-top: 1px solid rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.04);">
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <!-- Company Name + Cap -->
+                                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                        <span style="font-size:11.5px; color:var(--color-primary-light); font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:200px;">${companyName}</span>
+                                        <span>${capHtml}</span>
                                     </div>
-                                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-family: monospace; font-size: 10px; margin-top: 4px; border-bottom: 1px dashed rgba(255,255,255,0.06); padding-bottom: 8px;">
-                                        <div><strong>1D:</strong> ${ret1d}</div>
-                                        <div><strong>5D:</strong> ${ret5d}</div>
-                                        <div><strong>1M:</strong> ${ret1m}</div>
-                                        <div><strong>3M:</strong> ${ret3m}</div>
-                                        <div><strong>6M:</strong> ${ret6m}</div>
-                                        <div><strong>1Y:</strong> ${ret1y}</div>
-                                        <div style="grid-column: span 3; margin-top: 2px;"><strong>5Y:</strong> ${ret5y}</div>
+                                    <!-- Return Gauges Grid -->
+                                    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px 6px; font-size:10px;">
+                                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; background:rgba(255,255,255,0.02); border-radius:4px; padding:3px 6px;">
+                                            <span style="color:var(--text-muted); font-weight:600; font-size:9px;">1D</span>
+                                            ${ret1d}
+                                        </div>
+                                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; background:rgba(255,255,255,0.02); border-radius:4px; padding:3px 6px;">
+                                            <span style="color:var(--text-muted); font-weight:600; font-size:9px;">5D</span>
+                                            ${ret5d}
+                                        </div>
+                                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; background:rgba(255,255,255,0.02); border-radius:4px; padding:3px 6px;">
+                                            <span style="color:var(--text-muted); font-weight:600; font-size:9px;">1M</span>
+                                            ${ret1m}
+                                        </div>
+                                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; background:rgba(255,255,255,0.02); border-radius:4px; padding:3px 6px;">
+                                            <span style="color:var(--text-muted); font-weight:600; font-size:9px;">3M</span>
+                                            ${ret3m}
+                                        </div>
+                                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; background:rgba(255,255,255,0.02); border-radius:4px; padding:3px 6px;">
+                                            <span style="color:var(--text-muted); font-weight:600; font-size:9px;">6M</span>
+                                            ${ret6m}
+                                        </div>
+                                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; background:rgba(255,255,255,0.02); border-radius:4px; padding:3px 6px;">
+                                            <span style="color:var(--text-muted); font-weight:600; font-size:9px;">1Y</span>
+                                            ${ret1y}
+                                        </div>
+                                        <div style="display:flex; align-items:center; justify-content:space-between; gap:4px; background:rgba(255,255,255,0.02); border-radius:4px; padding:3px 6px; grid-column: span 3;">
+                                            <span style="color:var(--text-muted); font-weight:600; font-size:9px;">5Y</span>
+                                            ${ret5y}
+                                        </div>
                                     </div>
-                                </div>
-                                <div style="border-top: 1px dashed rgba(255,255,255,0.08); padding-top: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                    <span style="font-size: 10px; color: var(--text-muted);">Screener Actions:</span>
-                                    <div class="mobile-actions-wrapper" style="display: flex; gap: 6px;">
-                                        ${actionsHtml}
+                                    <!-- Action Buttons -->
+                                    <div style="display:flex; justify-content:flex-end; gap:6px; padding-top:4px; border-top:1px solid rgba(255,255,255,0.04);">
+                                        <div class="mobile-actions-wrapper" style="display:flex; gap:6px;">
+                                            ${actionsHtml}
+                                        </div>
                                     </div>
                                 </div>
                             </td>
                         `;
                         tr.parentNode.insertBefore(detailsTr, tr.nextSibling);
+
+                        // Fix pill sizing inside expand row for mobile
+                        detailsTr.querySelectorAll('span[style*="min-width"]').forEach(pill => {
+                            pill.style.minWidth = '0';
+                            pill.style.fontSize = '9px';
+                            pill.style.padding = '1px 4px';
+                        });
 
                         const detailsActions = detailsTr.querySelectorAll('button');
                         const originalActions = tr.cells[10].querySelectorAll('button');
@@ -3328,15 +3472,6 @@
                     }
                 });
             });
-        }
-
-        function setupSectorRadarTableObserver() {
-            const tbody = document.getElementById('sector-stocks-table-body');
-            if (tbody) {
-                decorateSectorRadarRowsForMobile();
-                const observer = new MutationObserver(() => decorateSectorRadarRowsForMobile());
-                observer.observe(tbody, { childList: true });
-            }
         }
 
         function setupSectorRadarTableObserver() {
@@ -5802,6 +5937,7 @@
                 window.decorateUniverse = () => {
                     const tbody = document.getElementById('universe-explorer-body');
                     if (!tbody) return;
+                    const mobile = window.innerWidth <= 768;
                     tbody.querySelectorAll('tr').forEach(row => {
                         const linkDiv = row.querySelector('.universe-symbol-link');
                         if (linkDiv && !linkDiv.querySelector('.stock-circle-logo') && !linkDiv.querySelector('img')) {
@@ -5809,20 +5945,29 @@
                             if (!strongEl) return;
                             const rawSym = strongEl.innerText.trim();
                             const cleanSym = rawSym.replace('.NS', '').toUpperCase();
-                            if (Object.keys(isinMapping).length === 0) return; // Wait for mapping
-                            const logoHtml = getStockLogoHtml(cleanSym);
+                            if (Object.keys(isinMapping).length === 0) return;
+                            const logoSize = mobile ? 22 : 28;
+                            const logoHtml = getStockLogoHtml(cleanSym)
+                                .replace(/width:28px/g, `width:${logoSize}px`)
+                                .replace(/height:28px/g, `height:${logoSize}px`);
                             
                             const wrapper = document.createElement('div');
-                            wrapper.style.display = 'inline-flex';
-                            wrapper.style.alignItems = 'center';
-                            wrapper.style.gap = '8px';
-                            wrapper.style.verticalAlign = 'middle';
-                            wrapper.style.marginRight = '8px';
+                            wrapper.style.cssText = 'display:inline-flex; align-items:center; flex-shrink:0;';
                             wrapper.innerHTML = logoHtml;
                             
                             linkDiv.insertBefore(wrapper, strongEl);
                             linkDiv.style.display = 'inline-flex';
                             linkDiv.style.alignItems = 'center';
+                            linkDiv.style.gap = mobile ? '5px' : '8px';
+
+                            if (mobile) {
+                                strongEl.style.overflow = 'hidden';
+                                strongEl.style.textOverflow = 'ellipsis';
+                                strongEl.style.whiteSpace = 'nowrap';
+                                strongEl.style.maxWidth = '90px';
+                                strongEl.style.display = 'inline-block';
+                                strongEl.style.fontSize = '11px';
+                            }
                         }
                     });
                 };
@@ -5964,28 +6109,74 @@
                 window.decorateScreener = () => {
                     const tbody = document.getElementById('screener-results-body');
                     if (!tbody) return;
+                    const mobile = window.innerWidth <= 768;
                     tbody.querySelectorAll('tr').forEach(row => {
                         const linkDiv = row.querySelector('.screener-symbol-link');
                         if (linkDiv && !linkDiv.querySelector('.stock-circle-logo') && !linkDiv.querySelector('img')) {
                             const symSpan = linkDiv.querySelector('span.text-muted');
                             if (!symSpan) return;
-                            // On mobile, the span may contain appended segment text like "GLENMARK.NS • mid"
                             const rawSym = symSpan.innerText.split('•')[0].trim();
                             const cleanSym = rawSym.replace('.NS', '').toUpperCase();
                             if (Object.keys(isinMapping).length === 0) return;
-                            const logoHtml = getStockLogoHtml(cleanSym);
+                            const logoSize = mobile ? 22 : 28;
+                            const logoHtml = getStockLogoHtml(cleanSym)
+                                .replace(/width:28px/g, `width:${logoSize}px`)
+                                .replace(/height:28px/g, `height:${logoSize}px`);
                             
                             const wrapper = document.createElement('div');
-                            wrapper.style.display = 'inline-flex';
-                            wrapper.style.alignItems = 'center';
-                            wrapper.style.gap = '8px';
-                            wrapper.style.verticalAlign = 'middle';
-                            wrapper.style.marginRight = '8px';
+                            wrapper.className = 'screener-logo-wrap';
+                            wrapper.style.cssText = 'display:inline-flex; align-items:center; flex-shrink:0;';
                             wrapper.innerHTML = logoHtml;
                             
-                            linkDiv.insertBefore(wrapper, linkDiv.firstChild);
-                            linkDiv.style.display = 'flex';
-                            linkDiv.style.alignItems = 'center';
+                            if (mobile) {
+                                // Wrap existing text content into a flex text container
+                                const textDiv = document.createElement('div');
+                                textDiv.style.cssText = 'flex:1; min-width:0; overflow:hidden;';
+                                // Move all existing children into textDiv
+                                while (linkDiv.firstChild) {
+                                    textDiv.appendChild(linkDiv.firstChild);
+                                }
+                                // Truncate company name
+                                const nameEl = textDiv.querySelector('strong');
+                                if (nameEl) {
+                                    nameEl.style.cssText += '; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11.5px;';
+                                }
+                                // Split symbol + cap into separate elements so cap is always visible
+                                const symEl = textDiv.querySelector('span.text-muted');
+                                if (symEl) {
+                                    const fullText = symEl.textContent.trim();
+                                    const parts = fullText.split('•');
+                                    const tickerPart = (parts[0] || '').trim();
+                                    const capPart = (parts[1] || '').trim();
+                                    
+                                    // Build a flex row: [ticker...] [• cap]
+                                    symEl.innerHTML = '';
+                                    symEl.style.cssText += '; display:flex; align-items:center; gap:3px; font-size:9px;';
+                                    
+                                    const tickerSpan = document.createElement('span');
+                                    tickerSpan.textContent = tickerPart;
+                                    tickerSpan.style.cssText = 'overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;';
+                                    symEl.appendChild(tickerSpan);
+                                    
+                                    if (capPart) {
+                                        const capSpan = document.createElement('span');
+                                        capSpan.textContent = '• ' + capPart;
+                                        capSpan.style.cssText = 'flex-shrink:0; white-space:nowrap; color:var(--color-primary-light); font-weight:bold;';
+                                        symEl.appendChild(capSpan);
+                                    }
+                                }
+                                // Remove the <br> between strong and span
+                                textDiv.querySelectorAll('br').forEach(br => br.remove());
+                                
+                                linkDiv.appendChild(wrapper);
+                                linkDiv.appendChild(textDiv);
+                                linkDiv.style.cssText = 'display:flex; align-items:center; gap:6px; cursor:pointer;';
+                            } else {
+                                linkDiv.insertBefore(wrapper, linkDiv.firstChild);
+                                linkDiv.style.display = 'flex';
+                                linkDiv.style.alignItems = 'center';
+                                linkDiv.style.gap = '8px';
+                            }
                         }
                     });
                 };
@@ -6231,30 +6422,32 @@
                             const rawSym = symSpan.innerText.trim();
                             const cleanSym = rawSym.replace('.NS', '').toUpperCase();
                             if (Object.keys(isinMapping).length === 0) return;
-                            const logoHtml = getStockLogoHtml(cleanSym);
+                            const logoHtml = getStockLogoHtml(cleanSym)
+                                .replace(/width:28px/g, 'width:22px')
+                                .replace(/height:28px/g, 'height:22px');
                             
                             const wrapper = document.createElement('div');
-                            wrapper.style.display = 'inline-flex';
-                            wrapper.style.alignItems = 'center';
-                            wrapper.style.marginRight = '8px';
-                            wrapper.style.flexShrink = '0';
+                            wrapper.style.cssText = 'display:inline-flex; align-items:center; flex-shrink:0;';
                             wrapper.innerHTML = logoHtml;
                             
-                            const leftDiv = card.querySelector('.event-mobile-left');
-                            if (leftDiv) {
-                                leftDiv.style.display = 'flex';
-                                leftDiv.style.alignItems = 'center';
-                                leftDiv.style.gap = '10px';
-                                
-                                const contentWrapper = document.createElement('div');
-                                contentWrapper.style.flex = '1';
-                                contentWrapper.style.minWidth = '0';
-                                while (leftDiv.firstChild) {
-                                    contentWrapper.appendChild(leftDiv.firstChild);
-                                }
-                                leftDiv.insertBefore(wrapper, leftDiv.firstChild);
-                                leftDiv.appendChild(contentWrapper);
+                            // Make company div a flex row: [logo] [name...] [ticker badge]
+                            companyDiv.style.cssText += '; display:flex; align-items:center; gap:6px; overflow:hidden;';
+                            
+                            // Get company name text (before the span)
+                            const companyText = companyDiv.childNodes[0];
+                            if (companyText && companyText.nodeType === Node.TEXT_NODE) {
+                                const nameSpan = document.createElement('span');
+                                nameSpan.textContent = companyText.textContent.trim();
+                                nameSpan.style.cssText = 'overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1; font-size:11.5px;';
+                                companyDiv.replaceChild(nameSpan, companyText);
                             }
+                            
+                            // Ensure ticker badge doesn't shrink
+                            symSpan.style.flexShrink = '0';
+                            symSpan.style.fontSize = '8.5px';
+                            
+                            // Insert logo at the start of the company div
+                            companyDiv.insertBefore(wrapper, companyDiv.firstChild);
                         });
                     }
                 };
@@ -6395,36 +6588,47 @@
                 window.decorateSectorStocks = () => {
                     const tbody = document.getElementById('sector-stocks-table-body');
                     if (!tbody) return;
+                    const mobile = window.innerWidth <= 768;
                     tbody.querySelectorAll('tr').forEach(row => {
+                        if (row.classList.contains('sector-details-row')) return;
                         const cell = row.cells[0];
                         if (cell && !cell.querySelector('.stock-circle-logo') && !cell.querySelector('img')) {
-                            // On mobile, cell may contain extra text from mobile decorators (cap badge, chevron)
-                            // Extract only the first line/word which is the actual symbol
-                            const rawText = cell.innerText.trim();
-                            const cleanSym = rawText.split('\n')[0].split(' ')[0].replace('.NS', '').toUpperCase();
+                            // Preserve mobile-added elements before clearing
+                            const existingChevron = cell.querySelector('.row-expand-trigger');
+                            const existingMeta = cell.querySelector('.mobile-sector-meta');
+                            
+                            const rawText = cell.innerText.split('\n')[0].split(' ')[0].trim();
+                            const cleanSym = rawText.replace('.NS', '').toUpperCase();
                             if (Object.keys(isinMapping).length === 0) return;
-                            const logoHtml = getStockLogoHtml(cleanSym);
+                            
+                            const logoSize = mobile ? 22 : 28;
+                            const logoHtml = getStockLogoHtml(cleanSym)
+                                .replace(/width:28px/g, `width:${logoSize}px`)
+                                .replace(/height:28px/g, `height:${logoSize}px`);
                             
                             const wrapper = document.createElement('div');
-                            wrapper.style.display = 'inline-flex';
-                            wrapper.style.alignItems = 'center';
-                            wrapper.style.gap = '8px';
-                            wrapper.style.verticalAlign = 'middle';
-                            wrapper.style.marginRight = '8px';
+                            wrapper.style.cssText = 'display:inline-flex; align-items:center; flex-shrink:0;';
                             wrapper.innerHTML = logoHtml;
                             
-                            const originalText = cell.innerText.split('\n')[0].trim();
                             cell.innerHTML = '';
                             cell.style.display = 'flex';
                             cell.style.alignItems = 'center';
+                            cell.style.gap = mobile ? '5px' : '8px';
                             
                             const textSpan = document.createElement('span');
-                            textSpan.innerText = originalText;
+                            textSpan.innerText = rawText;
                             textSpan.style.fontWeight = '700';
                             textSpan.style.color = 'var(--color-primary)';
+                            if (mobile) {
+                                textSpan.style.fontSize = '11px';
+                            }
                             
                             cell.appendChild(wrapper);
                             cell.appendChild(textSpan);
+                            
+                            // Re-attach mobile elements if they existed
+                            if (existingMeta) cell.appendChild(existingMeta);
+                            if (existingChevron) cell.appendChild(existingChevron);
                         }
                     });
                 };
@@ -6548,6 +6752,8 @@
                 window.decorateSectorStocksHeatmap = () => {
                     const listEl = document.getElementById('sector-radar-list');
                     if (!listEl) return;
+                    const mobile = window.innerWidth <= 768;
+                    const logoSize = mobile ? 18 : 28;
                     
                     listEl.querySelectorAll('.stock-heatmap-tile').forEach(tile => {
                         if (tile.querySelector('.stock-circle-logo') || tile.querySelector('img')) return;
@@ -6558,28 +6764,31 @@
                             const rawSym = symSpan.innerText.trim();
                             const cleanSym = rawSym.replace('.NS', '').toUpperCase();
                             if (Object.keys(isinMapping).length === 0) return;
-                            const logoHtml = getStockLogoHtml(cleanSym);
+                            const logoHtml = getStockLogoHtml(cleanSym)
+                                .replace(/width:28px/g, `width:${logoSize}px`)
+                                .replace(/height:28px/g, `height:${logoSize}px`)
+                                .replace(/font-size:\s*11px/g, `font-size:${mobile ? 8 : 11}px`);
                             
                             const wrapper = document.createElement('div');
-                            wrapper.style.display = 'inline-flex';
-                            wrapper.style.alignItems = 'center';
-                            wrapper.style.justifyContent = 'center';
+                            wrapper.style.cssText = 'display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;';
                             wrapper.innerHTML = logoHtml;
                             
                             const rightCol = document.createElement('div');
-                            rightCol.style.display = 'flex';
-                            rightCol.style.flexDirection = 'column';
-                            rightCol.style.alignItems = 'flex-start';
-                            rightCol.style.justifyContent = 'center';
-                            rightCol.style.lineHeight = '1.2';
+                            rightCol.style.cssText = 'display:flex; flex-direction:column; align-items:flex-start; justify-content:center; line-height:1.2; min-width:0; overflow:hidden;';
                             
-                            symSpan.style.fontSize = '10.5px';
+                            symSpan.style.fontSize = mobile ? '9.5px' : '10.5px';
                             symSpan.style.fontWeight = '700';
                             symSpan.style.margin = '0';
+                            symSpan.style.overflow = 'hidden';
+                            symSpan.style.textOverflow = 'ellipsis';
+                            symSpan.style.whiteSpace = 'nowrap';
+                            symSpan.style.maxWidth = '100%';
+                            symSpan.style.display = 'block';
                             
-                            pctSpan.style.fontSize = '9px';
+                            pctSpan.style.fontSize = mobile ? '8.5px' : '9px';
                             pctSpan.style.fontWeight = '600';
                             pctSpan.style.margin = '0';
+                            pctSpan.style.whiteSpace = 'nowrap';
                             
                             rightCol.appendChild(symSpan);
                             rightCol.appendChild(pctSpan);
@@ -6589,11 +6798,12 @@
                             tile.style.flexDirection = 'row';
                             tile.style.alignItems = 'center';
                             tile.style.justifyContent = 'flex-start';
-                            tile.style.padding = '6px 10px';
-                            tile.style.gap = '8px';
+                            tile.style.padding = mobile ? '4px 6px' : '6px 10px';
+                            tile.style.gap = mobile ? '5px' : '8px';
                             tile.style.boxSizing = 'border-box';
                             tile.style.height = 'auto';
-                            tile.style.minHeight = '42px';
+                            tile.style.minHeight = mobile ? '36px' : '42px';
+                            tile.style.overflow = 'hidden';
                             
                             tile.appendChild(wrapper);
                             tile.appendChild(rightCol);
