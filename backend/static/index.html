@@ -494,6 +494,10 @@
                                     <input type="checkbox" id="setting-disclaimers-toggle" checked style="cursor:pointer; transform: scale(1.15);">
                                 </div>
                                 <div class="setting-row">
+                                    <label>Show Company Logos</label>
+                                    <input type="checkbox" id="setting-logos-toggle" checked style="cursor:pointer; transform: scale(1.15);">
+                                </div>
+                                <div class="setting-row">
                                     <label>System Telemetry</label>
                                     <input type="checkbox" id="setting-telemetry-toggle" checked style="cursor:pointer; transform: scale(1.15);">
                                 </div>
@@ -6173,9 +6177,9 @@
                 </div>
 
                 <!-- Watchlist Telemetry Grid -->
-                <div class="watchlist-telemetry-grid" style="display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div class="watchlist-telemetry-grid" id="watchlist-telemetry-grid" style="display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 20px; margin-bottom: 20px;">
                     <!-- Avg Watchlist Conviction Gauge Card -->
-                    <div class="card" style="display: flex; gap: 15px; align-items: center; justify-content: center; box-sizing: border-box; padding: 15px; min-height: 120px;">
+                    <div class="card" id="watchlist-avg-conviction-card" style="display: flex; gap: 15px; align-items: center; justify-content: center; box-sizing: border-box; padding: 15px; min-height: 120px;">
                         <div style="position: relative; width: 64px; height: 64px; flex-shrink: 0;">
                             <svg viewBox="0 0 36 36" style="width: 100%; height: 100%; transform: rotate(-90deg); display: block;">
                                 <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="3"></path>
@@ -6193,7 +6197,7 @@
                     </div>
 
                     <!-- Sector Concentration Stack Card -->
-                    <div class="card" style="display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; padding: 15px; min-height: 120px;">
+                    <div class="card" id="watchlist-sector-dispersion-card" style="display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; padding: 15px; min-height: 120px;">
                         <span style="font-size: 8px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 6px; letter-spacing: 0.05em;">Sector Allocation Dispersion</span>
                         <div class="watchlist-sector-dispersion" style="display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: rgba(255,255,255,0.04); margin-bottom: 8px; border: 1px solid rgba(0,0,0,0.15);">
                             <!-- Populated dynamically with progress bars -->
@@ -6205,7 +6209,7 @@
                     </div>
 
                     <!-- Aggregate Standings Card -->
-                    <div class="card" style="display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; padding: 12px 15px; min-height: 120px;">
+                    <div class="card" id="watchlist-telemetry-card" style="display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; padding: 12px 15px; min-height: 120px;">
                         <span style="font-size: 8.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; display: block; letter-spacing: 0.05em;">Watchlist Telemetry</span>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 4px; font-size: 11px;">
                             <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.03); padding-bottom: 2px;">
@@ -8406,7 +8410,7 @@
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
     <script src="export_manager.js?v=1.1.7"></script>
-    <script src="app.js?v=1.9.6"></script>
+    <script src="app.js?v=1.9.7"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
@@ -8440,7 +8444,7 @@
     </div>
 
     <!-- Modernization Custom Layer -->
-    <script src="modernizer.js?v=8.20"></script>
+    <script src="modernizer.js?v=8.21"></script>
 
     <!-- Mobile Frosted Glass Slide-up Details Bottom Sheet -->
     <div id="mobile-details-bottom-sheet" class="mobile-bottom-sheet no-print" style="display: none;">

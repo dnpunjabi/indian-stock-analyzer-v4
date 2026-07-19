@@ -15452,6 +15452,19 @@ function renderWatchlistItems() {
     const warmEl = document.getElementById('watchlist-telemetry-warm');
     if (warmEl) warmEl.innerText = `${warmedPct}%`;
 
+    // Adjust visibility of the entire telemetry grid based on items count
+    const telemetryGrid = document.getElementById('watchlist-telemetry-grid');
+    const avgConvictionCard = document.getElementById('watchlist-avg-conviction-card');
+    const telemetryCard = document.getElementById('watchlist-telemetry-card');
+
+    if (telemetryGrid) {
+        if (totalItems === 0) {
+            telemetryGrid.style.display = 'none';
+        } else {
+            telemetryGrid.style.display = 'grid';
+        }
+    }
+
     // 3. Score & checklist calculations
     const scoreRing = document.getElementById('watchlist-avg-score-ring');
     const scoreNum = document.getElementById('watchlist-avg-score-num');
@@ -15461,6 +15474,11 @@ function renderWatchlistItems() {
     const mosEl = document.getElementById('watchlist-telemetry-mos');
 
     if (activeWatchlistBatchData && activeWatchlistBatchData.results && activeWatchlistBatchData.results.length > 0) {
+        // Show analysis cards and adjust layout
+        if (avgConvictionCard) avgConvictionCard.style.display = 'flex';
+        if (telemetryCard) telemetryCard.style.display = 'flex';
+        if (telemetryGrid) telemetryGrid.style.gridTemplateColumns = '1fr 1.5fr 1fr';
+
         const results = activeWatchlistBatchData.results;
         const totalScore = results.reduce((acc, curr) => acc + (curr.score || 0), 0);
         const avgScore = Math.round(totalScore / results.length);
@@ -15529,6 +15547,11 @@ function renderWatchlistItems() {
             }
         }
     } else {
+        // Hide analysis cards and collapse grid to Sector Allocation Dispersion only
+        if (avgConvictionCard) avgConvictionCard.style.display = 'none';
+        if (telemetryCard) telemetryCard.style.display = 'none';
+        if (telemetryGrid) telemetryGrid.style.gridTemplateColumns = '1fr';
+
         if (scoreNum) scoreNum.innerText = '--';
         if (scoreRing) scoreRing.setAttribute('stroke-dasharray', `0, 100`);
         if (scoreLabel) scoreLabel.style.display = 'none';

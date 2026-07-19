@@ -76,6 +76,8 @@
     };
 
     window.getStockFallbackLogoHtml = function(symbol) {
+        const showLogos = localStorage.getItem('settings-show-logos') !== 'false';
+        if (!showLogos) return '';
         const cleanSym = symbol.replace(".NS", "").toUpperCase();
         const presetLogos = {
             "RELIANCE": { bg: "#0a2540", logo: "⚡" }, 
@@ -114,6 +116,8 @@
     };
 
     function getStockLogoHtml(symbol) {
+        const showLogos = localStorage.getItem('settings-show-logos') !== 'false';
+        if (!showLogos) return '';
         const cleanSym = symbol.replace(".NS", "").toUpperCase();
         const isin = isinMapping[cleanSym];
         if (isin) {
@@ -2605,6 +2609,19 @@
             }
             if (telemetryEl) {
                 telemetryEl.style.setProperty('display', showTelemetry ? '' : 'none', 'important');
+            }
+
+            // Logo visibility toggle settings
+            const logosToggle = document.getElementById('setting-logos-toggle');
+            const showLogos = localStorage.getItem('settings-show-logos') !== 'false';
+            if (logosToggle) {
+                logosToggle.checked = showLogos;
+                logosToggle.addEventListener('change', (e) => {
+                    const checked = e.target.checked;
+                    localStorage.setItem('settings-show-logos', checked);
+                    // Reload the page to apply the logos visibility setting immediately with zero impact
+                    location.reload();
+                });
             }
         }
 
