@@ -18679,60 +18679,65 @@ select option {
 /* Heatmap Grid */
 .desktop-sector-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 4px !important;
 }
 .sector-block {
-    border-radius: 8px;
-    padding: 14px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    align-items: center;
-    justify-content: center;
+    border-radius: 6px !important; /* Slightly smaller border radius for compact cards */
+    padding: 8px 12px !important;
+    min-height: 64px !important;
+    height: 64px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important; /* Left-aligned! */
+    box-sizing: border-box !important;
     cursor: pointer;
+    text-align: left !important;
+    border: none !important;
     transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
-    text-align: center;
-    border: 1px solid transparent;
+}
+.sector-block:first-child {
+    grid-column: span 2 !important; /* First tile spans 2 columns */
 }
 .sector-block:hover {
     transform: translateY(-2px);
-    filter: brightness(1.1);
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    filter: brightness(1.08);
 }
 .sector-block:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
 }
-.sector-block.bullish {
-    background: rgba(34, 197, 94, 0.08);
-    border-color: rgba(34, 197, 94, 0.15);
+.sector-block.strong-bullish {
+    background: #10b981 !important;
 }
-.sector-block.bullish .sector-name { color: #22c55e; }
-.sector-block.bullish .sector-change { color: #4ade80; font-weight: bold; }
-
-.sector-block.bearish {
-    background: rgba(239, 68, 68, 0.08);
-    border-color: rgba(239, 68, 68, 0.15);
+.sector-block.mild-bullish {
+    background: #065f46 !important;
 }
-.sector-block.bearish .sector-name { color: #ef4444; }
-.sector-block.bearish .sector-change { color: #f87171; font-weight: bold; }
-
 .sector-block.neutral {
-    background: rgba(148, 163, 184, 0.08);
-    border-color: rgba(148, 163, 184, 0.15);
+    background: #1e293b !important;
 }
-.sector-block.neutral .sector-name { color: var(--text-secondary); }
-.sector-block.neutral .sector-change { color: var(--text-secondary); }
+.sector-block.mild-bearish {
+    background: #7f1d1d !important;
+}
+.sector-block.strong-bearish {
+    background: #dc2626 !important;
+}
 
-.sector-name {
-    font-size: 10px;
-    font-family: var(--font-heading);
-    font-weight: 700;
-    letter-spacing: 0.5px;
+.sector-block .sector-name {
+    color: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    font-family: 'Outfit', sans-serif !important;
+    text-transform: capitalize !important;
+    line-height: 1.2 !important;
 }
-.sector-change {
-    font-size: 12px;
-    font-family: var(--font-body);
+.sector-block .sector-change {
+    color: #ffffff !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    font-family: 'Inter', sans-serif !important;
+    letter-spacing: -0.01em !important;
+    line-height: 1.2 !important;
 }
 
 /* Movers Split Grid styling */
@@ -20091,4 +20096,197 @@ select option {
     box-shadow: 0 2px 6px rgba(59, 130, 246, 0.2) !important;
 }
 
+
+
+/* Scoped Desktop Typographic Standardization (Zero Mobile Impact) */
+@media (min-width: 992px) {
+    /* Card Padding & Headers */
+    .desktop-cmd-card {
+        padding: 16px !important;
+    }
+    .desktop-cmd-card-header {
+        margin-bottom: 12px !important;
+        padding-bottom: 8px !important;
+    }
+    .header-title {
+        font-size: 13px !important;
+        font-weight: 600 !important;
+    }
+    .badge-status-text {
+        font-size: 10px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Sector Heatmap */
+    .sector-block .sector-name {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+    }
+    .sector-block .sector-change {
+        font-size: 16px !important;
+        font-weight: 800 !important;
+        line-height: 1.2 !important;
+    }
+
+    /* Market Movers (Gainers & Losers list) */
+    .mover-column-title {
+        font-size: 10px !important;
+        font-weight: 700 !important;
+    }
+    .movers-cap-tab {
+        font-size: 11px !important;
+        font-weight: 600 !important;
+    }
+    .mover-stock-symbol {
+        font-size: 12px !important;
+        font-weight: 700 !important;
+    }
+    .mover-stock-name {
+        font-size: 10px !important;
+        font-weight: 400 !important;
+    }
+    .mover-stock-price {
+        font-size: 12px !important;
+        font-weight: 600 !important;
+    }
+    .mover-stock-change {
+        font-size: 12px !important;
+        font-weight: 700 !important;
+    }
+
+    /* Terminal Live News Stream */
+    .news-card-title {
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        line-height: 1.4 !important;
+    }
+    .news-source {
+        font-size: 10px !important;
+        font-weight: 700 !important;
+    }
+    .news-time {
+        font-size: 10px !important;
+        font-weight: 400 !important;
+    }
+    .news-sentiment-badge {
+        font-size: 10px !important;
+        font-weight: 600 !important;
+    }
+
+    /* Upcoming Events Badges */
+    .event-badge {
+        font-size: 10px !important;
+        font-weight: 700 !important;
+        padding: 3px 8px !important;
+        border-radius: 4px !important;
+        letter-spacing: 0.05em !important;
+        text-transform: uppercase !important;
+        display: inline-block !important;
+    }
+    .event-badge.results {
+        background: rgba(37, 99, 235, 0.15) !important;
+        color: #3b82f6 !important;
+    }
+    .event-badge.earnings {
+        background: rgba(139, 92, 246, 0.15) !important;
+        color: #a78bfa !important;
+    }
+    .event-badge.dividend {
+        background: rgba(245, 158, 11, 0.15) !important;
+        color: #fbbf24 !important;
+    }
+    .event-badge.meeting {
+        background: rgba(16, 185, 129, 0.15) !important;
+        color: #34d399 !important;
+    }
+    .event-badge.other {
+        background: rgba(107, 114, 128, 0.15) !important;
+        color: #9ca3af !important;
+    }
+
+    /* Watchlist Quick-Quote Row Styling */
+    .watchlist-row-item {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        padding: 6px 8px !important;
+        background: rgba(255, 255, 255, 0.015) !important;
+        border: 1px solid var(--border-glass) !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        transition: background 0.15s, transform 0.1s !important;
+    }
+    .watchlist-row-item:hover {
+        background: rgba(255, 255, 255, 0.035) !important;
+        transform: translateX(2px) !important;
+    }
+    .watchlist-row-item:active {
+        transform: scale(0.98) !important;
+    }
+    [data-theme="light"] .watchlist-row-item {
+        background: rgba(0, 0, 0, 0.005) !important;
+    }
+    [data-theme="light"] .watchlist-row-item:hover {
+        background: rgba(0, 0, 0, 0.02) !important;
+    }
+
+    /* Quant Top Picks Table Row Hover styling */
+    .quant-pick-row {
+        border-bottom: 1px solid var(--border-glass) !important;
+        cursor: pointer !important;
+        transition: background 0.15s !important;
+    }
+    .quant-pick-row:hover {
+        background: rgba(255, 255, 255, 0.02) !important;
+    }
+    [data-theme="light"] .quant-pick-row:hover {
+        background: rgba(0, 0, 0, 0.015) !important;
+    }
+
+    /* Signal Badges */
+    .signal-badge {
+        font-size: 10px !important;
+        font-weight: 700 !important;
+        padding: 3px 10px !important;
+        border-radius: 4px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.03em !important;
+        display: inline-block !important;
+        text-align: center !important;
+        min-width: 48px !important;
+    }
+    .signal-badge.buy {
+        background: rgba(16, 185, 129, 0.15) !important;
+        color: #10b981 !important;
+    }
+    .signal-badge.hold {
+        background: rgba(245, 158, 11, 0.15) !important;
+        color: #f59e0b !important;
+    }
+    .signal-badge.sell {
+        background: rgba(239, 68, 68, 0.15) !important;
+        color: #ef4444 !important;
+    }
+
+    /* Quant Strategy Tab Active and Hover styling */
+    .quant-strategy-tab.active {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid var(--border-glass) !important;
+        color: var(--text-primary) !important;
+    }
+    .quant-strategy-tab:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: var(--text-primary) !important;
+    }
+    [data-theme="light"] .quant-strategy-tab.active {
+        background: rgba(0, 0, 0, 0.06) !important;
+        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        color: var(--text-primary) !important;
+    }
+    [data-theme="light"] .quant-strategy-tab:hover {
+        background: rgba(0, 0, 0, 0.03) !important;
+        color: var(--text-primary) !important;
+    }
+}
 

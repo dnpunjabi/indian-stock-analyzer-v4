@@ -4750,7 +4750,7 @@
 
                         const sourceHtml = getNewsAgencyLogoHtml(item.source || "REUTERS");
                         return `
-                            <div class="news-card-item" data-index="${idx}">
+                            <div class="news-card-item" data-index="${idx}" data-link="${item.link}">
                                 <div class="news-card-top">
                                     <div class="news-source-wrap" style="display:flex; align-items:center; gap:8px;">
                                         <span class="news-source" style="background:transparent; padding:0; border:none; display:inline-block; vertical-align:middle; width:auto; height:auto; text-transform:none;">${sourceHtml}</span>
@@ -4776,14 +4776,9 @@
                     container.querySelectorAll('.news-card-item').forEach(card => {
                         card.addEventListener('click', (e) => {
                             e.stopPropagation();
-                            const idx = card.getAttribute('data-index');
-                            const detailPanel = document.getElementById(`news-details-${idx}`);
-                            if (detailPanel) {
-                                const isExpanded = detailPanel.classList.contains('expanded');
-                                container.querySelectorAll('.news-card-details').forEach(p => p.classList.remove('expanded'));
-                                if (!isExpanded) {
-                                    detailPanel.classList.add('expanded');
-                                }
+                            const link = card.getAttribute('data-link');
+                            if (link) {
+                                window.open(link, '_blank');
                             }
                         });
                     });
@@ -4806,6 +4801,38 @@
                 const res = await fetch(apiBaseUrl + '/api/market-movers');
                 if (!res.ok) throw new Error("Market movers fetch failed");
                 const data = await res.json();
+
+                // Update Nifty 500 Market Breadth UI
+                try {
+                    const adv = data.advances || 0;
+                    const dec = data.declines || 0;
+                    const total = 500;
+                    const neutral = Math.max(0, total - adv - dec);
+
+                    const advPct = (adv / total) * 100;
+                    const decPct = (dec / total) * 100;
+
+                    const advBar = document.getElementById('market-breadth-advances-bar');
+                    const decBar = document.getElementById('market-breadth-declines-bar');
+                    const ratioBadge = document.getElementById('market-breadth-ratio-badge');
+                    const advText = document.getElementById('market-breadth-advances-text');
+                    const decText = document.getElementById('market-breadth-declines-text');
+                    const neutralText = document.getElementById('market-breadth-neutral-text');
+
+                    if (advBar && decBar) {
+                        advBar.style.width = `${advPct}%`;
+                        decBar.style.width = `${decPct}%`;
+                    }
+                    if (ratioBadge) {
+                        const ratio = dec > 0 ? (adv / dec).toFixed(2) : adv;
+                        ratioBadge.innerText = `ADR: ${ratio}`;
+                    }
+                    if (advText) advText.innerText = `${adv} Advances`;
+                    if (decText) decText.innerText = `${dec} Declines`;
+                    if (neutralText) neutralText.innerText = `${neutral} Neutral`;
+                } catch (breadthErr) {
+                    console.error("Error updating Market Breadth UI:", breadthErr);
+                }
 
                 const renderStockList = (container, list, isGainer) => {
                     if (!list || list.length === 0) {
@@ -4903,10 +4930,28 @@
                     // Sort by return_1d descending (highest to lowest)
                     const sortedSectors = [...sectorsList].sort((a, b) => (b.return_1d || 0) - (a.return_1d || 0));
                     
-                    // Render top 6 sectors inside the grid
-                    sectorGrid.innerHTML = sortedSectors.slice(0, 6).map(item => {
+                    // Select exactly 6 sectors: top 4 (leaders) and bottom 2 (laggards) to ensure negative ones are represented
+                    let displaySectors = [];
+                    if (sortedSectors.length <= 6) {
+                        displaySectors = sortedSectors;
+                    } else {
+                        const leaders = sortedSectors.slice(0, 4);
+                        const laggards = sortedSectors.slice(-2);
+                        displaySectors = [...leaders, ...laggards];
+                    }
+
+                    sectorGrid.innerHTML = displaySectors.map(item => {
                         const ret = item.return_1d || 0;
-                        const trendClass = ret > 0.05 ? 'bullish' : (ret < -0.05 ? 'bearish' : 'neutral');
+                        let trendClass = 'neutral';
+                        if (ret > 1.0) {
+                            trendClass = 'strong-bullish';
+                        } else if (ret > 0.0) {
+                            trendClass = 'mild-bullish';
+                        } else if (ret < -1.0) {
+                            trendClass = 'strong-bearish';
+                        } else if (ret < 0.0) {
+                            trendClass = 'mild-bearish';
+                        }
                         const sign = ret >= 0 ? '+' : '';
                         return `
                             <div class="sector-block ${trendClass}" data-sector="${item.sector}">
@@ -4920,15 +4965,8 @@
                     sectorGrid.querySelectorAll('.sector-block').forEach(block => {
                         block.addEventListener('click', (e) => {
                             e.stopPropagation();
-                            const sector = block.getAttribute('data-sector');
-                            const searchInput = document.getElementById('analyzer-search-input');
-                            const searchBtn = document.getElementById('analyzer-search-btn');
-                            if (searchInput) {
-                                searchInput.value = sector;
-                                searchInput.focus();
-                                if (searchBtn) {
-                                    searchBtn.click();
-                                }
+                            if (window.switchTab) {
+                                window.switchTab('sector-radar');
                             }
                         });
                     });
@@ -4941,10 +4979,439 @@
             }
         };
 
+        // 4. Fetch & Render Upcoming Corporate Events
+        const loadUpcomingEvents = async () => {
+            const container = document.getElementById('desktop-events-container');
+            const viewAllBtn = document.getElementById('desktop-events-view-all-btn');
+            if (!container) return;
+
+            if (viewAllBtn) {
+                viewAllBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (window.switchTab) window.switchTab('events');
+                };
+            }
+
+            try {
+                const res = await fetch(apiBaseUrl + '/api/events/calendar?days=60');
+                if (!res.ok) throw new Error("Events load failed");
+                const data = await res.json();
+
+                if (data.events && data.events.length > 0) {
+                    const futureEvents = data.events.filter(ev => {
+                        return ev.countdown_days !== null && ev.countdown_days >= 0;
+                    });
+
+                    if (futureEvents.length === 0) {
+                        container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No upcoming corporate events scheduled in the next 60 days.</div>`;
+                        return;
+                    }
+
+                    container.innerHTML = futureEvents.slice(0, 4).map((item, idx) => {
+                        let eventTitle = "";
+                        let eventDesc = "";
+                        let badgeLabel = "";
+                        let badgeClass = "";
+
+                        const type = (item.event_type || "").toLowerCase();
+                        if (type.includes("result") || type.includes("earning")) {
+                            eventTitle = `${item.symbol} Q1 Results`;
+                            badgeLabel = "RESULTS";
+                            badgeClass = "results";
+                            if (item.details?.earnings_estimate) {
+                                eventDesc = `Consensus EPS: ₹${parseFloat(item.details.earnings_estimate).toFixed(2)}`;
+                            } else {
+                                eventDesc = "Upcoming quarterly disclosures.";
+                            }
+                        } else if (type.includes("dividend")) {
+                            eventTitle = `${item.symbol} — Dividend`;
+                            badgeLabel = "DIVIDEND";
+                            badgeClass = "dividend";
+                            if (item.details?.dividend_rate) {
+                                eventDesc = `₹${parseFloat(item.details.dividend_rate).toFixed(2)}/share Dividend`;
+                            } else {
+                                eventDesc = "Dividend record consideration.";
+                            }
+                        } else {
+                            eventTitle = `${item.symbol} — Corporate Action`;
+                            badgeLabel = "OTHER";
+                            badgeClass = "other";
+                            eventDesc = item.description || "Board meeting/ Capex update";
+                        }
+
+                        const parts = item.event_date.split('-');
+                        const year = parseInt(parts[0], 10);
+                        const month = parseInt(parts[1], 10) - 1;
+                        const day = parseInt(parts[2], 10);
+                        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                        const monthStr = monthNames[month];
+
+                        const isLast = idx === 3 || idx === futureEvents.length - 1;
+                        const borderStyle = isLast ? "" : "border-bottom: 1px solid var(--border-glass);";
+
+                        return `
+                            <div class="event-row-item" style="display: flex; align-items: center; padding: 12px 0; ${borderStyle}">
+                                <div class="event-date-wrap" style="width: 50px; flex-shrink: 0; display: flex; flex-direction: row; gap: 4px; align-items: baseline;">
+                                    <span class="event-month" style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">${monthStr}</span>
+                                    <span class="event-day" style="font-size: 13px; font-weight: 800; color: var(--text-primary);">${day}</span>
+                                </div>
+                                <div class="event-details-wrap" style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left;">
+                                    <span class="event-row-title" style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${eventTitle}</span>
+                                    <span class="event-row-desc" style="font-size: 10.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 95%;">${eventDesc}</span>
+                                </div>
+                                <div class="event-badge-wrap" style="flex-shrink: 0; text-align: right; width: 90px;">
+                                    <span class="event-badge ${badgeClass}">${badgeLabel}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No upcoming corporate events scheduled.</div>`;
+                }
+            } catch (err) {
+                console.error("Desktop events load error:", err);
+                container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Failed to load events calendar.</div>`;
+            }
+        };
+
+        // 5. Fetch, Render & Sort Watchlist Quick-Quote Strip
+        let watchlistCachedItems = [];
+        let wlSortCol = null;
+        let wlSortDir = 'none'; // 'none', 'asc', 'desc'
+
+        const loadWatchlistStrip = async () => {
+            const selector = document.getElementById('desktop-watchlist-selector');
+            const container = document.getElementById('desktop-watchlist-container');
+            if (!selector || !container) return;
+
+            try {
+                const res = await fetch(apiBaseUrl + '/api/watchlists');
+                if (!res.ok) throw new Error("Watchlists fetch failed");
+                const watchlists = await res.json();
+
+                selector.innerHTML = '<option value="" disabled selected>Select Watchlist</option>';
+                if (watchlists && watchlists.length > 0) {
+                    watchlists.forEach(w => {
+                        const opt = document.createElement('option');
+                        opt.value = w.id;
+                        opt.innerText = w.name;
+                        selector.appendChild(opt);
+                    });
+                }
+            } catch (err) {
+                console.error("Desktop watchlists load error:", err);
+            }
+
+            const renderWatchlistList = () => {
+                if (watchlistCachedItems.length === 0) {
+                    container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No stocks in this watchlist.</div>`;
+                    return;
+                }
+
+                let displayItems = [...watchlistCachedItems];
+                if (wlSortCol && wlSortDir !== 'none') {
+                    displayItems.sort((a, b) => {
+                        let valA = a[wlSortCol];
+                        let valB = b[wlSortCol];
+
+                        if (typeof valA === 'string') {
+                            valA = valA.toUpperCase();
+                            valB = valB.toUpperCase();
+                        } else {
+                            valA = valA || 0;
+                            valB = valB || 0;
+                        }
+
+                        if (valA < valB) return wlSortDir === 'asc' ? -1 : 1;
+                        if (valA > valB) return wlSortDir === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+
+                container.innerHTML = displayItems.map(item => {
+                    const price = item.live_price !== undefined ? parseFloat(item.live_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
+                    const changeVal = item.change_pct !== undefined ? parseFloat(item.change_pct) : 0;
+                    const changeStr = item.change_pct !== undefined ? `${changeVal >= 0 ? '+' : ''}${changeVal.toFixed(2)}%` : '--';
+                    const isPositive = changeVal >= 0;
+                    const arrow = isPositive ? '▲' : '▼';
+                    const color = isPositive ? '#10b981' : '#ef4444';
+                    const bg = isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+
+                    const cleanSym = item.symbol.replace('.NS', '');
+                    return `
+                        <div class="watchlist-row-item" data-symbol="${cleanSym}" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: 6px; cursor: pointer; transition: background 0.15s, transform 0.1s;">
+                            <div class="wl-item-left" style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0; text-align: left;">
+                                <span style="font-size: 11.5px; font-weight: 700; color: var(--text-primary);">${cleanSym}</span>
+                                <span style="font-size: 9.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;">${item.name || item.sector || ''}</span>
+                            </div>
+                            <div class="wl-item-price" style="width: 80px; text-align: right; font-size: 11.5px; font-weight: 600; color: var(--text-primary); font-family: 'Inter', monospace;">
+                                ₹${price}
+                            </div>
+                            <div class="wl-item-change" style="width: 80px; text-align: right; font-size: 10.5px; font-weight: 700;">
+                                <span style="color: ${color}; padding: 1px 6px; border-radius: 4px; background: ${bg};">${arrow} ${changeStr}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                container.querySelectorAll('.watchlist-row-item').forEach(row => {
+                    row.onclick = (e) => {
+                        e.stopPropagation();
+                        const symbol = row.getAttribute('data-symbol');
+                        const searchInput = document.getElementById('analyzer-search-input');
+                        const searchBtn = document.getElementById('analyzer-search-btn');
+                        if (searchInput) {
+                            searchInput.value = symbol;
+                            searchInput.focus();
+                            if (searchBtn) searchBtn.click();
+                        }
+                    };
+                });
+            };
+
+            selector.onchange = async () => {
+                const watchlistId = selector.value;
+                container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Fetching live quotes...</div>`;
+                watchlistCachedItems = [];
+
+                try {
+                    const res = await fetch(apiBaseUrl + `/api/watchlists/${watchlistId}`);
+                    if (!res.ok) throw new Error("Watchlist detail failed");
+                    const data = await res.json();
+                    
+                    const items = data.items || [];
+                    if (items.length === 0) {
+                        renderWatchlistList();
+                        return;
+                    }
+
+                    const symbols = items.map(item => item.symbol);
+                    const quoteRes = await fetch(apiBaseUrl + '/api/batch-quotes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbols: symbols })
+                    });
+                    
+                    if (quoteRes.ok) {
+                        const quoteData = await quoteRes.json();
+                        const quotes = quoteData.quotes || {};
+                        items.forEach(item => {
+                            const q = quotes[item.symbol];
+                            if (q) {
+                                item.live_price = q.price;
+                                item.change = q.change;
+                                item.change_pct = q.change_pct;
+                            }
+                        });
+                    }
+
+                    watchlistCachedItems = items;
+                    renderWatchlistList();
+                } catch (err) {
+                    console.error("Desktop watchlist loading failed:", err);
+                    container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Failed to load live watchlist.</div>`;
+                }
+            };
+
+            const updateSortHeaderIcons = () => {
+                ['sort-wl-symbol', 'sort-wl-price', 'sort-wl-change'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        const icon = el.querySelector('.sort-icon');
+                        if (icon) {
+                            const col = id === 'sort-wl-symbol' ? 'symbol' : (id === 'sort-wl-price' ? 'live_price' : 'change_pct');
+                            if (wlSortCol === col) {
+                                icon.innerText = wlSortDir === 'asc' ? ' ▲' : (wlSortDir === 'desc' ? ' ▼' : '');
+                            } else {
+                                icon.innerText = '';
+                            }
+                        }
+                    }
+                });
+            };
+
+            const toggleSort = (col) => {
+                if (wlSortCol === col) {
+                    if (wlSortDir === 'none') wlSortDir = 'asc';
+                    else if (wlSortDir === 'asc') wlSortDir = 'desc';
+                    else {
+                        wlSortDir = 'none';
+                        wlSortCol = null;
+                    }
+                } else {
+                    wlSortCol = col;
+                    wlSortDir = 'asc';
+                }
+                updateSortHeaderIcons();
+                renderWatchlistList();
+            };
+
+            const headerSym = document.getElementById('sort-wl-symbol');
+            const headerPrice = document.getElementById('sort-wl-price');
+            const headerChange = document.getElementById('sort-wl-change');
+
+            if (headerSym) headerSym.onclick = () => toggleSort('symbol');
+            if (headerPrice) headerPrice.onclick = () => toggleSort('live_price');
+            if (headerChange) headerChange.onclick = () => toggleSort('change_pct');
+        };
+
+        // 6. Fetch & Render Quant Top Picks Table (Screener Integration with Strategy Tabs)
+        let quantPicksCache = { hybrid: [], bottom_up: [], top_down: [] };
+        let activeQuantStrategy = 'hybrid';
+
+        const renderQuantTopPicksList = () => {
+            const tbody = document.getElementById('desktop-quant-picks-body');
+            if (!tbody) return;
+
+            const data = quantPicksCache[activeQuantStrategy] || [];
+            if (data && data.length > 0) {
+                // Sort by score descending
+                const sorted = [...data].sort((a, b) => (b.score || 0) - (a.score || 0));
+                const top5 = sorted.slice(0, 5);
+
+                tbody.innerHTML = top5.map((item, idx) => {
+                    const cleanSym = item.symbol.replace('.NS', '');
+                    let compName = item.name || '';
+                    compName = compName.replace(/(Limited|Ltd\.|\(India\)|\(I\))/gi, '').trim();
+
+                    const scoreVal = parseInt(item.score || 0);
+                    let scoreColor = '#ef4444';
+                    if (scoreVal >= 70) {
+                        scoreColor = '#10b981';
+                    } else if (scoreVal >= 50) {
+                        scoreColor = '#f59e0b';
+                    }
+
+                    const actionStr = (item.action || 'HOLD').toUpperCase();
+                    let signalText = 'HOLD';
+                    let badgeClass = 'hold';
+
+                    if (actionStr.includes('BUY')) {
+                        signalText = 'BUY';
+                        badgeClass = 'buy';
+                    } else if (actionStr.includes('SELL') || actionStr.includes('UNDERPERFORM') || actionStr.includes('RED')) {
+                        signalText = 'SELL';
+                        badgeClass = 'sell';
+                    }
+
+                    return `
+                        <tr class="quant-pick-row" data-symbol="${cleanSym}" style="border-bottom: 1px solid var(--border-glass); height: 38px;">
+                            <td style="padding: 4px 8px; color: var(--text-secondary);">${idx + 1}</td>
+                            <td style="padding: 4px 8px; font-weight: 700; color: var(--text-primary);">${cleanSym}</td>
+                            <td style="padding: 4px 8px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${item.name || ''}">${compName}</td>
+                            <td style="padding: 4px 8px; text-align: center; font-weight: 700; color: ${scoreColor}; font-family: 'Inter', monospace;">${scoreVal}</td>
+                            <td style="padding: 4px 8px; text-align: center;">
+                                <span class="signal-badge ${badgeClass}">${signalText}</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                tbody.querySelectorAll('.quant-pick-row').forEach(row => {
+                    row.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const symbol = row.getAttribute('data-symbol');
+                        const searchInput = document.getElementById('analyzer-search-input');
+                        const searchBtn = document.getElementById('analyzer-search-btn');
+                        if (searchInput) {
+                            searchInput.value = symbol;
+                            searchInput.focus();
+                            if (searchBtn) searchBtn.click();
+                        }
+                    });
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="5" class="recent-research-empty" style="padding: 20px 0; text-align: center;">No constituents qualified.</td></tr>`;
+            }
+        };
+
+        const loadQuantTopPicks = async () => {
+            const tbody = document.getElementById('desktop-quant-picks-body');
+            if (!tbody) return;
+
+            // Wire Tab Selector Buttons once
+            const tabs = document.querySelectorAll('.quant-strategy-tab');
+            tabs.forEach(tab => {
+                if (!tab.dataset.wired) {
+                    tab.dataset.wired = "true";
+                    tab.addEventListener('click', () => {
+                        tabs.forEach(t => {
+                            t.classList.remove('active');
+                            t.style.background = 'transparent';
+                            t.style.borderColor = 'transparent';
+                            t.style.color = 'var(--text-secondary)';
+                        });
+                        tab.classList.add('active');
+                        tab.style.background = 'rgba(255, 255, 255, 0.08)';
+                        tab.style.borderColor = 'var(--border-glass)';
+                        tab.style.color = 'var(--text-primary)';
+
+                        activeQuantStrategy = tab.getAttribute('data-strategy');
+                        renderQuantTopPicksList();
+                    });
+                }
+            });
+
+            try {
+                tbody.innerHTML = `<tr><td colspan="5" class="recent-research-empty" style="padding: 20px 0; text-align: center;">Scanning market for quant top picks...</td></tr>`;
+
+                // Fetch Hybrid, Bottom-Up, and Top-Down screeners in parallel across whole universe (all cap)
+                const [resHybrid, resBU, resTD] = await Promise.all([
+                    fetch(apiBaseUrl + '/api/discover?strategy=hybrid&universe=all'),
+                    fetch(apiBaseUrl + '/api/discover?strategy=bottom_up&universe=all'),
+                    fetch(apiBaseUrl + '/api/discover?strategy=top_down&universe=all')
+                ]);
+
+                if (resHybrid.ok) {
+                    const dataHybrid = await resHybrid.json();
+                    quantPicksCache.hybrid = Array.isArray(dataHybrid) ? dataHybrid : [];
+                }
+                if (resBU.ok) {
+                    const dataBU = await resBU.json();
+                    quantPicksCache.bottom_up = Array.isArray(dataBU) ? dataBU : [];
+                }
+                if (resTD.ok) {
+                    const dataTD = await resTD.json();
+                    quantPicksCache.top_down = Array.isArray(dataTD) ? dataTD : [];
+                }
+
+                renderQuantTopPicksList();
+            } catch (err) {
+                console.error("Desktop Quant Top Picks loading error:", err);
+                tbody.innerHTML = `<tr><td colspan="5" class="recent-research-empty" style="padding: 20px 0; text-align: center; color: var(--neon-red);">Failed to load Quant Top Picks.</td></tr>`;
+            }
+        };
+
+        // Wire Card Header View All Buttons
+        const moversViewAll = document.getElementById('desktop-movers-view-all-btn');
+        if (moversViewAll) {
+            moversViewAll.onclick = (e) => {
+                e.stopPropagation();
+                if (window.switchTab) window.switchTab('movers');
+            };
+        }
+        const newsViewAll = document.getElementById('desktop-news-view-all-btn');
+        if (newsViewAll) {
+            newsViewAll.onclick = (e) => {
+                e.stopPropagation();
+                if (window.switchTab) window.switchTab('market-news');
+            };
+        }
+        const quantViewAll = document.getElementById('desktop-quant-picks-view-all-btn');
+        if (quantViewAll) {
+            quantViewAll.onclick = (e) => {
+                e.stopPropagation();
+                if (window.switchTab) window.switchTab('screener');
+            };
+        }
+
         // Run cockpit routines
         loadNews();
         loadMarketMovers();
         loadSectorHeatmap();
+        loadUpcomingEvents();
+        loadWatchlistStrip();
+        loadQuantTopPicks();
     };
 
     // Initialize all visual modernization layers safely

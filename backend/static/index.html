@@ -1514,6 +1514,30 @@
                         <div class="desktop-cockpit-grid">
                             <!-- Left Column: Heatmap, Today's Top Gainers & Losers -->
                             <div class="desktop-cmd-left">
+                                <!-- Nifty 500 Market Breadth Card -->
+                                <div class="desktop-cmd-card" style="margin-bottom: 24px;">
+                                    <div class="desktop-cmd-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                                        <div class="header-left">
+                                            <span class="header-icon">📊</span>
+                                            <span class="header-title">Nifty 500 Market Breadth</span>
+                                        </div>
+                                        <div class="header-right">
+                                            <span id="market-breadth-ratio-badge" class="badge-status-text" style="font-weight: 700; color: var(--color-primary, #3b82f6);">ADR: --</span>
+                                        </div>
+                                    </div>
+                                    <div class="market-breadth-container" style="padding: 4px 0;">
+                                        <div class="market-breadth-bar-wrapper" style="height: 12px; width: 100%; background: rgba(255,255,255,0.05); border-radius: 6px; overflow: hidden; display: flex; position: relative;">
+                                            <div id="market-breadth-advances-bar" style="height: 100%; width: 50%; background: linear-gradient(90deg, #047857, #10b981); transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);"></div>
+                                            <div id="market-breadth-declines-bar" style="height: 100%; width: 50%; background: linear-gradient(90deg, #ef4444, #b91c1c); transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);"></div>
+                                        </div>
+                                        <div class="market-breadth-labels" style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; font-weight: 600;">
+                                            <span style="color: #10b981; display: flex; align-items: center; gap: 4px;">🟢 <span id="market-breadth-advances-text">-- Advances</span></span>
+                                            <span style="color: var(--text-secondary);" id="market-breadth-neutral-text">-- Neutral</span>
+                                            <span style="color: #ef4444; display: flex; align-items: center; gap: 4px;"><span id="market-breadth-declines-text">-- Declines</span> 🔴</span>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <!-- Sector Heatmap Card -->
                                 <div class="desktop-cmd-card">
                                     <div class="desktop-cmd-card-header">
@@ -1538,7 +1562,8 @@
                                             <span class="header-icon">📈</span>
                                             <span class="header-title">Today's Market Leaders (Nifty 500)</span>
                                         </div>
-                                        <div class="header-right">
+                                        <div class="header-right" style="display: flex; align-items: center; gap: 8px;">
+                                            <button id="desktop-movers-view-all-btn" class="no-print" style="background: rgba(255,255,255,0.03); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s; margin-right: 4px;">View All</button>
                                             <span class="badge-status-dot green pulse"></span>
                                             <span class="badge-status-text">LIVE VALUES</span>
                                         </div>
@@ -1568,6 +1593,43 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Quant Top Picks Card -->
+                                <div class="desktop-cmd-card" style="margin-top: 24px; margin-bottom: 0;">
+                                    <div class="desktop-cmd-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                                        <div class="header-left">
+                                            <span class="header-icon">🔬</span>
+                                            <span class="header-title" style="font-size: 14px; font-weight: 700; font-family: var(--font-heading);">Quant Top Picks</span>
+                                        </div>
+                                        <div class="header-right">
+                                            <button id="desktop-quant-picks-view-all-btn" class="no-print" style="background: rgba(255,255,255,0.03); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">View All</button>
+                                        </div>
+                                    </div>
+                                    <div class="quant-strategy-selector-container" style="display: flex; gap: 8px; padding: 6px 16px 12px 16px; border-bottom: 1px solid var(--border-glass);">
+                                         <button class="quant-strategy-tab active" data-strategy="hybrid" style="background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Hybrid</button>
+                                         <button class="quant-strategy-tab" data-strategy="bottom_up" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Bottom-Up</button>
+                                         <button class="quant-strategy-tab" data-strategy="top_down" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Top-Down</button>
+                                    </div>
+                                    <div class="quant-top-picks-container" style="padding: 4px 0;">
+                                        <!-- Mock-Style Table -->
+                                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11.5px;">
+                                            <thead>
+                                                <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-secondary); font-weight: 700; font-size: 10px; text-transform: uppercase; height: 30px;">
+                                                    <th style="width: 30px; padding: 4px 8px;">#</th>
+                                                    <th style="width: 120px; padding: 4px 8px;">Ticker</th>
+                                                    <th style="padding: 4px 8px;">Company</th>
+                                                    <th style="width: 60px; padding: 4px 8px; text-align: center;">Score</th>
+                                                    <th style="width: 80px; padding: 4px 8px; text-align: center;">Signal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="desktop-quant-picks-body">
+                                                <tr>
+                                                    <td colspan="5" class="recent-research-empty" style="padding: 20px 0; text-align: center;">Scanning market for quant top picks...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Right Column: Bloomberg News stream -->
@@ -1579,7 +1641,8 @@
                                             <span class="header-icon">📰</span>
                                             <span class="header-title">Bloomberg Terminal Live News Stream</span>
                                         </div>
-                                        <div class="header-right">
+                                        <div class="header-right" style="display: flex; align-items: center; gap: 8px;">
+                                            <button id="desktop-news-view-all-btn" class="no-print" style="background: rgba(255,255,255,0.03); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s; margin-right: 4px;">View All</button>
                                             <span class="badge-status-dot green pulse"></span>
                                             <span class="badge-status-text">STREAMING</span>
                                         </div>
@@ -1588,6 +1651,48 @@
                                         <div class="news-placeholder-item">Aggregating market news from institutional feeds...</div>
                                     </div>
                                 </div>
+
+                                <!-- Watchlist Quick-Quote Card -->
+                                <div class="desktop-cmd-card" style="margin-top: 24px; margin-bottom: 0;">
+                                    <div class="desktop-cmd-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                                        <div class="header-left">
+                                            <span class="header-icon">⭐</span>
+                                            <span class="header-title">Watchlist Quick-Quote</span>
+                                        </div>
+                                        <div class="header-right">
+                                            <select id="desktop-watchlist-selector" style="background: rgba(255,255,255,0.03); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 2px 6px; font-size: 11px; border-radius: 4px; outline: none; font-family: 'Outfit', sans-serif; cursor: pointer;">
+                                                <option value="" disabled selected>Select Watchlist</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="watchlist-strip-container">
+                                        <!-- Sort Headers -->
+                                        <div class="watchlist-strip-headers" style="display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; color: var(--text-secondary); border-bottom: 1px solid var(--border-glass); padding-bottom: 6px; margin-bottom: 6px; cursor: pointer; user-select: none;">
+                                            <span id="sort-wl-symbol" style="flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 4px;">TICKER <span class="sort-icon"></span></span>
+                                            <span id="sort-wl-price" style="width: 80px; text-align: right;">PRICE <span class="sort-icon"></span></span>
+                                            <span id="sort-wl-change" style="width: 80px; text-align: right;">CHG% <span class="sort-icon"></span></span>
+                                        </div>
+                                        <div id="desktop-watchlist-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 4px;">
+                                            <div class="recent-research-empty" style="font-size: 11px;">Select a watchlist to display quotes.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upcoming Corporate Events -->
+                        <div class="desktop-cmd-card" style="margin-top: 24px; margin-bottom: 0;">
+                            <div class="desktop-cmd-card-header">
+                                <div class="header-left">
+                                    <span class="header-icon">📅</span>
+                                    <span class="header-title">Upcoming Corporate Events</span>
+                                </div>
+                                <div class="header-right">
+                                    <button id="desktop-events-view-all-btn" class="no-print" style="background: rgba(255,255,255,0.03); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">View All</button>
+                                </div>
+                            </div>
+                            <div class="desktop-events-list" id="desktop-events-container">
+                                <div class="recent-research-empty">Fetching upcoming corporate events...</div>
                             </div>
                         </div>
                     </div>
