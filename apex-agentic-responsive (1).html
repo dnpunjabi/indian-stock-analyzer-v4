@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>APEX AGENTIC — Enterprise Equity Research Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   TOKEN SYSTEM
+   --ink       #0B0E14  primary surface
+   --surface   #111620  card / panel
+   --surface2  #151C2C  command bar
+   --border    #1E2736  dividers
+   --muted     #253047  inactive / track
+   --text-dim  #6B7A99  secondary labels
+   --text-mid  #9BAAC4  tertiary
+   --text-hi   #E4EAF6  primary text
+   --gain      #00C896  positive / live
+   --loss      #F05252  negative
+   --accent    #3D7EFF  interactive / CTA
+   --amber     #F5A623  alert / watchlist
+   --pulse     #B06FFF  AI / agentic
+═══════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink:       #0B0E14;
+  --surface:   #111620;
+  --surface2:  #151C2C;
+  --border:    #1E2736;
+  --muted:     #253047;
+  --text-dim:  #6B7A99;
+  --text-mid:  #9BAAC4;
+  --text-hi:   #E4EAF6;
+  --gain:      #00C896;
+  --loss:      #F05252;
+  --accent:    #3D7EFF;
+  --amber:     #F5A623;
+  --pulse:     #B06FFF;
+  --font-ui:   'Inter', sans-serif;
+  --font-data: 'JetBrains Mono', monospace;
+  --font-head: 'Space Grotesk', sans-serif;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+  --topbar-h: 52px;
+  --sidebar-w: 220px;
+  --bottomnav-h: 56px;
+}
+
+html { font-size: 14px; }
+body {
+  background: var(--ink);
+  color: var(--text-hi);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(0.7)} }
+@keyframes slide-in-left { from{transform:translateX(-100%)} to{transform:translateX(0)} }
+@keyframes fade-in { from{opacity:0} to{opacity:1} }
+
+/* ══════════════════════════════════════════════
+   DESKTOP LAYOUT  (≥ 768px)
+══════════════════════════════════════════════ */
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr;
+  height: 100vh;
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  grid-column: 1 / -1;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  position: sticky; top: 0; z-index: 200;
+  height: var(--topbar-h);
+}
+
+.logo-zone {
+  width: var(--sidebar-w); min-width: var(--sidebar-w);
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 18px;
+  border-right: 1px solid var(--border);
+  height: 100%; flex-shrink: 0;
+}
+.logo-icon {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--accent), var(--pulse));
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff;
+  font-family: var(--font-head); flex-shrink: 0;
+}
+.logo-text { font-family: var(--font-head); font-size: 13px; font-weight: 700; color: var(--text-hi); line-height: 1.1; }
+.logo-sub  { font-size: 9px; font-weight: 500; color: var(--pulse); letter-spacing: 0.08em; text-transform: uppercase; }
+
+/* hamburger — hidden on desktop */
+.hamburger {
+  display: none;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--text-mid); padding: 6px; margin-left: 4px;
+  border-radius: var(--r-sm);
+}
+.hamburger:active { background: var(--muted); }
+
+.market-ticker {
+  display: flex; align-items: center;
+  flex: 1; height: 100%;
+  overflow-x: auto; overflow-y: hidden;
+  border-right: 1px solid var(--border);
+  scrollbar-width: none;
+}
+.market-ticker::-webkit-scrollbar { display: none; }
+.ticker-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 16px; height: 100%;
+  border-right: 1px solid var(--border);
+  white-space: nowrap; flex-shrink: 0;
+}
+.ticker-item:last-child { border-right: none; }
+.ticker-label { font-size: 10px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; }
+.ticker-val   { font-family: var(--font-data); font-size: 13px; font-weight: 600; color: var(--text-hi); }
+.ticker-chg   { font-family: var(--font-data); font-size: 11px; font-weight: 500; }
+.gain { color: var(--gain); } .loss { color: var(--loss); }
+
+.live-badge {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 10px;
+  background: rgba(0,200,150,0.1);
+  border: 1px solid rgba(0,200,150,0.3);
+  border-radius: 20px;
+  font-size: 10px; font-weight: 600; color: var(--gain);
+  letter-spacing: 0.05em; text-transform: uppercase;
+  margin: 0 10px; white-space: nowrap; flex-shrink: 0;
+}
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gain); animation: pulse-dot 1.4s ease-in-out infinite; }
+
+.topbar-actions { display: flex; align-items: center; gap: 4px; padding: 0 12px; flex-shrink: 0; }
+.icon-btn {
+  width: 32px; height: 32px; border-radius: var(--r-sm);
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-dim); display: flex; align-items: center; justify-content: center;
+  font-size: 15px; transition: background 0.15s, color 0.15s; position: relative;
+}
+.icon-btn:hover { background: var(--muted); color: var(--text-hi); }
+.icon-btn.alert-active { color: var(--amber); }
+.badge {
+  position: absolute; top: 4px; right: 4px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--amber);
+  border: 1.5px solid var(--surface);
+}
+.user-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--pulse));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+  cursor: pointer; font-family: var(--font-head); flex-shrink: 0;
+}
+.ai-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(176,111,255,0.1); border: 1px solid rgba(176,111,255,0.3);
+  border-radius: 20px; padding: 3px 9px;
+  font-size: 10px; font-weight: 600; color: var(--pulse);
+  white-space: nowrap; flex-shrink: 0;
+}
+.ai-pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--pulse); animation: pulse-dot 1.8s ease-in-out infinite; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 10px 0 20px;
+}
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 10px; }
+
+/* mobile drawer overlay */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 299;
+  background: rgba(0,0,0,0.6);
+  animation: fade-in 0.2s ease;
+}
+
+.nav-section-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-dim); padding: 14px 18px 5px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 18px;
+  cursor: pointer; border: none; background: transparent; text-align: left; width: 100%;
+  font-family: var(--font-ui); font-size: 12px; font-weight: 500; color: var(--text-mid);
+  transition: background 0.12s, color 0.12s;
+  border-left: 2px solid transparent;
+}
+.nav-item:hover { background: rgba(61,126,255,0.06); color: var(--text-hi); }
+.nav-item.active {
+  background: rgba(61,126,255,0.1); color: var(--accent);
+  border-left-color: var(--accent); font-weight: 600;
+}
+.nav-item svg { flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto;
+  background: var(--amber); color: #000;
+  font-size: 9px; font-weight: 700;
+  border-radius: 10px; padding: 2px 6px;
+}
+.nav-badge.new { background: var(--pulse); color: #fff; }
+
+.sidebar-profile {
+  margin-top: auto; padding: 14px 18px 0;
+  border-top: 1px solid var(--border);
+}
+.profile-label { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+.profile-select {
+  background: var(--muted); border: 1px solid var(--border); color: var(--text-hi);
+  font-family: var(--font-ui); font-size: 11px; border-radius: var(--r-sm);
+  padding: 5px 8px; width: 100%; cursor: pointer; margin-bottom: 8px; appearance: none;
+}
+
+/* ── MAIN ── */
+.main {
+  overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column;
+  background: var(--ink);
+  padding-bottom: 26px; /* status bar */
+}
+.main::-webkit-scrollbar { width: 4px; }
+.main::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 10px; }
+
+/* ── COMMAND BAR ── */
+.command-bar {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0;
+}
+.search-wrap { flex: 1; position: relative; display: flex; align-items: center; min-width: 0; }
+.search-icon { position: absolute; left: 12px; color: var(--text-dim); font-size: 13px; pointer-events: none; }
+.search-input {
+  width: 100%; background: var(--muted); border: 1px solid var(--border);
+  color: var(--text-hi); font-family: var(--font-ui); font-size: 13px;
+  border-radius: var(--r-md); padding: 9px 70px 9px 36px;
+  outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.search-input::placeholder { color: var(--text-dim); }
+.search-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(61,126,255,0.15); }
+.kbd { font-family: var(--font-data); font-size: 10px; color: var(--text-dim); background: var(--border); border-radius: 4px; padding: 2px 6px; position: absolute; right: 10px; }
+.btn-analyze {
+  display: flex; align-items: center; gap: 7px;
+  background: linear-gradient(135deg, var(--accent), #6B5FFF);
+  border: none; border-radius: var(--r-md); padding: 9px 18px;
+  font-family: var(--font-ui); font-size: 12px; font-weight: 600; color: #fff;
+  cursor: pointer; white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(61,126,255,0.3);
+  transition: box-shadow 0.15s, transform 0.1s; flex-shrink: 0;
+}
+.btn-analyze:hover { box-shadow: 0 6px 24px rgba(61,126,255,0.45); transform: translateY(-1px); }
+.btn-outline {
+  display: flex; align-items: center; gap: 7px;
+  background: transparent; border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 9px 14px; font-family: var(--font-ui); font-size: 12px; font-weight: 500;
+  color: var(--text-mid); cursor: pointer; white-space: nowrap; flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── PAGE BODY ── */
+.page-body { padding: 18px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+
+/* ── INTEL STRIP (KPI CARDS) ── */
+.intel-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.intel-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 14px 16px;
+  position: relative; overflow: hidden; transition: border-color 0.2s;
+}
+.intel-card:hover { border-color: var(--accent); }
+.intel-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--card-accent, var(--accent));
+}
+.intel-card-label { font-size: 10px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.intel-card-val   { font-family: var(--font-data); font-size: 20px; font-weight: 600; color: var(--text-hi); margin-bottom: 2px; }
+.intel-card-chg   { font-family: var(--font-data); font-size: 11px; font-weight: 500; }
+.intel-card-sub   { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+
+/* ── TWO-COL ── */
+.two-col { display: grid; grid-template-columns: 1fr 340px; gap: 18px; align-items: start; }
+
+/* ── PANEL ── */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+}
+.panel-title {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-head); font-size: 13px; font-weight: 600; color: var(--text-hi);
+}
+.panel-title-icon { font-size: 14px; }
+.panel-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.chip {
+  font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 20px;
+  border: 1px solid var(--border); color: var(--text-mid); background: transparent;
+  cursor: pointer; transition: all 0.12s;
+}
+.chip.active, .chip:hover { border-color: var(--accent); color: var(--accent); background: rgba(61,126,255,0.08); }
+
+/* ── HEATMAP ── */
+.heatmap-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 12px; }
+.hm-cell {
+  border-radius: var(--r-sm); padding: 11px 9px;
+  display: flex; flex-direction: column; gap: 3px;
+  cursor: pointer; transition: filter 0.15s;
+}
+.hm-cell:hover { filter: brightness(1.2); }
+.hm-name { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.9); }
+.hm-chg  { font-family: var(--font-data); font-size: 13px; font-weight: 700; color: #fff; }
+.hm-vol  { font-size: 9px; color: rgba(255,255,255,0.6); }
+.hm-g3 { background: #0D5C40; } .hm-g2 { background: #0A7A52; }
+.hm-g1 { background: #0F9E6A; } .hm-g0 { background: #12C47E; }
+.hm-l1 { background: #7A1414; } .hm-l2 { background: #A31A1A; }
+.hm-n  { background: #1E2736; }
+.hm-span2 { grid-column: span 2; }
+
+/* ── MOVERS ── */
+.movers-cols { display: grid; grid-template-columns: 1fr 1fr; }
+.movers-section { padding: 12px; }
+.movers-section + .movers-section { border-left: 1px solid var(--border); }
+.movers-head { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px; }
+.mover-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 5px; border-radius: var(--r-sm);
+  transition: background 0.12s; cursor: pointer;
+}
+.mover-row:hover { background: var(--muted); }
+.mover-logo {
+  width: 28px; height: 28px; border-radius: var(--r-sm);
+  background: var(--muted); display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: var(--text-mid); flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+.mover-info { flex: 1; min-width: 0; }
+.mover-ticker { font-size: 11px; font-weight: 700; color: var(--text-hi); }
+.mover-name   { font-size: 10px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mover-nums   { text-align: right; flex-shrink: 0; }
+.mover-price  { font-family: var(--font-data); font-size: 11px; font-weight: 600; color: var(--text-hi); }
+.mover-pct    { font-family: var(--font-data); font-size: 10px; font-weight: 600; }
+
+/* ── AI SIGNAL FEED ── */
+.signal-list { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.signal-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--r-md); cursor: pointer; transition: border-color 0.15s;
+}
+.signal-item:hover { border-color: var(--pulse); }
+.signal-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.sig-buy   { background: var(--gain);   box-shadow: 0 0 6px var(--gain); }
+.sig-watch { background: var(--amber);  box-shadow: 0 0 6px var(--amber); }
+.sig-alert { background: var(--loss);   box-shadow: 0 0 6px var(--loss); }
+.signal-body { flex: 1; }
+.signal-ticker-row { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.signal-ticker { font-size: 12px; font-weight: 700; color: var(--text-hi); }
+.signal-type { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 4px; padding: 2px 6px; }
+.st-buy   { background: rgba(0,200,150,0.12);  color: var(--gain); }
+.st-watch { background: rgba(245,166,35,0.12); color: var(--amber); }
+.st-alert { background: rgba(240,82,82,0.12);  color: var(--loss); }
+.signal-reason { font-size: 10px; color: var(--text-dim); line-height: 1.45; }
+.signal-meta   { font-size: 9px;  color: var(--text-dim); margin-top: 4px; font-family: var(--font-data); }
+
+/* ── WATCHLIST ── */
+.watchlist { padding: 4px 12px 10px; }
+.wl-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 5px; border-radius: var(--r-sm); cursor: pointer;
+  border-bottom: 1px solid rgba(30,39,54,0.6); transition: background 0.12s;
+}
+.wl-item:last-child { border-bottom: none; }
+.wl-item:hover { background: var(--muted); }
+.wl-left  { display: flex; flex-direction: column; gap: 2px; }
+.wl-ticker { font-size: 12px; font-weight: 700; color: var(--text-hi); }
+.wl-name   { font-size: 10px; color: var(--text-dim); }
+.wl-right  { text-align: right; }
+.wl-price  { font-family: var(--font-data); font-size: 12px; font-weight: 600; color: var(--text-hi); }
+.wl-chg    { font-family: var(--font-data); font-size: 10px; font-weight: 600; }
+
+/* ── SCREENER ── */
+.screener-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px; border-bottom: 1px solid var(--border);
+  font-size: 11px; cursor: pointer; transition: background 0.12s;
+}
+.screener-row:hover { background: rgba(61,126,255,0.04); }
+.screener-row:last-child { border-bottom: none; }
+.sr-rank   { font-family: var(--font-data); color: var(--text-dim); width: 16px; flex-shrink: 0; }
+.sr-ticker { font-weight: 700; color: var(--text-hi); width: 80px; flex-shrink: 0; }
+.sr-name   { color: var(--text-dim); flex: 1; }
+.sr-score  { font-family: var(--font-data); font-weight: 700; font-size: 12px; width: 32px; text-align: right; flex-shrink: 0; }
+.sr-signal {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 7px; border-radius: 4px; min-width: 42px; text-align: center; flex-shrink: 0;
+}
+.s-buy  { background: rgba(0,200,150,0.12);  color: var(--gain); }
+.s-hold { background: rgba(245,166,35,0.12); color: var(--amber); }
+
+/* ── EVENTS ── */
+.event-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  font-size: 11px; transition: background 0.12s; cursor: pointer;
+}
+.event-row:hover { background: rgba(61,126,255,0.04); }
+.event-row:last-child { border-bottom: none; }
+.event-date  { font-family: var(--font-data); color: var(--text-dim); min-width: 44px; font-size: 10px; margin-top: 1px; flex-shrink: 0; }
+.event-body  { flex: 1; }
+.event-title { color: var(--text-hi); font-weight: 600; margin-bottom: 2px; }
+.event-desc  { color: var(--text-dim); font-size: 10px; }
+.event-tag   { font-size: 9px; font-weight: 700; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; flex-shrink: 0; }
+.et-earnings { background: rgba(176,111,255,0.12); color: var(--pulse); }
+.et-dividend { background: rgba(245,166,35,0.12);  color: var(--amber); }
+.et-results  { background: rgba(61,126,255,0.12);   color: var(--accent); }
+
+/* ── STATUS BAR (desktop only) ── */
+.status-bar {
+  position: fixed; bottom: 0; left: var(--sidebar-w); right: 0;
+  background: var(--surface); border-top: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 18px; height: 26px; z-index: 100;
+  overflow: hidden;
+}
+.status-item {
+  font-family: var(--font-data); font-size: 10px; color: var(--text-dim);
+  padding: 0 10px; border-right: 1px solid var(--border); white-space: nowrap;
+}
+.status-item:last-child { border-right: none; margin-left: auto; }
+
+/* ── BOTTOM NAV (mobile only) ── */
+.bottom-nav { display: none; }
+
+/* ── MOBILE MARKET BANNER ── */
+.mobile-market-banner { display: none; }
+
+/* ══════════════════════════════════════════════
+   TABLET  (< 1100px)
+══════════════════════════════════════════════ */
+@media (max-width: 1100px) {
+  .intel-strip { grid-template-columns: repeat(3, 1fr); }
+  /* hide last 2 KPI cards on tablet */
+  .intel-card:nth-child(4),
+  .intel-card:nth-child(5) { display: none; }
+  .two-col { grid-template-columns: 1fr; }
+  .btn-outline { display: none; }
+  .kbd { display: none; }
+}
+
+@media (max-width: 900px) {
+  :root { --sidebar-w: 200px; }
+  .intel-strip { grid-template-columns: repeat(2, 1fr); }
+  .intel-card:nth-child(3),
+  .intel-card:nth-child(4),
+  .intel-card:nth-child(5) { display: none; }
+  .ticker-item:nth-child(n+4) { display: none; }
+}
+
+/* ══════════════════════════════════════════════
+   MOBILE  (< 768px)  — FULL MOBILE-FIRST LAYOUT
+══════════════════════════════════════════════ */
+@media (max-width: 767px) {
+
+  html { font-size: 13px; }
+
+  /* Switch to mobile grid: no sidebar column */
+  .shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--topbar-h) 1fr;
+    height: 100vh;
+  }
+
+  /* ── TOPBAR mobile ── */
+  .topbar { grid-column: 1; }
+  .logo-zone {
+    width: auto; min-width: unset;
+    border-right: none;
+    padding: 0 12px;
+  }
+  .hamburger { display: flex; }
+  .market-ticker { display: none; }        /* moved to banner below */
+  .live-badge { margin: 0 6px; }
+  .ai-pill { display: none; }              /* too cramped on mobile */
+  .icon-btn { width: 28px; height: 28px; font-size: 14px; }
+  .topbar-actions { padding: 0 8px; gap: 2px; }
+  .user-avatar { width: 28px; height: 28px; font-size: 10px; }
+
+  /* ── SIDEBAR as slide-over drawer on mobile ── */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 260px; z-index: 300;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    padding-top: calc(var(--topbar-h) + 8px);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+    animation: slide-in-left 0.25s ease;
+  }
+  .sidebar-overlay.open { display: block; }
+
+  /* ── MAIN area takes full column ── */
+  .main {
+    grid-column: 1;
+    padding-bottom: calc(var(--bottomnav-h) + env(safe-area-inset-bottom));
+  }
+
+  /* ── MOBILE MARKET BANNER (scrolling ticker) ── */
+  .mobile-market-banner {
+    display: flex; align-items: center;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    padding: 7px 0; overflow-x: auto;
+    scrollbar-width: none; gap: 0;
+  }
+  .mobile-market-banner::-webkit-scrollbar { display: none; }
+  .mb-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 0 14px; border-right: 1px solid var(--border);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .mb-item:last-child { border-right: none; }
+  .mb-label { font-size: 9px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .mb-val   { font-family: var(--font-data); font-size: 12px; font-weight: 600; color: var(--text-hi); }
+  .mb-chg   { font-family: var(--font-data); font-size: 10px; font-weight: 500; }
+
+  /* ── COMMAND BAR mobile ── */
+  .command-bar { padding: 10px 14px; gap: 8px; }
+  .search-input { font-size: 12px; padding: 8px 10px 8px 34px; }
+  .btn-analyze { padding: 8px 14px; font-size: 11px; gap: 5px; }
+
+  /* ── PAGE BODY mobile ── */
+  .page-body { padding: 12px 12px 30px; gap: 14px; }
+
+  /* ── KPI STRIP: 2-col on mobile ── */
+  .intel-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .intel-card { padding: 11px 12px; }
+  .intel-card:nth-child(4) { display: block; }
+  .intel-card:nth-child(5) { display: none; } /* hide VIX on mobile */
+  .intel-card-val  { font-size: 16px; }
+  .intel-card-chg  { font-size: 10px; }
+  .intel-card-sub  { display: none; }
+
+  /* ── TWO-COL → single col on mobile ── */
+  .two-col { grid-template-columns: 1fr; gap: 14px; }
+
+  /* ── HEATMAP: 3-col on mobile ── */
+  .heatmap-grid { grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 10px; }
+  .hm-span2 { grid-column: span 1; } /* remove span on mobile */
+  .hm-cell  { padding: 9px 7px; }
+  .hm-chg   { font-size: 12px; }
+  .hm-vol   { display: none; }
+
+  /* ── MOVERS: stack on mobile ── */
+  .movers-cols { grid-template-columns: 1fr; }
+  .movers-section + .movers-section { border-left: none; border-top: 1px solid var(--border); }
+
+  /* ── SCREENER: hide company name col on mobile ── */
+  .sr-name { display: none; }
+  .sr-ticker { width: auto; flex: 1; }
+
+  /* ── STATUS BAR: hidden on mobile (replaced by bottom nav) ── */
+  .status-bar { display: none; }
+
+  /* ── BOTTOM NAV ── */
+  .bottom-nav {
+    display: flex;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: var(--bottomnav-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 200;
+  }
+  .bn-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; cursor: pointer; border: none; background: transparent;
+    color: var(--text-dim); font-family: var(--font-ui); font-size: 10px; font-weight: 500;
+    transition: color 0.15s; padding-bottom: 2px;
+  }
+  .bn-item.active { color: var(--accent); }
+  .bn-item svg { width: 20px; height: 20px; }
+  .bn-dot { position: relative; }
+  .bn-dot::after {
+    content: ''; position: absolute; top: -2px; right: -4px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--amber); border: 1.5px solid var(--surface);
+  }
+
+  /* ── PANEL adjustments ── */
+  .panel-header { padding: 11px 13px; }
+  .panel-title  { font-size: 12px; }
+
+  /* ── EVENT ROWS on mobile ── */
+  .event-row  { padding: 10px 13px; }
+  .event-date { min-width: 38px; }
+
+  /* ── SIGNAL ITEMS on mobile ── */
+  .signal-list { padding: 8px 10px; gap: 6px; }
+  .signal-item { padding: 9px 10px; }
+}
+
+/* Extra-small (< 375px) */
+@media (max-width: 374px) {
+  .intel-strip { grid-template-columns: 1fr 1fr; }
+  .intel-card-val { font-size: 15px; }
+  .page-body { padding: 10px 10px 28px; }
+}
+
+/* ── LIVE CATALYST NEWS ── */
+.news-filter-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  overflow-x: auto; scrollbar-width: none;
+}
+.news-filter-bar::-webkit-scrollbar { display: none; }
+.news-chip {
+  font-size: 10px; font-weight: 600; padding: 4px 11px; border-radius: 20px;
+  border: 1px solid var(--border); color: var(--text-mid); background: transparent;
+  cursor: pointer; transition: all 0.12s; white-space: nowrap; flex-shrink: 0;
+}
+.news-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(61,126,255,0.08); }
+.news-chip:hover  { border-color: var(--accent); color: var(--accent); }
+
+.news-item {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background 0.12s;
+  position: relative;
+}
+.news-item:hover { background: rgba(61,126,255,0.03); }
+.news-item:last-child { border-bottom: none; }
+
+/* left accent bar — colour encodes catalyst sentiment */
+.news-bar {
+  width: 3px; flex-shrink: 0;
+  border-radius: 0;
+}
+.nb-bullish { background: var(--gain); }
+.nb-neutral { background: var(--accent); }
+.nb-bearish { background: var(--loss); }
+
+.news-body { padding: 13px 16px; flex: 1; min-width: 0; }
+
+.news-meta {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px; flex-wrap: wrap;
+}
+.news-source {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--muted); color: var(--text-mid);
+  border-radius: 4px; padding: 2px 7px; white-space: nowrap;
+}
+.news-source.et        { background: rgba(255,160,0,0.15);  color: #FFA000; }
+.news-source.livemint  { background: rgba(0,180,120,0.12);  color: #00B478; }
+.news-source.moneyctrl { background: rgba(61,126,255,0.12); color: var(--accent); }
+.news-source.bsindia   { background: rgba(176,111,255,0.12);color: var(--pulse); }
+.news-date { font-family: var(--font-data); font-size: 9px; color: var(--text-dim); }
+.news-catalyst-tag {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  padding: 2px 7px; border-radius: 4px; margin-left: auto; white-space: nowrap; flex-shrink: 0;
+}
+.nct-bullish { background: rgba(0,200,150,0.12);  color: var(--gain); }
+.nct-neutral { background: rgba(61,126,255,0.1);  color: var(--accent); }
+.nct-bearish { background: rgba(240,82,82,0.12);  color: var(--loss); }
+
+.news-headline {
+  font-size: 12px; font-weight: 600; color: var(--text-hi);
+  line-height: 1.5; margin-bottom: 8px;
+}
+
+.news-impact-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.impact-label {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--text-dim); white-space: nowrap;
+}
+.impact-track {
+  flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden;
+}
+.impact-fill { height: 100%; border-radius: 2px; }
+.if-high   { background: var(--gain); }
+.if-medium { background: var(--accent); }
+.if-low    { background: var(--text-dim); }
+.impact-score {
+  font-family: var(--font-data); font-size: 11px; font-weight: 700;
+  min-width: 24px; text-align: right;
+}
+.is-high   { color: var(--gain); }
+.is-medium { color: var(--accent); }
+.is-low    { color: var(--text-dim); }
+
+/* tickers mentioned in news */
+.news-tickers {
+  display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap;
+}
+.news-ticker-tag {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+  background: var(--muted); color: var(--text-mid);
+  border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px;
+  cursor: pointer; transition: all 0.12s;
+}
+.news-ticker-tag:hover { border-color: var(--accent); color: var(--accent); }
+
+/* full-width news panel below the two-col grid */
+.news-panel-wrap { /* full width */ }
+
+@media (max-width: 767px) {
+  .news-filter-bar { padding: 10px 12px; gap: 5px; }
+  .news-body { padding: 11px 13px; }
+  .news-headline { font-size: 12px; }
+  .impact-label { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR OVERLAY (mobile) ── -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<div class="shell">
+
+  <!-- ══ TOPBAR ══ -->
+  <header class="topbar">
+    <button class="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+
+    <div class="logo-zone">
+      <div class="logo-icon">A⚡</div>
+      <div>
+        <div class="logo-text">APEX AGENTIC</div>
+        <div class="logo-sub">Equities AI</div>
+      </div>
+    </div>
+
+    <!-- Desktop ticker -->
+    <div class="market-ticker">
+      <div class="ticker-item"><span class="ticker-label">Nifty 50</span><span class="ticker-val">24,853</span><span class="ticker-chg gain">▲ +0.38%</span></div>
+      <div class="ticker-item"><span class="ticker-label">Bank Nifty</span><span class="ticker-val">52,741</span><span class="ticker-chg gain">▲ +0.12%</span></div>
+      <div class="ticker-item"><span class="ticker-label">Nifty IT</span><span class="ticker-val">38,204</span><span class="ticker-chg gain">▲ +0.53%</span></div>
+      <div class="ticker-item"><span class="ticker-label">India VIX</span><span class="ticker-val">13.82</span><span class="ticker-chg loss">▼ −1.4%</span></div>
+      <div class="ticker-item"><span class="ticker-label">USDINR</span><span class="ticker-val">83.42</span><span class="ticker-chg gain">▲ +0.06%</span></div>
+    </div>
+
+    <div class="live-badge"><div class="live-dot"></div>LIVE · Angel One</div>
+
+    <div class="topbar-actions">
+      <div class="ai-pill"><div class="ai-pulse"></div>AI Active</div>
+      <button class="icon-btn alert-active">🔔<span class="badge"></span></button>
+      <button class="icon-btn">⚙️</button>
+      <div class="user-avatar">PD</div>
+    </div>
+  </header>
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="nav-section-label">Research</div>
+    <button class="nav-item active">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Equity Research Terminal
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Quant Screener &amp; Scanner
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Peer Benchmarking Arena
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg>
+      Index Universe Registry
+    </button>
+
+    <div class="nav-section-label">Market</div>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+      Today's Market Movers
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
+      Global News Feed
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Events Calendar
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Deals Sweep
+    </button>
+
+    <div class="nav-section-label">Tactical</div>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Swing Setup Scanner
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Rule Scanner
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      Sector Momentum Radar
+    </button>
+
+    <div class="nav-section-label">Portfolio</div>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Watchlist Registry
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Portfolio Optimisation
+    </button>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Alert Centre
+      <span class="nav-badge">1</span>
+    </button>
+
+    <div class="nav-section-label">Learn</div>
+    <button class="nav-item">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      Learning Academy
+      <span class="nav-badge new">New</span>
+    </button>
+
+    <div class="sidebar-profile">
+      <div class="profile-label">Investor Profile</div>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:5px;">Horizon</div>
+      <select class="profile-select"><option>Long-term (3+ years)</option><option>Medium-term</option></select>
+      <div style="font-size:10px;color:var(--text-dim);margin-bottom:5px;">Risk</div>
+      <select class="profile-select"><option>Moderate</option><option>Aggressive</option><option>Conservative</option></select>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <main class="main">
+
+    <!-- Mobile scrolling market banner -->
+    <div class="mobile-market-banner">
+      <div class="mb-item"><span class="mb-label">Nifty 50</span><span class="mb-val">24,853</span><span class="mb-chg gain">▲ +0.38%</span></div>
+      <div class="mb-item"><span class="mb-label">Bank Nifty</span><span class="mb-val">52,741</span><span class="mb-chg gain">▲ +0.12%</span></div>
+      <div class="mb-item"><span class="mb-label">Nifty IT</span><span class="mb-val">38,204</span><span class="mb-chg gain">▲ +0.53%</span></div>
+      <div class="mb-item"><span class="mb-label">VIX</span><span class="mb-val">13.82</span><span class="mb-chg loss">▼ −1.4%</span></div>
+      <div class="mb-item"><span class="mb-label">₹/$</span><span class="mb-val">83.42</span><span class="mb-chg gain">▲ +0.06%</span></div>
+      <div class="mb-item"><span class="mb-label">AI Signals</span><span class="mb-val" style="color:var(--pulse);">7 active</span></div>
+    </div>
+
+    <!-- COMMAND BAR -->
+    <div class="command-bar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" type="text" placeholder="Search equities — RELIANCE, TCS, DIXON…" />
+        <span class="kbd">⌘K</span>
+      </div>
+      <button class="btn-outline">＋ Watchlist</button>
+      <button class="btn-analyze">⚡ Analyse</button>
+    </div>
+
+    <div class="page-body">
+
+      <!-- KPI STRIP -->
+      <div class="intel-strip">
+        <div class="intel-card" style="--card-accent:#3D7EFF">
+          <div class="intel-card-label">Nifty 50</div>
+          <div class="intel-card-val">24,853</div>
+          <div class="intel-card-chg gain">▲ +94.5 pts (+0.38%)</div>
+          <div class="intel-card-sub">Prev close: 24,758</div>
+        </div>
+        <div class="intel-card" style="--card-accent:#00C896">
+          <div class="intel-card-label">Advances / Declines</div>
+          <div class="intel-card-val">1,142</div>
+          <div class="intel-card-chg gain">vs 748 declines</div>
+          <div class="intel-card-sub">A:D 1.53 · Breadth Bullish</div>
+        </div>
+        <div class="intel-card" style="--card-accent:#F5A623">
+          <div class="intel-card-label">52W Highs / Lows</div>
+          <div class="intel-card-val">38 / 12</div>
+          <div class="intel-card-chg gain">+12 new highs today</div>
+          <div class="intel-card-sub">NSE 500 universe</div>
+        </div>
+        <div class="intel-card" style="--card-accent:#B06FFF">
+          <div class="intel-card-label">AI Signals Today</div>
+          <div class="intel-card-val">7</div>
+          <div class="intel-card-chg" style="color:var(--pulse)">4 BUY · 2 WATCH · 1 EXIT</div>
+          <div class="intel-card-sub">Score ≥ 75</div>
+        </div>
+        <div class="intel-card" style="--card-accent:#F05252">
+          <div class="intel-card-label">India VIX</div>
+          <div class="intel-card-val">13.82</div>
+          <div class="intel-card-chg loss">▼ −1.40% (calm)</div>
+          <div class="intel-card-sub">30d avg: 15.6</div>
+        </div>
+      </div>
+
+      <!-- TWO-COL -->
+      <div class="two-col">
+
+        <!-- LEFT COL -->
+        <div style="display:flex;flex-direction:column;gap:18px;">
+
+          <!-- SECTOR HEATMAP -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><span class="panel-title-icon">🟩</span> NSE Sector Heatmap</div>
+              <div class="panel-actions">
+                <button class="chip active">1D</button>
+                <button class="chip">1W</button>
+                <button class="chip">1M</button>
+                <button class="chip">Mkt Cap</button>
+              </div>
+            </div>
+            <div class="heatmap-grid">
+              <div class="hm-cell hm-g1 hm-span2"><div class="hm-name">Realty</div><div class="hm-chg">+1.24%</div><div class="hm-vol">Vol ▲ 2.1x avg</div></div>
+              <div class="hm-cell hm-g0"><div class="hm-name">IT</div><div class="hm-chg">+0.53%</div><div class="hm-vol">Vol ▲ 1.4x</div></div>
+              <div class="hm-cell hm-g0"><div class="hm-name">Media</div><div class="hm-chg">+0.48%</div><div class="hm-vol">Vol ▲ 1.2x</div></div>
+              <div class="hm-cell hm-g2"><div class="hm-name">Fin. Svcs</div><div class="hm-chg">+0.34%</div><div class="hm-vol">Vol = avg</div></div>
+              <div class="hm-cell hm-g3"><div class="hm-name">Oil &amp; Gas</div><div class="hm-chg">+0.26%</div><div class="hm-vol">Vol ▼ 0.8x</div></div>
+              <div class="hm-cell hm-g1"><div class="hm-name">Defence</div><div class="hm-chg">+0.71%</div><div class="hm-vol">Vol ▲ 1.6x</div></div>
+              <div class="hm-cell hm-g0"><div class="hm-name">EMS</div><div class="hm-chg">+0.65%</div><div class="hm-vol">Vol ▲ 1.9x</div></div>
+              <div class="hm-cell hm-g2"><div class="hm-name">Energy</div><div class="hm-chg">+0.41%</div><div class="hm-vol">Vol = avg</div></div>
+              <div class="hm-cell hm-n"><div class="hm-name">FMCG</div><div class="hm-chg" style="color:var(--text-mid)">−0.02%</div><div class="hm-vol">Flat</div></div>
+              <div class="hm-cell hm-l1"><div class="hm-name">Pharma</div><div class="hm-chg">−0.34%</div><div class="hm-vol">Vol ▼ 0.6x</div></div>
+              <div class="hm-cell hm-l2"><div class="hm-name">Metal</div><div class="hm-chg">−0.88%</div><div class="hm-vol">Vol ▲ 1.8x</div></div>
+              <div class="hm-cell hm-g3"><div class="hm-name">Services</div><div class="hm-chg">+0.20%</div><div class="hm-vol">Vol = avg</div></div>
+            </div>
+          </div>
+
+          <!-- MARKET MOVERS -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><span class="panel-title-icon">🏆</span> Market Leaders — Nifty 500</div>
+              <div class="panel-actions">
+                <button class="chip active">All Cap</button>
+                <button class="chip">Large</button>
+                <button class="chip">Mid</button>
+                <button class="chip">Small</button>
+              </div>
+            </div>
+            <div class="movers-cols">
+              <div class="movers-section">
+                <div class="movers-head">🔥 Top Gainers</div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(0,200,150,0.1);color:var(--gain)">EC</div><div class="mover-info"><div class="mover-ticker">ECLERX</div><div class="mover-name">eClerx Services</div></div><div class="mover-nums"><div class="mover-price">₹1,979.80</div><div class="mover-pct gain">▲ +12.51%</div></div></div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(0,200,150,0.1);color:var(--gain)">AI</div><div class="mover-info"><div class="mover-ticker">AIIL</div><div class="mover-name">Authum Invest.</div></div><div class="mover-nums"><div class="mover-price">₹571.00</div><div class="mover-pct gain">▲ +9.88%</div></div></div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(0,200,150,0.1);color:var(--gain)">FB</div><div class="mover-info"><div class="mover-ticker">FEDERALBNK</div><div class="mover-name">Federal Bank</div></div><div class="mover-nums"><div class="mover-price">₹349.00</div><div class="mover-pct gain">▲ +6.86%</div></div></div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(0,200,150,0.1);color:var(--gain)">KJ</div><div class="mover-info"><div class="mover-ticker">KALYANKJIL</div><div class="mover-name">Kalyan Jewellers</div></div><div class="mover-nums"><div class="mover-price">₹574.40</div><div class="mover-pct gain">▲ +5.09%</div></div></div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(0,200,150,0.1);color:var(--gain)">AF</div><div class="mover-info"><div class="mover-ticker">AFCONS</div><div class="mover-name">Afcons Infra</div></div><div class="mover-nums"><div class="mover-price">₹299.75</div><div class="mover-pct gain">▲ +5.03%</div></div></div>
+              </div>
+              <div class="movers-section">
+                <div class="movers-head" style="color:var(--loss)">❄️ Top Losers</div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(240,82,82,0.1);color:var(--loss)">CT</div><div class="mover-info"><div class="mover-ticker">CEATLTD</div><div class="mover-name">Ceat Ltd.</div></div><div class="mover-nums"><div class="mover-price">₹3,142</div><div class="mover-pct loss">▼ −4.22%</div></div></div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(240,82,82,0.1);color:var(--loss)">WC</div><div class="mover-info"><div class="mover-ticker">WELCORP</div><div class="mover-name">Welspun Corp</div></div><div class="mover-nums"><div class="mover-price">₹718.50</div><div class="mover-pct loss">▼ −3.88%</div></div></div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(240,82,82,0.1);color:var(--loss)">KO</div><div class="mover-info"><div class="mover-ticker">KIRLOSENG</div><div class="mover-name">Kirloskar Oil</div></div><div class="mover-nums"><div class="mover-price">₹1,088</div><div class="mover-pct loss">▼ −2.94%</div></div></div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(240,82,82,0.1);color:var(--loss)">EM</div><div class="mover-info"><div class="mover-ticker">EMMVEE</div><div class="mover-name">Emmvee Photo.</div></div><div class="mover-nums"><div class="mover-price">₹412.30</div><div class="mover-pct loss">▼ −2.61%</div></div></div>
+                <div class="mover-row"><div class="mover-logo" style="background:rgba(240,82,82,0.1);color:var(--loss)">VD</div><div class="mover-info"><div class="mover-ticker">VIJAYA</div><div class="mover-name">Vijaya Diagnostic</div></div><div class="mover-nums"><div class="mover-price">₹894.55</div><div class="mover-pct loss">▼ −2.18%</div></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- UPCOMING EVENTS -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><span class="panel-title-icon">📅</span> Upcoming Corporate Events</div>
+              <button class="chip">View All</button>
+            </div>
+            <div class="event-row"><div class="event-date">Jul 21</div><div class="event-body"><div class="event-title">Infosys Q1 FY26 Results</div><div class="event-desc">Revenue guidance update. Consensus EPS ₹17.2</div></div><span class="event-tag et-results">Results</span></div>
+            <div class="event-row"><div class="event-date">Jul 22</div><div class="event-body"><div class="event-title">Dixon Technologies — Board Meeting</div><div class="event-desc">Approval of Q1 financials + capex plan</div></div><span class="event-tag et-earnings">Earnings</span></div>
+            <div class="event-row"><div class="event-date">Jul 24</div><div class="event-body"><div class="event-title">JSW Energy — Dividend Record Date</div><div class="event-desc">₹1.50/share interim dividend</div></div><span class="event-tag et-dividend">Dividend</span></div>
+            <div class="event-row"><div class="event-date">Jul 25</div><div class="event-body"><div class="event-title">Hitachi Energy India — Q1 Results</div><div class="event-desc">Transformer &amp; grid order book update</div></div><span class="event-tag et-results">Results</span></div>
+          </div>
+        </div>
+
+        <!-- RIGHT COL -->
+        <div style="display:flex;flex-direction:column;gap:18px;">
+
+          <!-- AI SIGNALS -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><span class="panel-title-icon" style="color:var(--pulse)">⚡</span> AI Signal Feed</div>
+              <div class="ai-pill"><div class="ai-pulse"></div>Live</div>
+            </div>
+            <div class="signal-list">
+              <div class="signal-item"><div class="signal-dot sig-buy"></div><div class="signal-body"><div class="signal-ticker-row"><span class="signal-ticker">DIXON</span><span class="signal-type st-buy">BUY</span></div><div class="signal-reason">MACD crossover + POC breakout. EV/EBITDA 42x — justified by PLI-led growth. Score 82/100.</div><div class="signal-meta">13 mins ago · Composite Model v2.3</div></div></div>
+              <div class="signal-item"><div class="signal-dot sig-buy"></div><div class="signal-body"><div class="signal-ticker-row"><span class="signal-ticker">KAYNES</span><span class="signal-type st-buy">BUY</span></div><div class="signal-reason">RSI(14) at 58, above 200-DMA. Order book 4.2x TTM revenue. PEG 0.72.</div><div class="signal-meta">31 mins ago · Fundamental + Technical</div></div></div>
+              <div class="signal-item"><div class="signal-dot sig-watch"></div><div class="signal-body"><div class="signal-ticker-row"><span class="signal-ticker">JSWENERGY</span><span class="signal-type st-watch">WATCH</span></div><div class="signal-reason">Overbought on BB upper band. Wait for ₹620–630 retest for entry.</div><div class="signal-meta">1h 04m ago · Swing Setup</div></div></div>
+              <div class="signal-item"><div class="signal-dot sig-buy"></div><div class="signal-body"><div class="signal-ticker-row"><span class="signal-ticker">ZEN TECH</span><span class="signal-type st-buy">BUY</span></div><div class="signal-reason">Defence cycle tailwind. Volume 2.8x avg. Breakout above ₹2,140 resistance.</div><div class="signal-meta">2h 22m ago · Sector Momentum</div></div></div>
+              <div class="signal-item"><div class="signal-dot sig-alert"></div><div class="signal-body"><div class="signal-ticker-row"><span class="signal-ticker">FORTIS</span><span class="signal-type st-alert">REVIEW</span></div><div class="signal-reason">Promoter pledge risk elevated. EBITDA margin compression YoY.</div><div class="signal-meta">3h 48m ago · Risk Monitor</div></div></div>
+            </div>
+          </div>
+
+          <!-- WATCHLIST -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><span class="panel-title-icon">⭐</span> Watchlist</div>
+              <button class="chip">Manage</button>
+            </div>
+            <div class="watchlist">
+              <div class="wl-item"><div class="wl-left"><div class="wl-ticker">DIXON</div><div class="wl-name">Dixon Technologies</div></div><div class="wl-right"><div class="wl-price">₹17,842</div><div class="wl-chg gain">▲ +2.34%</div></div></div>
+              <div class="wl-item"><div class="wl-left"><div class="wl-ticker">HITACHIENERGY</div><div class="wl-name">Hitachi Energy India</div></div><div class="wl-right"><div class="wl-price">₹14,290</div><div class="wl-chg gain">▲ +1.18%</div></div></div>
+              <div class="wl-item"><div class="wl-left"><div class="wl-ticker">KAYNES</div><div class="wl-name">Kaynes Technology</div></div><div class="wl-right"><div class="wl-price">₹4,672</div><div class="wl-chg gain">▲ +0.87%</div></div></div>
+              <div class="wl-item"><div class="wl-left"><div class="wl-ticker">JSWENERGY</div><div class="wl-name">JSW Energy</div></div><div class="wl-right"><div class="wl-price">₹643.50</div><div class="wl-chg loss">▼ −0.42%</div></div></div>
+              <div class="wl-item"><div class="wl-left"><div class="wl-ticker">ZENTECH</div><div class="wl-name">Zen Technologies</div></div><div class="wl-right"><div class="wl-price">₹2,188</div><div class="wl-chg gain">▲ +3.10%</div></div></div>
+              <div class="wl-item"><div class="wl-left"><div class="wl-ticker">ASTRAL</div><div class="wl-name">Astral Ltd.</div></div><div class="wl-right"><div class="wl-price">₹1,834</div><div class="wl-chg loss">▼ −0.62%</div></div></div>
+            </div>
+          </div>
+
+          <!-- QUANT SCREENER -->
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title"><span class="panel-title-icon">🔬</span> Quant Top Picks</div>
+              <button class="chip">Full Screen →</button>
+            </div>
+            <div style="padding:6px 0">
+              <div class="screener-row" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-dim);cursor:default;background:transparent!important;">
+                <span class="sr-rank">#</span><span class="sr-ticker">Ticker</span><span class="sr-name">Company</span><span class="sr-score" style="color:var(--text-dim)">Score</span><span class="sr-signal" style="color:var(--text-dim);text-align:center">Signal</span>
+              </div>
+              <div class="screener-row"><span class="sr-rank">1</span><span class="sr-ticker">DIXON</span><span class="sr-name">Dixon Technologies</span><span class="sr-score gain">82</span><span class="sr-signal s-buy">BUY</span></div>
+              <div class="screener-row"><span class="sr-rank">2</span><span class="sr-ticker">KAYNES</span><span class="sr-name">Kaynes Technology</span><span class="sr-score gain">79</span><span class="sr-signal s-buy">BUY</span></div>
+              <div class="screener-row"><span class="sr-rank">3</span><span class="sr-ticker">ZENTECH</span><span class="sr-name">Zen Technologies</span><span class="sr-score gain">77</span><span class="sr-signal s-buy">BUY</span></div>
+              <div class="screener-row"><span class="sr-rank">4</span><span class="sr-ticker">HITACHIENERGY</span><span class="sr-name">Hitachi Energy</span><span class="sr-score gain">74</span><span class="sr-signal s-buy">BUY</span></div>
+              <div class="screener-row"><span class="sr-rank">5</span><span class="sr-ticker">JSWENERGY</span><span class="sr-name">JSW Energy</span><span class="sr-score" style="color:var(--amber)">61</span><span class="sr-signal s-hold">HOLD</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ══ LIVE CATALYST NEWS — full width ══ -->
+      <div class="panel news-panel-wrap">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="panel-title-icon">📰</span> Live Catalyst News
+            <div class="live-badge" style="margin:0 0 0 8px;padding:3px 8px;font-size:9px;"><div class="live-dot"></div>Real-time</div>
+          </div>
+          <div class="panel-actions">
+            <button class="chip">View All →</button>
+          </div>
+        </div>
+
+        <!-- Filter tabs -->
+        <div class="news-filter-bar">
+          <button class="news-chip active">All</button>
+          <button class="news-chip">Earnings</button>
+          <button class="news-chip">M&amp;A</button>
+          <button class="news-chip">Policy</button>
+          <button class="news-chip">Global</button>
+          <button class="news-chip">Defence</button>
+          <button class="news-chip">EMS</button>
+          <button class="news-chip">Energy</button>
+        </div>
+
+        <!-- News items grid: 2-col on desktop, 1-col on mobile -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));">
+
+          <!-- Item 1 — Bullish -->
+          <div class="news-item">
+            <div class="news-bar nb-bullish"></div>
+            <div class="news-body">
+              <div class="news-meta">
+                <span class="news-source et">ET</span>
+                <span class="news-date">Jul 19, 2026 · 13:42 IST</span>
+                <span class="news-catalyst-tag nct-bullish">Bullish Catalyst</span>
+              </div>
+              <div class="news-headline">Nifty breakout above 24,600 could unlock record high — move is technically convincing: Anand James</div>
+              <div class="news-impact-row">
+                <span class="impact-label">Catalyst Impact</span>
+                <div class="impact-track"><div class="impact-fill if-high" style="width:78%"></div></div>
+                <span class="impact-score is-high">7.8</span>
+              </div>
+              <div class="news-tickers">
+                <span class="news-ticker-tag">NIFTY50</span>
+                <span class="news-ticker-tag">BANKNIFTY</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 2 — Neutral -->
+          <div class="news-item">
+            <div class="news-bar nb-neutral"></div>
+            <div class="news-body">
+              <div class="news-meta">
+                <span class="news-source et">ET</span>
+                <span class="news-date">Jul 19, 2026 · 13:28 IST</span>
+                <span class="news-catalyst-tag nct-neutral">Market Catalyst</span>
+              </div>
+              <div class="news-headline">Ahead of Market: 10 things that will decide D-Street action on Monday</div>
+              <div class="news-impact-row">
+                <span class="impact-label">Catalyst Impact</span>
+                <div class="impact-track"><div class="impact-fill if-medium" style="width:40%"></div></div>
+                <span class="impact-score is-medium">4.0</span>
+              </div>
+              <div class="news-tickers">
+                <span class="news-ticker-tag">NIFTY50</span>
+                <span class="news-ticker-tag">SENSEX</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 3 — Neutral -->
+          <div class="news-item">
+            <div class="news-bar nb-neutral"></div>
+            <div class="news-body">
+              <div class="news-meta">
+                <span class="news-source livemint">Livemint</span>
+                <span class="news-date">Jul 19, 2026 · 13:05 IST</span>
+                <span class="news-catalyst-tag nct-neutral">Market Catalyst</span>
+              </div>
+              <div class="news-headline">Expert view: Selective bets &amp; strong fundamentals amid global chaos, says Vikram Nair</div>
+              <div class="news-impact-row">
+                <span class="impact-label">Catalyst Impact</span>
+                <div class="impact-track"><div class="impact-fill if-low" style="width:43%"></div></div>
+                <span class="impact-score is-low">4.3</span>
+              </div>
+              <div class="news-tickers">
+                <span class="news-ticker-tag">DIXON</span>
+                <span class="news-ticker-tag">KAYNES</span>
+                <span class="news-ticker-tag">ZENTECH</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 4 — Bullish / EMS + Defence -->
+          <div class="news-item">
+            <div class="news-bar nb-bullish"></div>
+            <div class="news-body">
+              <div class="news-meta">
+                <span class="news-source moneyctrl">MoneyControl</span>
+                <span class="news-date">Jul 19, 2026 · 12:50 IST</span>
+                <span class="news-catalyst-tag nct-bullish">Bullish Catalyst</span>
+              </div>
+              <div class="news-headline">PLI scheme disbursements for EMS sector up 34% YoY in Q1 FY26 — Dixon, Kaynes biggest beneficiaries</div>
+              <div class="news-impact-row">
+                <span class="impact-label">Catalyst Impact</span>
+                <div class="impact-track"><div class="impact-fill if-high" style="width:88%"></div></div>
+                <span class="impact-score is-high">8.8</span>
+              </div>
+              <div class="news-tickers">
+                <span class="news-ticker-tag">DIXON</span>
+                <span class="news-ticker-tag">KAYNES</span>
+                <span class="news-ticker-tag">SYRMA</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 5 — Bullish / Defence -->
+          <div class="news-item">
+            <div class="news-bar nb-bullish"></div>
+            <div class="news-body">
+              <div class="news-meta">
+                <span class="news-source bsindia">BS India</span>
+                <span class="news-date">Jul 19, 2026 · 12:18 IST</span>
+                <span class="news-catalyst-tag nct-bullish">Bullish Catalyst</span>
+              </div>
+              <div class="news-headline">MoD clears ₹4,200 Cr order for domestic defence electronics — Zen Technologies among likely beneficiaries</div>
+              <div class="news-impact-row">
+                <span class="impact-label">Catalyst Impact</span>
+                <div class="impact-track"><div class="impact-fill if-high" style="width:85%"></div></div>
+                <span class="impact-score is-high">8.5</span>
+              </div>
+              <div class="news-tickers">
+                <span class="news-ticker-tag">ZENTECH</span>
+                <span class="news-ticker-tag">BEL</span>
+                <span class="news-ticker-tag">BHEL</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 6 — Bearish -->
+          <div class="news-item">
+            <div class="news-bar nb-bearish"></div>
+            <div class="news-body">
+              <div class="news-meta">
+                <span class="news-source et">ET</span>
+                <span class="news-date">Jul 19, 2026 · 11:55 IST</span>
+                <span class="news-catalyst-tag nct-bearish">Bearish Catalyst</span>
+              </div>
+              <div class="news-headline">Promoter pledge concerns resurface in healthcare sector amid tight credit conditions — Fortis under watch</div>
+              <div class="news-impact-row">
+                <span class="impact-label">Catalyst Impact</span>
+                <div class="impact-track"><div class="impact-fill if-high" style="width:68%;background:var(--loss)"></div></div>
+                <span class="impact-score" style="color:var(--loss)">6.8</span>
+              </div>
+              <div class="news-tickers">
+                <span class="news-ticker-tag">FORTIS</span>
+                <span class="news-ticker-tag">MAXHEALTH</span>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /news grid -->
+      </div><!-- /news panel -->
+
+    </div><!-- /page-body -->
+
+    <!-- Desktop Status Bar -->
+    <div class="status-bar">
+      <span class="status-item">NSE · Market Open</span>
+      <span class="status-item">Angel One · Connected · 48ms</span>
+      <span class="status-item">SmartAPI + yfinance</span>
+      <span class="status-item">AI: Gemini 2.5 Flash · ADK v1.4</span>
+      <span class="status-item">Last refresh: 13:51:22 IST</span>
+      <span class="status-item" style="color:var(--pulse)">⚡ APEX AGENTIC v2.0-enterprise</span>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ MOBILE BOTTOM NAV ══ -->
+<nav class="bottom-nav">
+  <button class="bn-item active">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
+    Terminal
+  </button>
+  <button class="bn-item">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    Screener
+  </button>
+  <button class="bn-item">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    Watchlist
+  </button>
+  <button class="bn-item">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Portfolio
+  </button>
+  <button class="bn-item bn-dot">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+    More
+  </button>
+</nav>
+
+<script>
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebarOverlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+// Close drawer on nav-item tap (mobile)
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    if (window.innerWidth < 768) closeSidebar();
+  });
+});
+// Bottom nav active state
+document.querySelectorAll('.bn-item').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.bn-item').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// News filter chips
+document.querySelectorAll('.news-chip').forEach(chip => {
+  chip.addEventListener('click', function() {
+    document.querySelectorAll('.news-chip').forEach(c => c.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

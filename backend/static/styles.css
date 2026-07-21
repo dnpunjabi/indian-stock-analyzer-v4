@@ -20628,3 +20628,19 @@ select option {
 
 
 
+
+/* Scrollable controls alpha fade masks */
+.scroll-fade-mask {
+    position: relative;
+}
+.scroll-fade-mask::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 28px;
+    background: linear-gradient(to right, rgba(13,19,33,0) 0%, var(--bg-surface, #0b0f19) 100%);
+    pointer-events: none;
+    z-index: 5;
+}

@@ -1538,7 +1538,7 @@
             `;
             document.body.appendChild(bottomNav);
 
-            document.getElementById('nav-terminal').addEventListener('click', () => window.switchTab('analyzer'));
+            document.getElementById('nav-terminal').addEventListener('click', () => window.switchTab('market-news'));
             document.getElementById('nav-screener').addEventListener('click', () => window.switchTab('screener'));
             document.getElementById('nav-watchlist').addEventListener('click', () => window.switchTab('watchlist'));
             document.getElementById('nav-portfolio').addEventListener('click', () => window.switchTab('portfolio'));
@@ -1964,7 +1964,7 @@
 
             sheetEl.classList.remove('active');
             playHaptic(15);
-            window.switchTab('analyzer');
+            window.switchTab('market-news');
         }
 
         function openCustomSelectBottomSheet(selectEl) {
@@ -2194,7 +2194,7 @@
             if (cancelBtn) {
                 cancelBtn.addEventListener('click', () => {
                     pinOverlay.style.display = 'none';
-                    window.switchTab('analyzer');
+                    window.switchTab('market-news');
                 });
             }
 
@@ -2412,7 +2412,7 @@
                 if (searchInput && searchBtn) {
                     searchInput.value = symbol;
                     searchBtn.click();
-                    window.switchTab('analyzer');
+                    window.switchTab('market-news');
                 }
                 setTimeout(() => { if (rowEl) rowEl.style.transform = ''; }, 600);
             }
@@ -3658,71 +3658,13 @@
                     <div id="mobile-home-recent-pills" style="display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; padding: 2px 0;"></div>
                 </div>
 
-                <!-- Quick Action Shortcuts -->
-                <h5 style="margin:0 0 12px 0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">Quick Analysis Workspaces</h5>
-                <div class="mobile-cmd-grid">
-                    <div class="mobile-cmd-card inst-card-screener" id="cmd-btn-screener">
-                        <div class="mobile-cmd-card-header">
-                            <div class="cmd-svg-icon svg-screener">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <rect x="3" y="14" width="4" height="7" rx="1" fill="#3b82f6" opacity="0.8"/>
-                                    <rect x="10" y="8" width="4" height="13" rx="1" fill="#3b82f6"/>
-                                    <rect x="17" y="3" width="4" height="18" rx="1" fill="#60a5fa"/>
-                                    <path d="M2 7L9 4L15 8L22 2" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </div>
-                            <span class="cmd-badge badge-blue">ACTIVE</span>
-                        </div>
-                        <span class="mobile-cmd-card-title">Quant Screener</span>
-                        <span class="mobile-cmd-card-desc">Execute multi-factor scoring scans & target overlays.</span>
-                    </div>
-                    <div class="mobile-cmd-card inst-card-radar" id="cmd-btn-radar">
-                        <div class="mobile-cmd-card-header">
-                            <div class="cmd-svg-icon svg-radar">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="12" cy="12" r="9" stroke="#10b981" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.6"/>
-                                    <circle cx="12" cy="12" r="5" stroke="#10b981" stroke-width="1.5"/>
-                                    <circle cx="12" cy="12" r="2" fill="#10b981"/>
-                                    <path d="M12 12L19 5" stroke="#34d399" stroke-width="2" stroke-linecap="round"/>
-                                    <circle cx="16" cy="8" r="1.5" fill="#34d399"/>
-                                </svg>
-                            </div>
-                            <span class="cmd-badge badge-green">LIVE</span>
-                        </div>
-                        <span class="mobile-cmd-card-title">Momentum Radar</span>
-                        <span class="mobile-cmd-card-desc">Real-time sector heatmaps & rotation diagnostics.</span>
-                    </div>
-                    <div class="mobile-cmd-card inst-card-scanner" id="cmd-btn-scanner">
-                        <div class="mobile-cmd-card-header">
-                            <div class="cmd-svg-icon svg-scanner">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M4 4H8M16 4H20M4 20H8M16 20H20" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
-                                    <line x1="2" y1="12" x2="22" y2="12" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="2 2"/>
-                                    <path d="M6 16L10 11L14 14L18 8" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                                </svg>
-                            </div>
-                            <span class="cmd-badge badge-amber">SCANS</span>
-                        </div>
-                        <span class="mobile-cmd-card-title">Rule Scanner</span>
-                        <span class="mobile-cmd-card-desc">AI catalyst scans & indicators breakout logs.</span>
-                    </div>
-                    <div class="mobile-cmd-card inst-card-alerts" id="cmd-btn-alerts">
-                        <div class="mobile-cmd-card-header">
-                            <div class="cmd-svg-icon svg-alerts">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M18 8A6 6 0 0 0 6 8C6 15 3 17 3 17H21S18 15 18 8Z" stroke="#ef4444" stroke-width="1.5" stroke-linejoin="round"/>
-                                    <path d="M13.73 21A2 2 0 0 1 10.27 21" stroke="#f87171" stroke-width="1.5" stroke-linecap="round"/>
-                                    <circle cx="18" cy="5" r="3" fill="#ef4444"/>
-                                </svg>
-                            </div>
-                            <span class="cmd-badge badge-red">3 ACTIVE</span>
-                        </div>
-                        <span class="mobile-cmd-card-title">Alert Center</span>
-                        <span class="mobile-cmd-card-desc">Manage trigger alerts and target rule updates.</span>
-                    </div>
-                </div>
+                
 
                 <!-- Today's Market Movers Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">Today's Market Leaders</h5>
+                    <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('movers')" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">View All →</button>
+                </div>
                 <div class="movers-container mobile-glass-card">
                     <div class="movers-segmented-control">
                         <button class="movers-segmented-tab active" id="movers-tab-gainers">Gainers</button>
@@ -3739,10 +3681,88 @@
                 </div>
 
                 <!-- Today's Sector Rotations Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 8px;">
+                    <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">Sector Rotations</h5>
+                    <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('sector-radar')" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">View All →</button>
+                </div>
                 <div id="mobile-home-sectors-container" style="margin-bottom: 20px;"></div>
 
-                <!-- Live Catalyst News Feed Section -->
-                <h5 style="margin:20px 0 10px 0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">Live Catalyst News</h5>
+                
+                <!-- Quant Top Picks Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 8px;">
+                    <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">🔬 Quant Top Picks</h5>
+                    <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('screener')" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">View All </button>
+                </div>
+                <div class="mobile-glass-card" style="padding: 12px; margin-bottom: 20px;">
+                    <div class="movers-segmented-control" style="margin-bottom: 12px; display: flex; gap: 4px;">
+                        <button class="movers-segmented-tab active" id="mobile-quant-tab-hybrid" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">Hybrid</button>
+                        <button class="movers-segmented-tab" id="mobile-quant-tab-bottom_up" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">Bottom-Up</button>
+                        <button class="movers-segmented-tab" id="mobile-quant-tab-top_down" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">Top-Down</button>
+                    </div>
+                    <div id="mobile-home-quant-picks-container" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="recent-research-empty" style="font-size: 11px;">Scanning market for quant top picks...</div>
+                    </div>
+                </div>
+                <!-- Watchlist Quick-Quote Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 8px;">
+                    <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">⭐ Watchlist Quick-Quote</h5>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <select id="mobile-watchlist-selector" style="background: rgba(255,255,255,0.03); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 2px 6px; font-size: 11px; border-radius: 4px; outline: none; font-family: 'Outfit', sans-serif; cursor: pointer; max-width: 120px;">
+                            <option value="" disabled selected>Select Watchlist</option>
+                        </select>
+                        <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('watchlist')" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">View All </button>
+                    </div>
+                </div>
+                <div class="mobile-glass-card" style="padding: 12px; margin-bottom: 20px;">
+                    <div id="mobile-home-watchlist-container" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="recent-research-empty" style="font-size: 11px;">Select watchlist in main workspace to display.</div>
+                    </div>
+                </div>
+
+ <!-- Technical Scans & Breakouts Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 8px;">
+                    <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">⚡ Technical Breakouts</h5>
+                    <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('technical-scans')" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">View All →</button>
+                </div>
+                <div class="mobile-glass-card" style="padding: 12px; margin-bottom: 20px;">
+                    <div class="movers-segmented-control scroll-fade-mask" style="margin-bottom: 12px; display: flex; gap: 4px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 2px;">
+                        <button class="movers-segmented-tab active" id="mobile-tech-tab-near_high" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 90px;">Near 52W High</button>
+                        <button class="movers-segmented-tab" id="mobile-tech-tab-near_low" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 90px;">Near 52W Low</button>
+                        <button class="movers-segmented-tab" id="mobile-tech-tab-gap_up" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 80px;">Gap Up</button>
+                        <button class="movers-segmented-tab" id="mobile-tech-tab-gap_down" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 85px;">Gap Down</button>
+                    </div>
+                    <div id="mobile-home-tech-scans-container" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="recent-research-empty" style="font-size: 11px;">Scanning technical breakouts...</div>
+                    </div>
+                </div>
+                
+                <!-- Institutional Alert Center Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 8px;">
+                    <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">🚨 Institutional Alert Center</h5>
+                    <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('alerts')" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">View All →</button>
+                </div>
+                <div class="mobile-glass-card" style="padding: 12px; margin-bottom: 20px;">
+                    <div id="mobile-home-alerts-container" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="recent-research-empty" style="font-size: 11px;">Scanning real-time alerts...</div>
+                    </div>
+                </div>
+
+                <!-- Upcoming Corporate Events Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 8px;">
+                    <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">📅 Corporate Events</h5>
+                    <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('events')" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">View All →</button>
+                </div>
+                <div class="mobile-glass-card" style="padding: 12px; margin-bottom: 20px;">
+                    <div id="mobile-home-events-container" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="recent-research-empty" style="font-size: 11px;">Fetching events schedule...</div>
+                    </div>
+                </div>
+<!-- Live Catalyst News Feed Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 8px;">
+                    <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">Live Catalyst News</h5>
+                    <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('market-news')" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">View All →</button>
+                </div>
+                
                 <div class="news-categories-scroll-wrapper">
                     <button class="news-category-pill-btn active" data-category="all">All</button>
                     <button class="news-category-pill-btn" data-category="earnings">Earnings</button>
@@ -3779,6 +3799,86 @@
                 };
             }
 
+            // Wire mobile Quant Picks strategy selector clicks
+            const qTabHybrid = document.getElementById('mobile-quant-tab-hybrid');
+            const qTabBU = document.getElementById('mobile-quant-tab-bottom_up');
+            const qTabTD = document.getElementById('mobile-quant-tab-top_down');
+            const qMobileTabs = [qTabHybrid, qTabBU, qTabTD];
+
+            const updateMobileQuantActiveTab = (activeId) => {
+                qMobileTabs.forEach(tab => {
+                    if (tab) tab.classList.remove('active');
+                });
+                const activeTab = document.getElementById(activeId);
+                if (activeTab) activeTab.classList.add('active');
+            };
+
+            if (qTabHybrid) {
+                qTabHybrid.onclick = () => {
+                    window.activeQuantStrategy = 'hybrid';
+                    updateMobileQuantActiveTab('mobile-quant-tab-hybrid');
+                    if (window.renderQuantTopPicksList) window.renderQuantTopPicksList();
+                };
+            }
+            if (qTabBU) {
+                qTabBU.onclick = () => {
+                    window.activeQuantStrategy = 'bottom_up';
+                    updateMobileQuantActiveTab('mobile-quant-tab-bottom_up');
+                    if (window.renderQuantTopPicksList) window.renderQuantTopPicksList();
+                };
+            }
+            if (qTabTD) {
+                qTabTD.onclick = () => {
+                    window.activeQuantStrategy = 'top_down';
+                    updateMobileQuantActiveTab('mobile-quant-tab-top_down');
+                    if (window.renderQuantTopPicksList) window.renderQuantTopPicksList();
+                };
+            }
+
+            // Wire mobile Technical Breakouts strategy selector clicks
+            const mtTabHigh = document.getElementById('mobile-tech-tab-near_high');
+            const mtTabLow = document.getElementById('mobile-tech-tab-near_low');
+            const mtTabGapUp = document.getElementById('mobile-tech-tab-gap_up');
+            const mtTabGapDown = document.getElementById('mobile-tech-tab-gap_down');
+            const mtMobileTabs = [mtTabHigh, mtTabLow, mtTabGapUp, mtTabGapDown];
+
+            const updateMobileTechActiveTab = (activeId) => {
+                mtMobileTabs.forEach(tab => {
+                    if (tab) tab.classList.remove('active');
+                });
+                const activeTab = document.getElementById(activeId);
+                if (activeTab) activeTab.classList.add('active');
+            };
+
+            if (mtTabHigh) {
+                mtTabHigh.onclick = () => {
+                    window.activeTechnicalScan = 'near_high';
+                    updateMobileTechActiveTab('mobile-tech-tab-near_high');
+                    if (window.renderTechnicalScansList) window.renderTechnicalScansList();
+                };
+            }
+            if (mtTabLow) {
+                mtTabLow.onclick = () => {
+                    window.activeTechnicalScan = 'near_low';
+                    updateMobileTechActiveTab('mobile-tech-tab-near_low');
+                    if (window.renderTechnicalScansList) window.renderTechnicalScansList();
+                };
+            }
+            if (mtTabGapUp) {
+                mtTabGapUp.onclick = () => {
+                    window.activeTechnicalScan = 'gap_up';
+                    updateMobileTechActiveTab('mobile-tech-tab-gap_up');
+                    if (window.renderTechnicalScansList) window.renderTechnicalScansList();
+                };
+            }
+            if (mtTabGapDown) {
+                mtTabGapDown.onclick = () => {
+                    window.activeTechnicalScan = 'gap_down';
+                    updateMobileTechActiveTab('mobile-tech-tab-gap_down');
+                    if (window.renderTechnicalScansList) window.renderTechnicalScansList();
+                };
+            }
+
             // Wire News Category Tab Clicks
             const newsCategoryTabs = container.querySelectorAll('.news-category-pill-btn');
             newsCategoryTabs.forEach(tab => {
@@ -3790,11 +3890,15 @@
                 };
             });
 
-            // Wire Tab Switches
-            document.getElementById('cmd-btn-screener').onclick = () => window.switchTab('screener');
-            document.getElementById('cmd-btn-radar').onclick = () => window.switchTab('sector-radar');
-            document.getElementById('cmd-btn-scanner').onclick = () => window.switchTab('rule-scanner');
-            document.getElementById('cmd-btn-alerts').onclick = () => window.switchTab('alerts');
+            // Wire Tab Switches (Safely)
+            const btnScreener = document.getElementById('cmd-btn-screener');
+            if (btnScreener) btnScreener.onclick = () => window.switchTab('screener');
+            const btnRadar = document.getElementById('cmd-btn-radar');
+            if (btnRadar) btnRadar.onclick = () => window.switchTab('sector-radar');
+            const btnScanner = document.getElementById('cmd-btn-scanner');
+            if (btnScanner) btnScanner.onclick = () => window.switchTab('rule-scanner');
+            const btnAlerts = document.getElementById('cmd-btn-alerts');
+            if (btnAlerts) btnAlerts.onclick = () => window.switchTab('alerts');
 
             // Wire Voice Catalyst Click
             const homeMic = document.getElementById('mobile-home-mic-btn');
@@ -3985,6 +4089,11 @@
             const losersContainer = document.getElementById('mobile-home-losers-container');
             const sectorsContainer = document.getElementById('mobile-home-sectors-container');
             const newsContainer = document.getElementById('mobile-home-news-container');
+            const mobileWatchlistContainer = document.getElementById('mobile-home-watchlist-container');
+            const mobileTechScansContainer = document.getElementById('mobile-home-tech-scans-container');
+            const mobileAlertsContainer = document.getElementById('mobile-home-alerts-container');
+            const mobileEventsContainer = document.getElementById('mobile-home-events-container');
+            const mobileQuantPicksContainer = document.getElementById('mobile-home-quant-picks-container');
 
             // 1. Render Recent Search Pills
             const pillsContainer = document.getElementById('mobile-home-recent-pills-container');
@@ -4980,34 +5089,49 @@
         };
 
         // 4. Fetch & Render Upcoming Corporate Events
-        const loadUpcomingEvents = async () => {
-            const container = document.getElementById('desktop-events-container');
-            const viewAllBtn = document.getElementById('desktop-events-view-all-btn');
-            if (!container) return;
+            const loadUpcomingEvents = async () => {
+        const container = document.getElementById('desktop-events-container');
+        const viewAllBtn = document.getElementById('desktop-events-view-all-btn');
+        if (!container) return;
 
-            if (viewAllBtn) {
-                viewAllBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (window.switchTab) window.switchTab('events');
-                };
-            }
+        if (viewAllBtn) {
+            viewAllBtn.onclick = (e) => {
+                e.stopPropagation();
+                if (window.switchTab) window.switchTab('events');
+            };
+        }
 
-            try {
-                const res = await fetch(apiBaseUrl + '/api/events/calendar?days=60');
-                if (!res.ok) throw new Error("Events load failed");
-                const data = await res.json();
+        try {
+            const res = await fetch(apiBaseUrl + '/api/events/calendar?days=60');
+            if (!res.ok) throw new Error("Events load failed");
+            const data = await res.json();
 
-                if (data.events && data.events.length > 0) {
-                    const futureEvents = data.events.filter(ev => {
-                        return ev.countdown_days !== null && ev.countdown_days >= 0;
-                    });
+            if (data.events && data.events.length > 0) {
+                const futureEvents = data.events.filter(ev => {
+                    return ev.countdown_days !== null && ev.countdown_days >= 0;
+                });
 
-                    if (futureEvents.length === 0) {
-                        container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No upcoming corporate events scheduled in the next 60 days.</div>`;
-                        return;
-                    }
+                if (futureEvents.length === 0) {
+                    container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No upcoming corporate events scheduled in the next 60 days.</div>`;
+                    return;
+                }
 
-                    container.innerHTML = futureEvents.slice(0, 4).map((item, idx) => {
+                // Group by earliest upcoming date to show complete day events
+                const earliestDate = futureEvents[0].event_date;
+                const targetEvents = futureEvents.filter(ev => ev.event_date === earliestDate);
+
+                // Set max-height scroll properties
+                container.style.maxHeight = '280px';
+                container.style.overflowY = 'auto';
+                container.style.paddingRight = '4px';
+
+                const mobileEvents = document.getElementById('mobile-home-events-container');
+                if (mobileEvents) {
+                    mobileEvents.style.maxHeight = '280px';
+                    mobileEvents.style.overflowY = 'auto';
+                    mobileEvents.style.paddingRight = '4px';
+
+                    mobileEvents.innerHTML = targetEvents.map(item => {
                         let eventTitle = "";
                         let eventDesc = "";
                         let badgeLabel = "";
@@ -5019,96 +5143,186 @@
                             badgeLabel = "RESULTS";
                             badgeClass = "results";
                             if (item.details?.earnings_estimate) {
-                                eventDesc = `Consensus EPS: ₹${parseFloat(item.details.earnings_estimate).toFixed(2)}`;
+                                eventDesc = `Consensus EPS: ${parseFloat(item.details.earnings_estimate).toFixed(2)}`;
                             } else {
                                 eventDesc = "Upcoming quarterly disclosures.";
                             }
                         } else if (type.includes("dividend")) {
-                            eventTitle = `${item.symbol} — Dividend`;
+                            eventTitle = `${item.symbol} Dividend`;
                             badgeLabel = "DIVIDEND";
                             badgeClass = "dividend";
                             if (item.details?.dividend_rate) {
-                                eventDesc = `₹${parseFloat(item.details.dividend_rate).toFixed(2)}/share Dividend`;
+                                eventDesc = `${parseFloat(item.details.dividend_rate).toFixed(2)}/share Dividend`;
                             } else {
                                 eventDesc = "Dividend record consideration.";
                             }
                         } else {
-                            eventTitle = `${item.symbol} — Corporate Action`;
+                            eventTitle = `${item.symbol} Corporate Action`;
                             badgeLabel = "OTHER";
                             badgeClass = "other";
                             eventDesc = item.description || "Board meeting/ Capex update";
                         }
 
                         const parts = item.event_date.split('-');
-                        const year = parseInt(parts[0], 10);
-                        const month = parseInt(parts[1], 10) - 1;
-                        const day = parseInt(parts[2], 10);
+                        const day = parts[2] || '01';
                         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                        const monthStr = monthNames[month];
+                        const monthIdx = parseInt(parts[1] || '1', 10) - 1;
+                        const monthStr = monthNames[monthIdx] || 'Event';
 
-                        const isLast = idx === 3 || idx === futureEvents.length - 1;
-                        const borderStyle = isLast ? "" : "border-bottom: 1px solid var(--border-glass);";
+                        let displayBadgeClass = 'event-earnings';
+                        if (badgeClass === 'dividend') displayBadgeClass = 'event-dividend';
+                        else if (badgeClass === 'other') displayBadgeClass = 'event-split';
 
                         return `
-                            <div class="event-row-item" style="display: flex; align-items: center; padding: 12px 0; ${borderStyle}">
-                                <div class="event-date-wrap" style="width: 50px; flex-shrink: 0; display: flex; flex-direction: row; gap: 4px; align-items: baseline;">
-                                    <span class="event-month" style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">${monthStr}</span>
-                                    <span class="event-day" style="font-size: 13px; font-weight: 800; color: var(--text-primary);">${day}</span>
+                                <div class="event-row-item" style="display: flex; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-glass); cursor: pointer;" onclick="window.switchTab && window.switchTab('events')">
+                                    <div class="event-date-wrap" style="width: 45px; flex-shrink: 0; display: flex; flex-direction: row; gap: 3px; align-items: baseline;">
+                                        <span style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">${monthStr}</span>
+                                        <span style="font-size: 12.5px; font-weight: 800; color: var(--text-primary);">${day}</span>
+                                    </div>
+                                    <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; text-align: left; padding: 0 4px;">
+                                        <span style="font-size: 11.5px; font-weight: 700; color: var(--text-primary);">${eventTitle}</span>
+                                        <span style="font-size: 10px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 95%;">${eventDesc}</span>
+                                    </div>
+                                    <div style="flex-shrink: 0; text-align: right;">
+                                        <span class="event-badge ${displayBadgeClass}" style="font-size: 8.5px; padding: 2px 6px;">${badgeLabel}</span>
+                                    </div>
                                 </div>
-                                <div class="event-details-wrap" style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left;">
-                                    <span class="event-row-title" style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${eventTitle}</span>
-                                    <span class="event-row-desc" style="font-size: 10.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 95%;">${eventDesc}</span>
-                                </div>
-                                <div class="event-badge-wrap" style="flex-shrink: 0; text-align: right; width: 90px;">
-                                    <span class="event-badge ${badgeClass}">${badgeLabel}</span>
-                                </div>
-                            </div>
-                        `;
+                            `;
                     }).join('');
-                } else {
-                    container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No upcoming corporate events scheduled.</div>`;
                 }
-            } catch (err) {
-                console.error("Desktop events load error:", err);
-                container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Failed to load events calendar.</div>`;
+
+                container.innerHTML = targetEvents.map((item, idx) => {
+                    let eventTitle = "";
+                    let eventDesc = "";
+                    let badgeLabel = "";
+                    let badgeClass = "";
+
+                    const type = (item.event_type || "").toLowerCase();
+                    if (type.includes("result") || type.includes("earning")) {
+                        eventTitle = `${item.symbol} Q1 Results`;
+                        badgeLabel = "RESULTS";
+                        badgeClass = "results";
+                        if (item.details?.earnings_estimate) {
+                            eventDesc = `Consensus EPS: ${parseFloat(item.details.earnings_estimate).toFixed(2)}`;
+                        } else {
+                            eventDesc = "Upcoming quarterly disclosures.";
+                        }
+                    } else if (type.includes("dividend")) {
+                        eventTitle = `${item.symbol}  Dividend`;
+                        badgeLabel = "DIVIDEND";
+                        badgeClass = "dividend";
+                        if (item.details?.dividend_rate) {
+                            eventDesc = `${parseFloat(item.details.dividend_rate).toFixed(2)}/share Dividend`;
+                        } else {
+                            eventDesc = "Dividend record consideration.";
+                        }
+                    } else {
+                        eventTitle = `${item.symbol}  Corporate Action`;
+                        badgeLabel = "OTHER";
+                        badgeClass = "other";
+                        eventDesc = item.description || "Board meeting/ Capex update";
+                    }
+
+                    const parts = item.event_date.split('-');
+                    const year = parseInt(parts[0], 10);
+                    const month = parseInt(parts[1], 10) - 1;
+                    const day = parseInt(parts[2], 10);
+                    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                    const monthStr = monthNames[month];
+
+                    const isLast = idx === targetEvents.length - 1;
+                    const borderStyle = isLast ? "" : "border-bottom: 1px solid var(--border-glass);";
+
+                    return `
+                        <div class="event-row-item" style="display: flex; align-items: center; padding: 12px 0; ${borderStyle}">
+                            <div class="event-date-wrap" style="width: 50px; flex-shrink: 0; display: flex; flex-direction: row; gap: 4px; align-items: baseline;">
+                                <span class="event-month" style="font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">${monthStr}</span>
+                                <span class="event-day" style="font-size: 13px; font-weight: 800; color: var(--text-primary);">${day}</span>
+                            </div>
+                            <div class="event-details-wrap" style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left;">
+                                <span class="event-row-title" style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${eventTitle}</span>
+                                <span class="event-row-desc" style="font-size: 10px; color: var(--text-secondary);">${eventDesc}</span>
+                            </div>
+                            <div class="event-status-wrap" style="width: 90px; flex-shrink: 0; text-align: right;">
+                                <span class="event-badge ${badgeClass}" style="font-size: 9px; padding: 3px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase;">${badgeLabel}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No upcoming corporate events.</div>`;
             }
-        };
+        } catch (err) {
+            console.error("Events load error:", err);
+            container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Failed to load events calendar.</div>`;
+        }
+    };
 
         // 4b. Fetch & Render Homepage Institutional Alert Center Card
         const loadHomepageAlerts = async () => {
-            const container = document.getElementById('desktop-home-alerts-container');
-            if (!container) return;
+        const container = document.getElementById('desktop-home-alerts-container');
+        if (!container) return;
 
-            try {
-                const res = await fetch(apiBaseUrl + '/api/alerts/active');
-                if (!res.ok) throw new Error("Alerts load failed");
-                const data = await res.json();
-                const alerts = data.alerts || data.active_alerts || [];
-                if (alerts.length > 0) {
-                    container.innerHTML = alerts.slice(0, 3).map(a => `
+        try {
+            const res = await fetch(apiBaseUrl + '/api/alerts/list');
+            if (!res.ok) throw new Error("Alerts load failed");
+            const allAlerts = await res.json();
+            
+            // Filter to show only active scanning alerts
+                        // Filter to show only active scanning alerts
+            const alerts = (allAlerts || []).filter(a => a.triggered === false || a.triggered === 0 || a.status === 'Active' || a.status === 'Scanning');
+
+            // Update active scan counter in mobile header scans button
+            const scansBtn = document.getElementById('mobile-header-scans-btn');
+            if (scansBtn) {
+                scansBtn.innerHTML = `⚡ Scans (${alerts.length})`;
+            }
+
+            const mobileAlerts = document.getElementById('mobile-home-alerts-container');
+
+            if (alerts.length > 0) {
+                const renderAlertHtml = (a) => {
+                    const cleanSym = (a.ticker || 'SYSTEM').replace('.NS', '');
+                    const condition = a.condition_type || 'PRICE';
+                    const operator = a.operator || '';
+                    const targetVal = a.value || '';
+                    const message = `Monitoring: ${condition} ${operator} ${targetVal}`;
+                    
+                    return `
                         <div class="alert-home-item" onclick="window.switchTab && window.switchTab('alerts')">
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="font-size: 11px; font-weight: 700; color: var(--color-primary);">${a.symbol || 'SYSTEM'}</span>
-                                <span style="font-size: 10.5px; color: var(--text-secondary);">${a.message || a.title || 'Breakout signal detected'}</span>
+                                <span style="font-size: 11px; font-weight: 700; color: var(--color-primary);">${cleanSym}</span>
+                                <span style="font-size: 10.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px;" title="${message}">${message}</span>
                             </div>
-                            <span style="font-size: 9.5px; color: var(--text-muted);">${a.timestamp || 'Live'}</span>
-                        </div>
-                    `).join('');
-                } else {
-                    container.innerHTML = `
-                        <div class="alert-home-item" onclick="window.switchTab && window.switchTab('alerts')">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span style="font-size: 11px; font-weight: 700; color: #10b981;">SYSTEM</span>
-                                <span style="font-size: 10.5px; color: var(--text-secondary);">Institutional alert monitors active. Real-time signal sweeps running.</span>
-                            </div>
-                            <span style="font-size: 9.5px; color: #10b981;">ONLINE</span>
+                            <span style="font-size: 9.5px; color: #10b981; font-family: 'Inter', monospace; font-weight: 700; text-transform: uppercase;">SCANNING</span>
                         </div>
                     `;
+                };
+
+                if (mobileAlerts) {
+                    mobileAlerts.innerHTML = alerts.slice(0, 5).map(a => renderAlertHtml(a)).join('');
                 }
-            } catch (e) {
-                container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Institutional alert center ready.</div>`;
+                container.innerHTML = alerts.slice(0, 5).map(a => renderAlertHtml(a)).join('');
+            } else {
+                const defaultOnlineHtml = `
+                    <div class="alert-home-item" onclick="window.switchTab && window.switchTab('alerts')">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 11px; font-weight: 700; color: #10b981;">SYSTEM</span>
+                            <span style="font-size: 10.5px; color: var(--text-secondary);">Institutional alert monitors active. Real-time sweeps running.</span>
+                        </div>
+                        <span style="font-size: 9.5px; color: #10b981; font-family: 'Inter', monospace;">ONLINE</span>
+                    </div>
+                `;
+                if (mobileAlerts) {
+                    mobileAlerts.innerHTML = defaultOnlineHtml;
+                }
+                container.innerHTML = defaultOnlineHtml;
             }
-        };
+        } catch (e) {
+            console.error("Alerts render error:", e);
+            container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Institutional alert center ready.</div>`;
+        }
+    };
 
         // 5. Fetch, Render & Sort Watchlist Quick-Quote Strip
         let watchlistCachedItems = [];
@@ -5126,12 +5340,23 @@
                 const watchlists = await res.json();
 
                 selector.innerHTML = '<option value="" disabled selected>Select Watchlist</option>';
+                const mobileSel = document.getElementById('mobile-watchlist-selector');
+                if (mobileSel) {
+                    mobileSel.innerHTML = '<option value="" disabled selected>Select Watchlist</option>';
+                }
                 if (watchlists && watchlists.length > 0) {
                     watchlists.forEach(w => {
                         const opt = document.createElement('option');
                         opt.value = w.id;
                         opt.innerText = w.name;
                         selector.appendChild(opt);
+
+                        if (mobileSel) {
+                            const mOpt = document.createElement('option');
+                            mOpt.value = w.id;
+                            mOpt.innerText = w.name;
+                            mobileSel.appendChild(mOpt);
+                        }
                     });
                 }
             } catch (err) {
@@ -5164,7 +5389,118 @@
                     });
                 }
 
-                container.innerHTML = displayItems.map(item => {
+                const mobileWatchlist = document.getElementById('mobile-home-watchlist-container');
+                                if (mobileWatchlist) {
+                    if (displayItems.length > 0) {
+                        // Sort by change_pct descending
+                        const sortedByChange = [...displayItems].sort((a, b) => {
+                            const valA = parseFloat(a.change_pct || 0);
+                            const valB = parseFloat(b.change_pct || 0);
+                            return valB - valA;
+                        });
+
+                        const topGainers = sortedByChange.slice(0, 3);
+                        // Bottom 3 (if length >= 3, slice last 3, else take remainder that are not gainers or just bottom)
+                        // If we have very few stocks, let's make sure we don't overlap duplicates
+                        const topLosers = sortedByChange.length > 3 ? sortedByChange.slice(-3).reverse() : [];
+
+                        let htmlContent = '';
+
+                        // Render Gainers Group
+                        if (topGainers.length > 0) {
+                            htmlContent += `
+                                <div style="font-size: 10px; font-weight: 700; color: #10b981; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.03em;">🔥 Watchlist Gainers</div>
+                                <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left; margin-bottom: 12px;">
+                                    <tbody>
+                                        ${topGainers.map(item => {
+                                            const changePct = parseFloat(item.change_pct || 0);
+                                            const changeClass = changePct >= 0 ? 'cmp-badge-up' : 'cmp-badge-down';
+                                            return `
+                                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.02); height: 34px; cursor: pointer;" onclick="
+    const searchInput = document.getElementById('analyzer-search-input');
+    const searchBtn = document.getElementById('analyzer-search-btn');
+    if (searchInput && searchBtn) {
+        searchInput.value = '${item.symbol}';
+        window.switchTab('analyzer');
+        searchBtn.click();
+    }
+">
+                                                    <td style="padding: 5px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol}</td>
+                                                    <td style="padding: 5px 4px; text-align: right; color: var(--text-primary); font-weight: 600; font-family: 'Inter', monospace;">₹${parseFloat(item.live_price || 0).toFixed(2)}</td>
+                                                    <td style="padding: 5px 4px; text-align: right; font-weight: 700; font-family: 'Inter', monospace;" class="${changeClass}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            `;
+                        }
+
+                        // Render Losers Group
+                        if (topLosers.length > 0) {
+                            htmlContent += `
+                                <div style="font-size: 10px; font-weight: 700; color: #ef4444; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.03em;">❄️ Watchlist Losers</div>
+                                <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
+                                    <tbody>
+                                        ${topLosers.map(item => {
+                                            const changePct = parseFloat(item.change_pct || 0);
+                                            const changeClass = changePct >= 0 ? 'cmp-badge-up' : 'cmp-badge-down';
+                                            return `
+                                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.02); height: 34px; cursor: pointer;" onclick="
+    const searchInput = document.getElementById('analyzer-search-input');
+    const searchBtn = document.getElementById('analyzer-search-btn');
+    if (searchInput && searchBtn) {
+        searchInput.value = '${item.symbol}';
+        window.switchTab('analyzer');
+        searchBtn.click();
+    }
+">
+                                                    <td style="padding: 5px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol}</td>
+                                                    <td style="padding: 5px 4px; text-align: right; color: var(--text-primary); font-weight: 600; font-family: 'Inter', monospace;">₹${parseFloat(item.live_price || 0).toFixed(2)}</td>
+                                                    <td style="padding: 5px 4px; text-align: right; font-weight: 700; font-family: 'Inter', monospace;" class="${changeClass}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            `;
+                        } else if (sortedByChange.length <= 3) {
+                            // If total items <= 3, just show them all in a single watchlist list without splitting
+                            htmlContent = `
+                                <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.03em;">📋 Watchlist Items</div>
+                                <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
+                                    <tbody>
+                                        ${sortedByChange.map(item => {
+                                            const changePct = parseFloat(item.change_pct || 0);
+                                            const changeClass = changePct >= 0 ? 'cmp-badge-up' : 'cmp-badge-down';
+                                            return `
+                                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.02); height: 34px; cursor: pointer;" onclick="
+    const searchInput = document.getElementById('analyzer-search-input');
+    const searchBtn = document.getElementById('analyzer-search-btn');
+    if (searchInput && searchBtn) {
+        searchInput.value = '${item.symbol}';
+        window.switchTab('analyzer');
+        searchBtn.click();
+    }
+">
+                                                    <td style="padding: 5px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol}</td>
+                                                    <td style="padding: 5px 4px; text-align: right; color: var(--text-primary); font-weight: 600; font-family: 'Inter', monospace;">₹${parseFloat(item.live_price || 0).toFixed(2)}</td>
+                                                    <td style="padding: 5px 4px; text-align: right; font-weight: 700; font-family: 'Inter', monospace;" class="${changeClass}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            `;
+                        }
+
+                        mobileWatchlist.innerHTML = htmlContent;
+                    } else {
+                        mobileWatchlist.innerHTML = '<div class="recent-research-empty" style="font-size: 11px;">No stocks in watchlist.</div>';
+                    }
+                }
+                                // Define row element renderer
+                const renderRowItem = (item) => {
                     const price = item.live_price !== undefined ? parseFloat(item.live_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '--';
                     const changeVal = item.change_pct !== undefined ? parseFloat(item.change_pct) : 0;
                     const changeStr = item.change_pct !== undefined ? `${changeVal >= 0 ? '+' : ''}${changeVal.toFixed(2)}%` : '--';
@@ -5172,23 +5508,51 @@
                     const arrow = isPositive ? '▲' : '▼';
                     const color = isPositive ? '#10b981' : '#ef4444';
                     const bg = isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
-
                     const cleanSym = item.symbol.replace('.NS', '');
+
                     return `
-                        <div class="watchlist-row-item" data-symbol="${cleanSym}" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: 6px; cursor: pointer; transition: background 0.15s, transform 0.1s;">
-                            <div class="wl-item-left" style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0; text-align: left;">
-                                <span style="font-size: 11.5px; font-weight: 700; color: var(--text-primary);">${cleanSym}</span>
-                                <span style="font-size: 9.5px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;">${item.name || item.sector || ''}</span>
-                            </div>
-                            <div class="wl-item-price" style="width: 80px; text-align: right; font-size: 11.5px; font-weight: 600; color: var(--text-primary); font-family: 'Inter', monospace;">
-                                ₹${price}
-                            </div>
-                            <div class="wl-item-change" style="width: 80px; text-align: right; font-size: 10.5px; font-weight: 700;">
-                                <span style="color: ${color}; padding: 1px 6px; border-radius: 4px; background: ${bg};">${arrow} ${changeStr}</span>
+                        <div class="watchlist-row-item" data-symbol="${cleanSym}" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: rgba(255, 255, 255, 0.015); border: 1px solid var(--border-glass); border-radius: 6px; cursor: pointer; transition: background 0.15s, transform 0.1s; height: 38px; box-sizing: border-box;">
+                            <div style="font-weight: 700; color: var(--text-primary); font-size: 11.5px; width: 85px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${cleanSym}</div>
+                            <div style="text-align: right; color: var(--text-primary); font-weight: 600; font-family: 'Inter', monospace; font-size: 11px; flex-grow: 1; padding-right: 12px;">₹${price}</div>
+                            <div style="text-align: right; font-weight: 700; font-family: 'Inter', monospace; font-size: 10px; width: 68px; flex-shrink: 0;">
+                                <span style="color: ${color}; padding: 2px 6px; border-radius: 4px; background: ${bg}; display: inline-block; min-width: 54px; text-align: right;">${arrow}${changeStr}</span>
                             </div>
                         </div>
                     `;
-                }).join('');
+                };
+
+                // Split displayItems into Top 3 Gainers and Bottom 3 Losers by change_pct
+                const sortedByChange = [...displayItems].sort((a, b) => {
+                    const valA = parseFloat(a.change_pct || 0);
+                    const valB = parseFloat(b.change_pct || 0);
+                    return valB - valA;
+                });
+
+                if (sortedByChange.length > 3) {
+                    const gainers = sortedByChange.slice(0, 3);
+                    const losers = sortedByChange.slice(-3).reverse();
+
+                    container.innerHTML = `
+                        <div style="display: flex; gap: 16px; width: 100%;">
+                            <!-- Left Column (Gainers) -->
+                            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                                <div style="font-size: 9px; font-weight: 700; color: #10b981; text-transform: uppercase; letter-spacing: 0.03em; border-left: 2px solid #10b981; padding-left: 6px; margin-bottom: 2px;">🔥 Watchlist Gainers</div>
+                                ${gainers.map(item => renderRowItem(item)).join('')}
+                            </div>
+                            <!-- Right Column (Losers) -->
+                            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                                <div style="font-size: 9px; font-weight: 700; color: #ef4444; text-transform: uppercase; letter-spacing: 0.03em; border-left: 2px solid #ef4444; padding-left: 6px; margin-bottom: 2px;">❄️ Watchlist Losers</div>
+                                ${losers.map(item => renderRowItem(item)).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+                            ${sortedByChange.map(item => renderRowItem(item)).join('')}
+                        </div>
+                    `;
+                }
 
                 container.querySelectorAll('.watchlist-row-item').forEach(row => {
                     row.onclick = (e) => {
@@ -5205,9 +5569,12 @@
                 });
             };
 
-            selector.onchange = async () => {
-                const watchlistId = selector.value;
+            const onWatchlistChange = async (watchlistId) => {
                 container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Fetching live quotes...</div>`;
+                const mobileWatchlist = document.getElementById('mobile-home-watchlist-container');
+                if (mobileWatchlist) {
+                    mobileWatchlist.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Fetching live quotes...</div>`;
+                }
                 watchlistCachedItems = [];
 
                 try {
@@ -5243,19 +5610,34 @@
 
                     watchlistCachedItems = items;
                     renderWatchlistList();
+                    setTimeout(bindMobileSortHeaders, 100);
                 } catch (err) {
                     console.error("Desktop watchlist loading failed:", err);
                     container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Failed to load live watchlist.</div>`;
                 }
             };
 
+            selector.onchange = async () => {
+                const mobileSel = document.getElementById('mobile-watchlist-selector');
+                if (mobileSel) mobileSel.value = selector.value;
+                await onWatchlistChange(selector.value);
+            };
+
+            const mobileSelEl = document.getElementById('mobile-watchlist-selector');
+            if (mobileSelEl) {
+                mobileSelEl.onchange = async () => {
+                    selector.value = mobileSelEl.value;
+                    await onWatchlistChange(mobileSelEl.value);
+                };
+            }
+
             const updateSortHeaderIcons = () => {
-                ['sort-wl-symbol', 'sort-wl-price', 'sort-wl-change'].forEach(id => {
+                ['sort-wl-symbol', 'sort-wl-price', 'sort-wl-change', 'mobile-sort-wl-symbol', 'mobile-sort-wl-price', 'mobile-sort-wl-change'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) {
                         const icon = el.querySelector('.sort-icon');
                         if (icon) {
-                            const col = id === 'sort-wl-symbol' ? 'symbol' : (id === 'sort-wl-price' ? 'live_price' : 'change_pct');
+                            const col = (id.includes('symbol')) ? 'symbol' : ((id.includes('price')) ? 'live_price' : 'change_pct');
                             if (wlSortCol === col) {
                                 icon.innerText = wlSortDir === 'asc' ? ' ▲' : (wlSortDir === 'desc' ? ' ▼' : '');
                             } else {
@@ -5289,23 +5671,88 @@
             if (headerSym) headerSym.onclick = () => toggleSort('symbol');
             if (headerPrice) headerPrice.onclick = () => toggleSort('live_price');
             if (headerChange) headerChange.onclick = () => toggleSort('change_pct');
+
+            // Wire Mobile Header Clicks
+            const bindMobileSortHeaders = () => {
+                const mHeaderSym = document.getElementById('mobile-sort-wl-symbol');
+                const mHeaderPrice = document.getElementById('mobile-sort-wl-price');
+                const mHeaderChange = document.getElementById('mobile-sort-wl-change');
+                if (mHeaderSym) mHeaderSym.onclick = () => toggleSort('symbol');
+                if (mHeaderPrice) mHeaderPrice.onclick = () => toggleSort('live_price');
+                if (mHeaderChange) mHeaderChange.onclick = () => toggleSort('change_pct');
+                updateSortHeaderIcons();
+            };
+            setTimeout(bindMobileSortHeaders, 100);
         };
 
         // 6. Fetch & Render Quant Top Picks Table (Screener Integration with Strategy Tabs)
         let quantPicksCache = { hybrid: [], bottom_up: [], top_down: [] };
-        let activeQuantStrategy = 'hybrid';
+        window.activeQuantStrategy = 'hybrid';
 
-        const renderQuantTopPicksList = () => {
+        const renderQuantTopPicksList = () => { window.renderQuantTopPicksList = renderQuantTopPicksList;
+            // Synchronize active indicator on mobile strategy tabs
+            const qTabHybrid = document.getElementById('mobile-quant-tab-hybrid');
+            const qTabBU = document.getElementById('mobile-quant-tab-bottom_up');
+            const qTabTD = document.getElementById('mobile-quant-tab-top_down');
+            if (qTabHybrid && qTabBU && qTabTD) {
+                qTabHybrid.classList.remove('active');
+                qTabBU.classList.remove('active');
+                qTabTD.classList.remove('active');
+                if (window.activeQuantStrategy === 'hybrid') qTabHybrid.classList.add('active');
+                else if (window.activeQuantStrategy === 'bottom_up') qTabBU.classList.add('active');
+                else if (window.activeQuantStrategy === 'top_down') qTabTD.classList.add('active');
+            }
             const tbody = document.getElementById('desktop-quant-picks-body');
             if (!tbody) return;
 
-            const data = quantPicksCache[activeQuantStrategy] || [];
+            const data = quantPicksCache[window.activeQuantStrategy] || [];
             if (data && data.length > 0) {
                 // Sort by score descending
                 const sorted = [...data].sort((a, b) => (b.score || 0) - (a.score || 0));
                 const top5 = sorted.slice(0, 5);
 
-                tbody.innerHTML = top5.map((item, idx) => {
+                const mobileQuantPicks = document.getElementById('mobile-home-quant-picks-container');
+            if (mobileQuantPicks) {
+                if (top5.length > 0) {
+                    mobileQuantPicks.innerHTML = `
+                        <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-secondary); font-weight: 700; font-size: 9.5px; height: 26px; text-transform: uppercase;">
+                                    <th style="padding: 6px 4px;">Ticker</th>
+                                    <th style="padding: 6px 4px; text-align: center;">Score</th>
+                                    <th style="padding: 6px 4px; text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${top5.map(item => {
+                                    const scoreVal = parseInt(item.score || 0);
+                                    const scoreColor = scoreVal >= 70 ? '#10b981' : '#f59e0b';
+                                    const actionStr = (item.action || 'BUY').toUpperCase().includes('BUY') ? 'BUY' : 'SELL';
+                                    const actionClass = actionStr === 'BUY' ? 'cmp-badge-up' : 'cmp-badge-down';
+                                    return `
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); height: 36px; cursor: pointer;" onclick="
+    const searchInput = document.getElementById('analyzer-search-input');
+    const searchBtn = document.getElementById('analyzer-search-btn');
+    if (searchInput && searchBtn) {
+        searchInput.value = '${item.symbol.replace('.NS', '')}';
+        window.switchTab('analyzer');
+        searchBtn.click();
+    }
+">
+                                            <td style="padding: 6px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol.replace('.NS', '')}</td>
+                                            <td style="padding: 6px 4px; text-align: center; font-weight: 800; color: ${scoreColor}; font-family: 'Inter', monospace;">${scoreVal}</td>
+                                            <td style="padding: 6px 4px; text-align: right; font-weight: 700;" class="${actionClass}">${actionStr}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    mobileQuantPicks.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Scanning market for picks...</div>`;
+                }
+            }
+            tbody.innerHTML = top5.map((item, idx) => {
                     const cleanSym = item.symbol.replace('.NS', '');
                     let compName = item.name || '';
                     compName = compName.replace(/(Limited|Ltd\.|\(India\)|\(I\))/gi, '').trim();
@@ -5382,7 +5829,7 @@
                         tab.style.borderColor = 'var(--border-glass)';
                         tab.style.color = 'var(--text-primary)';
 
-                        activeQuantStrategy = tab.getAttribute('data-strategy');
+                        window.activeQuantStrategy = tab.getAttribute('data-strategy');
                         renderQuantTopPicksList();
                     });
                 }
@@ -5423,14 +5870,14 @@
         if (moversViewAll) {
             moversViewAll.onclick = (e) => {
                 e.stopPropagation();
-                if (window.switchTab) window.switchTab('sector-radar');
+                if (window.switchTab) window.switchTab('movers');
             };
         }
         const newsViewAll = document.getElementById('desktop-news-view-all-btn');
         if (newsViewAll) {
             newsViewAll.onclick = (e) => {
                 e.stopPropagation();
-                if (window.switchTab) window.switchTab('analyzer');
+                if (window.switchTab) window.switchTab('market-news');
             };
         }
         const quantViewAll = document.getElementById('desktop-quant-picks-view-all-btn');
@@ -5475,7 +5922,7 @@
             rsi_oversold: [], rsi_overbought: [], volume_shockers: [], golden_crossover: [],
             sma_50_pullback: [], sma_100_pullback: [], sma_200_pullback: [], fib_618_support: [], fib_500_support: []
         };
-        let activeTechnicalScan = 'near_high';
+        window.activeTechnicalScan = 'near_high';
         let fullscreenActiveScan = 'near_high';
         let fullscreenSortCol = 'value'; // Default sort metric value
         let fullscreenSortDir = 'asc';   // Default sort asc
@@ -5565,16 +6012,16 @@
             });
         };
 
-        const renderTechnicalScansList = () => {
+        const renderTechnicalScansList = () => { window.renderTechnicalScansList = renderTechnicalScansList;
             const tbody = document.getElementById('desktop-technical-scans-body');
             const desktopMetricHeader = document.getElementById('desktop-tech-scan-metric-header');
             if (!tbody) return;
 
             if (desktopMetricHeader) {
-                if (activeTechnicalScan === 'near_high') desktopMetricHeader.innerText = 'Dist to High';
-                else if (activeTechnicalScan === 'near_low') desktopMetricHeader.innerText = 'Dist to Low';
-                else if (activeTechnicalScan === 'gap_up' || activeTechnicalScan === 'gap_down') desktopMetricHeader.innerText = 'Opening Gap';
-                else if (activeTechnicalScan.includes('rsi')) desktopMetricHeader.innerText = 'RSI (14)';
+                if (window.activeTechnicalScan === 'near_high') desktopMetricHeader.innerText = 'Dist to High';
+                else if (window.activeTechnicalScan === 'near_low') desktopMetricHeader.innerText = 'Dist to Low';
+                else if (window.activeTechnicalScan === 'gap_up' || window.activeTechnicalScan === 'gap_down') desktopMetricHeader.innerText = 'Opening Gap';
+                else if (window.activeTechnicalScan.includes('rsi')) desktopMetricHeader.innerText = 'RSI (14)';
                 else if (activeTechnicalScan === 'volume_shockers') desktopMetricHeader.innerText = 'Vol Multiplier';
                 else if (activeTechnicalScan === 'golden_crossover') desktopMetricHeader.innerText = 'Golden Cross Spread';
                 else if (activeTechnicalScan === 'sma_50_pullback') desktopMetricHeader.innerText = 'Dist to 50MA';
@@ -5585,9 +6032,65 @@
                 else desktopMetricHeader.innerText = 'Scan Detail';
             }
 
-            const list = technicalScansCache[activeTechnicalScan] || [];
+            const list = technicalScansCache[window.activeTechnicalScan] || [];
             if (list && list.length > 0) {
-                tbody.innerHTML = list.slice(0, 5).map((item, idx) => {
+                const mobileTechScans = document.getElementById('mobile-home-tech-scans-container');
+            // Synchronize active indicator on mobile tech tabs
+            const mtHigh = document.getElementById('mobile-tech-tab-near_high');
+            const mtLow = document.getElementById('mobile-tech-tab-near_low');
+            const mtGapUp = document.getElementById('mobile-tech-tab-gap_up');
+            const mtGapDown = document.getElementById('mobile-tech-tab-gap_down');
+            if (mtHigh && mtLow && mtGapUp && mtGapDown) {
+                mtHigh.classList.remove('active');
+                mtLow.classList.remove('active');
+                mtGapUp.classList.remove('active');
+                mtGapDown.classList.remove('active');
+                if (window.activeTechnicalScan === 'near_high') mtHigh.classList.add('active');
+                else if (window.activeTechnicalScan === 'near_low') mtLow.classList.add('active');
+                else if (window.activeTechnicalScan === 'gap_up') mtGapUp.classList.add('active');
+                else if (window.activeTechnicalScan === 'gap_down') mtGapDown.classList.add('active');
+            }
+
+            if (mobileTechScans) {
+                if (list.length > 0) {
+                    mobileTechScans.innerHTML = `
+                        <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-secondary); font-weight: 700; font-size: 9.5px; height: 26px; text-transform: uppercase;">
+                                    <th style="padding: 6px 4px;">Ticker</th>
+                                    <th style="padding: 6px 4px; text-align: right;">CMP</th>
+                                    <th style="padding: 6px 4px; text-align: right;">Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${list.slice(0, 5).map(item => {
+                                    const changePct = parseFloat(item.change_pct || 0);
+                                    const changeClass = changePct >= 0 ? 'cmp-badge-up' : 'cmp-badge-down';
+                                    return `
+                                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); height: 36px; cursor: pointer;" onclick="
+    const searchInput = document.getElementById('analyzer-search-input');
+    const searchBtn = document.getElementById('analyzer-search-btn');
+    if (searchInput && searchBtn) {
+        searchInput.value = '${item.symbol}';
+        window.switchTab('analyzer');
+        searchBtn.click();
+    }
+">
+                                            <td style="padding: 6px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol}</td>
+                                            <td style="padding: 6px 4px; text-align: right; color: var(--text-primary); font-family: 'Inter', monospace; font-weight: 600;">₹${item.price} <span style="font-size: 9.5px;" class="${changeClass}">(${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%)</span></td>
+                                            <td style="padding: 6px 4px; text-align: right; font-weight: 700; color: var(--neon-green); font-family: 'Inter', monospace;">${item.value}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    mobileTechScans.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Scanning technical breakouts...</div>`;
+                }
+            }
+            
+            tbody.innerHTML = list.slice(0, 5).map((item, idx) => {
                     const cleanSym = item.symbol;
                     let compName = item.name || '';
                     compName = compName.replace(/(Limited|Ltd\.|\(India\)|\(I\))/gi, '').trim();
@@ -5595,7 +6098,7 @@
                     // Determine sentiment color badge based on active scan strategy
                     let badgeClass = 'buy';
                     let badgeText = 'BULLISH';
-                    if (activeTechnicalScan === 'near_low' || activeTechnicalScan === 'gap_down' || activeTechnicalScan === 'rsi_overbought') {
+                    if (window.activeTechnicalScan === 'near_low' || window.activeTechnicalScan === 'gap_down' || activeTechnicalScan === 'rsi_overbought') {
                         badgeClass = 'sell';
                         badgeText = 'BEARISH';
                     }
@@ -5604,7 +6107,7 @@
                     let formattedVal = item.value;
                     let metricStyle = 'color: var(--text-primary); font-weight: 600;';
 
-                    if (activeTechnicalScan.includes('rsi')) {
+                    if (window.activeTechnicalScan.includes('rsi')) {
                         const rsiVal = (item.rsi !== undefined && item.rsi !== null) ? Number(item.rsi) : (item.value !== undefined ? Number(item.value) : null);
                         if (rsiVal !== null && !isNaN(rsiVal)) {
                             formattedVal = rsiVal.toFixed(1);
@@ -5615,9 +6118,9 @@
                             }
                         }
                     } else if (typeof formattedVal === 'number') {
-                        if (activeTechnicalScan.includes('near') || activeTechnicalScan.includes('gap') || activeTechnicalScan.includes('pullback') || activeTechnicalScan.includes('fib')) {
+                        if (window.activeTechnicalScan.includes('near') || window.activeTechnicalScan.includes('gap') || window.activeTechnicalScan.includes('pullback') || window.activeTechnicalScan.includes('fib')) {
                             formattedVal = formattedVal.toFixed(2) + '%';
-                        } else if (activeTechnicalScan.includes('volume')) {
+                        } else if (window.activeTechnicalScan.includes('volume')) {
                             formattedVal = formattedVal.toFixed(1) + 'x';
                         }
                     }
@@ -5892,7 +6395,7 @@
                             searchInput.value = symbol;
                             searchInput.focus();
                             if (searchBtn) searchBtn.click();
-                            if (window.switchTab) window.switchTab('analyzer');
+                            if (window.switchTab) window.switchTab('market-news');
                         }
                     };
                 });
@@ -5907,7 +6410,7 @@
                             searchInput.value = symbol;
                             searchInput.focus();
                             if (searchBtn) searchBtn.click();
-                            if (window.switchTab) window.switchTab('analyzer');
+                            if (window.switchTab) window.switchTab('market-news');
                         }
                     };
                 });
@@ -5974,7 +6477,7 @@
                         tab.style.borderColor = 'var(--border-glass)';
                         tab.style.color = 'var(--text-primary)';
 
-                        activeTechnicalScan = tab.getAttribute('data-scan');
+                        window.activeTechnicalScan = tab.getAttribute('data-scan');
                         renderTechnicalScansList();
                     });
                 }
