@@ -2170,19 +2170,19 @@
                             </div>
                         </div>
                         
-                        <!-- SWOT & Price Performance Card -->
-                        <div class="card col-span-4 no-print" id="swot-performance-card" data-subtab="summary" style="margin-top: 15px; margin-bottom: 15px;">
+                        <!-- Price Performance & Shareholding Card -->
+                        <div class="card col-span-2 no-print" id="performance-shareholding-card" data-subtab="summary" style="margin-top: 15px; margin-bottom: 15px;">
                             <div class="card-header" style="border: none; padding-bottom: 0;">
                                 <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
-                                    <span>📊</span> STOCK SWOT & PRICE PERFORMANCE
+                                    <span>📊</span> PRICE & SHAREHOLDING PROFILE
                                 </h3>
                             </div>
                             
                             <!-- Price Performance Section -->
                             <div style="padding: 15px 20px 20px 20px; border-bottom: 1px solid var(--border-glass);">
                                 <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 15px;">Price Performance Profile</div>
-                                <div class="perf-row-container" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px;">
-                                    <!-- 1W, 1M, 3M, YTD, 1Y, 3Y -->
+                                <div class="perf-row-container" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;">
+                                    <!-- 1W, 1M, 3M, YTD, 1Y, 3Y in a beautiful 3x2 grid -->
                                     <div class="perf-tile" style="background: var(--bg-card-sub); border: 1px solid var(--border-glass); padding: 12px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; gap: 6px;">
                                         <div style="font-size: 11px; font-weight: 600; color: var(--text-muted);">1 Week</div>
                                         <div id="perf-val-1w" style="font-size: 16px; font-weight: 700; color: var(--text-primary);">--</div>
@@ -2229,7 +2229,7 @@
                             </div>
                             
                             <!-- Quick-Glance Shareholding Section -->
-                            <div style="padding: 15px 20px; border-bottom: 1px solid var(--border-glass);">
+                            <div style="padding: 15px 20px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                     <span style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-family: 'Outfit', sans-serif;">📊 Institutional & Promoter Shareholding (Latest)</span>
                                     <span id="summary-sh-quarter-label" style="font-size: 10.5px; color: var(--text-muted); font-weight: 600;">Loading...</span>
@@ -2243,32 +2243,39 @@
                                     <div id="summary-sh-bar-public" class="sh-segment sh-public" style="width: 0%;" title="Public"></div>
                                 </div>
                                 <!-- Legend Row -->
-                                <div style="display: flex; flex-wrap: wrap; gap: 15px; font-size: 10px; color: var(--text-secondary);">
+                                <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 9px; color: var(--text-secondary);">
                                     <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #3b82f6;"></span>
+                                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 2px; background: #3b82f6;"></span>
                                         <span>Promoters: <strong id="summary-sh-promoter-val">--</strong></span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #f59e0b;"></span>
+                                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 2px; background: #f59e0b;"></span>
                                         <span>FIIs: <strong id="summary-sh-fii-val">--</strong></span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #10b981;"></span>
+                                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 2px; background: #10b981;"></span>
                                         <span>DIIs: <strong id="summary-sh-dii-val">--</strong></span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #8b5cf6;"></span>
+                                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 2px; background: #8b5cf6;"></span>
                                         <span>Gov: <strong id="summary-sh-government-val">--</strong></span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 4px;">
-                                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #6b7280;"></span>
+                                        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 2px; background: #6b7280;"></span>
                                         <span>Public: <strong id="summary-sh-public-val">--</strong></span>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- SWOT Diagnostic Assessment Card -->
+                        <div class="card col-span-2 no-print" id="swot-diagnostic-card" data-subtab="summary" style="margin-top: 15px; margin-bottom: 15px;">
+                            <div class="card-header" style="border: none; padding-bottom: 0;">
+                                <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                                    <span>⚔️</span> SWOT DIAGNOSTIC ASSESSMENT
+                                </h3>
+                            </div>
                             
-                            <!-- SWOT 2x2 Quadrant Grid -->
-                            <!-- Segmented SWOT Balance Control (Webull/Enterprise Style) -->
                             <div style="padding: 20px;">
                                 <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 15px;">SWOT Diagnostic Assessment</div>
                                 
@@ -2280,7 +2287,7 @@
                                         <div id="swot-bar-w" class="swot-bar-segment" style="width: 25%; background: #f97316;"></div>
                                         <div id="swot-bar-t" class="swot-bar-segment" style="width: 25%; background: #ef4444;"></div>
                                     </div>
-                                    <div class="swot-balance-legend">
+                                    <div class="swot-balance-legend" style="display: flex; gap: 10px; justify-content: space-between; font-size: 9px; margin-top: 8px;">
                                         <span class="legend-item strengths"><span class="legend-color" style="background:#10b981;"></span>Strengths <strong id="swot-leg-s">--</strong></span>
                                         <span class="legend-item opps"><span class="legend-color" style="background:#3b82f6;"></span>Opps <strong id="swot-leg-o">--</strong></span>
                                         <span class="legend-item weaknesses"><span class="legend-color" style="background:#f97316;"></span>Weaknesses <strong id="swot-leg-w">--</strong></span>
@@ -2289,7 +2296,7 @@
                                 </div>
                                 
                                 <!-- iOS-Style Segmented Tab Switcher -->
-                                <div class="swot-tabs-control no-print">
+                                <div class="swot-tabs-control no-print" style="margin-top: 15px; margin-bottom: 15px;">
                                     <div class="swot-tab-slide-bg" id="swot-tab-slider"></div>
                                     <button class="swot-tab-btn active" data-tab="strengths">Strengths <span class="swot-tab-count" id="tab-count-s">0</span></button>
                                     <button class="swot-tab-btn" data-tab="opportunities">Opps <span class="swot-tab-count" id="tab-count-o">0</span></button>
