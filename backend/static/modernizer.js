@@ -3667,8 +3667,8 @@
                 </div>
                 <div class="movers-container mobile-glass-card">
                     <div class="movers-segmented-control">
-                        <button class="movers-segmented-tab active" id="movers-tab-gainers">Gainers</button>
-                        <button class="movers-segmented-tab" id="movers-tab-losers">Losers</button>
+                        <button class="tech-segmented-tab active" id="movers-tab-gainers">Gainers</button>
+                        <button class="tech-segmented-tab" id="movers-tab-losers">Losers</button>
                     </div>
                     <div class="mobile-movers-cap-selector-container" style="display: flex; gap: 8px; margin: 10px 0 15px 0; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px;">
                         <button class="mobile-movers-cap-tab active" data-cap="all" style="flex-shrink:0;">All Cap</button>
@@ -3695,9 +3695,9 @@
                 </div>
                 <div class="mobile-glass-card" style="padding: 12px; margin-bottom: 20px;">
                     <div class="movers-segmented-control" style="margin-bottom: 12px; display: flex; gap: 4px;">
-                        <button class="movers-segmented-tab active" id="mobile-quant-tab-hybrid" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">Hybrid</button>
-                        <button class="movers-segmented-tab" id="mobile-quant-tab-bottom_up" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">Bottom-Up</button>
-                        <button class="movers-segmented-tab" id="mobile-quant-tab-top_down" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">Top-Down</button>
+                        <button class="tech-segmented-tab active" id="mobile-quant-tab-hybrid" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">Hybrid</button>
+                        <button class="tech-segmented-tab" id="mobile-quant-tab-bottom_up" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">Bottom-Up</button>
+                        <button class="tech-segmented-tab" id="mobile-quant-tab-top_down" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">Top-Down</button>
                     </div>
                     <div id="mobile-home-quant-picks-container" style="display: flex; flex-direction: column; gap: 8px;">
                         <div class="recent-research-empty" style="font-size: 11px;">Scanning market for quant top picks...</div>
@@ -3725,11 +3725,11 @@
                     <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('technical-scans')" style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">View All →</button>
                 </div>
                 <div class="mobile-glass-card" style="padding: 12px; margin-bottom: 20px;">
-                    <div class="movers-segmented-control scroll-fade-mask" style="margin-bottom: 12px; display: flex; gap: 4px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 2px;">
-                        <button class="movers-segmented-tab active" id="mobile-tech-tab-near_high" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 90px;">Near 52W High</button>
-                        <button class="movers-segmented-tab" id="mobile-tech-tab-near_low" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 90px;">Near 52W Low</button>
-                        <button class="movers-segmented-tab" id="mobile-tech-tab-gap_up" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 80px;">Gap Up</button>
-                        <button class="movers-segmented-tab" id="mobile-tech-tab-gap_down" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 85px;">Gap Down</button>
+                    <div class="tech-segmented-control scroll-fade-mask" style="margin-bottom: 12px; display: flex; gap: 4px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 2px;">
+                        <button class="tech-segmented-tab active" id="mobile-tech-tab-near_high" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 90px;">Near 52W High</button>
+                        <button class="tech-segmented-tab" id="mobile-tech-tab-near_low" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 90px;">Near 52W Low</button>
+                        <button class="tech-segmented-tab" id="mobile-tech-tab-gap_up" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 80px;">Gap Up</button>
+                        <button class="tech-segmented-tab" id="mobile-tech-tab-gap_down" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 10px; min-width: 85px;">Gap Down</button>
                     </div>
                     <div id="mobile-home-tech-scans-container" style="display: flex; flex-direction: column; gap: 8px;">
                         <div class="recent-research-empty" style="font-size: 11px;">Scanning technical breakouts...</div>
@@ -5345,19 +5345,30 @@
                     mobileSel.innerHTML = '<option value="" disabled selected>Select Watchlist</option>';
                 }
                 if (watchlists && watchlists.length > 0) {
+                    // Check main tab selection first, default to first watchlist if none
+                    const mainSelectedId = document.getElementById('watchlist-select')?.value;
+                    const defaultId = (mainSelectedId && mainSelectedId !== "") ? mainSelectedId : watchlists[0].id;
+
                     watchlists.forEach(w => {
                         const opt = document.createElement('option');
                         opt.value = w.id;
                         opt.innerText = w.name;
+                        if (w.id === defaultId) opt.selected = true;
                         selector.appendChild(opt);
 
                         if (mobileSel) {
                             const mOpt = document.createElement('option');
                             mOpt.value = w.id;
                             mOpt.innerText = w.name;
+                            if (w.id === defaultId) mOpt.selected = true;
                             mobileSel.appendChild(mOpt);
                         }
                     });
+
+                    // Auto-load default watchlist
+                    selector.value = defaultId;
+                    if (mobileSel) mobileSel.value = defaultId;
+                    await onWatchlistChange(defaultId);
                 }
             } catch (err) {
                 console.error("Desktop watchlists load error:", err);
@@ -5839,10 +5850,11 @@
                 tbody.innerHTML = `<tr><td colspan="5" class="recent-research-empty" style="padding: 20px 0; text-align: center;">Scanning market for quant top picks...</td></tr>`;
 
                 // Fetch Hybrid, Bottom-Up, and Top-Down screeners in parallel across whole universe (all cap)
+                const tBuster = Date.now();
                 const [resHybrid, resBU, resTD] = await Promise.all([
-                    fetch(apiBaseUrl + '/api/discover?strategy=hybrid&universe=all'),
-                    fetch(apiBaseUrl + '/api/discover?strategy=bottom_up&universe=all'),
-                    fetch(apiBaseUrl + '/api/discover?strategy=top_down&universe=all')
+                    fetch(apiBaseUrl + `/api/discover?strategy=hybrid&universe=all&_t=${tBuster}`),
+                    fetch(apiBaseUrl + `/api/discover?strategy=bottom_up&universe=all&_t=${tBuster}`),
+                    fetch(apiBaseUrl + `/api/discover?strategy=top_down&universe=all&_t=${tBuster}`)
                 ]);
 
                 if (resHybrid.ok) {
@@ -5905,14 +5917,14 @@
         if (techScansViewAll) {
             techScansViewAll.onclick = (e) => {
                 e.stopPropagation();
-                if (window.switchTab) window.switchTab('technical-scans');
+                if (window.switchTab) window.switchTab('alerts');
             };
         }
         const mobileHeaderScans = document.getElementById('mobile-header-scans-btn');
         if (mobileHeaderScans) {
             mobileHeaderScans.onclick = (e) => {
                 e.stopPropagation();
-                if (window.switchTab) window.switchTab('technical-scans');
+                if (window.switchTab) window.switchTab('alerts');
             };
         }
 
@@ -6489,7 +6501,7 @@
                 viewAllBtn.dataset.wired = "true";
                 viewAllBtn.onclick = (e) => {
                     e.stopPropagation();
-                    if (window.switchTab) window.switchTab('technical-scans');
+                    if (window.switchTab) window.switchTab('alerts');
                 };
             }
 

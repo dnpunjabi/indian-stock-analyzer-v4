@@ -20644,3 +20644,60 @@ select option {
     pointer-events: none;
     z-index: 5;
 }
+
+/* Technical Breakouts segmented custom styles */
+.tech-segmented-control {
+    display: flex !important;
+    background: rgba(0, 0, 0, 0.18) !important;
+    border: 1px solid var(--border-glass) !important;
+    border-radius: 8px !important;
+    padding: 3px !important;
+    margin-bottom: 12px !important;
+}
+.tech-segmented-tab {
+    flex: 0 0 auto !important; /* Prevent squeezing and text overlap */
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    padding: 6px 12px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: var(--text-secondary) !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    text-align: center !important;
+    outline: none !important;
+}
+.tech-segmented-tab.active {
+    background: var(--bg-card) !important;
+    color: var(--color-primary) !important;
+    box-shadow: 0 2px 8px var(--color-primary-glow) !important;
+    border: 1px solid var(--color-primary) !important;
+}
+
+/* Header branding fitting adjustments for actual mobile devices */
+@media (max-width: 480px) {
+    .mobile-header {
+        padding: 0 10px !important;
+    }
+    .mobile-logo.inst-brand-badge {
+        padding: 4px 8px !important;
+        gap: 4px !important;
+        max-height: 32px !important;
+    }
+    .mobile-logo.inst-brand-badge .inst-brand-text {
+        flex-direction: row !important;
+        font-size: 11px !important;
+        white-space: nowrap !important;
+        gap: 3px !important;
+    }
+    .mobile-logo.inst-brand-badge .inst-brand-icon-wrap {
+        width: 16px !important;
+        height: 16px !important;
+    }
+    .mobile-logo.inst-brand-badge .inst-logo-svg {
+        width: 14px !important;
+        height: 14px !important;
+        margin-right: 0 !important;
+    }
+}
