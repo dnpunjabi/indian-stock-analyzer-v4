@@ -19258,6 +19258,11 @@ select option {
     overflow: hidden !important;
     text-overflow: ellipsis !important;
 }
+@media (max-width: 768px) {
+    .hud-company {
+        display: none !important;
+    }
+}
 .hud-right {
     display: flex !important;
     align-items: center !important;
