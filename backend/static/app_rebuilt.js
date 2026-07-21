@@ -1141,7 +1141,8 @@ const tabs = {
     'sector-radar': document.getElementById('tab-sector-radar'),
     movers: document.getElementById('tab-movers'),
     'market-news': document.getElementById('tab-market-news'),
-    learning: document.getElementById('tab-learning')
+    learning: document.getElementById('tab-learning'),
+    'technical-scans': document.getElementById('tab-technical-scans')
 };
 
 const tabBtns = {
@@ -1158,7 +1159,8 @@ const tabBtns = {
     'sector-radar': document.getElementById('tab-sector-radar-btn'),
     movers: document.getElementById('tab-movers-btn'),
     'market-news': document.getElementById('tab-market-news-btn'),
-    learning: document.getElementById('tab-learning-btn')
+    learning: document.getElementById('tab-learning-btn'),
+    'technical-scans': document.getElementById('tab-technical-scans-btn')
 };
 
 // Initialize Application

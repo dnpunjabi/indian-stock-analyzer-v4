@@ -1352,7 +1352,8 @@ const tabs = {
     'market-news': document.getElementById('tab-market-news'),
     events: document.getElementById('tab-events'),
     trades: document.getElementById('tab-trades'),
-    learning: document.getElementById('tab-learning')
+    learning: document.getElementById('tab-learning'),
+    'technical-scans': document.getElementById('tab-technical-scans')
 };
 
 const tabBtns = {
@@ -1371,7 +1372,8 @@ const tabBtns = {
     'market-news': document.getElementById('tab-market-news-btn'),
     events: document.getElementById('tab-events-btn'),
     trades: document.getElementById('tab-trades-btn'),
-    learning: document.getElementById('tab-learning-btn')
+    learning: document.getElementById('tab-learning-btn'),
+    'technical-scans': document.getElementById('tab-technical-scans-btn')
 };
 
 // Initialize Application

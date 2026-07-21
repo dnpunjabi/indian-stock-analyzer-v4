@@ -2411,6 +2411,288 @@ async def discover_stocks(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Screener engine failed: {str(e)}")
 
+@app.get("/api/technical-scans")
+async def get_technical_scans():
+    """
+    Scans the database to return stocks qualifying in various technical breakout categories.
+    """
+    import sqlite3
+    import json
+    from backend.agent import get_db, clean_float
+
+    try:
+        def run_scans():
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT s.symbol, s.company_name, s.sector, s.cap_type, p.profile_json 
+                    FROM screener_universe s 
+                    JOIN cached_profiles p ON s.symbol = p.symbol
+                    WHERE s.symbol NOT LIKE '%DUMMY%'
+                """)
+                rows = cursor.fetchall()
+                
+                near_high = []
+                near_low = []
+                gap_up = []
+                gap_down = []
+                rsi_oversold = []
+                rsi_overbought = []
+                volume_shockers = []
+                golden_crossover = []
+                sma_50_pullback = []
+                sma_100_pullback = []
+                sma_200_pullback = []
+                fib_618_support = []
+                fib_500_support = []
+                
+                for r in rows:
+                    symbol = r["symbol"]
+                    name = r["company_name"]
+                    sector = r["sector"]
+                    cap_raw = (r["cap_type"] or "").lower().strip()
+                    
+                    if cap_raw == "large":
+                        segment = "Large Cap"
+                    elif cap_raw == "mid":
+                        segment = "Mid Cap"
+                    elif cap_raw == "small":
+                        segment = "Small Cap"
+                    else:
+                        segment = "Small Cap"
+                    
+                    try:
+                        p = json.loads(r["profile_json"])
+                    except Exception:
+                        continue
+                        
+                    t = p.get("technicals") or {}
+                    f = p.get("fundamentals") or {}
+                    
+                    dist_h = t.get("dist_high_52w_pct")
+                    dist_l = t.get("dist_low_52w_pct")
+                    rsi = t.get("rsi")
+                    vol = t.get("volume_vs_avg20") or t.get("vol_ratio") or t.get("volume_ratio") or t.get("volume_surge_multiplier")
+                    sma50 = t.get("sma_50") or t.get("sma50") or t.get("ema_50") or f.get("sma_50") or p.get("sma_50")
+                    sma100 = t.get("sma_100") or t.get("sma100") or f.get("sma_100") or p.get("sma_100")
+                    sma200 = t.get("sma_200") or t.get("sma200") or t.get("ema_200") or f.get("sma_200") or p.get("sma_200")
+                    
+                    fib = t.get("fib_levels") or {}
+                    fib_618 = fib.get("fib_618")
+                    fib_500 = fib.get("fib_500")
+                    
+                    cp = t.get("current_price") or f.get("current_price") or p.get("current_price")
+                    op = clean_float(f.get("open") or t.get("daily_open"))
+                    pc = clean_float(f.get("previous_close") or t.get("daily_close"))
+                    
+                    h52 = t.get("high_52w") or f.get("high_52week") or f.get("high52")
+                    l52 = t.get("low_52w") or f.get("low_52week") or f.get("low52")
+                    
+                    clean_sym = symbol.replace(".NS", "")
+                    rsi_val = round(clean_float(rsi), 1) if rsi is not None else 50.0
+                    cp_val = round(clean_float(cp), 2) if (cp is not None and clean_float(cp) > 0) else None
+                    pc_val = clean_float(pc) if (pc is not None and clean_float(pc) > 0) else None
+                    chg_pct = round(((cp_val - pc_val) / pc_val) * 100, 2) if (cp_val and pc_val and pc_val > 0) else 0.0
+                    vol_val = round(clean_float(vol), 2) if (vol is not None and clean_float(vol) > 0) else 1.0
+                    s50_val = round(clean_float(sma50), 2) if (sma50 is not None and clean_float(sma50) > 0) else None
+                    s200_val = round(clean_float(sma200), 2) if (sma200 is not None and clean_float(sma200) > 0) else None
+                    h52_val = round(clean_float(h52), 2) if (h52 is not None and clean_float(h52) > 0) else None
+                    l52_val = round(clean_float(l52), 2) if (l52 is not None and clean_float(l52) > 0) else None
+                    dh_val = round(clean_float(dist_h), 2) if dist_h is not None else None
+                    dl_val = round(clean_float(dist_l), 2) if dist_l is not None else None
+
+                    item_meta = {
+                        "symbol": clean_sym,
+                        "name": name,
+                        "sector": sector,
+                        "segment": segment,
+                        "rsi": rsi_val,
+                        "price": cp_val,
+                        "change_pct": chg_pct,
+                        "vol_mult": vol_val,
+                        "sma50": s50_val,
+                        "sma200": s200_val,
+                        "high52": h52_val,
+                        "low52": l52_val,
+                        "dist_h": dh_val,
+                        "dist_l": dl_val
+                    }
+                    
+                    # 1. Near 52W High
+                    if dist_h is not None and clean_float(dist_h) <= 3.0:
+                        near_high.append({
+                            **item_meta,
+                            "value": f"{clean_float(dist_h):.2f}%",
+                            "sort_val": clean_float(dist_h)
+                        })
+                        
+                    # 2. Near 52W Low
+                    if dist_l is not None and clean_float(dist_l) <= 3.0:
+                        near_low.append({
+                            **item_meta,
+                            "value": f"{clean_float(dist_l):.2f}%",
+                            "sort_val": clean_float(dist_l)
+                        })
+                        
+                    # 3. Gap Up / Down
+                    if op > 0 and pc > 0:
+                        gap = ((op - pc) / pc) * 100
+                        if gap >= 1.0:
+                            gap_up.append({
+                                **item_meta,
+                                "value": f"+{gap:.2f}%",
+                                "sort_val": gap
+                            })
+                        elif gap <= -1.0:
+                            gap_down.append({
+                                **item_meta,
+                                "value": f"{gap:.2f}%",
+                                "sort_val": gap
+                            })
+
+                    # 4. RSI Oversold
+                    if rsi is not None and clean_float(rsi) <= 35.0:
+                        rsi_oversold.append({
+                            **item_meta,
+                            "value": f"{clean_float(rsi):.1f}",
+                            "sort_val": clean_float(rsi)
+                        })
+
+                    # 5. RSI Overbought
+                    if rsi is not None and clean_float(rsi) >= 65.0:
+                        rsi_overbought.append({
+                            **item_meta,
+                            "value": f"{clean_float(rsi):.1f}",
+                            "sort_val": clean_float(rsi)
+                        })
+
+                    # 6. Volume Shockers
+                    if vol is not None and clean_float(vol) >= 1.5:
+                        volume_shockers.append({
+                            **item_meta,
+                            "value": f"{clean_float(vol):.2f}x",
+                            "sort_val": clean_float(vol)
+                        })
+
+                    # 7. Golden Crossover (Spread <= 3%)
+                    if sma50 and sma200:
+                        s50 = clean_float(sma50)
+                        s200 = clean_float(sma200)
+                        if s50 > s200:
+                            spread = (s50 - s200) / s200
+                            if spread <= 0.03:
+                                golden_crossover.append({
+                                    **item_meta,
+                                    "value": f"+{spread*100:.2f}%",
+                                    "sort_val": spread
+                                })
+
+                    # 8. SMA 50 Pullback (within 2%)
+                    if cp and sma50:
+                        c_price = clean_float(cp)
+                        s50 = clean_float(sma50)
+                        if s50 > 0:
+                            dist = (c_price - s50) / s50
+                            if abs(dist) <= 0.02:
+                                sma_50_pullback.append({
+                                    **item_meta,
+                                    "value": f"{dist*100:+.2f}%",
+                                    "sort_val": abs(dist)
+                                })
+
+                    # 9. SMA 100 Pullback (within 2%)
+                    if cp and sma100:
+                        c_price = clean_float(cp)
+                        s100 = clean_float(sma100)
+                        if s100 > 0:
+                            dist = (c_price - s100) / s100
+                            if abs(dist) <= 0.02:
+                                sma_100_pullback.append({
+                                    **item_meta,
+                                    "value": f"{dist*100:+.2f}%",
+                                    "sort_val": abs(dist)
+                                })
+
+                    # 10. SMA 200 Pullback (within 2%)
+                    if cp and sma200:
+                        c_price = clean_float(cp)
+                        s200 = clean_float(sma200)
+                        if s200 > 0:
+                            dist = (c_price - s200) / s200
+                            if abs(dist) <= 0.02:
+                                sma_200_pullback.append({
+                                    **item_meta,
+                                    "value": f"{dist*100:+.2f}%",
+                                    "sort_val": abs(dist)
+                                })
+
+                    # 11. Fib 61.8% Support (Golden support)
+                    if cp and fib_618:
+                        c_price = clean_float(cp)
+                        f618 = clean_float(fib_618)
+                        if f618 > 0:
+                            dist = (c_price - f618) / f618
+                            if abs(dist) <= 0.015:
+                                fib_618_support.append({
+                                    **item_meta,
+                                    "value": f"{dist*100:+.2f}%",
+                                    "sort_val": abs(dist)
+                                })
+
+                    # 12. Fib 50.0% Support (Midpoint)
+                    if cp and fib_500:
+                        c_price = clean_float(cp)
+                        f500 = clean_float(fib_500)
+                        if f500 > 0:
+                            dist = (c_price - f500) / f500
+                            if abs(dist) <= 0.015:
+                                fib_500_support.append({
+                                    **item_meta,
+                                    "value": f"{dist*100:+.2f}%",
+                                    "sort_val": abs(dist)
+                                })
+                                
+                # Sort and slice top 50
+                near_high = sorted(near_high, key=lambda x: x["sort_val"])[:50]
+                near_low = sorted(near_low, key=lambda x: x["sort_val"])[:50]
+                gap_up = sorted(gap_up, key=lambda x: x["sort_val"], reverse=True)[:50]
+                gap_down = sorted(gap_down, key=lambda x: x["sort_val"])[:50]
+                rsi_oversold = sorted(rsi_oversold, key=lambda x: x["sort_val"])[:50]
+                rsi_overbought = sorted(rsi_overbought, key=lambda x: x["sort_val"], reverse=True)[:50]
+                volume_shockers = sorted(volume_shockers, key=lambda x: x["sort_val"], reverse=True)[:50]
+                golden_crossover = sorted(golden_crossover, key=lambda x: x["sort_val"])[:50]
+                sma_50_pullback = sorted(sma_50_pullback, key=lambda x: x["sort_val"])[:50]
+                sma_100_pullback = sorted(sma_100_pullback, key=lambda x: x["sort_val"])[:50]
+                sma_200_pullback = sorted(sma_200_pullback, key=lambda x: x["sort_val"])[:50]
+                fib_618_support = sorted(fib_618_support, key=lambda x: x["sort_val"])[:50]
+                fib_500_support = sorted(fib_500_support, key=lambda x: x["sort_val"])[:50]
+                
+                # Cleanup sort_val
+                for lst in [near_high, near_low, gap_up, gap_down, rsi_oversold, rsi_overbought, volume_shockers, golden_crossover, sma_50_pullback, sma_100_pullback, sma_200_pullback, fib_618_support, fib_500_support]:
+                    for item in lst:
+                        item.pop("sort_val", None)
+                        
+                return {
+                    "near_high": near_high,
+                    "near_low": near_low,
+                    "gap_up": gap_up,
+                    "gap_down": gap_down,
+                    "rsi_oversold": rsi_oversold,
+                    "rsi_overbought": rsi_overbought,
+                    "volume_shockers": volume_shockers,
+                    "golden_crossover": golden_crossover,
+                    "sma_50_pullback": sma_50_pullback,
+                    "sma_100_pullback": sma_100_pullback,
+                    "sma_200_pullback": sma_200_pullback,
+                    "fib_618_support": fib_618_support,
+                    "fib_500_support": fib_500_support
+                }
+                
+        results = await asyncio.to_thread(run_scans)
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to query technical scans: {str(e)}")
+
 def fetch_enriched_sector_regime(conn):
     cursor = conn.cursor()
     # 1. Fetch sector averages

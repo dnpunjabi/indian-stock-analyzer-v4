@@ -173,7 +173,8 @@
                 <span class="brand-part-quant">QUANT AI</span>
             </span>
         </div>
-        <div id="mobile-ws-dot" class="mobile-ws-dot-indicator" title="WebSocket Live Status" style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 6px #ef4444; margin-left: auto; margin-right: 12px; display: inline-block;"></div>
+        <button id="mobile-header-scans-btn" class="mobile-header-scan-pill" title="Technical Scans & Breakouts">⚡ Scans</button>
+        <div id="mobile-ws-dot" class="mobile-ws-dot-indicator" title="WebSocket Live Status" style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 6px #ef4444; margin-left: auto; margin-right: 8px; display: inline-block;"></div>
         <button id="mobile-theme-toggle" class="theme-toggle-btn" style="margin-left: 0;">🌓</button>
     </header>
 
@@ -266,6 +267,9 @@
                 </button>
                 <button class="nav-btn" id="tab-sector-radar-btn" data-title="Sector Momentum Radar">
                     <span class="btn-icon">🔥</span> <span class="btn-text">Sector Momentum Radar</span>
+                </button>
+                <button class="nav-btn" id="tab-technical-scans-btn" data-title="Technical Scans & Breakouts">
+                    <span class="btn-icon">⚡</span> <span class="btn-text">Technical Scans & Breakouts</span>
                 </button>
 
                 <div class="nav-category-header">💼 Portfolio & Alerts</div>
@@ -745,6 +749,106 @@
                     <!-- Sector Heatmap Grid Container -->
                     <div id="sector-radar-list" class="sector-heatmap-grid">
                         <!-- Populated dynamically with color-coded heatmap tiles -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- SECTION: TECHNICAL SCANS & BREAKOUTS -->
+            <section class="workspace-tab" id="tab-technical-scans" style="display: none; font-family: 'Inter', sans-serif;">
+                <div class="section-header">
+                    <h2 style="margin: 0 0 6px 0; font-size: 18px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px;">Technical Scans & Breakouts</h2>
+                    <p style="margin: 0; font-size: 11.5px; color: var(--text-muted);">Real-time alerts and setups for stocks approaching key visual support, resistance, 52-week boundaries, or showing opening gaps.</p>
+                </div>
+
+                <div class="card" style="padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Controls Row: Search + Sync -->
+                    <div class="sector-radar-header-wrap" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <input type="text" id="fullscreen-tech-scans-search" placeholder="🔍 Search symbol..." style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); border-radius: 6px; padding: 6px 12px; color: var(--text-primary); font-size: 11.5px; width: 160px; outline: none; transition: border 0.2s;" onfocus="this.style.borderColor='var(--color-primary)'" onblur="this.style.borderColor='var(--border-glass)'">
+                            <select id="fullscreen-tech-scans-mobile-select" class="mobile-scan-dropdown-select" style="display: none; background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 6px; padding: 5px 8px; font-size: 11px; font-weight: 600; outline: none; height: 32px; max-width: 160px;">
+                                <option value="near_high">Near 52W High</option>
+                                <option value="near_low">Near 52W Low</option>
+                                <option value="gap_up">Gap Up</option>
+                                <option value="gap_down">Gap Down</option>
+                                <option value="rsi_oversold">RSI Oversold</option>
+                                <option value="rsi_overbought">RSI Overbought</option>
+                                <option value="volume_shockers">Volume Shockers</option>
+                                <option value="golden_crossover">Golden Crossover</option>
+                                <option value="sma_50_pullback">SMA 50 Pullback</option>
+                                <option value="sma_100_pullback">SMA 100 Pullback</option>
+                                <option value="sma_200_pullback">SMA 200 Pullback</option>
+                                <option value="fib_618_support">Fib 61.8% Support</option>
+                                <option value="fib_500_support">Fib 50.0% Retrace</option>
+                            </select>
+                            <span id="fullscreen-tech-scans-count" class="events-count-badge" style="background: var(--color-primary); color: #000; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; min-width: 18px; text-align: center;">0 Stocks</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                            <span id="fullscreen-tech-scans-sync-time" style="font-size: 11px; color: var(--text-muted); font-family: 'Inter';">Not synced yet</span>
+                            <button id="fullscreen-tech-scans-refresh-btn" class="btn-secondary" style="font-family: 'Outfit'; font-weight: 600; font-size: 11.5px; height: 32px; padding: 0 14px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; transition: all 0.2s; background: var(--bg-glass); border: 1px solid var(--border-glass); color: var(--text-secondary);">
+                                ↻ Sync Scans
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Horizontally Scrollable Selector Tabs (13 Scans) -->
+                    <div class="quant-strategy-selector-container technical-scans-selector" style="display: flex; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--border-glass); overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none;">
+                         <button class="tech-scan-tab-btn active fullscreen-tech-scan-tab" data-scan="near_high" style="background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Near 52W High</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="near_low" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Near 52W Low</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="gap_up" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Gap Up</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="gap_down" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Gap Down</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="rsi_oversold" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">RSI Oversold</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="rsi_overbought" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">RSI Overbought</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="volume_shockers" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Volume Shockers</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="golden_crossover" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Golden Crossover</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="sma_50_pullback" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">SMA 50 Pullback</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="sma_100_pullback" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">SMA 100 Pullback</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="sma_200_pullback" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">SMA 200 Pullback</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="fib_618_support" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Fib 61.8% Support</button>
+                         <button class="tech-scan-tab-btn fullscreen-tech-scan-tab" data-scan="fib_500_support" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Fib 50.0% Retrace</button>
+                    </div>
+
+                    <!-- Scrollable Table -->
+                    <div class="tech-scans-table-container" style="overflow-x: auto; width: 100%; border-radius: 8px; border: 1px solid var(--border-glass);">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11.5px; font-family: 'Inter', sans-serif;">
+                            <thead>
+                                <tr class="sticky-tech-scan-header" style="background: rgba(255,255,255,0.01); border-bottom: 1px solid var(--border-glass); color: var(--text-secondary); font-weight: 700; height: 36px; text-transform: uppercase; font-size: 10px; user-select: none;">
+                                    <th class="col-hide-mobile" style="width: 40px; padding: 6px 12px;">#</th>
+                                    <th class="tech-sortable-header" data-sort="symbol" style="width: 100px; padding: 6px 12px; cursor: pointer;">Ticker <span class="sort-direction"></span></th>
+                                    <th class="tech-sortable-header" data-sort="name" style="padding: 6px 12px; cursor: pointer;">Company Name <span class="sort-direction"></span></th>
+                                    <th class="tech-sortable-header col-hide-mobile" data-sort="sector" style="width: 140px; padding: 6px 12px; cursor: pointer;">Sector <span class="sort-direction"></span></th>
+                                    <th class="tech-sortable-header col-hide-mobile" data-sort="segment" style="width: 100px; padding: 6px 12px; cursor: pointer;">Segment <span class="sort-direction"></span></th>
+                                    <th class="tech-sortable-header" data-sort="price" style="width: 120px; padding: 6px 12px; text-align: right; cursor: pointer;">CMP / Chg <span class="sort-direction"></span></th>
+                                    <th id="fullscreen-tech-scan-metric-header" class="tech-sortable-header" data-sort="value" style="width: 130px; padding: 6px 12px; text-align: right; cursor: pointer;">Scan Detail <span class="sort-direction"></span></th>
+                                    <th style="width: 140px; padding: 6px 12px; text-align: center;">Signal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fullscreen-technical-scans-body">
+                                <tr>
+                                    <td colspan="8" class="recent-research-empty" style="padding: 30px 0; text-align: center;">Scanning technical breakouts...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Smart Pagination Controls for Technical Scans & Breakouts -->
+                    <div id="fullscreen-tech-scans-pagination" class="no-print" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 8px;">
+                        <button class="btn-secondary" id="fullscreen-tech-scans-prev-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>◀ Prev</button>
+                        
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span id="fullscreen-tech-scans-page-info" style="font-size: 11px; font-weight: 600; color: var(--text-secondary);">Page 1 of 1</span>
+                            
+                            <div style="display: flex; align-items: center; gap: 6px; border-left: 1px solid var(--border-glass); padding-left: 15px;">
+                                <span style="font-size: 10px; color: var(--text-secondary);">Records per page:</span>
+                                <select id="fullscreen-tech-scans-pagesize-select" style="background: var(--bg-glass-input); border: 1px solid var(--border-glass); color: var(--text-primary); border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer; outline: none; height: 24px;">
+                                    <option value="5">5</option>
+                                    <option value="10" selected>10</option>
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button class="btn-secondary" id="fullscreen-tech-scans-next-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>Next ▶</button>
                     </div>
                 </div>
             </section>
@@ -1659,10 +1763,11 @@
                                             <span class="header-icon">⭐</span>
                                             <span class="header-title">Watchlist Quick-Quote</span>
                                         </div>
-                                        <div class="header-right">
+                                        <div class="header-right" style="display: flex; align-items: center; gap: 6px;">
                                             <select id="desktop-watchlist-selector" style="background: rgba(255,255,255,0.03); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 2px 6px; font-size: 11px; border-radius: 4px; outline: none; font-family: 'Outfit', sans-serif; cursor: pointer;">
                                                 <option value="" disabled selected>Select Watchlist</option>
                                             </select>
+                                            <button id="desktop-watchlist-view-all-btn" class="no-print" style="background: rgba(255,255,255,0.03); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">View All</button>
                                         </div>
                                     </div>
                                     <div class="watchlist-strip-container">
@@ -1675,6 +1780,61 @@
                                         <div id="desktop-watchlist-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 4px;">
                                             <div class="recent-research-empty" style="font-size: 11px;">Select a watchlist to display quotes.</div>
                                         </div>
+                                    </div>
+                                </div>
+
+                                <!-- Institutional Alert Center Card -->
+                                <div class="desktop-cmd-card" style="margin-top: 24px; margin-bottom: 0;">
+                                    <div class="desktop-cmd-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                                        <div class="header-left">
+                                            <span class="header-icon">🚨</span>
+                                            <span class="header-title" style="font-size: 14px; font-weight: 700; font-family: var(--font-heading);">Institutional Alert Center</span>
+                                        </div>
+                                        <div class="header-right">
+                                            <button id="desktop-alerts-view-all-btn" class="no-print" style="background: rgba(255,255,255,0.03); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">View All</button>
+                                        </div>
+                                    </div>
+                                    <div id="desktop-home-alerts-container" style="display: flex; flex-direction: column; gap: 8px; padding: 4px 0;">
+                                        <div class="recent-research-empty" style="font-size: 11px;">Scanning real-time institutional alerts...</div>
+                                    </div>
+                                </div>
+
+                                <!-- Technical Scans & Breakouts Card -->
+                                <div class="desktop-cmd-card" style="margin-top: 24px; margin-bottom: 0;">
+                                    <div class="desktop-cmd-card-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                                        <div class="header-left">
+                                            <span class="header-icon">⚡</span>
+                                            <span class="header-title" style="font-size: 14px; font-weight: 700; font-family: var(--font-heading);">Technical Scans & Breakouts</span>
+                                        </div>
+                                        <div class="header-right">
+                                            <button id="desktop-tech-scans-view-all-btn" class="no-print" style="background: rgba(255,255,255,0.03); color: var(--text-secondary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">View All</button>
+                                        </div>
+                                    </div>
+                                    <!-- Horizontally Swipeable Selector Tabs -->
+                                    <div class="quant-strategy-selector-container technical-scans-selector" style="display: flex; gap: 8px; padding: 6px 16px 12px 16px; border-bottom: 1px solid var(--border-glass); overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch;">
+                                         <button class="tech-scan-tab-btn active" data-scan="near_high" style="background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Near 52W High</button>
+                                         <button class="tech-scan-tab-btn" data-scan="near_low" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Near 52W Low</button>
+                                         <button class="tech-scan-tab-btn" data-scan="gap_up" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Gap Up</button>
+                                         <button class="tech-scan-tab-btn" data-scan="gap_down" style="background: transparent; color: var(--text-secondary); border: 1px solid transparent; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Gap Down</button>
+                                    </div>
+                                    <div class="technical-scans-container" style="padding: 4px 0;">
+                                        <!-- Mock-Style Table -->
+                                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 11.5px;">
+                                            <thead>
+                                                <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-secondary); font-weight: 700; font-size: 10px; text-transform: uppercase; height: 30px;">
+                                                    <th style="width: 30px; padding: 4px 8px;">#</th>
+                                                    <th style="width: 100px; padding: 4px 8px;">Ticker</th>
+                                                    <th style="padding: 4px 8px;">Company</th>
+                                                    <th id="desktop-tech-scan-metric-header" style="width: 110px; padding: 4px 8px; text-align: right;">Scan Detail</th>
+                                                    <th style="width: 90px; padding: 4px 8px; text-align: center;">Signal</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="desktop-technical-scans-body">
+                                                <tr>
+                                                    <td colspan="5" class="recent-research-empty" style="padding: 20px 0; text-align: center;">Scanning technical breakouts...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
@@ -8549,7 +8709,7 @@
     </div>
 
     <!-- Modernization Custom Layer -->
-    <script src="modernizer.js?v=8.21"></script>
+    <script src="modernizer.js?v=8.27"></script>
 
     <!-- Mobile Frosted Glass Slide-up Details Bottom Sheet -->
     <div id="mobile-details-bottom-sheet" class="mobile-bottom-sheet no-print" style="display: none;">
