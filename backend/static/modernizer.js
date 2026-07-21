@@ -4711,6 +4711,11 @@
             if (summaryEl) {
                 summaryEl.innerHTML = deriveMarketBreadthGreeting();
             }
+
+            // Render other dynamic lists that were fetched on startup to prevent overrides
+            if (typeof renderWatchlistList === 'function') renderWatchlistList();
+            if (typeof renderQuantTopPicksList === 'function') renderQuantTopPicksList();
+            if (typeof renderTechnicalScansList === 'function') renderTechnicalScansList();
         }
 
         // Wire android mic listener relay
@@ -5374,7 +5379,7 @@
                 console.error("Desktop watchlists load error:", err);
             }
 
-            const renderWatchlistList = () => {
+            function renderWatchlistList() {
                 if (watchlistCachedItems.length === 0) {
                     container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No stocks in this watchlist.</div>`;
                     return;
@@ -5580,7 +5585,7 @@
                 });
             };
 
-            const onWatchlistChange = async (watchlistId) => {
+            async function onWatchlistChange(watchlistId) {
                 container.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Fetching live quotes...</div>`;
                 const mobileWatchlist = document.getElementById('mobile-home-watchlist-container');
                 if (mobileWatchlist) {
@@ -5642,7 +5647,7 @@
                 };
             }
 
-            const updateSortHeaderIcons = () => {
+            function updateSortHeaderIcons() {
                 ['sort-wl-symbol', 'sort-wl-price', 'sort-wl-change', 'mobile-sort-wl-symbol', 'mobile-sort-wl-price', 'mobile-sort-wl-change'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el) {
@@ -5659,7 +5664,7 @@
                 });
             };
 
-            const toggleSort = (col) => {
+            function toggleSort(col) {
                 if (wlSortCol === col) {
                     if (wlSortDir === 'none') wlSortDir = 'asc';
                     else if (wlSortDir === 'asc') wlSortDir = 'desc';
@@ -5684,7 +5689,7 @@
             if (headerChange) headerChange.onclick = () => toggleSort('change_pct');
 
             // Wire Mobile Header Clicks
-            const bindMobileSortHeaders = () => {
+            function bindMobileSortHeaders() {
                 const mHeaderSym = document.getElementById('mobile-sort-wl-symbol');
                 const mHeaderPrice = document.getElementById('mobile-sort-wl-price');
                 const mHeaderChange = document.getElementById('mobile-sort-wl-change');
