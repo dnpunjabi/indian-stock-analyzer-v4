@@ -2575,7 +2575,29 @@ async def get_fuzzy_evaluation(symbol: str):
                 # proxy debt trajectory
                 debt_delta = 0.0
 
-            # 4. Evaluate Mamdani fuzzy logic model
+            # 4. Extract institutional stealth parameters
+            sma_50 = float(technicals.get("sma_50", 0.0))
+            sma_20 = float(technicals.get("sma_20", current_price * 0.98 if current_price > 0 else 100.0))
+            sma_100 = float(technicals.get("sma_100", (sma_50 + sma_200) / 2.0 if (sma_50 > 0 and sma_200 > 0) else current_price))
+            dma_stack_bullish = bool(sma_20 > sma_50 > sma_100 > sma_200 > 0)
+            dma_stack_bearish = bool(0 < sma_20 < sma_50 < sma_100 < sma_200)
+
+            pe_ratio = float(fundamentals.get("pe_ratio", 20.0))
+            pe_3y_median = float(fundamentals.get("pe_3y_median", 22.0))
+            pe_valuation_ratio = pe_ratio / pe_3y_median if pe_3y_median > 0 else 1.0
+
+            high_52w = float(fundamentals.get("high_52w", current_price * 1.1 if current_price > 0 else 110.0))
+            low_52w = float(fundamentals.get("low_52w", current_price * 0.8 if current_price > 0 else 80.0))
+            fifty_two_week_prox = (current_price - low_52w) / (high_52w - low_52w) if (high_52w - low_52w) > 0 else 0.5
+            fifty_two_week_prox = max(0.0, min(1.0, fifty_two_week_prox))
+
+            delivery_pct = float(fundamentals.get("delivery_pct", 40.0))
+            vcp_squeeze = bool(technicals.get("vcp_squeeze", False))
+            fii_dii_delta = float(fundamentals.get("fii_dii_delta", 0.0))
+            icr = float(quality.get("interest_coverage_ratio", 5.0))
+            ocf_pat_ratio = float(quality.get("ocf_pat_ratio", 1.0))
+
+            # Evaluate Mamdani fuzzy logic model
             evaluation = evaluate_fuzzy_logic(
                 opm_delta=opm_delta,
                 roe_delta=roe_delta,
@@ -2589,7 +2611,16 @@ async def get_fuzzy_evaluation(symbol: str):
                 promoter_holding=promoter_holding,
                 promoter_pledge_delta=promoter_pledge_delta,
                 relative_volume=relative_volume,
-                sector_markdown=sector_markdown
+                sector_markdown=sector_markdown,
+                pe_valuation_ratio=pe_valuation_ratio,
+                dma_stack_bullish=dma_stack_bullish,
+                dma_stack_bearish=dma_stack_bearish,
+                fifty_two_week_prox=fifty_two_week_prox,
+                delivery_pct=delivery_pct,
+                vcp_squeeze=vcp_squeeze,
+                fii_dii_delta=fii_dii_delta,
+                icr=icr,
+                ocf_pat_ratio=ocf_pat_ratio
             )
             
             # Include input diagnostics for visual transparency in the UI Console
@@ -2609,7 +2640,16 @@ async def get_fuzzy_evaluation(symbol: str):
                 "promoter_holding": round(promoter_holding, 1),
                 "promoter_pledge_delta": round(promoter_pledge_delta, 2),
                 "relative_volume": round(relative_volume, 2),
-                "sector_markdown": sector_markdown
+                "sector_markdown": sector_markdown,
+                "pe_valuation_ratio": round(pe_valuation_ratio, 2),
+                "dma_stack_bullish": dma_stack_bullish,
+                "dma_stack_bearish": dma_stack_bearish,
+                "fifty_two_week_prox": round(fifty_two_week_prox, 2),
+                "delivery_pct": round(delivery_pct, 1),
+                "vcp_squeeze": vcp_squeeze,
+                "fii_dii_delta": round(fii_dii_delta, 2),
+                "icr": round(icr, 2),
+                "ocf_pat_ratio": round(ocf_pat_ratio, 2)
             }
             return evaluation
     except HTTPException:
@@ -2617,108 +2657,37 @@ async def get_fuzzy_evaluation(symbol: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fuzzy evaluation error: {str(e)}")
 
-@app.get("/api/fuzzy/universe-standings")
-async def get_fuzzy_universe_standings(limit: int = 5):
+@app.get("/api/fuzzy/rules-knowledge-base")
+async def get_fuzzy_rules_knowledge_base():
     try:
-        with get_db() as conn:
-            # Query all symbols from cached_profiles
-            cursor = conn.execute("SELECT symbol FROM cached_profiles")
-            symbols = [row["symbol"] for row in cursor.fetchall() if not row["symbol"].startswith("BTEST")]
-            
-            evaluations = []
-            for symbol in symbols:
-                try:
-                    # Run the internal evaluation logic synchronously
-                    row = conn.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (symbol,)).fetchone()
-                    if not row:
-                        continue
-                    profile = json.loads(row["profile_json"])
-                    fundamentals = profile.get("fundamentals", {})
-                    technicals = profile.get("technicals", {})
-                    quality = profile.get("earnings_quality", {})
-                    sector = profile.get("sector", "Unknown")
-
-                    rsi = float(technicals.get("rsi", 50.0))
-                    current_price = float(technicals.get("current_price", 0.0))
-                    sma_200 = float(technicals.get("sma_200", 0.0))
-                    dma_prox = 0.0
-                    if sma_200 > 0:
-                        dma_prox = ((current_price - sma_200) / sma_200) * 100.0
-                    
-                    trend_str = technicals.get("trend_50_vs_200", "Neutral")
-                    adx = float(technicals.get("adx", 22.0))
-                    
-                    stage = 1
-                    if trend_str == "Bullish" and current_price >= sma_200:
-                        stage = 2
-                    elif trend_str == "Bearish" and current_price < sma_200:
-                        stage = 4
-                    elif rsi > 65 and trend_str != "Bullish":
-                        stage = 3
-
-                    altman_z = float(quality.get("altman_z_score", 3.0))
-                    piotroski = int(quality.get("piotroski_score", 6))
-                    promoter_holding = float(fundamentals.get("promoter_holding_pct", 50.0))
-                    
-                    # Fast proxy calculations for batch query to keep execution under 100ms
-                    sales_growth_3y_pct = float(fundamentals.get("sales_growth_3y_pct", 0.0))
-                    profit_growth_3y_pct = float(fundamentals.get("profit_growth_3y_pct", 0.0))
-                    roe_pct = float(fundamentals.get("roe_pct", 12.0))
-                    debt_to_equity = float(fundamentals.get("debt_to_equity", 0.0))
-                    
-                    opm_delta = (profit_growth_3y_pct - sales_growth_3y_pct) / 10.0
-                    roe_delta = 1.0 if roe_pct > 15.0 else -1.0 if roe_pct < 8.0 else 0.0
-                    debt_delta = 0.0
-                    
-                    volume = float(fundamentals.get("volume", 1.0))
-                    average_volume = float(fundamentals.get("average_volume", 1.0))
-                    relative_volume = volume / average_volume if average_volume > 0 else 1.0
-
-                    sector_markdown = False
-                    sec_row = conn.execute("SELECT return_1m FROM sector_regime_stats WHERE sector = ?", (sector,)).fetchone()
-                    if sec_row and sec_row["return_1m"] is not None and float(sec_row["return_1m"]) < -5.0:
-                        sector_markdown = True
-
-                    evaluation = evaluate_fuzzy_logic(
-                        opm_delta=opm_delta,
-                        roe_delta=roe_delta,
-                        debt_delta=debt_delta,
-                        rsi=rsi,
-                        dma_prox=dma_prox,
-                        adx=adx,
-                        stage=stage,
-                        altman_z=altman_z,
-                        piotroski=piotroski,
-                        promoter_holding=promoter_holding,
-                        promoter_pledge_delta=0.0,
-                        relative_volume=relative_volume,
-                        sector_markdown=sector_markdown
-                    )
-                    
-                    evaluations.append({
-                        "symbol": symbol,
-                        "company_name": profile.get("company_name", symbol),
-                        "sector": sector,
-                        "fuzzy_score": evaluation["fuzzy_score"],
-                        "rating": evaluation["rating"],
-                        "market_regime": evaluation["market_regime"]
-                    })
-                except Exception as eval_err:
-                    print(f"Skipping batch evaluate for {symbol}: {eval_err}")
-            
-            # Sort evaluations by score descending
-            buys = [ev for ev in evaluations if ev["fuzzy_score"] > 0]
-            sells = [ev for ev in evaluations if ev["fuzzy_score"] < 0]
-            
-            buys.sort(key=lambda x: x["fuzzy_score"], reverse=True)
-            sells.sort(key=lambda x: x["fuzzy_score"]) # most negative first
-            
-            return {
-                "top_buys": buys[:limit],
-                "top_sells": sells[:limit]
-            }
+        from backend.fuzzy_engine import get_all_fuzzy_rules_kb
+        return {"rules": get_all_fuzzy_rules_kb(), "total": 19}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch universe standings: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching fuzzy rules KB: {str(e)}")
+
+@app.get("/api/fuzzy/universe-standings")
+async def get_fuzzy_universe_standings_legacy(limit: int = 5):
+    """
+    Delegates to institutional normalized universe standings pipeline.
+    """
+    with get_db() as conn:
+        eval_map = get_universe_fuzzy_evaluations(conn)
+        evaluations = list(eval_map.values())
+        for e in evaluations:
+            e["market_regime"] = "ACCUMULATION" if e["fuzzy_score"] >= 15 else ("DISTRIBUTION" if e["fuzzy_score"] <= -15 else "NEUTRAL")
+
+        top_buys = sorted(evaluations, key=lambda x: x["fuzzy_score"], reverse=True)[:limit]
+        top_sells = sorted(evaluations, key=lambda x: x["fuzzy_score"])[:limit]
+
+        return {
+            "top_buys": top_buys,
+            "top_sells": top_sells
+        }
+
+@app.get("/api/scans/fuzzy")
+@app.get("/api/fuzzy/screener")
+async def scan_fuzzy_conviction(min_score: float = -100.0, rating_class: Optional[str] = "ALL", limit: int = 50):
+    return await scan_fuzzy(min_score=min_score, rating_class=rating_class, limit=limit)
 
 class FuzzyCommentaryRequest(BaseModel):
     symbol: str
@@ -7541,7 +7510,26 @@ async def evaluate_single_condition_bool(cond_type: str, op: str, val_str: str, 
     
     cond_type = cond_type.upper()
     try:
-        if cond_type == "RSI":
+        if cond_type in ("FUZZY_SCORE", "FUZZY"):
+            symbol_curr = t.get("ticker") or t.get("symbol") or ""
+            with get_db() as conn:
+                fz_res = get_fuzzy_summary_for_symbol(conn, symbol_curr)
+            f_score = fz_res.get("fuzzy_score", 0.0)
+            f_rating = fz_res.get("fuzzy_rating", "Neutral")
+            cur_val = f"Fuzzy Score: {f_score:+.1f}% ({f_rating})"
+            threshold = float(val_str)
+            if op == ">" and f_score > threshold:
+                triggered = True
+            elif op == ">=" and f_score >= threshold:
+                triggered = True
+            elif op == "<" and f_score < threshold:
+                triggered = True
+            elif op == "<=" and f_score <= threshold:
+                triggered = True
+            elif op == "==" and abs(f_score - threshold) < 1.0:
+                triggered = True
+
+        elif cond_type == "RSI":
             rsi_val = t["technicals"]["rsi"]
             cur_val = f"RSI: {rsi_val:.1f}"
             if op == "<" and rsi_val < float(val_str):
@@ -7923,25 +7911,107 @@ async def evaluate_single_condition_bool(cond_type: str, op: str, val_str: str, 
             elif op == "<" and z_val < threshold:
                 triggered = True
 
-        elif cond_type == "INST_HOLDING":
-            shareholding = t.get("shareholding", {})
-            inst_val = float(shareholding.get("FIIs", 0.0)) + float(shareholding.get("DIIs", 0.0))
-            cur_val = f"Institutional Holding: {inst_val:.1f}%"
+        elif cond_type in ("FUZZY_SCORE", "FUZZY_CONVICTION"):
+            with get_db() as conn:
+                fz = get_fuzzy_summary_for_symbol(conn, symbol_upper)
+            fz_score = float(fz.get("fuzzy_score", 0.0))
+            fz_rating = fz.get("fuzzy_rating", "Neutral")
+            cur_val = f"Fuzzy Conviction: {fz_score:+.1f}% ({fz_rating})"
             threshold = float(val_str)
-            if op == ">" and inst_val > threshold:
+            if op in (">", ">=") and fz_score >= threshold:
                 triggered = True
-            elif op == "<" and inst_val < threshold:
+            elif op in ("<", "<=") and fz_score <= threshold:
+                triggered = True
+            elif op in ("==", "=") and abs(fz_score - threshold) < 0.1:
                 triggered = True
     except Exception as eval_err:
         print(f"Error evaluating condition {cond_type} {op} {val_str}: {eval_err}")
         
     return triggered, cur_val
 
+# In-memory deduplication cache for fuzzy whatsapp alerts (symbol -> last_sent_rating)
+_fuzzy_whatsapp_sent_cache = {}
+
+async def check_fuzzy_watchlist_whatsapp_alerts():
+    """
+    Sweeps all active watchlist items, evaluates Fuzzy Conviction,
+    and dispatches a WhatsApp alert if any stock crosses >= +70% (Strong Buy) or <= -40% (Avoid).
+    """
+    wa_token = os.environ.get("WHATSAPP_TOKEN", "")
+    wa_phone_id = os.environ.get("WHATSAPP_PHONE_ID", "")
+    wa_recipient = os.environ.get("WHATSAPP_RECIPIENT", "")
+    if not (wa_token and wa_phone_id and wa_recipient):
+        return
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT symbol FROM watchlist_items")
+        symbols = [row["symbol"] for row in cursor.fetchall()]
+
+    for symbol in symbols:
+        try:
+            with get_db() as conn:
+                fz = get_fuzzy_summary_for_symbol(conn, symbol)
+            score = fz.get("fuzzy_score", 0.0)
+            rating = fz.get("fuzzy_rating", "Neutral")
+
+            target_state = None
+            if score >= 70.0:
+                target_state = "STRONG_BUY"
+            elif score <= -40.0:
+                target_state = "AVOID"
+
+            if target_state:
+                last_sent = _fuzzy_whatsapp_sent_cache.get(symbol)
+                if last_sent != target_state:
+                    _fuzzy_whatsapp_sent_cache[symbol] = target_state
+                    trigger_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    
+                    header_emoji = "🚀" if target_state == "STRONG_BUY" else "⚠️"
+                    signal_title = "STRONG BUY CONVICTION (+70%+)" if target_state == "STRONG_BUY" else "AVOID CONVICTION (-40%-)"
+                    
+                    wa_msg = (
+                        f"{header_emoji} *FUZZY ENGINE CONVICTION ALERT* {header_emoji}\n\n"
+                        f"• *Stock:* {symbol}\n"
+                        f"• *Signal:* *{signal_title}*\n"
+                        f"• *Fuzzy Score:* *{score:+.1f}%*\n"
+                        f"• *Rating Class:* *{rating}*\n"
+                        f"• *Evaluated At:* {trigger_date}\n\n"
+                        f"🤖 *Mamdani Inference Engine:* Stock momentum, valuation, RSI, and DMA proximity have aligned to cross institutional threshold.\n\n"
+                        f"_APEX Agentic Equities AI Workstation_"
+                    )
+                    
+                    wa_url = f"https://graph.facebook.com/v21.0/{wa_phone_id}/messages"
+                    wa_headers = {
+                        "Authorization": f"Bearer {wa_token}",
+                        "Content-Type": "application/json"
+                    }
+                    wa_payload = {
+                        "messaging_product": "whatsapp",
+                        "to": wa_recipient,
+                        "type": "text",
+                        "text": {
+                            "preview_url": False,
+                            "body": wa_msg
+                        }
+                    }
+                    await asyncio.to_thread(requests.post, wa_url, headers=wa_headers, json=wa_payload, timeout=10)
+                    print(f"Dispatched WhatsApp Fuzzy Alert for {symbol} ({score:+.1f}%)")
+        except Exception as err:
+            print(f"Error checking fuzzy WhatsApp alert for {symbol}: {err}")
+
+
 @app.get("/api/alerts/check")
 async def check_alerts():
     """Background-triggered active alert scanning sweep."""
     if os.environ.get("ENABLE_BACKGROUND_ALERTS", "true").lower() == "false":
         return {"status": "disabled", "triggers": []}
+
+    # Also sweep Watchlist Fuzzy Conviction alerts for WhatsApp notification
+    try:
+        await check_fuzzy_watchlist_whatsapp_alerts()
+    except Exception as fz_alert_err:
+        print(f"Fuzzy Watchlist alert sweep error: {fz_alert_err}")
 
     # Read WhatsApp settings from environment
     wa_token = os.environ.get("WHATSAPP_TOKEN", "")
@@ -8184,7 +8254,439 @@ async def check_alerts():
 
 # ==================== WATCHLISTS ====================
 
+def get_fuzzy_summary_for_symbol(conn, symbol_upper: str) -> dict:
+    """Helper to evaluate and return fuzzy score and rating from cached profile."""
+    try:
+        base_sym = symbol_upper.split('.')[0]
+        ns_sym = f"{base_sym}.NS"
+        row = conn.execute(
+            "SELECT profile_json FROM cached_profiles WHERE symbol = ? OR symbol = ? OR symbol = ?",
+            (symbol_upper, base_sym, ns_sym)
+        ).fetchone()
+        if not row:
+            return {"fuzzy_score": 0.0, "fuzzy_rating": "Neutral"}
+        profile = json.loads(row["profile_json"])
+        fundamentals = profile.get("fundamentals", {})
+        technicals = profile.get("technicals", {})
+        quality = profile.get("earnings_quality", {})
+        sector = profile.get("sector", "Unknown")
+
+        rsi = float(technicals.get("rsi", 50.0))
+        current_price = float(technicals.get("current_price", 0.0))
+        sma_200 = float(technicals.get("sma_200", 0.0))
+        dma_prox = ((current_price - sma_200) / sma_200 * 100.0) if sma_200 > 0 else 0.0
+        trend_str = technicals.get("trend_50_vs_200", "Neutral")
+        adx = float(technicals.get("adx", 22.0))
+
+        stage = 1
+        if trend_str == "Bullish" and current_price >= sma_200:
+            stage = 2
+        elif trend_str == "Bearish" and current_price < sma_200:
+            stage = 4
+        elif rsi > 65 and trend_str != "Bullish":
+            stage = 3
+
+        altman_z = float(quality.get("altman_z_score", 3.0))
+        piotroski = int(quality.get("piotroski_score", 6))
+        promoter_holding = float(fundamentals.get("promoter_holding_pct", 50.0))
+        promoter_pledge_delta = float(fundamentals.get("promoter_pledge_pct", 0.0))
+
+        volume = float(fundamentals.get("volume", 1.0))
+        average_volume = float(fundamentals.get("average_volume", 1.0))
+        relative_volume = volume / average_volume if average_volume > 0 else 1.0
+
+        sector_markdown = False
+        sec_row = conn.execute("SELECT return_1m FROM sector_regime_stats WHERE sector = ?", (sector,)).fetchone()
+        if sec_row and sec_row["return_1m"] is not None and float(sec_row["return_1m"]) < -5.0:
+            sector_markdown = True
+
+        sales_growth = float(fundamentals.get("sales_growth_3y_pct", 0.0))
+        profit_growth = float(fundamentals.get("profit_growth_3y_pct", 0.0))
+        roe_pct = float(fundamentals.get("roe_pct", 12.0))
+        opm_delta = (profit_growth - sales_growth) / 10.0
+        roe_delta = 1.0 if roe_pct > 15.0 else -1.0 if roe_pct < 8.0 else 0.0
+        debt_delta = 0.0
+
+        sma_50 = float(technicals.get("sma_50", 0.0))
+        sma_20 = float(technicals.get("sma_20", current_price * 0.98 if current_price > 0 else 100.0))
+        sma_100 = float(technicals.get("sma_100", (sma_50 + sma_200) / 2.0 if (sma_50 > 0 and sma_200 > 0) else current_price))
+        dma_stack_bullish = bool(sma_20 > sma_50 > sma_100 > sma_200 > 0)
+        dma_stack_bearish = bool(0 < sma_20 < sma_50 < sma_100 < sma_200)
+
+        pe_ratio = float(fundamentals.get("pe_ratio", 20.0))
+        pe_3y_median = float(fundamentals.get("pe_3y_median", 22.0))
+        pe_valuation_ratio = pe_ratio / pe_3y_median if pe_3y_median > 0 else 1.0
+
+        high_52w = float(fundamentals.get("high_52w", current_price * 1.1 if current_price > 0 else 110.0))
+        low_52w = float(fundamentals.get("low_52w", current_price * 0.8 if current_price > 0 else 80.0))
+        fifty_two_week_prox = (current_price - low_52w) / (high_52w - low_52w) if (high_52w - low_52w) > 0 else 0.5
+        fifty_two_week_prox = max(0.0, min(1.0, fifty_two_week_prox))
+
+        delivery_pct = float(fundamentals.get("delivery_pct", 40.0))
+        vcp_squeeze = bool(technicals.get("vcp_squeeze", False))
+        fii_dii_delta = float(fundamentals.get("fii_dii_delta", 0.0))
+        icr = float(quality.get("interest_coverage_ratio", 5.0))
+        ocf_pat_ratio = float(quality.get("ocf_pat_ratio", 1.0))
+
+        res = evaluate_fuzzy_logic(
+            opm_delta=opm_delta, roe_delta=roe_delta, debt_delta=debt_delta,
+            rsi=rsi, dma_prox=dma_prox, adx=adx, stage=stage,
+            altman_z=altman_z, piotroski=piotroski,
+            promoter_holding=promoter_holding, promoter_pledge_delta=promoter_pledge_delta,
+            relative_volume=relative_volume, sector_markdown=sector_markdown,
+            pe_valuation_ratio=pe_valuation_ratio,
+            dma_stack_bullish=dma_stack_bullish,
+            dma_stack_bearish=dma_stack_bearish,
+            fifty_two_week_prox=fifty_two_week_prox,
+            delivery_pct=delivery_pct,
+            vcp_squeeze=vcp_squeeze,
+            fii_dii_delta=fii_dii_delta,
+            icr=icr,
+            ocf_pat_ratio=ocf_pat_ratio
+        )
+        raw_sc = float(res.get("fuzzy_score", res.get("score", 0.0)))
+        if abs(raw_sc) <= 62.5 and raw_sc != 0.0:
+            final_sc = round(min(100.0, max(-100.0, raw_sc / 0.625)), 1)
+        else:
+            final_sc = round(raw_sc, 1)
+        return {
+            "fuzzy_score": final_sc,
+            "fuzzy_rating": res.get("rating", "Neutral")
+        }
+    except Exception:
+        return {"fuzzy_score": 0.0, "fuzzy_rating": "Neutral"}
+
+_FUZZY_EVAL_CACHE = {}
+_FUZZY_CACHE_TIMESTAMP = 0.0
+
+def get_universe_fuzzy_evaluations(conn):
+    global _FUZZY_EVAL_CACHE, _FUZZY_CACHE_TIMESTAMP
+    import importlib
+    import backend.fuzzy_engine
+    importlib.reload(backend.fuzzy_engine)
+    from backend.fuzzy_engine import evaluate_fuzzy_logic
+
+    now = time.time()
+    if _FUZZY_EVAL_CACHE and (now - _FUZZY_CACHE_TIMESTAMP < 1.0):
+        return _FUZZY_EVAL_CACHE
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT symbol, profile_json FROM cached_profiles")
+    rows = cursor.fetchall()
+    
+    if not rows:
+        cursor.execute("SELECT symbol, name as company_name, sector FROM watchlist_items")
+        rows = cursor.fetchall()
+
+    sec_rows = cursor.execute("SELECT sector, return_1m FROM sector_regime_stats").fetchall()
+    sector_stats_map = {r["sector"]: float(r["return_1m"]) for r in sec_rows if r["return_1m"] is not None}
+
+    evaluations = {}
+    for r in rows:
+        sym = r["symbol"]
+        profile_raw = r["profile_json"] if "profile_json" in r.keys() else None
+        comp_name = sym.split('.')[0]
+        sector = "N/A"
+        
+        if profile_raw:
+            try:
+                p = json.loads(profile_raw)
+                comp_name = p.get("company_name", comp_name)
+                sector = p.get("sector", "N/A")
+                
+                tech = p.get("technicals", {})
+                quality = p.get("earnings_quality", {})
+                fundamentals = p.get("fundamentals", {})
+                
+                rsi = float(tech.get("rsi", 50.0))
+                adx = float(tech.get("adx", 20.0))
+                sma_50 = float(tech.get("sma_50", 0.0))
+                current_price = float(fundamentals.get("current_price", sma_50 if sma_50 > 0 else 100.0))
+                dma_prox = ((current_price - sma_50) / sma_50 * 100.0) if sma_50 > 0 else 0.0
+                
+                sma_200 = float(tech.get("sma_200", 0.0))
+                stage = 2
+                if sma_50 > sma_200 > 0: stage = 2
+                elif sma_50 < sma_200: stage = 4
+                else: stage = 3
+
+                altman_z = float(quality.get("altman_z_score", 3.0))
+                piotroski = int(quality.get("piotroski_score", 6))
+                promoter_holding = float(fundamentals.get("promoter_holding_pct", 50.0))
+                promoter_pledge_delta = float(fundamentals.get("promoter_pledge_pct", 0.0))
+                volume = float(fundamentals.get("volume", 1.0))
+                average_volume = float(fundamentals.get("average_volume", 1.0))
+                relative_volume = volume / average_volume if average_volume > 0 else 1.0
+
+                sec_ret = sector_stats_map.get(sector, 0.0)
+                sector_markdown = (sec_ret < -5.0)
+
+                sales_growth = float(fundamentals.get("sales_growth_3y_pct", 0.0))
+                profit_growth = float(fundamentals.get("profit_growth_3y_pct", 0.0))
+                roe_pct = float(fundamentals.get("roe_pct", 12.0))
+                opm_delta = (profit_growth - sales_growth) / 10.0
+                roe_delta = 1.0 if roe_pct > 15.0 else -1.0 if roe_pct < 8.0 else 0.0
+                debt_delta = 0.0
+
+                sma_20 = float(tech.get("sma_20", current_price * 0.98))
+                sma_100 = float(tech.get("sma_100", (sma_50 + sma_200) / 2.0 if (sma_50 > 0 and sma_200 > 0) else current_price))
+                dma_stack_bullish = bool(sma_20 > sma_50 > sma_100 > sma_200 > 0)
+                dma_stack_bearish = bool(0 < sma_20 < sma_50 < sma_100 < sma_200)
+
+                pe_ratio = float(fundamentals.get("pe_ratio", 20.0))
+                pe_3y_median = float(fundamentals.get("pe_3y_median", 22.0))
+                pe_valuation_ratio = pe_ratio / pe_3y_median if pe_3y_median > 0 else 1.0
+
+                high_52w = float(fundamentals.get("high_52w", current_price * 1.1))
+                low_52w = float(fundamentals.get("low_52w", current_price * 0.8))
+                fifty_two_week_prox = (current_price - low_52w) / (high_52w - low_52w) if (high_52w - low_52w) > 0 else 0.5
+                fifty_two_week_prox = max(0.0, min(1.0, fifty_two_week_prox))
+
+                delivery_pct = float(fundamentals.get("delivery_pct", 40.0))
+                vcp_squeeze = bool(tech.get("vcp_squeeze", False))
+                fii_dii_delta = float(fundamentals.get("fii_dii_delta", 0.0))
+                icr = float(quality.get("interest_coverage_ratio", 5.0))
+                ocf_pat_ratio = float(quality.get("ocf_pat_ratio", 1.0))
+
+                fz = evaluate_fuzzy_logic(
+                    opm_delta=opm_delta, roe_delta=roe_delta, debt_delta=debt_delta,
+                    rsi=rsi, dma_prox=dma_prox, adx=adx, stage=stage,
+                    altman_z=altman_z, piotroski=piotroski,
+                    promoter_holding=promoter_holding, promoter_pledge_delta=promoter_pledge_delta,
+                    relative_volume=relative_volume, sector_markdown=sector_markdown,
+                    pe_valuation_ratio=pe_valuation_ratio,
+                    dma_stack_bullish=dma_stack_bullish,
+                    dma_stack_bearish=dma_stack_bearish,
+                    fifty_two_week_prox=fifty_two_week_prox,
+                    delivery_pct=delivery_pct,
+                    vcp_squeeze=vcp_squeeze,
+                    fii_dii_delta=fii_dii_delta,
+                    icr=icr,
+                    ocf_pat_ratio=ocf_pat_ratio
+                )
+                raw_fz_score = float(fz.get("fuzzy_score", fz.get("score", 0.0)))
+                if abs(raw_fz_score) <= 62.5 and raw_fz_score != 0.0:
+                    fuzzy_score = round(min(100.0, max(-100.0, raw_fz_score / 0.625)), 1)
+                else:
+                    fuzzy_score = round(raw_fz_score, 1)
+                fuzzy_rating = fz.get("rating", "Neutral")
+                rule_trail = fz.get("rule_trail", [])
+            except Exception:
+                fuzzy_score = 0.0
+                fuzzy_rating = "Neutral"
+                rule_trail = []
+        else:
+            fuzzy_score = 0.0
+            fuzzy_rating = "Neutral"
+
+        evaluations[sym] = {
+            "symbol": sym,
+            "company_name": comp_name,
+            "sector": sector,
+            "fuzzy_score": fuzzy_score,
+            "fuzzy_rating": fuzzy_rating,
+            "rule_trail": rule_trail
+        }
+
+    _FUZZY_EVAL_CACHE = evaluations
+    _FUZZY_CACHE_TIMESTAMP = now
+    return evaluations
+
+@app.get("/api/fuzzy/universe-standings")
+async def get_fuzzy_universe_standings(limit: int = 8):
+    """
+    Returns top accumulation signals and value traps across cached stock profiles using Mamdani Fuzzy engine.
+    """
+    with get_db() as conn:
+        eval_map = get_universe_fuzzy_evaluations(conn)
+        evaluations = list(eval_map.values())
+        for e in evaluations:
+            e["market_regime"] = "ACCUMULATION" if e["fuzzy_score"] >= 15 else ("DISTRIBUTION" if e["fuzzy_score"] <= -15 else "NEUTRAL")
+
+        top_buys = sorted(evaluations, key=lambda x: x["fuzzy_score"], reverse=True)[:limit]
+        top_sells = sorted(evaluations, key=lambda x: x["fuzzy_score"])[:limit]
+
+        return {
+            "top_buys": top_buys,
+            "top_sells": top_sells,
+            "total_evaluated": len(evaluations)
+        }
+
+@app.get("/api/scans/fuzzy")
+async def scan_fuzzy(min_score: float = -100.0, rating_class: Optional[str] = "ALL", limit: int = 50):
+    """
+    Scans cached stock profiles using Mamdani Fuzzy Inference engine.
+    Supports filtering by min_score and rating_class ('STRONG_BUY', 'BUY', 'HOLD', 'AVOID', or 'ALL').
+    """
+    with get_db() as conn:
+        eval_map = get_universe_fuzzy_evaluations(conn)
+        r_upper = rating_class.upper() if rating_class else "ALL"
+
+        matches = []
+        for sym, item in eval_map.items():
+            score = item["fuzzy_score"]
+            rating = item.get("fuzzy_rating", "")
+
+            if r_upper == "STRONG_BUY":
+                if score < 70.0 and rating != "Strong Buy": continue
+            elif r_upper == "BUY":
+                if (score < 30.0 or score >= 70.0) and rating != "Buy": continue
+            elif r_upper == "HOLD":
+                if (score <= -40.0 or score >= 30.0) and rating != "Hold": continue
+            elif r_upper == "AVOID":
+                if score > -40.0 and rating not in ["Sell", "Strong Sell"]: continue
+            else: # ALL
+                if score < min_score: continue
+
+            matches.append(item)
+
+        reverse_sort = (r_upper != "AVOID")
+        matches = sorted(matches, key=lambda x: x["fuzzy_score"], reverse=reverse_sort)[:limit]
+
+        return {
+            "stocks": matches,
+            "count": len(matches),
+            "total_matches": len(matches)
+        }
+
+@app.get("/api/portfolio/fuzzy-swaps")
+async def get_portfolio_fuzzy_swaps():
+    """
+    Scans active portfolio holdings against Mamdani Fuzzy Conviction scores.
+    Identifies underperforming holdings (fuzzy_score < 15.0) and recommends
+    same-sector high-conviction swaps (fuzzy_score >= +30.0, ideally >= +70.0).
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, symbol, quantity, purchase_price FROM portfolio_items WHERE quantity > 0")
+        items = cursor.fetchall()
+        
+        if not items:
+            return {
+                "portfolio_fuzzy_score": 0.0,
+                "portfolio_health_rating": "No Holdings",
+                "underperforming_count": 0,
+                "swap_recommendations": []
+            }
+            
+        universe_evals = get_universe_fuzzy_evaluations(conn)
+        
+        portfolio_positions = []
+        total_value = 0.0
+        weighted_score_sum = 0.0
+        
+        for item in items:
+            sym = item["symbol"]
+            qty = float(item["quantity"] or 0.0)
+            purchase_price = float(item["purchase_price"] or 0.0)
+            
+            fz_info = get_fuzzy_summary_for_symbol(conn, sym)
+            fuzzy_score = float(fz_info.get("fuzzy_score", 0.0))
+            fuzzy_rating = fz_info.get("fuzzy_rating", "Neutral")
+            
+            sec_row = conn.execute("SELECT name, sector FROM watchlist_items WHERE symbol = ?", (sym,)).fetchone()
+            if not sec_row:
+                sec_row = conn.execute("SELECT symbol as name, 'Other' as sector FROM cached_profiles WHERE symbol = ?", (sym,)).fetchone()
+            
+            comp_name = sec_row["name"] if sec_row and "name" in sec_row.keys() else sym
+            sector = sec_row["sector"] if sec_row and "sector" in sec_row.keys() else "Other"
+            
+            if sector in ("Other", "Unknown", "N/A"):
+                univ_item = universe_evals.get(sym, {})
+                if univ_item.get("sector") and univ_item.get("sector") not in ("Other", "Unknown", "N/A"):
+                    sector = univ_item["sector"]
+                    
+            pos_val = qty * (purchase_price if purchase_price > 0 else 100.0)
+            total_value += pos_val
+            weighted_score_sum += (fuzzy_score * pos_val)
+            
+            portfolio_positions.append({
+                "symbol": sym,
+                "company_name": comp_name,
+                "sector": sector,
+                "quantity": qty,
+                "purchase_price": purchase_price,
+                "fuzzy_score": fuzzy_score,
+                "fuzzy_rating": fuzzy_rating
+            })
+            
+        avg_portfolio_score = round(weighted_score_sum / total_value, 1) if total_value > 0 else 0.0
+        
+        if avg_portfolio_score >= 50.0:
+            health_rating = "Strong Conviction"
+        elif avg_portfolio_score >= 15.0:
+            health_rating = "Moderate Conviction"
+        elif avg_portfolio_score >= -15.0:
+            health_rating = "Neutral / Hold"
+        else:
+            health_rating = "High Vulnerability"
+            
+        underperforming = [p for p in portfolio_positions if p["fuzzy_score"] < 15.0]
+        # Deduplicate underperforming positions by symbol keeping lowest score
+        seen_under_syms = set()
+        dedup_underperforming = []
+        for p in sorted(underperforming, key=lambda x: x["fuzzy_score"]):
+            if p["symbol"] not in seen_under_syms:
+                seen_under_syms.add(p["symbol"])
+                dedup_underperforming.append(p)
+        
+        swap_recommendations = []
+        portfolio_symbols = set(p["symbol"] for p in portfolio_positions)
+        
+        for p in dedup_underperforming:
+            cur_sym = p["symbol"]
+            cur_sector = p["sector"]
+            cur_score = p["fuzzy_score"]
+            cur_rating = p["fuzzy_rating"]
+            
+            candidates = []
+            for u_sym, u_data in universe_evals.items():
+                if u_sym in portfolio_symbols:
+                    continue
+                u_sector = u_data.get("sector", "Other")
+                u_score = u_data.get("fuzzy_score", 0.0)
+                
+                same_sector = (u_sector == cur_sector) if (cur_sector not in ("Other", "N/A", "Unknown")) else True
+                
+                if same_sector and u_score >= 30.0 and u_score > cur_score:
+                    candidates.append(u_data)
+                    
+            candidates.sort(key=lambda x: x.get("fuzzy_score", 0.0), reverse=True)
+            
+            if candidates:
+                best_match = candidates[0]
+                rec_sym = best_match["symbol"]
+                rec_name = best_match.get("company_name", rec_sym)
+                rec_score = best_match.get("fuzzy_score", 0.0)
+                rec_rating = best_match.get("fuzzy_rating", "Buy")
+                rec_sector = best_match.get("sector", cur_sector)
+                
+                delta = round(rec_score - cur_score, 1)
+                
+                swap_recommendations.append({
+                    "current_symbol": cur_sym,
+                    "current_name": p["company_name"],
+                    "current_sector": cur_sector,
+                    "current_fuzzy_score": cur_score,
+                    "current_fuzzy_rating": cur_rating,
+                    "suggested_symbol": rec_sym,
+                    "suggested_name": rec_name,
+                    "suggested_sector": rec_sector,
+                    "suggested_fuzzy_score": rec_score,
+                    "suggested_fuzzy_rating": rec_rating,
+                    "conviction_delta": delta,
+                    "rationale": f"Upgrades conviction by +{delta}% within {cur_sector}. {rec_sym} exhibits superior Mamdani trend & trajectory metrics."
+                })
+                
+        return {
+            "portfolio_fuzzy_score": avg_portfolio_score,
+            "portfolio_health_rating": health_rating,
+            "underperforming_count": len(dedup_underperforming),
+            "swap_recommendations": swap_recommendations
+        }
+
 @app.get("/api/watchlists")
+
 async def get_watchlists():
     with get_db() as conn:
         cursor = conn.cursor()
@@ -8205,7 +8707,12 @@ async def get_watchlists():
                 LEFT JOIN cached_profiles p ON i.symbol = p.symbol
                 WHERE i.watchlist_id = ?
             """, (w["id"],))
-            w["items"] = [dict(row) for row in cursor.fetchall()]
+            items = [dict(row) for row in cursor.fetchall()]
+            for item in items:
+                fz = get_fuzzy_summary_for_symbol(conn, item["symbol"])
+                item["fuzzy_score"] = fz["fuzzy_score"]
+                item["fuzzy_rating"] = fz["fuzzy_rating"]
+            w["items"] = items
         
     return watchlists
 
@@ -8290,7 +8797,8 @@ async def add_watchlist_item(watchlist_id: int, data: WatchlistItemCreate):
                 (watchlist_id, symbol, company_name, sector, data.quantity or 0.0, data.purchase_price or 0.0, data.in_portfolio or 0)
             )
             conn.commit()
-            return {"symbol": symbol, "name": company_name, "sector": sector, "quantity": data.quantity or 0.0, "purchase_price": data.purchase_price or 0.0, "in_portfolio": data.in_portfolio or 0}
+            fz = get_fuzzy_summary_for_symbol(conn, symbol)
+            return {"symbol": symbol, "name": company_name, "sector": sector, "quantity": data.quantity or 0.0, "purchase_price": data.purchase_price or 0.0, "in_portfolio": data.in_portfolio or 0, "fuzzy_score": fz["fuzzy_score"], "fuzzy_rating": fz["fuzzy_rating"]}
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=400, detail="Stock already exists in this watchlist.")
 
@@ -8317,7 +8825,12 @@ async def get_single_watchlist(watchlist_id: int):
             LEFT JOIN cached_profiles p ON i.symbol = p.symbol
             WHERE i.watchlist_id = ?
         """, (watchlist_id,))
-        w_dict["items"] = [dict(row) for row in cursor.fetchall()]
+        items = [dict(row) for row in cursor.fetchall()]
+        for item in items:
+            fz = get_fuzzy_summary_for_symbol(conn, item["symbol"])
+            item["fuzzy_score"] = fz["fuzzy_score"]
+            item["fuzzy_rating"] = fz["fuzzy_rating"]
+        w_dict["items"] = items
         
     return w_dict
 
@@ -12319,14 +12832,37 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
                     elif operator == "<" and z_val < threshold:
                         triggered = True
 
-                elif condition_type == "INST_HOLDING":
-                    shareholding = prof.get("shareholding") or {}
-                    inst_val = clean_float(shareholding.get("FIIs"), 0.0) + clean_float(shareholding.get("DIIs"), 0.0)
-                    cur_val = f"Institutional Holding: {inst_val:.1f}%"
+                elif condition_type in ("FUZZY_SCORE", "FUZZY_CONVICTION"):
+                    with get_db() as conn_f:
+                        fz = get_fuzzy_summary_for_symbol(conn_f, sym)
+                    fz_score = float(fz.get("fuzzy_score", 0.0))
+                    fz_rating = fz.get("fuzzy_rating", "Neutral")
+                    cur_val = f"Fuzzy Conviction: {fz_score:+.1f}% ({fz_rating})"
                     threshold = float(value)
-                    if operator == ">" and inst_val > threshold:
+                    if operator in (">", ">=") and fz_score >= threshold:
                         triggered = True
-                    elif operator == "<" and inst_val < threshold:
+                    elif operator in ("<", "<=") and fz_score <= threshold:
+                        triggered = True
+                    elif operator in ("==", "=") and abs(fz_score - threshold) < 0.1:
+                        triggered = True
+
+                elif condition_type == "COMBO_FUZZY_BREAKOUT":
+                    with get_db() as conn_f:
+                        fz = get_fuzzy_summary_for_symbol(conn_f, sym)
+                    fz_score = float(fz.get("fuzzy_score", 0.0))
+                    fz_rating = fz.get("fuzzy_rating", "Neutral")
+                    adx_val = clean_float(t.get("adx"), 20.0)
+                    if fz_score >= 60.0 and adx_val >= 22.0:
+                        cur_val = f"Fuzzy Score: {fz_score:+.1f}% ({fz_rating}), ADX: {adx_val:.1f}"
+                        triggered = True
+
+                elif condition_type == "COMBO_FUZZY_AVOID":
+                    with get_db() as conn_f:
+                        fz = get_fuzzy_summary_for_symbol(conn_f, sym)
+                    fz_score = float(fz.get("fuzzy_score", 0.0))
+                    fz_rating = fz.get("fuzzy_rating", "Neutral")
+                    if fz_score <= -40.0:
+                        cur_val = f"Fuzzy Score: {fz_score:+.1f}% ({fz_rating})"
                         triggered = True
 
                 # ─── MULTI-FACTOR COMBO STRATEGIES ─────────────────────────────────────
@@ -12964,6 +13500,66 @@ async def scan_trigger(condition_type: str, operator: str, value: str, universe:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Rule scan failed: {str(e)}")
 
+
+@app.get("/api/scans/fuzzy")
+async def scan_fuzzy_conviction(
+    min_score: float = -100.0,
+    max_score: float = 100.0,
+    rating_class: Optional[str] = None,
+    limit: int = 100
+):
+    """
+    Scans cached profiles and evaluates Mamdani Fuzzy Conviction scores.
+    Returns filtered and sorted rank list for the Fuzzy Screener and Scans UI.
+    """
+    results = []
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT symbol FROM cached_profiles")
+        symbols = [row["symbol"] for row in cursor.fetchall()]
+        
+        for sym in symbols:
+            try:
+                fz = get_fuzzy_summary_for_symbol(conn, sym)
+                score = float(fz.get("fuzzy_score", 0.0))
+                rating = fz.get("fuzzy_rating", "Neutral")
+                
+                if min_score <= score <= max_score:
+                    if rating_class and rating_class.strip().lower() != "all":
+                        rc_clean = rating_class.strip().lower().replace("_", "").replace(" ", "")
+                        r_clean = rating.strip().lower().replace("_", "").replace(" ", "")
+                        if rc_clean not in r_clean:
+                            continue
+
+                    row = conn.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (sym,)).fetchone()
+                    if not row:
+                        continue
+                    prof = json.loads(row["profile_json"])
+                    f = prof.get("fundamentals") or {}
+                    t = prof.get("technicals") or {}
+                    
+                    results.append({
+                        "symbol": sym,
+                        "company_name": prof.get("company_name", sym),
+                        "sector": prof.get("sector", "N/A"),
+                        "price": float(t.get("current_price", f.get("current_price", 0.0))),
+                        "fuzzy_score": score,
+                        "fuzzy_rating": rating,
+                        "rsi": float(t.get("rsi", 50.0)),
+                        "adx": float(t.get("adx", 20.0)),
+                        "trend": t.get("trend_50_vs_200", "Neutral"),
+                        "pe": float(f.get("pe_ratio", 0.0))
+                    })
+            except Exception:
+                continue
+
+    results.sort(key=lambda x: x["fuzzy_score"], reverse=True)
+    return {
+        "status": "success",
+        "count": len(results[:limit]),
+        "total_matches": len(results),
+        "stocks": results[:limit]
+    }
 
 @app.post("/api/screener/scan-synthesis")
 async def scan_synthesis(data: ScanSynthesisRequest):

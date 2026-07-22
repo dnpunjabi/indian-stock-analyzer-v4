@@ -8,6 +8,11 @@
 
     // Global Error and Promise Rejection Handlers for Remote Debugging
     window.onerror = function(message, source, lineno, colno, error) {
+        const msgStr = String(message || '');
+        if (msgStr.includes("Script error") || msgStr.includes("Object is disposed") || msgStr.includes("disposed") || msgStr.includes("ResizeObserver")) {
+            console.warn("Ignored cross-origin/disposed error:", message);
+            return true;
+        }
         const errorText = `JS Error: ${message} at ${source}:${lineno}:${colno}`;
         console.error(errorText);
         const toast = document.createElement('div');
@@ -2664,6 +2669,7 @@
                         const changeVal = tr.cells[3] ? tr.cells[3].textContent.trim() : 'N/A';
                         const dayHigh = tr.cells[5] ? tr.cells[5].textContent.trim() : 'N/A';
                         const dayLow = tr.cells[6] ? tr.cells[6].textContent.trim() : 'N/A';
+                        const fuzzyCellHTML = tr.cells[7] ? tr.cells[7].innerHTML.trim() : '';
 
                         const detailsTr = document.createElement('tr');
                         detailsTr.className = 'watchlist-details-row no-print';
@@ -2675,6 +2681,10 @@
                                     <div style="text-align: right;"><strong>Day High:</strong> ${dayHigh}</div>
                                     <div><strong>Daily Change:</strong> ${changeVal}</div>
                                     <div style="text-align: right;"><strong>Day Low:</strong> ${dayLow}</div>
+                                    <div style="grid-column: span 2; display: flex; align-items: center; justify-content: space-between; margin-top: 4px; padding-top: 6px; border-top: 1px dashed rgba(255,255,255,0.08);">
+                                        <strong style="color: var(--text-primary);">Fuzzy Conviction:</strong>
+                                        <div>${fuzzyCellHTML}</div>
+                                    </div>
                                 </div>
                             </td>
                         `;

@@ -1036,9 +1036,14 @@ body.light-theme .brand-part-apex {
 [data-mode="light"] .brand-part-quant,
 [data-theme="light"] .brand-part-quant,
 body.light-theme .brand-part-quant {
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+
+
+/* Mobile responsive Fuzzy Conviction badge styling */
+.mobile-only-fuzzy-pill {
+    display: none !important;
 }
-
-
+@media (max-width: 768px) {
+    .mobile-only-fuzzy-pill {
+        display: block !important;
+    }
+}

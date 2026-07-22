@@ -1017,8 +1017,8 @@
                         </button>
                     </div>
                     
-                    <!-- Cap Universe Selector & Style Overlays (Widescreen flex rows) -->
-                    <div class="screener-controls-grid">
+                    <!-- Cap Universe Selector, Style Overlays & Fuzzy Conviction Filter -->
+                    <div class="screener-controls-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px;">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <label for="screener-universe-select" style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Screener Universe Cap Segment</label>
                             <select id="screener-universe-select" style="padding: 10px 14px; border-radius: 8px; font-size: 11.5px; cursor: pointer; outline: none; transition: all 0.2s; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);">
@@ -1038,14 +1038,43 @@
                                 <option value="contra">Contra Style (Oversold Turnaround)</option>
                             </select>
                         </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label for="screener-fuzzy-rating-select" style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Fuzzy Rating Class Filter</label>
+                            <select id="screener-fuzzy-rating-select" style="padding: 10px 14px; border-radius: 8px; font-size: 11.5px; cursor: pointer; outline: none; transition: all 0.2s; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);">
+                                <option value="ALL" selected>All Ratings (No Filter)</option>
+                                <option value="STRONG_BUY">🚀 Strong Buy (≥ +70%)</option>
+                                <option value="BUY">🟢 Buy (≥ +30%)</option>
+                                <option value="HOLD">🟡 Hold (-39% to +29%)</option>
+                                <option value="SELL">🔴 Sell (≤ -40%)</option>
+                                <option value="STRONG_SELL">⛔ Strong Sell (≤ -70%)</option>
+                            </select>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label for="screener-fuzzy-score-slider" style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Min Fuzzy Score Filter</label>
+                                <span id="screener-fuzzy-score-val" style="font-size: 11px; font-weight: 800; color: #10b981;">-100%</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <input type="range" id="screener-fuzzy-score-slider" min="-100" max="100" value="-100" step="5" style="flex: 1; cursor: pointer;">
+                                <input type="number" id="screener-fuzzy-score-num" min="-100" max="100" value="-100" step="5" style="width: 54px; padding: 6px; font-size: 11px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.4); color: var(--text-primary); text-align: center; font-weight: 700;">
+                            </div>
+                        </div>
                     </div>
                     
-                    <button class="analyze-asset-btn" id="run-screener-btn" style="min-width: 230px; height: 42px; border-radius: 8px; font-weight: 700; transition: all 0.3s ease;">
-                        <span class="analyze-btn-particles" id="screener-btn-particles"></span>
-                        <span class="analyze-btn-icon" id="screener-btn-icon" style="font-size: 14px;">🔬</span>
-                        <span class="analyze-btn-label" id="screener-btn-label" style="font-family: 'Outfit', sans-serif; font-size: 12.5px; letter-spacing: 0.02em;">Run AI Screener Scan</span>
-                        <span class="analyze-btn-shimmer"></span>
-                    </button>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="analyze-asset-btn" id="run-screener-btn" style="min-width: 200px; height: 42px; border-radius: 8px; font-weight: 700; transition: all 0.3s ease;">
+                            <span class="analyze-btn-particles" id="screener-btn-particles"></span>
+                            <span class="analyze-btn-icon" id="screener-btn-icon" style="font-size: 14px;">🔬</span>
+                            <span class="analyze-btn-label" id="screener-btn-label" style="font-family: 'Outfit', sans-serif; font-size: 12.5px; letter-spacing: 0.02em;">Run AI Screener Scan</span>
+                            <span class="analyze-btn-shimmer"></span>
+                        </button>
+                        <button class="analyze-asset-btn" id="run-fuzzy-screener-modal-btn" style="min-width: 200px; height: 42px; border-radius: 8px; font-weight: 700; background: linear-gradient(135deg, #3b82f6, #10b981); border: none; color: #fff; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);">
+                            <span style="font-size: 14px;">⚡</span>
+                            <span style="font-family: 'Outfit', sans-serif; font-size: 12.5px; letter-spacing: 0.02em;">Run Fuzzy Scan</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Screener Results -->
@@ -1165,14 +1194,86 @@
                     <p style="margin: 0; font-size: 11.5px; line-height: 1.6; color: var(--text-secondary);">
                         Runs non-linear Mamdani Fuzzy Inference over 3-Year balance sheet delta trajectories (&Delta;<sub>OPM</sub>, &Delta;<sub>ROE</sub>, &Delta;<sub>Debt</sub>) and market regimes to locate smart money accumulation and flag value traps before the price breakout.
                     </p>
+                <!-- FMADE Sub-Navigation Tabs -->
+                <div class="fmade-sub-nav no-print" style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px; flex-wrap: wrap;">
+                    <button class="fmade-sub-tab-btn active" id="fmade-subtab-scanner-btn" onclick="window.switchFmadeSubTab('scanner')">
+                        <span>🔍</span> FUZZY CONVICTION SCANNER
+                    </button>
+                    <button class="fmade-sub-tab-btn" id="fmade-subtab-console-btn" onclick="window.switchFmadeSubTab('console')">
+                        <span>🔬</span> SINGLE-STOCK DIAGNOSTIC CONSOLE
+                    </button>
                 </div>
 
-                <div class="scanner-panel-grid" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 15px; width: 100%;">
-                    <!-- Left: Standings Board -->
-                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                <!-- SUB-SECTION 1: FUZZY CONVICTION SCANNER -->
+                <div id="fmade-subtab-scanner" class="fmade-subtab-content" style="display: block; width: 100%;">
+                    <!-- Interactive Mamdani Fuzzy Screener Controls Bar -->
+                    <div class="fmade-control-card no-print">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; color: #3b82f6; display: flex; align-items: center; gap: 8px;">
+                                <span>🔍</span> MAMDANI CONVICTION MARKET SCANNER
+                            </h3>
+                            <span id="fuzzy-screener-match-count" style="font-size: 11px; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3); padding: 4px 12px; border-radius: 12px; font-weight: 700;">
+                                Scanning Database...
+                            </span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr 0.8fr 1fr; gap: 12px; align-items: center;" class="fuzzy-screener-controls-grid">
+                            <div>
+                                <label style="font-size: 10.5px; color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 600;">Minimum Conviction Score:</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="range" id="fuzzy-score-slider" min="-100" max="100" value="30" step="5" style="flex: 1; cursor: pointer;">
+                                    <span id="fuzzy-score-slider-val" style="font-size: 11.5px; font-weight: 800; color: #10b981; min-width: 45px; text-align: right;">+30.0%</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label style="font-size: 10.5px; color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 600;">Rating Class Filter:</label>
+                                <select id="fuzzy-rating-class-select" class="fmade-input-field">
+                                    <option value="ALL" selected>All Ratings</option>
+                                    <option value="STRONG_BUY">🚀 Strong Buy (≥ +70%)</option>
+                                    <option value="BUY">🟢 Buy (≥ +30%)</option>
+                                    <option value="HOLD">🟡 Hold (-39% to +29%)</option>
+                                    <option value="AVOID">🔴 Avoid / Strong Sell (≤ -40%)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size: 10.5px; color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 600;">Filter Ticker / Company:</label>
+                                <input type="text" id="fuzzy-screener-search" class="fmade-input-field" placeholder="e.g. BOSCHLTD, RELIANCE...">
+                            </div>
+                            <div>
+                                <label style="font-size: 10.5px; color: var(--text-secondary); display: block; margin-bottom: 4px; font-weight: 600;">Max Results:</label>
+                                <select id="fuzzy-screener-limit-select" class="fmade-input-field">
+                                    <option value="25">25</option>
+                                    <option value="50" selected>50</option>
+                                    <option value="100">100</option>
+                                    <option value="250">250</option>
+                                    <option value="500">All (500)</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: flex-end; height: 100%;">
+                                <button id="btn-run-fuzzy-screener" style="width: 100%; padding: 9px 14px; font-size: 11.5px; font-weight: 700; border-radius: 6px; border: none; background: linear-gradient(135deg, #3b82f6, #10b981); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);">
+                                    ⚡ Run Market Scan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Market Scan Results Card (full-width) -->
+                    <div id="fuzzy-scan-results-card" class="card" style="margin-bottom: 20px; padding: 16px; display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 13px; color: #3b82f6; display: flex; align-items: center; gap: 8px;">
+                                <span>⚡</span> MAMDANI SCANNER MATCHES (<span id="fuzzy-scan-results-count">0</span>)
+                            </h3>
+                            <button id="btn-close-fuzzy-scan-results" type="button" style="background: none; border: 1px solid var(--border-glass); border-radius: 4px; padding: 2px 8px; color: var(--text-secondary); cursor: pointer; font-size: 10.5px; font-weight: 700;">✕ Reset Scan</button>
+                        </div>
+                        <div id="fuzzy-scan-results-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; max-height: 420px; overflow-y: auto; padding-right: 4px;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Scanner Results & Standings Grid -->
+                    <div class="fuzzy-signals-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%;">
                         <!-- Top Buys card -->
-                        <div class="card" style="margin: 0;">
-                            <h3 style="margin: 0 0 10px 0; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #10b981;">
+                        <div class="card" style="margin: 0; padding: 16px;">
+                            <h3 style="margin: 0 0 12px 0; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #10b981;">
                                 <span>🟢</span> TOP MAMDANI ACCUMULATION SIGNALS
                             </h3>
                             <div id="fuzzy-buys-list" style="display: flex; flex-direction: column; gap: 8px;">
@@ -1181,8 +1282,8 @@
                         </div>
                         
                         <!-- Top Sells card -->
-                        <div class="card" style="margin: 0;">
-                            <h3 style="margin: 0 0 10px 0; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #ef4444;">
+                        <div class="card" style="margin: 0; padding: 16px;">
+                            <h3 style="margin: 0 0 12px 0; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #ef4444;">
                                 <span>🔴</span> TOP VALUE TRAPS & DISTRIBUTION ALERTS
                             </h3>
                             <div id="fuzzy-sells-list" style="display: flex; flex-direction: column; gap: 8px;">
@@ -1190,8 +1291,10 @@
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Right: Selected Stock Diagnostics -->
+                <!-- SUB-SECTION 2: SINGLE-STOCK DIAGNOSTIC CONSOLE -->
+                <div id="fmade-subtab-console" class="fmade-subtab-content" style="display: none; width: 100%;">
                     <div class="card" style="margin: 0; display: flex; flex-direction: column; gap: 15px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px; flex-wrap: wrap; gap: 8px;">
                             <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 13.5px; font-weight: 700; color: #3b82f6;">
@@ -1199,10 +1302,11 @@
                             </h3>
                             <div style="display: flex; align-items: center; gap: 8px; position: relative; flex-wrap: wrap; max-width: 100%;">
                                 <div style="position: relative; flex: 1; min-width: 130px; max-width: 100%;">
-                                    <input type="text" id="fuzzy-stock-search-input" placeholder="Search stock or symbol..." autocomplete="off" style="padding: 6px 10px; font-size: 11px; font-family: monospace; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.4); color: var(--text-primary); text-transform: uppercase; width: 100%; box-sizing: border-box; outline: none;">
+                                    <input type="text" id="fuzzy-stock-search-input" class="fmade-input-field" placeholder="Search stock or symbol..." autocomplete="off" style="font-family: monospace; text-transform: uppercase;">
                                     <div id="fuzzy-search-autocomplete" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; min-width: 220px; max-height: 220px; overflow-y: auto; background: #0f172a; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.7); margin-top: 4px; padding: 4px 0;"></div>
                                 </div>
                                 <button id="fuzzy-stock-search-btn" type="button" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.2); color: #3b82f6; cursor: pointer; font-family: 'Outfit', sans-serif; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">Analyze 🔍</button>
+                                <button id="fuzzy-rules-kb-btn" type="button" style="padding: 6px 10px; font-size: 10px; font-weight: 700; border-radius: 6px; border: 1px solid rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.2); color: #a78bfa; cursor: pointer; font-family: 'Outfit', sans-serif; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">📖 19-Rule KB</button>
                                 <span id="fuzzy-active-stock" style="font-size: 11px; font-weight: 800; font-family: monospace; padding: 4px 8px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.25); white-space: nowrap; flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis;">SELECT A STOCK</span>
                             </div>
                         </div>
@@ -1256,8 +1360,8 @@
                                     <span class="fz-info-icon" data-fz-tooltip="Fuzzified Trajectories|Continuous inputs fuzzified from 3-Year balance sheet deltas (OPM, ROE, Debt) and momentum regime metrics (RSI, 200-DMA, ADX).">?</span>
                                 </span>
                             </h4>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 10.5px;">
-                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 10px; border-radius: 6px; display: flex; flex-direction: column; gap: 8px;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; font-size: 10px;">
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 6px;">
                                     <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Margin Delta (ΔOPM)|YoY % change in Operating Profit Margin. Positive values indicate expanding profitability and pricing power.">
                                         <span class="fuzzy-label-light" style="cursor: help;">Margin delta (&Delta;<sub>OPM</sub>):</span>
                                         <strong id="f-val-opm">--</strong>
@@ -1266,23 +1370,49 @@
                                         <span class="fuzzy-label-light" style="cursor: help;">Capital delta (&Delta;<sub>ROE</sub>):</span>
                                         <strong id="f-val-roe">--</strong>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Debt Delta (ΔDebt)|Change in Total Debt leverage. Negative values indicate deleveraging (debt reduction); positive values indicate debt expansion.">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Debt Delta (ΔDebt)|Change in Total Debt leverage. Negative values indicate deleveraging (debt reduction).">
                                         <span class="fuzzy-label-light" style="cursor: help;">Debt delta (&Delta;<sub>Debt</sub>):</span>
                                         <strong id="f-val-debt">--</strong>
                                     </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Interest Coverage Ratio|EBIT / Interest Expense. Values < 1.5 trigger solvency caps.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">ICR Solvency:</span>
+                                        <strong id="f-val-icr">--</strong>
+                                    </div>
                                 </div>
-                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 10px; border-radius: 6px; display: flex; flex-direction: column; gap: 8px;">
-                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="14-Day RSI|Relative Strength Index. <30 = Oversold, >70 = Overbought, 45-60 = Steady accumulation regime.">
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 6px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="14-Day RSI|Relative Strength Index. <30 = Oversold, >70 = Overbought.">
                                         <span class="fuzzy-label-light" style="cursor: help;">14-Day RSI:</span>
                                         <strong id="f-val-rsi">--</strong>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="200-DMA Proximity|% distance from 200-Day Moving Average. Positive = Trading above institutional baseline; Negative = Discount.">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="200-DMA Proximity|% distance from 200-Day Moving Average.">
                                         <span class="fuzzy-label-light" style="cursor: help;">200-DMA Prox:</span>
                                         <strong id="f-val-dma">--</strong>
                                     </div>
-                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Regime ADX|Average Directional Index. ADX >25 confirms strong trend momentum; ADX <20 indicates rangebound accumulation.">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Regime ADX|Average Directional Index. ADX >25 confirms strong trend momentum.">
                                         <span class="fuzzy-label-light" style="cursor: help;">Regime ADX:</span>
                                         <strong id="f-val-adx">--</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="52-Week Range Proximity|0.0 = At 52W Low, 1.0 = At 52W High breakout level.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">52W Prox:</span>
+                                        <strong id="f-val-52w">--</strong>
+                                    </div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 8px; border-radius: 6px; display: flex; flex-direction: column; gap: 6px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="P/E Valuation Ratio|Current P/E relative to historical 3-Year Median P/E (<0.85 = Bargain).">
+                                        <span class="fuzzy-label-light" style="cursor: help;">P/E vs 3Y Med:</span>
+                                        <strong id="f-val-pe">--</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Delivery Volume %|Physical delivery share percentage (>65% indicates stealth accumulation).">
+                                        <span class="fuzzy-label-light" style="cursor: help;">Delivery %:</span>
+                                        <strong id="f-val-deliv">--</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="FII/DII Flow Delta|Quarterly change in institutional holding percentage.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">FII/DII Delta:</span>
+                                        <strong id="f-val-fii">--</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Stealth Alignment|VCP squeeze coiling state and DMA Stack alignment.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">Stealth State:</span>
+                                        <strong id="f-val-stealth">--</strong>
                                     </div>
                                 </div>
                             </div>
@@ -5735,6 +5865,7 @@
                                 <div class="form-group">
                                     <label for="alert-condition">Trigger Condition</label>
                                     <select id="alert-condition">
+                                        <option value="FUZZY_SCORE">Mamdani Fuzzy Conviction Score (%)</option>
                                         <option value="RSI">RSI-14 (Relative Strength)</option>
                                         <option value="PE">Stock P/E Value</option>
                                         <option value="RATING">AI Analyst Rating</option>
@@ -6459,6 +6590,9 @@
                             <div class="form-group">
                                 <label for="rule-scanner-condition">Trigger Condition</label>
                                 <select id="rule-scanner-condition" style="width: 100%;">
+                                    <option value="FUZZY_SCORE">Mamdani Fuzzy Conviction Score (%)</option>
+                                    <option value="COMBO_FUZZY_BREAKOUT">Combo: Fuzzy High Conviction Breakout (Fuzzy Score ≥ 60% + ADX ≥ 22)</option>
+                                    <option value="COMBO_FUZZY_AVOID">Combo: Fuzzy Institutional Avoid / Value Trap (Fuzzy Score ≤ -40%)</option>
                                     <option value="RSI">RSI-14 (Relative Strength)</option>
                                     <option value="PE">Stock P/E Value</option>
                                     <option value="RATING">AI Analyst Rating</option>
@@ -6950,12 +7084,13 @@
                                         <th class="sortable-wl cursor-pointer wl-change-pct" data-sort="change_pct" style="color: var(--text-secondary); transition: color 0.2s; cursor: pointer; text-align: right;">Change % <span style="font-size: 8px; margin-left: 2px;">↕</span></th>
                                         <th class="sortable-wl cursor-pointer wl-day-high" data-sort="day_high" style="color: var(--text-secondary); transition: color 0.2s; cursor: pointer; text-align: right;">Day High <span style="font-size: 8px; margin-left: 2px;">↕</span></th>
                                         <th class="sortable-wl cursor-pointer wl-day-low" data-sort="day_low" style="color: var(--text-secondary); transition: color 0.2s; cursor: pointer; text-align: right;">Day Low <span style="font-size: 8px; margin-left: 2px;">↕</span></th>
+                                        <th class="sortable-wl cursor-pointer" data-sort="fuzzy_score" style="color: var(--text-secondary); transition: color 0.2s; cursor: pointer; text-align: center;">Fuzzy Conviction <span style="font-size: 8px; margin-left: 2px;">↕</span></th>
                                         <th style="color: var(--text-secondary);">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="watchlist-table-body">
                                     <tr>
-                                        <td colspan="8" class="center-text text-muted">Select or create a watchlist on the left to display its constituents.</td>
+                                        <td colspan="9" class="center-text text-muted">Select or create a watchlist on the left to display its constituents.</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -7284,6 +7419,24 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Fuzzy Health & Sector Auto-Swap Advisor Card -->
+                        <div id="portfolio-fuzzy-swap-container" style="display: none; margin-top: 25px; border-top: 1px dashed var(--border-glass); padding-top: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                                <h4 style="font-size: 13px; color: var(--color-primary); border-left: 3px solid var(--color-primary); padding-left: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                    <span>⚡ Mamdani Fuzzy Health & Sector Auto-Swap Advisor</span>
+                                    <span id="portfolio-fuzzy-health-badge" class="badge-rec" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 11px;">Calculating...</span>
+                                </h4>
+                                <div style="font-size: 11px; color: var(--text-secondary); font-weight: 600;">
+                                    <span id="portfolio-fuzzy-underperforming-count" style="color: var(--neon-red); font-weight: 700;">0</span> Positions Flagged
+                                </div>
+                            </div>
+
+                            <!-- Recommendations Grid -->
+                            <div id="portfolio-fuzzy-swaps-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 15px;">
+                                <!-- Swap Cards populated dynamically -->
                             </div>
                         </div>
                         
@@ -9126,6 +9279,36 @@
                 <div id="bottom-sheet-content-list" style="display: flex; flex-direction: column; gap: 8px;">
                     <!-- Content will be cloned dynamically from the desktop checklist -->
                 </div>
+            </div>
+        </div>
+    </div>
+    <!-- 19-Rule Fuzzy Knowledge Base Modal -->
+    <div id="fuzzy-rules-kb-modal">
+        <div class="fuzzy-kb-card">
+            <!-- Modal Header -->
+            <div class="fuzzy-kb-header">
+                <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding-right: 8px;">
+                    <span style="font-size: 22px; flex-shrink: 0;">🧠</span>
+                    <div style="min-width: 0;">
+                        <h3 class="fuzzy-kb-title">Mamdani Fuzzy Decision Engine (19 Rules)</h3>
+                        <div class="fuzzy-kb-subtitle">Institutional Knowledge Base, Mathematical Membership Formulas & Safeguards</div>
+                    </div>
+                </div>
+                <button id="fuzzy-rules-kb-close-btn" title="Close">&times;</button>
+            </div>
+
+            <!-- Modal Filter Tabs -->
+            <div class="fuzzy-kb-tabs-bar">
+                <button class="fuzzy-kb-tab active" data-category="all">All Rules (19)</button>
+                <button class="fuzzy-kb-tab" data-category="buy">🟢 Buy Signals (8)</button>
+                <button class="fuzzy-kb-tab" data-category="quality">🔵 Quality (2)</button>
+                <button class="fuzzy-kb-tab" data-category="bearish">🔴 Bearish Warnings (4)</button>
+                <button class="fuzzy-kb-tab" data-category="safeguard">🛡️ Safeguards (5)</button>
+            </div>
+
+            <!-- Modal Content Body -->
+            <div id="fuzzy-rules-kb-body">
+                <!-- Populated dynamically via JS -->
             </div>
         </div>
     </div>

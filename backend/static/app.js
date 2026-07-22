@@ -2216,6 +2216,11 @@ function switchTab(tabKey) {
         if (typeof fetchAlertsList === 'function') fetchAlertsList();
     }
 
+    if (tabKey === 'portfolio') {
+        if (typeof loadPortfolioDoctorLedger === 'function') loadPortfolioDoctorLedger();
+        if (typeof loadPortfolioFuzzySwaps === 'function') loadPortfolioFuzzySwaps();
+    }
+
     // Auto-resize TradingView Lightweight Charts on tab activation to prevent collapsed canvas sizing
     if (tabKey === 'swing') {
         setTimeout(() => {
@@ -2861,6 +2866,27 @@ async function runAIScreener() {
         results.forEach((item, index) => {
             item.rank = index + 1;
         });
+
+        // Apply Fuzzy Conviction & Rating Class Filters if configured
+        const fuzzyRatingFilter = document.getElementById('screener-fuzzy-rating-select')?.value || 'ALL';
+        const fuzzyMinScoreFilter = parseFloat(document.getElementById('screener-fuzzy-score-slider')?.value || -100);
+
+        if (fuzzyRatingFilter !== 'ALL' || fuzzyMinScoreFilter > -100) {
+            results = results.filter(item => {
+                const itemScore = item.fuzzy_score !== undefined ? item.fuzzy_score : (item.score || 0);
+                const itemRating = item.fuzzy_rating || (itemScore >= 70 ? 'STRONG_BUY' : itemScore >= 30 ? 'BUY' : itemScore <= -70 ? 'STRONG_SELL' : itemScore <= -40 ? 'SELL' : 'HOLD');
+                
+                if (itemScore < fuzzyMinScoreFilter) return false;
+                if (fuzzyRatingFilter !== 'ALL') {
+                    if (fuzzyRatingFilter === 'STRONG_BUY' && itemRating !== 'STRONG_BUY') return false;
+                    if (fuzzyRatingFilter === 'BUY' && itemRating !== 'BUY' && itemRating !== 'STRONG_BUY') return false;
+                    if (fuzzyRatingFilter === 'HOLD' && itemRating !== 'HOLD') return false;
+                    if (fuzzyRatingFilter === 'SELL' && itemRating !== 'SELL' && itemRating !== 'STRONG_SELL') return false;
+                    if (fuzzyRatingFilter === 'STRONG_SELL' && itemRating !== 'STRONG_SELL') return false;
+                }
+                return true;
+            });
+        }
 
         activeScreenerResults = results;
         activeScreenerPage = 1;
@@ -14333,7 +14359,13 @@ function drawFibonacciChart(p) {
                 : 250;
             const targetWidth = entry.contentRect.width || container.clientWidth;
             if (targetWidth > 50 && targetHeight > 50) {
-                chart.resize(targetWidth, targetHeight);
+                try {
+                    if (chart && typeof chart.resize === 'function') {
+                        chart.resize(targetWidth, targetHeight);
+                    }
+                } catch (e) {
+                    // Ignore disposed lightweight chart error on container teardown
+                }
             }
         }
     });
@@ -15574,7 +15606,7 @@ function renderWatchlistItems() {
     }
 
     // --- SORT CONSTITUENTS ---
-    const numericSortFields = ['live_price', 'change', 'change_pct', 'day_high', 'day_low'];
+    const numericSortFields = ['live_price', 'change', 'change_pct', 'day_high', 'day_low', 'fuzzy_score'];
     let sortedItems = [...activeWatch.items];
     sortedItems.sort((a, b) => {
         let valA, valB;
@@ -15639,6 +15671,39 @@ function renderWatchlistItems() {
             ? `<span style="font-family: 'Inter', monospace;">₹${item.day_low.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
             : `<span style="display:inline-block; width:55px; height:14px; border-radius:3px; background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite;"></span>`;
 
+        let fuzzyHTML = `<span style="color: var(--text-muted); font-size: 11px;">--</span>`;
+        if (item.fuzzy_score !== undefined && item.fuzzy_score !== null && item.fuzzy_rating && item.fuzzy_rating !== 'Uncached') {
+            const fScore = item.fuzzy_score;
+            const fRating = item.fuzzy_rating || 'Neutral';
+            let fBg = 'rgba(255,255,255,0.06)';
+            let fColor = 'var(--text-secondary)';
+            let fBorder = 'rgba(255,255,255,0.1)';
+
+            if (fScore >= 70) {
+                fBg = 'rgba(16, 185, 129, 0.15)';
+                fColor = 'var(--color-emerald)';
+                fBorder = 'rgba(16, 185, 129, 0.35)';
+            } else if (fScore >= 40) {
+                fBg = 'rgba(59, 130, 246, 0.15)';
+                fColor = 'var(--color-primary-light)';
+                fBorder = 'rgba(59, 130, 246, 0.35)';
+            } else if (fScore >= 10) {
+                fBg = 'rgba(245, 158, 11, 0.15)';
+                fColor = 'var(--color-amber)';
+                fBorder = 'rgba(245, 158, 11, 0.35)';
+            } else if (fScore <= -40) {
+                fBg = 'rgba(239, 68, 68, 0.15)';
+                fColor = 'var(--color-crimson)';
+                fBorder = 'rgba(239, 68, 68, 0.35)';
+            }
+
+            const sign = fScore > 0 ? '+' : '';
+            fuzzyHTML = `<div class="wl-fuzzy-badge cursor-pointer" data-symbol="${item.symbol}" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; background: ${fBg}; border: 1px solid ${fBorder}; font-size: 11px; font-weight: 700; color: ${fColor};" title="Click to view full Fuzzy Logic Engine profile for ${item.symbol}">
+                <span>${sign}${fScore.toFixed(1)}%</span>
+                <span style="font-size: 9.5px; opacity: 0.85;">(${fRating})</span>
+            </div>`;
+        }
+
         const tr = document.createElement('tr');
         tr.setAttribute('data-wl-symbol', item.symbol);
         tr.innerHTML = `
@@ -15653,6 +15718,9 @@ function renderWatchlistItems() {
                     </div>
                     <div class="watchlist-symbol-link" style="cursor: pointer; font-size: 11px; color: var(--text-secondary);" title="Click to load research workspace">
                         ${item.name}
+                    </div>
+                    <div class="mobile-only-fuzzy-pill" style="margin-top: 3px;">
+                        ${fuzzyHTML}
                     </div>
                 </div>
             </td>
@@ -15672,6 +15740,9 @@ function renderWatchlistItems() {
             <td class="wl-day-low" style="text-align: right; font-size: 11.5px; color: var(--text-secondary);">
                 ${lowHTML}
             </td>
+            <td style="text-align: center;">
+                ${fuzzyHTML}
+            </td>
             <td style="white-space: nowrap;">
                 <button class="btn-secondary remove-watchlist-item-btn" data-ticker="${item.symbol}" style="font-size: 10px; padding: 3px 8px; cursor:pointer; white-space: nowrap;" title="Remove ${item.symbol}">🗑️</button>
             </td>
@@ -15681,6 +15752,18 @@ function renderWatchlistItems() {
             el.addEventListener('click', () => {
                 switchTab('analyzer');
                 loadStockAnalyzer(item.symbol);
+            });
+        });
+
+        tr.querySelectorAll('.wl-fuzzy-badge').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const sym = el.getAttribute('data-symbol');
+                if (typeof window.evaluateFuzzyStock === 'function') {
+                    window.evaluateFuzzyStock(sym);
+                } else if (window.switchTab) {
+                    window.switchTab('fuzzy');
+                }
             });
         });
 
@@ -20900,6 +20983,9 @@ async function loadPortfolioDoctorLedger(forceRefresh = false) {
             concEl.style.fontWeight = '700';
         }
 
+        // Trigger Mamdani Fuzzy Health & Sector Auto-Swap Advisor
+        await loadPortfolioFuzzySwaps();
+
     } catch (e) {
         console.warn("Could not load portfolio ledger: ", e);
         if (emptyState) emptyState.style.display = 'block';
@@ -20907,6 +20993,117 @@ async function loadPortfolioDoctorLedger(forceRefresh = false) {
         if (runBtn) runBtn.style.display = 'none';
     }
 }
+
+async function loadPortfolioFuzzySwaps() {
+    const swapContainer = document.getElementById('portfolio-fuzzy-swap-container');
+    const healthBadge = document.getElementById('portfolio-fuzzy-health-badge');
+    const countEl = document.getElementById('portfolio-fuzzy-underperforming-count');
+    const gridEl = document.getElementById('portfolio-fuzzy-swaps-grid');
+
+    if (!swapContainer || !gridEl) return;
+
+    try {
+        const response = await fetch('/api/portfolio/fuzzy-swaps');
+        if (!response.ok) throw new Error("Failed to fetch portfolio fuzzy swaps.");
+        const data = await response.json();
+
+        const score = data.portfolio_fuzzy_score || 0.0;
+        const rating = data.portfolio_health_rating || "N/A";
+        const count = data.underperforming_count || 0;
+        const recommendations = data.swap_recommendations || [];
+
+        if (healthBadge) {
+            const scoreColor = score >= 15 ? '#10b981' : score < -15 ? '#ef4444' : '#f59e0b';
+            const sign = score >= 0 ? '+' : '';
+            healthBadge.innerText = `${sign}${score}% (${rating})`;
+            healthBadge.style.color = scoreColor;
+            healthBadge.style.background = `${scoreColor}18`;
+            healthBadge.style.borderColor = `${scoreColor}40`;
+        }
+
+        if (countEl) countEl.innerText = count;
+
+        if (recommendations.length === 0) {
+            swapContainer.style.display = 'block';
+            gridEl.innerHTML = `
+                <div style="grid-column: 1 / -1; padding: 20px; text-align: center; border: 1px dashed var(--border-glass); border-radius: 8px; color: var(--text-secondary); background: rgba(16, 185, 129, 0.03);">
+                    <span style="font-size: 20px; display: block; margin-bottom: 6px;">🛡️</span>
+                    <strong style="color: var(--neon-green);">All Portfolio Holdings Are Strong!</strong><br>
+                    <span style="font-size: 11px; opacity: 0.8;">No high-vulnerability positions detected ($<15\\%$). Your sector allocations carry healthy Mamdani conviction.</span>
+                </div>
+            `;
+            return;
+        }
+
+        swapContainer.style.display = 'block';
+        gridEl.innerHTML = recommendations.map(rec => {
+            const curScore = rec.current_fuzzy_score;
+            const recScore = rec.suggested_fuzzy_score;
+            const curColor = curScore >= 15 ? '#10b981' : curScore < -15 ? '#ef4444' : '#f59e0b';
+            const recColor = recScore >= 15 ? '#10b981' : recScore < -15 ? '#ef4444' : '#f59e0b';
+            
+            const curSign = curScore >= 0 ? '+' : '';
+            const recSign = recScore >= 0 ? '+' : '';
+
+            return `
+                <div class="fuzzy-swap-card">
+                    <div class="fuzzy-swap-header">
+                        <span style="font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--color-primary); letter-spacing: 0.05em;">${rec.current_sector} Sector Swap</span>
+                        <span class="conviction-delta-badge">+${rec.conviction_delta}% Upgrade</span>
+                    </div>
+
+                    <div class="fuzzy-swap-compare-row">
+                        <!-- Current Holding -->
+                        <div class="fuzzy-swap-side">
+                            <span style="font-size: 9.5px; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Current Position</span>
+                            <span style="font-size: 13px; font-weight: 700; color: var(--text-primary);">${rec.current_symbol}</span>
+                            <span style="font-size: 10.5px; font-weight: 600; color: ${curColor};">${curSign}${curScore}% (${rec.current_fuzzy_rating})</span>
+                        </div>
+
+                        <!-- Arrow -->
+                        <div class="fuzzy-swap-arrow">
+                            <span style="font-size: 16px; color: var(--neon-green);">➔</span>
+                        </div>
+
+                        <!-- Suggested Replacement -->
+                        <div class="fuzzy-swap-side">
+                            <span style="font-size: 9.5px; text-transform: uppercase; color: var(--neon-green); font-weight: 600;">Suggested Replacement</span>
+                            <span style="font-size: 13px; font-weight: 700; color: var(--neon-green);">${rec.suggested_symbol}</span>
+                            <span style="font-size: 10.5px; font-weight: 600; color: ${recColor};">${recSign}${recScore}% (${rec.suggested_fuzzy_rating})</span>
+                        </div>
+                    </div>
+
+                    <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4; font-style: italic;">
+                        "${rec.rationale}"
+                    </div>
+
+                    <div style="display: flex; gap: 8px; margin-top: 4px;">
+                        <button class="btn-primary analyze-fuzzy-swap-btn" data-symbol="${rec.suggested_symbol}" style="flex: 1; font-size: 11px; padding: 6px 12px; height: 30px; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                            Analyze ${rec.suggested_symbol} 🔍
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        gridEl.querySelectorAll('.analyze-fuzzy-swap-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const sym = e.currentTarget.getAttribute('data-symbol');
+                if (sym) {
+                    const searchInput = document.getElementById('analyzer-search-input');
+                    if (searchInput) searchInput.value = sym;
+                    switchTab('analyzer');
+                    loadStockAnalyzer(sym);
+                }
+            });
+        });
+
+    } catch (err) {
+        console.warn("Error loading portfolio fuzzy swaps:", err);
+    }
+}
+
+window.loadPortfolioFuzzySwaps = loadPortfolioFuzzySwaps;
 
 async function runPortfolioDoctorAnalysis() {
     const runBtn = document.getElementById('run-portfolio-doctor-btn');
@@ -32037,26 +32234,34 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
 
         // 1. TradingView Workstation Chart
         setupFullscreenToggle('tv-chart-card', '#tv-chart-container', 420, (width, height) => {
-            if (activeTVWorkstationChart && width > 50 && height > 50) {
-                activeTVWorkstationChart.resize(width, height);
-            }
+            try {
+                if (activeTVWorkstationChart && width > 50 && height > 50) {
+                    activeTVWorkstationChart.resize(width, height);
+                }
+            } catch (e) {}
         });
 
         // 2. Fibonacci Retracements Chart
         setupFullscreenToggle('tech-fib-card', '#fibonacci-chart-container', 250, (width, height) => {
-            if (window.activeFibLightweightChart && width > 50 && height > 50) {
-                window.activeFibLightweightChart.resize(width, height);
-            }
-            if (activeFibChartInstance) {
-                activeFibChartInstance.resize();
-            }
+            try {
+                if (window.activeFibLightweightChart && width > 50 && height > 50) {
+                    window.activeFibLightweightChart.resize(width, height);
+                }
+            } catch (e) {}
+            try {
+                if (activeFibChartInstance) {
+                    activeFibChartInstance.resize();
+                }
+            } catch (e) {}
         });
 
         // 3. Historical Price & Trend Analysis Chart
         setupFullscreenToggle('price-trend-chart-card', '.price-chart-container', 350, (width, height) => {
-            if (activeChartInstance) {
-                activeChartInstance.resize();
-            }
+            try {
+                if (activeChartInstance) {
+                    activeChartInstance.resize();
+                }
+            } catch (e) {}
         });
 
         // Escape key to exit fullscreen (for any active fullscreen card)
@@ -32078,20 +32283,22 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
 
                     // Resize matching charts
                     setTimeout(() => {
-                        if (activeFullscreenCard.id === 'tv-chart-card' && activeTVWorkstationChart && tvContainer) {
-                            const targetWidth = tvContainer.clientWidth || 300;
-                            activeTVWorkstationChart.resize(targetWidth, 420);
-                        } else if (activeFullscreenCard.id === 'tech-fib-card') {
-                            if (window.activeFibLightweightChart && fibContainer) {
-                                const targetWidth = fibContainer.clientWidth || 300;
-                                window.activeFibLightweightChart.resize(targetWidth, 250);
+                        try {
+                            if (activeFullscreenCard.id === 'tv-chart-card' && activeTVWorkstationChart && tvContainer) {
+                                const targetWidth = tvContainer.clientWidth || 300;
+                                activeTVWorkstationChart.resize(targetWidth, 420);
+                            } else if (activeFullscreenCard.id === 'tech-fib-card') {
+                                if (window.activeFibLightweightChart && fibContainer) {
+                                    const targetWidth = fibContainer.clientWidth || 300;
+                                    window.activeFibLightweightChart.resize(targetWidth, 250);
+                                }
+                                if (activeFibChartInstance) {
+                                    activeFibChartInstance.resize();
+                                }
+                            } else if (activeFullscreenCard.id === 'price-trend-chart-card' && activeChartInstance) {
+                                activeChartInstance.resize();
                             }
-                            if (activeFibChartInstance) {
-                                activeFibChartInstance.resize();
-                            }
-                        } else if (activeFullscreenCard.id === 'price-trend-chart-card' && activeChartInstance) {
-                            activeChartInstance.resize();
-                        }
+                        } catch (err) {}
                     }, 50);
                 }
             }
@@ -49020,7 +49227,214 @@ function calculateAnomalyFlags() {
 
 // ─── APEX Fuzzy-Multi-Agent Decision Engine (FMADE) ───
 
+window.initFuzzyScreenerControls = function() {
+    const slider = document.getElementById('fuzzy-score-slider');
+    const sliderVal = document.getElementById('fuzzy-score-slider-val');
+    const ratingSelect = document.getElementById('fuzzy-rating-class-select');
+    const searchInput = document.getElementById('fuzzy-screener-search');
+    const scanBtn = document.getElementById('btn-run-fuzzy-screener');
+
+    if (!slider || !scanBtn) return;
+
+    if (!slider.dataset.wired) {
+        slider.dataset.wired = 'true';
+        slider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            if (sliderVal) {
+                sliderVal.innerText = `${val >= 0 ? '+' : ''}${val.toFixed(1)}%`;
+                sliderVal.style.color = val > 15 ? '#10b981' : val < -15 ? '#ef4444' : '#f59e0b';
+            }
+        });
+
+        scanBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.fetchFuzzyScreenerResults();
+        });
+
+        if (ratingSelect) {
+            ratingSelect.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if (val === 'AVOID') {
+                    slider.value = "-40";
+                } else if (val === 'STRONG_BUY') {
+                    slider.value = "70";
+                } else if (val === 'BUY') {
+                    slider.value = "30";
+                } else if (val === 'HOLD') {
+                    slider.value = "-40";
+                }
+                const numVal = parseFloat(slider.value);
+                if (sliderVal) {
+                    sliderVal.innerText = `${numVal >= 0 ? '+' : ''}${numVal.toFixed(1)}%`;
+                    sliderVal.style.color = numVal > 15 ? '#10b981' : numVal < -15 ? '#ef4444' : '#f59e0b';
+                }
+                window.fetchFuzzyScreenerResults();
+            });
+        }
+
+        const limitSelect = document.getElementById('fuzzy-screener-limit-select');
+        if (limitSelect) {
+            limitSelect.addEventListener('change', () => window.fetchFuzzyScreenerResults());
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') window.fetchFuzzyScreenerResults();
+            });
+        }
+    }
+
+    window.fetchFuzzyScreenerResults();
+};
+
+window.fetchFuzzyScreenerResults = async function() {
+    const slider = document.getElementById('fuzzy-score-slider');
+    const ratingSelect = document.getElementById('fuzzy-rating-class-select');
+    const limitSelect = document.getElementById('fuzzy-screener-limit-select');
+    const searchInput = document.getElementById('fuzzy-screener-search');
+    const matchCountEl = document.getElementById('fuzzy-screener-match-count');
+    const scanResultsCard = document.getElementById('fuzzy-scan-results-card');
+    const scanResultsGrid = document.getElementById('fuzzy-scan-results-grid');
+    const scanResultsCount = document.getElementById('fuzzy-scan-results-count');
+    const resetScanBtn = document.getElementById('btn-close-fuzzy-scan-results');
+
+    const minScore = slider ? parseFloat(slider.value) : -100.0;
+    const ratingClass = ratingSelect ? ratingSelect.value : 'ALL';
+    const limitVal = limitSelect ? parseInt(limitSelect.value) : 50;
+    const searchQuery = searchInput ? searchInput.value.trim().toUpperCase() : '';
+
+    if (matchCountEl) matchCountEl.innerText = "Scanning Market...";
+
+    try {
+        let url = `/api/scans/fuzzy?min_score=${minScore}&limit=${limitVal}`;
+        if (ratingClass !== 'ALL') url += `&rating_class=${encodeURIComponent(ratingClass)}`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+
+        let stocks = data.stocks || [];
+        if (searchQuery) {
+            stocks = stocks.filter(s => s.symbol.includes(searchQuery) || (s.company_name && s.company_name.toUpperCase().includes(searchQuery)));
+        }
+
+        if (matchCountEl) {
+            matchCountEl.innerText = `${stocks.length} Matches Found`;
+        }
+
+        if (scanResultsCard && scanResultsGrid) {
+            if (stocks.length > 0) {
+                scanResultsCard.style.display = 'block';
+                if (scanResultsCount) scanResultsCount.innerText = stocks.length;
+
+                scanResultsGrid.innerHTML = stocks.map((item) => {
+                    const isBuy = item.fuzzy_score >= 15;
+                    const isAvoid = item.fuzzy_score <= -15;
+                    const scoreColor = isBuy ? '#10b981' : isAvoid ? '#ef4444' : '#f59e0b';
+                    const bgStyle = isBuy ? 'rgba(16, 185, 129, 0.04)' : isAvoid ? 'rgba(239, 68, 68, 0.04)' : 'rgba(245, 158, 11, 0.04)';
+                    const borderStyle = isBuy ? 'rgba(16, 185, 129, 0.2)' : isAvoid ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.2)';
+
+                    return `
+                        <div class="fuzzy-scan-row" data-symbol="${item.symbol}" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: ${bgStyle}; border: 1px solid ${borderStyle}; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-sizing: border-box;">
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-weight: 800; font-family: monospace; font-size: 12.5px; color: var(--text-primary);">${item.symbol}</span>
+                                    <span style="font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: rgba(59, 130, 246, 0.1); color: #3b82f6;">${item.sector || 'NSE'}</span>
+                                </div>
+                                <span style="font-size: 10.5px; color: var(--text-secondary); max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.company_name}</span>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="font-size: 12px; font-weight: 800; color: ${scoreColor}; padding: 3px 8px; background: rgba(0,0,0,0.25); border-radius: 6px; font-family: 'Outfit', sans-serif;">${item.fuzzy_score > 0 ? '+' : ''}${item.fuzzy_score.toFixed(1)}%</span>
+                                <div style="font-size: 8.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-top: 3px;">${item.fuzzy_rating}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                scanResultsGrid.querySelectorAll('.fuzzy-scan-row').forEach(row => {
+                    row.addEventListener('click', () => {
+                        const symbol = row.getAttribute('data-symbol');
+                        window.evaluateFuzzyStock(symbol);
+                        window.switchFmadeSubTab('console');
+                    });
+                });
+            } else {
+                scanResultsCard.style.display = 'block';
+                if (scanResultsCount) scanResultsCount.innerText = '0';
+                scanResultsGrid.innerHTML = `<div class="recent-research-empty" style="font-size: 11px; grid-column: 1 / -1;">No stock records match the selected conviction score and rating class filters.</div>`;
+            }
+
+            if (resetScanBtn && !resetScanBtn.dataset.wired) {
+                resetScanBtn.dataset.wired = 'true';
+                resetScanBtn.addEventListener('click', () => {
+                    if (slider) slider.value = "30";
+                    const sliderVal = document.getElementById('fuzzy-score-slider-val');
+                    if (sliderVal) sliderVal.innerText = "+30.0%";
+                    if (ratingSelect) ratingSelect.value = "ALL";
+                    if (searchInput) searchInput.value = "";
+                    scanResultsCard.style.display = 'none';
+                    window.fetchFuzzyScreenerResults();
+                });
+            }
+        }
+
+    } catch (e) {
+        console.error("Failed to fetch fuzzy screener results:", e);
+        if (matchCountEl) matchCountEl.innerText = "Error loading scans";
+    }
+};
+
+window.switchFmadeSubTab = function(subTabName) {
+    const scannerSubTab = document.getElementById('fmade-subtab-scanner');
+    const consoleSubTab = document.getElementById('fmade-subtab-console');
+    const scannerBtn = document.getElementById('fmade-subtab-scanner-btn');
+    const consoleBtn = document.getElementById('fmade-subtab-console-btn');
+
+    if (!scannerSubTab || !consoleSubTab) return;
+
+    if (subTabName === 'scanner') {
+        scannerSubTab.style.display = 'block';
+        consoleSubTab.style.display = 'none';
+        
+        if (scannerBtn) {
+            scannerBtn.style.background = 'rgba(59, 130, 246, 0.2)';
+            scannerBtn.style.borderColor = '#3b82f6';
+            scannerBtn.style.color = '#3b82f6';
+            scannerBtn.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.15)';
+        }
+
+        if (consoleBtn) {
+            consoleBtn.style.background = 'rgba(0, 0, 0, 0.3)';
+            consoleBtn.style.borderColor = 'var(--border-glass)';
+            consoleBtn.style.color = 'var(--text-secondary)';
+            consoleBtn.style.boxShadow = 'none';
+        }
+    } else if (subTabName === 'console') {
+        scannerSubTab.style.display = 'none';
+        consoleSubTab.style.display = 'block';
+
+        if (consoleBtn) {
+            consoleBtn.style.background = 'rgba(59, 130, 246, 0.2)';
+            consoleBtn.style.borderColor = '#3b82f6';
+            consoleBtn.style.color = '#3b82f6';
+            consoleBtn.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.15)';
+        }
+
+        if (scannerBtn) {
+            scannerBtn.style.background = 'rgba(0, 0, 0, 0.3)';
+            scannerBtn.style.borderColor = 'var(--border-glass)';
+            scannerBtn.style.color = 'var(--text-secondary)';
+            scannerBtn.style.boxShadow = 'none';
+        }
+    }
+};
+
 window.loadFuzzyIntelligence = async function() {
+    window.initFuzzyScreenerControls();
+    const consoleSubTab = document.getElementById('fmade-subtab-console');
+    if (!consoleSubTab || consoleSubTab.style.display !== 'block') {
+        window.switchFmadeSubTab('scanner');
+    }
     const buysList = document.getElementById('fuzzy-buys-list');
     const sellsList = document.getElementById('fuzzy-sells-list');
     if (!buysList || !sellsList) return;
@@ -49037,13 +49451,13 @@ window.loadFuzzyIntelligence = async function() {
         if (data.top_buys && data.top_buys.length > 0) {
             buysList.innerHTML = data.top_buys.map((item, idx) => `
                 <div class="watchlist-strip-row fuzzy-standings-row" data-symbol="${item.symbol}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(16, 185, 129, 0.03); border: 1px solid rgba(16, 185, 129, 0.1); border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 2px;">
-                    <div style="display: flex; flex-direction: column;">
+                    <div style="display: flex; flex-direction: column; min-width: 0; flex: 1; margin-right: 8px;">
                         <span style="font-weight: 800; font-family: monospace; font-size: 12px; color: #10b981;">${item.symbol}</span>
-                        <span style="font-size: 10px; color: var(--text-secondary); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.company_name}</span>
+                        <span class="fuzzy-company-name" style="font-size: 10px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">${item.company_name}</span>
                     </div>
-                    <div style="text-align: right;">
+                    <div style="text-align: right; flex-shrink: 0;">
                         <span style="font-size: 11px; font-weight: 800; color: #10b981; padding: 2px 6px; background: rgba(16, 185, 129, 0.1); border-radius: 4px;">+${item.fuzzy_score.toFixed(1)}%</span>
-                        <div style="font-size: 8px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-top: 2px;">${item.market_regime}</div>
+                        <div style="font-size: 8px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-top: 2px; white-space: nowrap;">${item.market_regime}</div>
                     </div>
                 </div>
             `).join('');
@@ -49053,6 +49467,7 @@ window.loadFuzzyIntelligence = async function() {
                 row.addEventListener('click', () => {
                     const symbol = row.getAttribute('data-symbol');
                     window.evaluateFuzzyStock(symbol);
+                    window.switchFmadeSubTab('console');
                 });
             });
         } else {
@@ -49063,13 +49478,13 @@ window.loadFuzzyIntelligence = async function() {
         if (data.top_sells && data.top_sells.length > 0) {
             sellsList.innerHTML = data.top_sells.map((item, idx) => `
                 <div class="watchlist-strip-row fuzzy-standings-row" data-symbol="${item.symbol}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.1); border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 2px;">
-                    <div style="display: flex; flex-direction: column;">
+                    <div style="display: flex; flex-direction: column; min-width: 0; flex: 1; margin-right: 8px;">
                         <span style="font-weight: 800; font-family: monospace; font-size: 12px; color: #ef4444;">${item.symbol}</span>
-                        <span style="font-size: 10px; color: var(--text-secondary); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.company_name}</span>
+                        <span class="fuzzy-company-name" style="font-size: 10px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">${item.company_name}</span>
                     </div>
-                    <div style="text-align: right;">
+                    <div style="text-align: right; flex-shrink: 0;">
                         <span style="font-size: 11px; font-weight: 800; color: #ef4444; padding: 2px 6px; background: rgba(239, 68, 68, 0.1); border-radius: 4px;">${item.fuzzy_score.toFixed(1)}%</span>
-                        <div style="font-size: 8px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-top: 2px;">${item.market_regime}</div>
+                        <div style="font-size: 8px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-top: 2px; white-space: nowrap;">${item.market_regime}</div>
                     </div>
                 </div>
             `).join('');
@@ -49079,6 +49494,7 @@ window.loadFuzzyIntelligence = async function() {
                 row.addEventListener('click', () => {
                     const symbol = row.getAttribute('data-symbol');
                     window.evaluateFuzzyStock(symbol);
+                    window.switchFmadeSubTab('console');
                 });
             });
         } else {
@@ -49206,11 +49622,16 @@ window.loadFuzzyIntelligence = async function() {
             }
         });
 
-        // Auto-select first buy as active
-        if (data.top_buys && data.top_buys.length > 0) {
-            window.evaluateFuzzyStock(data.top_buys[0].symbol);
-        } else if (data.top_sells && data.top_sells.length > 0) {
-            window.evaluateFuzzyStock(data.top_sells[0].symbol);
+        // Auto-select first buy as active only if no stock is currently set or active
+        const activeLabel = document.getElementById('fuzzy-active-stock');
+        const fuzzyInput = document.getElementById('fuzzy-symbol-input');
+        const currentActive = (activeLabel && activeLabel.innerText && activeLabel.innerText !== '---') ? activeLabel.innerText.trim() : (fuzzyInput ? fuzzyInput.value.trim() : '');
+        if (!currentActive) {
+            if (data.top_buys && data.top_buys.length > 0) {
+                window.evaluateFuzzyStock(data.top_buys[0].symbol);
+            } else if (data.top_sells && data.top_sells.length > 0) {
+                window.evaluateFuzzyStock(data.top_sells[0].symbol);
+            }
         }
 
     } catch (err) {
@@ -49221,8 +49642,21 @@ window.loadFuzzyIntelligence = async function() {
 };
 
 window.evaluateFuzzyStock = async function(symbol) {
+    const fuzzyInput = document.getElementById('fuzzy-symbol-input');
+    if (fuzzyInput) fuzzyInput.value = symbol;
+
+    const stockSearchInput = document.getElementById('fuzzy-stock-search-input');
+    if (stockSearchInput) stockSearchInput.value = symbol;
+
     const activeLabel = document.getElementById('fuzzy-active-stock');
     if (activeLabel) activeLabel.innerText = symbol;
+
+    if (typeof window.switchTab === 'function') {
+        window.switchTab('fuzzy');
+    }
+    if (typeof window.switchFmadeSubTab === 'function') {
+        window.switchFmadeSubTab('console');
+    }
 
     try {
         const response = await fetch(`/api/fuzzy/evaluate?symbol=${symbol}`);
@@ -49258,17 +49692,29 @@ window.evaluateFuzzyStock = async function(symbol) {
         }
 
         // 2. Fuzzified inputs values
-        const inputs = result.inputs;
-        const setVal = (id, val, suffix='') => {
+        const inputs = result.inputs || {};
+        const setVal = (id, val, suffix='', decimals=2) => {
             const el = document.getElementById(id);
-            if (el) el.innerText = val !== undefined && val !== null ? `${val.toFixed(2)}${suffix}` : '--';
+            if (el) el.innerText = (val !== undefined && val !== null) ? `${typeof val === 'number' ? val.toFixed(decimals) : val}${suffix}` : '--';
         };
         setVal('f-val-opm', inputs.opm_delta, '%');
         setVal('f-val-roe', inputs.roe_delta, '%');
         setVal('f-val-debt', inputs.debt_delta);
-        setVal('f-val-rsi', inputs.rsi);
-        setVal('f-val-dma', inputs.dma_prox, '%');
-        setVal('f-val-adx', inputs.adx);
+        setVal('f-val-icr', inputs.icr, 'x');
+        setVal('f-val-rsi', inputs.rsi, '', 1);
+        setVal('f-val-dma', inputs.dma_prox, '%', 1);
+        setVal('f-val-adx', inputs.adx, '', 1);
+        setVal('f-val-52w', inputs.fifty_two_week_prox, '', 2);
+        setVal('f-val-pe', inputs.pe_valuation_ratio, 'x', 2);
+        setVal('f-val-deliv', inputs.delivery_pct, '%', 1);
+        setVal('f-val-fii', inputs.fii_dii_delta, '%', 2);
+        
+        // Stealth State synthesis label
+        const stealthEl = document.getElementById('f-val-stealth');
+        if (stealthEl) {
+            let stealthStr = inputs.vcp_squeeze ? 'VCP Squeeze' : inputs.dma_stack_bullish ? 'Bull Stack' : inputs.dma_stack_bearish ? 'Bear Stack' : 'Normal';
+            stealthEl.innerText = stealthStr;
+        }
 
         // 3. Fired rules trail
         const trailContainer = document.getElementById('fuzzy-rules-trail');
@@ -49607,15 +50053,203 @@ window.hydrateFuzzyRadarHomepage = async function() {
     }
 };
 
-// Wire up the desktop go button
-const desktopGoBtn = document.getElementById('desktop-fuzzy-radar-go-btn');
-if (desktopGoBtn) {
-    desktopGoBtn.onclick = () => {
-        if (window.switchTab) window.switchTab('fuzzy');
+window.initScreenerFuzzyControls = function() {
+    const slider = document.getElementById('screener-fuzzy-score-slider');
+    const numInput = document.getElementById('screener-fuzzy-score-num');
+    const scoreVal = document.getElementById('screener-fuzzy-score-val');
+    const ratingSelect = document.getElementById('screener-fuzzy-rating-select');
+    const runFuzzyBtn = document.getElementById('run-fuzzy-screener-modal-btn');
+
+    if (!slider || slider.dataset.fuzzyWired) return;
+    slider.dataset.fuzzyWired = 'true';
+
+    const updateScoreDisplay = (val) => {
+        const num = parseFloat(val);
+        if (scoreVal) {
+            scoreVal.innerText = `${num >= 0 ? '+' : ''}${num.toFixed(0)}%`;
+            scoreVal.style.color = num > 15 ? '#10b981' : num < -15 ? '#ef4444' : '#f59e0b';
+        }
     };
-}
+
+    slider.addEventListener('input', (e) => {
+        const val = e.target.value;
+        if (numInput) numInput.value = val;
+        updateScoreDisplay(val);
+    });
+
+    if (numInput) {
+        numInput.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            if (isNaN(val)) val = -100;
+            val = Math.max(-100, Math.min(100, val));
+            slider.value = val;
+            updateScoreDisplay(val);
+        });
+    }
+
+    if (ratingSelect) {
+        ratingSelect.addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val === 'STRONG_BUY') {
+                slider.value = "70";
+            } else if (val === 'BUY') {
+                slider.value = "30";
+            } else if (val === 'HOLD') {
+                slider.value = "-39";
+            } else if (val === 'SELL') {
+                slider.value = "-40";
+            } else if (val === 'STRONG_SELL') {
+                slider.value = "-70";
+            }
+            if (numInput) numInput.value = slider.value;
+            updateScoreDisplay(slider.value);
+        });
+    }
+
+    if (runFuzzyBtn) {
+        runFuzzyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (window.runAIScreener) window.runAIScreener();
+        });
+    }
+};
+
+window.initFuzzyRulesKBModal = function() {
+    const kbBtn = document.getElementById('fuzzy-rules-kb-btn');
+    const modal = document.getElementById('fuzzy-rules-kb-modal');
+    const closeBtn = document.getElementById('fuzzy-rules-kb-close-btn');
+    const body = document.getElementById('fuzzy-rules-kb-body');
+    if (!kbBtn || !modal) return;
+
+    const static19Rules = [
+        { id: 101, name: "Stage 2 Breakout Alignment", category: "Buy Signals", type: "buy", formula: "min(Momentum >= 0.5, Trend >= 0.5, RSI in 50-70)", description: "Fires when stock enters a high-momentum Stage 2 Mark-up phase with healthy RSI confirmation.", impact: "Buy (+40)" },
+        { id: 102, name: "Oversold Mean Reversion", category: "Buy Signals", type: "buy", formula: "min(RSI < 35, Volatility >= 0.6, Trend < 0.3)", description: "Detects extreme oversold conditions in volatile assets with classic mean-reversion bounce potential.", impact: "Buy (+25)" },
+        { id: 103, name: "Valuation Bargain Quality Surge", category: "Buy Signals", type: "buy", formula: "PE <= 25x AND Quality >= 0.6 AND Value >= 0.6", description: "Fires when high fundamental quality & value metrics coincide with low PE valuation multiples.", impact: "Strong Buy (+35)" },
+        { id: 104, name: "Bullish DMA Stack Alignment", category: "Buy Signals", type: "buy", formula: "20 DMA > 50 DMA > 100 DMA > 200 DMA", description: "Fires when short, medium, and long-term moving averages align in perfect ascending order.", impact: "Strong Buy (+30)" },
+        { id: 105, name: "52-Week Range Proximity Breakout", category: "Buy Signals", type: "buy", formula: "Price >= 0.90 * 52W_High AND Volume Spike >= 1.8x", description: "Detects stock trading within 10% of 52-week highs with heavy institutional volume confirmation.", impact: "Strong Buy (+35)" },
+        { id: 106, name: "Stealth Institutional Delivery Accumulation", category: "Buy Signals", type: "buy", formula: "Delivery Ratio >= 55% AND Daily Change <= 2.0%", description: "Pre-Market Stealth Signal: Detects heavy institutional delivery uptake on low price volatility days.", impact: "Strong Buy (+45)" },
+        { id: 107, name: "FII / DII Institutional Flow Surge", category: "Buy Signals", type: "buy", formula: "FII Net Delta + DII Net Delta > 0", description: "Pre-Market Signal: Institutional cash inflow tracking combined FII & DII net buying momentum.", impact: "Buy (+30)" },
+        { id: 108, name: "VCP Volatility Contraction Squeeze", category: "Buy Signals", type: "buy", formula: "Volatility Range <= 3.0% AND Relative Volume <= 0.8x", description: "Pre-Market Signal: Identifies tight price consolidation squeeze prior to explosive Mark-up breakout.", impact: "Strong Buy (+35)" },
+        { id: 201, name: "Steady Compounder Trajectory", category: "Quality Trajectories", type: "quality", formula: "Quality >= 0.70 AND Volatility < 0.40 AND Debt < 0.40", description: "Identifies low-volatility, low-debt compounding quality stocks with consistent earnings growth.", impact: "Quality (+15)" },
+        { id: 202, name: "Speculative Volatility Warning", category: "Quality Trajectories", type: "quality", formula: "Quality < 0.30 AND Volatility >= 0.70", description: "Applies negative quality drag to low-fundamental high-volatility speculative assets.", impact: "Warning (-20)" },
+        { id: 301, name: "Severe Stage 4 Markdown", category: "Bearish & Markdown", type: "sell", formula: "min(Momentum < 0.2, Trend < 0.2, Volatility >= 0.7)", description: "Fires when stock enters an active institutional distribution and Stage 4 markdown trend.", impact: "Strong Sell (-45)" },
+        { id: 302, name: "Overbought Exhaustion Distribution", category: "Bearish & Markdown", type: "sell", formula: "RSI > 75 AND Momentum >= 0.8 AND Quality < 0.5", description: "Detects overbought momentum exhaustion without underlying fundamental quality support.", impact: "Sell (-30)" },
+        { id: 303, name: "Overvaluation & Margin Compression", category: "Bearish & Markdown", type: "sell", formula: "PE_Overvalued > 1.45x AND OPM_Compressing", description: "Fires when stock trades > 1.45x over 3Y Median PE while margin compression has begun.", impact: "Sell (-80)" },
+        { id: 304, name: "Bearish DMA Stack Alignment", category: "Bearish & Markdown", type: "sell", formula: "20 DMA < 50 DMA < 100 DMA < 200 DMA", description: "Fires when moving averages align in descending bearish hierarchy.", impact: "Strong Sell (-85)" },
+        { id: 401, name: "Promoter Risk Penalty", category: "Safeguards & Hard Caps", type: "cap", formula: "Pledge Delta > 2% OR Promoter Holding < 30%", description: "Applies a 50% multiplier penalty to Buy activations if promoter pledging rises or equity holding is low.", impact: "Penalty (-50%)" },
+        { id: 402, name: "Volume Drift Penalty", category: "Safeguards & Hard Caps", type: "cap", formula: "Relative Volume < 0.80", description: "Applies a 40% penalty if trading volume falls below 80% of 20-day average.", impact: "Penalty (-40%)" },
+        { id: 403, name: "Altman Z & Piotroski Hard Cap", category: "Safeguards & Hard Caps", type: "cap", formula: "Altman Z < 1.8 OR Piotroski Score < 4", description: "Hard caps final Mamdani score at <= +18.0 (Hold) for distress risk candidates.", impact: "Hard Cap (<= 18.0)" },
+        { id: 404, name: "Sector Markdown Penalty", category: "Safeguards & Hard Caps", type: "cap", formula: "Sector 1-Month Return < -5.0%", description: "Applies a 40% penalty when sector macro trend is in active markdown.", impact: "Penalty (-40%)" },
+        { id: 405, name: "Solvency & Cash Flow Trap Cap", category: "Safeguards & Hard Caps", type: "cap", formula: "ICR < 1.5 OR OCF/PAT Ratio < 0.50", description: "Pre-market safeguard: Hard caps final score at <= +18.0 if Interest Coverage Ratio < 1.5 or Operating Cash Flow is less than half of reported Net Profit.", impact: "Hard Cap (<= 18.0)" }
+    ];
+
+    let rulesCache = null;
+
+    function matchesCategory(ruleCategory, catFilter) {
+        if (!catFilter || catFilter === 'all') return true;
+        const catLower = (ruleCategory || '').toLowerCase();
+        const filterLower = catFilter.toLowerCase();
+        if (filterLower === 'buy') return catLower.includes('buy');
+        if (filterLower === 'quality') return catLower.includes('quality');
+        if (filterLower === 'bearish') return catLower.includes('bearish') || catLower.includes('markdown');
+        if (filterLower === 'safeguard' || filterLower === 'cap') return catLower.includes('safeguard') || catLower.includes('cap') || catLower.includes('floor') || catLower.includes('penalty');
+        return catLower.includes(filterLower);
+    }
+
+    async function loadRules(categoryFilter = 'all') {
+        if (!body) return;
+
+        try {
+            if (!rulesCache) {
+                try {
+                    const res = await fetch('/api/fuzzy/rules-knowledge-base');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && Array.isArray(data.rules) && data.rules.length > 0) {
+                            rulesCache = data.rules;
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Fuzzy rules API fetch warning, using static fallback:", e);
+                }
+                if (!rulesCache) {
+                    rulesCache = static19Rules;
+                }
+            }
+
+            const filtered = rulesCache.filter(r => matchesCategory(r.category, categoryFilter));
+
+            if (filtered.length === 0) {
+                body.innerHTML = `<div style="text-align: center; padding: 30px; color: var(--text-muted, #94a3b8); font-size: 13px;">No rules found in this category.</div>`;
+                return;
+            }
+
+            body.innerHTML = filtered.map(rule => {
+                let badgeClass = 'rule-type-buy';
+                let badgeStyle = 'background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);';
+
+                if (rule.type === 'sell') {
+                    badgeStyle = 'background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);';
+                } else if (rule.type === 'cap') {
+                    badgeStyle = 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3);';
+                } else if (rule.type === 'quality') {
+                    badgeStyle = 'background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.3);';
+                }
+
+                return `
+                    <div class="fuzzy-kb-rule-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="fuzzy-kb-rule-id">R${rule.id}</span>
+                                <h4 class="fuzzy-kb-rule-name">${rule.name}</h4>
+                            </div>
+                            <div>
+                                <span style="font-size: 10.5px; font-weight: 800; padding: 3px 10px; border-radius: 12px; ${badgeStyle}">${rule.impact}</span>
+                            </div>
+                        </div>
+                        <div class="fuzzy-kb-rule-desc">${rule.description}</div>
+                        <div class="fuzzy-kb-formula-box">
+                            <span class="fuzzy-kb-formula-label">Formula:</span>
+                            <code>${rule.formula}</code>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (err) {
+            body.innerHTML = `<div style="text-align: center; padding: 20px; color: #ef4444;">Error displaying rules: ${err.message}</div>`;
+        }
+    }
+
+    kbBtn.addEventListener('click', () => {
+        modal.style.display = 'flex';
+        loadRules('all');
+    });
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            modal.style.display = 'none';
+        });
+    }
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+    });
+
+    const tabs = document.querySelectorAll('.fuzzy-kb-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const category = tab.getAttribute('data-category');
+            loadRules(category);
+        });
+    });
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(window.hydrateFuzzyRadarHomepage, 800);
+    setTimeout(window.initScreenerFuzzyControls, 500);
+    setTimeout(window.initFuzzyRulesKBModal, 600);
 });
+
 
