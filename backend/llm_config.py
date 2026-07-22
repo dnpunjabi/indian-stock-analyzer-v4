@@ -301,13 +301,12 @@ def _call_gemini_with_rotation(task_type: str,
             res = requests.post(url, headers=headers, json=payload, timeout=20.0)
             
             if res.status_code == 200:
-                res_json = res.json()
-                try:
-                    text = res_json["candidates"][0]["content"]["parts"][0]["text"]
-                    return text, True
-                except (KeyError, IndexError) as parse_err:
-                    print(f"[LLM Rotation] Error parsing Gemini candidate JSON: {parse_err}")
-                    return f"ERROR: Invalid response structure from Gemini API: {res.text}", False
+                    candidate = res_json["candidates"][0]
+                    parts = candidate.get("content", {}).get("parts", [])
+                    text = "".join([p.get("text", "") for p in parts if "text" in p])
+                    if text:
+                        return text, True
+                    print(f"[LLM Rotation] No text parts found in Gemini response candidate")
                     
             elif res.status_code == 429:
                 print(f"[LLM Rotation] Key {mask} rate-limited (429). Placing on 60s cooldown.")
@@ -562,49 +561,38 @@ def call_llm(task_type: str,
         return f"ERROR: Failed to query LLM model {model}. Details: {err_msg}"
 
 def _clean_reasoning_metadata(text: str) -> str:
-    """Strip out any internal thinking process, chain-of-thought blocks, or conversational greetings from the text."""
+    """Strip out any internal thinking process or chain-of-thought blocks from the text."""
     if not text:
         return text
-        
-    lower_text = text.lower()
-    starts_with_thinking = any(lower_text.strip().startswith(p) for p in [
-        "thinking process", "reasoning process", "analysis process", 
+
+    import re
+    # 1. Remove explicit <think>...</think> or <reasoning>...</reasoning> tags
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'<reasoning>.*?</reasoning>', '', text, flags=re.DOTALL | re.IGNORECASE)
+
+    lower_text = text.lower().strip()
+    thinking_prefixes = [
+        "thinking process:", "reasoning process:", "analysis process:",
         "here's a thinking process", "here is the thinking process",
         "here is a thinking process", "here's the thinking process"
-    ])
+    ]
     
-    import re
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL | re.IGNORECASE)
-    
+    starts_with_thinking = any(lower_text.startswith(p) for p in thinking_prefixes)
     if not starts_with_thinking:
         return text.strip()
-        
-    markers = [
-        r'\b(?:draft|response|answer|output)\s*(?:\([^)]*\))?\s*[:\*\s]*'
-    ]
-    last_idx = -1
-    last_end = -1
-    for marker in markers:
-        for m in re.finditer(marker, lower_text):
-            if m.start() > last_idx:
-                last_idx = m.start()
-                last_end = m.end()
-                
-    if last_idx != -1:
-        return text[last_end:].strip()
-        
-    headers = [r'<h[1-6]>', r'^###\s', r'^##\s', r'^####\s']
-    last_header_idx = -1
-    for header in headers:
-        flags = re.MULTILINE | re.IGNORECASE
-        for m in re.finditer(header, text, flags=flags):
-            if m.start() > 200 and m.start() < len(text) - 50:
-                if m.start() > last_header_idx:
-                    last_header_idx = m.start()
-                    
-    if last_header_idx != -1:
-        return text[last_header_idx:].strip()
-        
+
+    # 2. If it starts with an explicit thinking header block, look for markdown header transition
+    header_match = re.search(r'\n\s*(?:#+\s*(?:final response|answer|summary|output|analysis|recommendation))\b', text, flags=re.IGNORECASE)
+    if header_match:
+        return text[header_match.start():].strip()
+
+    # 3. Look for double blank lines after thinking block
+    blocks = re.split(r'\n\s*\n', text.strip())
+    if len(blocks) > 1:
+        non_thinking_blocks = [b for b in blocks if not any(b.lower().strip().startswith(p) for p in thinking_prefixes)]
+        if non_thinking_blocks:
+            return "\n\n".join(non_thinking_blocks).strip()
+
     return text.strip()
 
 def call_llm_stream(task_type: str,

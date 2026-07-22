@@ -3687,7 +3687,28 @@
                 </div>
                 <div id="mobile-home-sectors-container" style="margin-bottom: 20px;"></div>
 
-                
+                <!-- Fuzzy Radar Quick-View Section -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 8px;">
+                    <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:#3b82f6; font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">🧠 Fuzzy Radar Quick-View</h5>
+                    <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('fuzzy')" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.25); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">Console →</button>
+                </div>
+                <div class="mobile-glass-card" style="padding: 12px; margin-bottom: 20px; border: 1px solid rgba(59, 130, 246, 0.15);">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div>
+                            <div style="font-size: 10px; font-weight: 700; color: #10b981; margin-bottom: 8px; text-transform: uppercase;">🟢 Accumulation</div>
+                            <div id="mobile-fuzzy-buy-radar" style="display: flex; flex-direction: column; gap: 6px;">
+                                <div class="recent-research-empty" style="font-size: 10px; padding: 10px;">Hydrating radar...</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; font-weight: 700; color: #ef4444; margin-bottom: 8px; text-transform: uppercase;">🔴 Avoid / Traps</div>
+                            <div id="mobile-fuzzy-sell-radar" style="display: flex; flex-direction: column; gap: 6px;">
+                                <div class="recent-research-empty" style="font-size: 10px; padding: 10px;">Hydrating radar...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Quant Top Picks Section -->
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 8px;">
                     <h5 style="margin:0; font-size:13.5px; text-transform:uppercase; color:var(--text-secondary); font-family:var(--font-heading); font-weight: 700; letter-spacing: 0.05em;">🔬 Quant Top Picks</h5>

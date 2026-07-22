@@ -83,6 +83,142 @@
         [data-theme="light"] .rs-bottom-sheet-handle {
             background: rgba(0, 0, 0, 0.15) !important;
         }
+
+        /* Sleek Global Floating Tooltip System */
+        .fz-global-tooltip-card {
+            position: absolute;
+            z-index: 999999;
+            width: 250px;
+            background: rgba(15, 23, 42, 0.96);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: #f1f5f9;
+            text-align: left;
+            border-radius: 8px;
+            padding: 10px 14px;
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.6), 0 0 15px rgba(59, 130, 246, 0.25);
+            font-size: 11px;
+            line-height: 1.45;
+            pointer-events: none;
+            font-family: 'Inter', sans-serif;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .fz-global-tooltip-card strong {
+            color: #60a5fa;
+            font-size: 11.5px;
+            font-weight: 700;
+        }
+
+        .fz-info-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            color: #3b82f6;
+            font-size: 9px;
+            font-weight: 700;
+            margin-left: 5px;
+            cursor: help;
+            transition: all 0.15s ease;
+            line-height: 1;
+            vertical-align: middle;
+        }
+
+        .fz-info-icon:hover {
+            background: rgba(59, 130, 246, 0.35);
+            color: #ffffff;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.7);
+        }
+
+        /* Light Mode High Contrast Overrides for Diagnostic Console & Conviction Score */
+        [data-mode="light"] .fz-global-tooltip-card,
+        [data-theme="light"] .fz-global-tooltip-card {
+            background: #ffffff !important;
+            color: #1e293b !important;
+            border: 1px solid rgba(59, 130, 246, 0.4) !important;
+            box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.15), 0 0 15px rgba(59, 130, 246, 0.15) !important;
+        }
+
+        [data-mode="light"] .fz-global-tooltip-card strong,
+        [data-theme="light"] .fz-global-tooltip-card strong {
+            color: #1d4ed8 !important;
+        }
+
+        [data-mode="light"] #fuzzy-gauge-val,
+        [data-theme="light"] #fuzzy-gauge-val {
+            text-shadow: none !important;
+        }
+
+        [data-mode="light"] .fz-info-icon,
+        [data-theme="light"] .fz-info-icon {
+            background: rgba(59, 130, 246, 0.1) !important;
+            border-color: rgba(59, 130, 246, 0.35) !important;
+            color: #2563eb !important;
+        }
+
+        [data-mode="light"] #screener-panel-fuzzy .fuzzy-label-light,
+        [data-theme="light"] #screener-panel-fuzzy .fuzzy-label-light {
+            color: #334155 !important;
+        }
+
+        .fz-chip-btn {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            color: #3b82f6;
+            font-size: 9.5px;
+            font-weight: 600;
+            padding: 3px 7px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .fz-chip-btn:hover {
+            background: rgba(59, 130, 246, 0.25);
+            border-color: rgba(59, 130, 246, 0.45);
+        }
+
+        .fuzzy-scale-track {
+            position: relative;
+            margin: 15px 25px 5px 25px;
+            height: 8px;
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.35) 0%, rgba(245, 158, 11, 0.35) 50%, rgba(16, 185, 129, 0.35) 100%);
+            border-radius: 4px;
+            cursor: help;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        [data-mode="light"] .fuzzy-scale-track,
+        [data-theme="light"] .fuzzy-scale-track {
+            background: linear-gradient(90deg, rgba(220, 38, 38, 0.25) 0%, rgba(217, 119, 6, 0.25) 50%, rgba(5, 150, 105, 0.25) 100%) !important;
+            border: 1px solid rgba(0, 0, 0, 0.2) !important;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.12) !important;
+        }
+
+        .fuzzy-scale-center-tick {
+            position: absolute;
+            left: 50%;
+            top: -4px;
+            width: 2px;
+            height: 16px;
+            background: rgba(255, 255, 255, 0.6);
+            transform: translateX(-50%);
+            z-index: 1;
+        }
+
+        [data-mode="light"] .fuzzy-scale-center-tick,
+        [data-theme="light"] .fuzzy-scale-center-tick {
+            background: rgba(0, 0, 0, 0.45) !important;
+        }
+
         [data-mode="light"] .rs-bottom-sheet-close,
         [data-theme="light"] .rs-bottom-sheet-close {
             background: rgba(0, 0, 0, 0.04) !important;
@@ -235,6 +371,9 @@
                 </button>
                 <button class="nav-btn" id="tab-screener-btn" data-title="Quant Screener & Scanner">
                     <span class="btn-icon">🔍</span> <span class="btn-text">Quant Screener & Scanner</span>
+                </button>
+                <button class="nav-btn" id="tab-fuzzy-btn" data-title="Fuzzy Intelligence Engine">
+                    <span class="btn-icon">🧠</span> <span class="btn-text">Fuzzy Intelligence Engine</span>
                 </button>
                 <button class="nav-btn" id="tab-compare-btn" data-title="Peer Benchmarking Arena">
                     <span class="btn-icon">⚖️</span> <span class="btn-text">Peer Benchmarking Arena</span>
@@ -860,7 +999,9 @@
                     <p>Execute quantitative screening sweeps and discovery scans across liquid Indian equity segments.</p>
                 </div>
 
-                <div class="screener-controls-card">
+                <!-- QUANTITATIVE SCREENER -->
+                <div id="screener-panel-quant">
+                    <div class="screener-controls-card">
                     <div class="strategy-selector">
                         <button class="strategy-btn active" data-strategy="hybrid" style="cursor: pointer; padding: 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.05); background: rgba(255,255,255,0.01); display: flex; flex-direction: column; gap: 6px; text-align: left; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); outline: none;">
                             <span class="strat-title" style="font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 0.02em;">Hybrid Strategy</span>
@@ -1001,6 +1142,229 @@
                         </div>
 
                         <button class="btn-secondary" id="screener-results-next-btn" style="font-size: 10px; padding: 4px 12px; height: auto;" disabled>Next ▶</button>
+                    </div>
+                </div> <!-- Close #screener-panel-quant -->
+            </section>
+
+            <!-- SECTION: FUZZY INTELLIGENCE DECISION ENGINE (FMADE) -->
+            <section class="workspace-tab" id="tab-fuzzy" style="display: none; font-family: 'Inter', sans-serif;">
+                <div class="section-header">
+                    <h2>Fuzzy Intelligence Decision Engine</h2>
+                    <p>Non-linear Mamdani Fuzzy Logic inference over fundamental trajectories and market regimes.</p>
+                </div>
+
+                <!-- FMADE Header banner -->
+                <div class="alerts-radar-sentinel-card no-print" style="margin-bottom: 20px; border-left: 3px solid #3b82f6;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
+                        <h4 style="font-size: 13px; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.05em; margin: 0;">🔬 APEX Fuzzy-Multi-Agent Decision Engine (FMADE)</h4>
+                        <div class="sonar-pulse-widget" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2);">
+                            <span class="sonar-pulse-indicator" style="background: #3b82f6; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);"></span>
+                            <span style="color: #3b82f6; font-weight: 700;">FMADE Cognitive Engine: Active</span>
+                        </div>
+                    </div>
+                    <p style="margin: 0; font-size: 11.5px; line-height: 1.6; color: var(--text-secondary);">
+                        Runs non-linear Mamdani Fuzzy Inference over 3-Year balance sheet delta trajectories (&Delta;<sub>OPM</sub>, &Delta;<sub>ROE</sub>, &Delta;<sub>Debt</sub>) and market regimes to locate smart money accumulation and flag value traps before the price breakout.
+                    </p>
+                </div>
+
+                <div class="scanner-panel-grid" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 15px; width: 100%;">
+                    <!-- Left: Standings Board -->
+                    <div style="display: flex; flex-direction: column; gap: 15px;">
+                        <!-- Top Buys card -->
+                        <div class="card" style="margin: 0;">
+                            <h3 style="margin: 0 0 10px 0; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #10b981;">
+                                <span>🟢</span> TOP MAMDANI ACCUMULATION SIGNALS
+                            </h3>
+                            <div id="fuzzy-buys-list" style="display: flex; flex-direction: column; gap: 8px;">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        
+                        <!-- Top Sells card -->
+                        <div class="card" style="margin: 0;">
+                            <h3 style="margin: 0 0 10px 0; font-family: 'Outfit', sans-serif; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #ef4444;">
+                                <span>🔴</span> TOP VALUE TRAPS & DISTRIBUTION ALERTS
+                            </h3>
+                            <div id="fuzzy-sells-list" style="display: flex; flex-direction: column; gap: 8px;">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Selected Stock Diagnostics -->
+                    <div class="card" style="margin: 0; display: flex; flex-direction: column; gap: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-glass); padding-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                            <h3 style="margin: 0; font-family: 'Outfit', sans-serif; font-size: 13.5px; font-weight: 700; color: #3b82f6;">
+                                <span>🔬</span> COGNITIVE DIAGNOSTIC CONSOLE
+                            </h3>
+                            <div style="display: flex; align-items: center; gap: 8px; position: relative; flex-wrap: wrap; max-width: 100%;">
+                                <div style="position: relative; flex: 1; min-width: 130px; max-width: 100%;">
+                                    <input type="text" id="fuzzy-stock-search-input" placeholder="Search stock or symbol..." autocomplete="off" style="padding: 6px 10px; font-size: 11px; font-family: monospace; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.4); color: var(--text-primary); text-transform: uppercase; width: 100%; box-sizing: border-box; outline: none;">
+                                    <div id="fuzzy-search-autocomplete" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; min-width: 220px; max-height: 220px; overflow-y: auto; background: #0f172a; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.7); margin-top: 4px; padding: 4px 0;"></div>
+                                </div>
+                                <button id="fuzzy-stock-search-btn" type="button" style="padding: 6px 12px; font-size: 11px; font-weight: 700; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.2); color: #3b82f6; cursor: pointer; font-family: 'Outfit', sans-serif; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">Analyze 🔍</button>
+                                <span id="fuzzy-active-stock" style="font-size: 11px; font-weight: 800; font-family: monospace; padding: 4px 8px; background: rgba(59, 130, 246, 0.1); color: #3b82f6; border-radius: 6px; border: 1px solid rgba(59, 130, 246, 0.25); white-space: nowrap; flex-shrink: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis;">SELECT A STOCK</span>
+                            </div>
+                        </div>
+
+                        <!-- Centroid score gauge -->
+                        <div style="text-align: center; padding: 12px 15px; background: var(--bg-card-sub); border-radius: 8px; border: 1px solid var(--border-glass);">
+                            <div style="margin-bottom: 8px;">
+                                <span class="fuzzy-label-light" style="font-size: 10.5px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em;">Centroid Conviction Score</span>
+                                <span class="fz-info-icon" data-fz-tooltip="Centroid Conviction Score|Defuzzified Mamdani Center-of-Gravity score ranging from -100% (Strong Sell / Distribution) to +100% (Strong Buy / Accumulation).">?</span>
+                            </div>
+                            <div id="fuzzy-gauge-val" data-fz-tooltip="Defuzzified Centroid Score|Raw mathematical Center-of-Gravity value (-100% to +100%) calculated by aggregating all active Mamdani rule implied fuzzy membership functions." style="font-size: 28px; font-weight: 800; font-family: 'Outfit', sans-serif; cursor: help; display: inline-block;">--</div>
+                            <div style="margin-top: 4px;">
+                                <div id="fuzzy-rating-label" data-fz-tooltip="Institutional Conviction Tier|Qualitative conviction rating derived from defuzzified centroid value (-100% to +100%)." style="font-size: 11px; font-weight: 800; text-transform: uppercase; cursor: help; display: inline-block;">Hold</div>
+                            </div>
+                            
+                            <!-- Conviction Slider scale visualizer -->
+                            <div class="fuzzy-scale-track" data-fz-tooltip="Defuzzified Conviction Scale|Visualization of Mamdani inference output. Left = Sell (-100%), Center = Neutral (0%), Right = Buy (+100%).">
+                                <div class="fuzzy-scale-center-tick"></div>
+                                <div id="fuzzy-scale-pointer" style="position: absolute; top: -4px; left: 50%; width: 14px; height: 14px; border-radius: 50%; background: #3b82f6; border: 2px solid #fff; box-shadow: 0 0 8px rgba(59, 130, 246, 0.8); transition: left 0.5s ease-out; transform: translateX(-50%); z-index: 2;"></div>
+                            </div>
+                            <div class="fuzzy-label-light" style="display: flex; justify-content: space-between; font-size: 9px; padding: 0 25px; font-weight: 700; text-transform: uppercase;">
+                                <span data-fz-tooltip="Sell Zone|Centroid score < -15%. Implies margin contraction, high leverage, or broken technical momentum.">SELL (-100%)</span>
+                                <span data-fz-tooltip="Neutral Zone|Centroid score between -15% and +15%. Rangebound momentum or balanced fundamentals.">NEUTRAL</span>
+                                <span data-fz-tooltip="Buy Zone|Centroid score > +15%. Implies margin expansion, strong ROE trajectory, deleveraging, or bullish momentum.">BUY (+100%)</span>
+                            </div>
+                        </div>
+
+                        <!-- AI Layman Institutional Commentary Card -->
+                        <div id="fuzzy-ai-commentary-card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(124, 58, 237, 0.08)); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 8px; padding: 12px 14px; position: relative;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-size: 14px;">🤖</span>
+                                    <span style="font-family: 'Outfit', sans-serif; font-size: 11px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 0.04em;">AI Institutional Analyst</span>
+                                    <button class="section-speak-btn" data-target="fuzzy-ai-commentary-body" data-title="AI Institutional Synthesis" title="Listen to Analysis" style="background: none; border: none; cursor: pointer; font-size: 12px; color: #3b82f6; outline: none; padding: 0;">🔊</button>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <button id="fuzzy-ai-commentary-generate-btn" type="button" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(99, 102, 241, 0.2)); border: 1px solid rgba(59, 130, 246, 0.4); color: #3b82f6; border-radius: 6px; padding: 4px 10px; font-size: 10px; font-weight: 700; cursor: pointer; transition: all 0.2s;">🤖 Generate AI Analysis</button>
+                                </div>
+                            </div>
+                            
+                            <div id="fuzzy-ai-commentary-body" style="font-size: 10.5px; line-height: 1.5; color: var(--text-primary);">
+                                <div style="color: var(--text-muted); font-style: italic;">Select a stock and click <strong>"Generate AI Analysis"</strong> to synthesize an institutional thesis.</div>
+                            </div>
+                        </div>
+
+                        <!-- Input diagnostics variables -->
+                        <div>
+                            <h4 class="fuzzy-label-light" style="margin: 0 0 10px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; display: flex; align-items: center; justify-content: space-between;">
+                                <span>
+                                    <span>📊 Fuzzified Inputs & Trajectories</span>
+                                    <span class="fz-info-icon" data-fz-tooltip="Fuzzified Trajectories|Continuous inputs fuzzified from 3-Year balance sheet deltas (OPM, ROE, Debt) and momentum regime metrics (RSI, 200-DMA, ADX).">?</span>
+                                </span>
+                            </h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 10.5px;">
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 10px; border-radius: 6px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Margin Delta (ΔOPM)|YoY % change in Operating Profit Margin. Positive values indicate expanding profitability and pricing power.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">Margin delta (&Delta;<sub>OPM</sub>):</span>
+                                        <strong id="f-val-opm">--</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Capital Delta (ΔROE)|YoY % change in Return on Equity. Measures shareholder capital efficiency and return trajectory.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">Capital delta (&Delta;<sub>ROE</sub>):</span>
+                                        <strong id="f-val-roe">--</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Debt Delta (ΔDebt)|Change in Total Debt leverage. Negative values indicate deleveraging (debt reduction); positive values indicate debt expansion.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">Debt delta (&Delta;<sub>Debt</sub>):</span>
+                                        <strong id="f-val-debt">--</strong>
+                                    </div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); padding: 10px; border-radius: 6px; display: flex; flex-direction: column; gap: 8px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="14-Day RSI|Relative Strength Index. <30 = Oversold, >70 = Overbought, 45-60 = Steady accumulation regime.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">14-Day RSI:</span>
+                                        <strong id="f-val-rsi">--</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="200-DMA Proximity|% distance from 200-Day Moving Average. Positive = Trading above institutional baseline; Negative = Discount.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">200-DMA Prox:</span>
+                                        <strong id="f-val-dma">--</strong>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;" data-fz-tooltip="Regime ADX|Average Directional Index. ADX >25 confirms strong trend momentum; ADX <20 indicates rangebound accumulation.">
+                                        <span class="fuzzy-label-light" style="cursor: help;">Regime ADX:</span>
+                                        <strong id="f-val-adx">--</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Rules trail timeline -->
+                        <div style="flex: 1; display: flex; flex-direction: column;">
+                            <h4 class="fuzzy-label-light" style="margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em;">
+                                <span>
+                                    <span>🕵️‍♂️ Mamdani Inference Trail</span>
+                                    <span class="fz-info-icon" data-fz-tooltip="Mamdani Inference Trail|Trace of all activated fuzzy rules with membership grades (μ ∈ [0.0, 1.0]) and implied decision consequences.">?</span>
+                                </span>
+                            </h4>
+                            <div id="fuzzy-rules-trail" style="display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 180px;">
+                                <!-- Rules show dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Interactive What-If AI Assistant -->
+                        <div style="margin-top: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-glass); border-radius: 8px; padding: 10px; max-width: 100%; box-sizing: border-box; overflow: hidden;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+                                <span class="fuzzy-label-light" style="font-size: 10.5px; font-weight: 700; text-transform: uppercase; display: flex; align-items: center; gap: 4px;">
+                                    <span>🪄</span> Interactive What-If AI Assistant
+                                </span>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <button class="section-speak-btn" data-target="fuzzy-ai-ask-response" data-title="What-If AI Explanation" title="Listen to AI Explanation" style="background: none; border: none; cursor: pointer; font-size: 12px; color: #3b82f6; outline: none; padding: 0;">🔊</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Categorized Template Dropdown & Quick Chips -->
+                            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; max-width: 100%;">
+                                <div style="display: flex; gap: 6px; align-items: center; max-width: 100%;">
+                                    <select id="fuzzy-ai-template-select" style="width: 100%; min-width: 0; max-width: 100%; padding: 5px 8px; font-size: 10.5px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.9); color: var(--text-primary); outline: none; font-family: 'Inter', sans-serif; cursor: pointer; box-sizing: border-box; text-overflow: ellipsis;">
+                                        <option value="" disabled selected>📋 Select Predefined What-If Scenario Template...</option>
+                                        <optgroup label="💡 Fundamental & Profitability Scenarios">
+                                            <option value="Why did this stock receive its conviction rating?">💡 Why did this stock receive its conviction rating?</option>
+                                            <option value="What if profit margins drop by 5% next quarter?">📉 What if Operating Profit Margin (OPM) drops by 5% next quarter?</option>
+                                            <option value="What if quarterly revenue growth accelerates by 15%?">🚀 What if quarterly revenue growth accelerates by 15%?</option>
+                                            <option value="Is the debt leverage creating downside risk?">🛡️ Is the debt leverage creating downside risk?</option>
+                                            <option value="What happens if Return on Equity (ROE) improves by 3%?">📊 What happens if Return on Equity (ROE) improves by 3%?</option>
+                                        </optgroup>
+                                        <optgroup label="📈 Technical & Momentum Regimes">
+                                            <option value="What if RSI breaks above 70 into overbought territory?">📈 What if RSI breaks above 70 into overbought territory?</option>
+                                            <option value="What if ADX drops below 20 indicating a trendless market?">⚡ What if ADX drops below 20 indicating a trendless market?</option>
+                                            <option value="What if stock price falls 8% below its 200-day moving average?">🔻 What if stock price falls 8% below its 200-DMA?</option>
+                                        </optgroup>
+                                        <optgroup label="🎯 Institutional Conviction Triggers">
+                                            <option value="What threshold is needed for a Strong Buy rating?">🎯 What threshold is needed for a Strong Buy rating?</option>
+                                            <option value="What fundamental failure would downgrade this stock to Strong Sell?">⚠️ What fundamental failure would trigger a Strong Sell?</option>
+                                            <option value="How would institutional FII/DII inflows impact this fuzzy conviction score?">🏦 How would institutional FII/DII inflows impact this score?</option>
+                                        </optgroup>
+                                        <optgroup label="🌐 Macro & Risk Stress Tests">
+                                            <option value="What if raw material input costs rise by 10%?">🌐 What if raw material input costs rise by 10%?</option>
+                                            <option value="How sensitive is this rating to an interest rate hike?">💵 How sensitive is this rating to an interest rate hike?</option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+
+                                <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                                    <button type="button" class="fz-chip-btn" data-fz-ask="Why did this stock receive its conviction rating?">💡 Why rating?</button>
+                                    <button type="button" class="fz-chip-btn" data-fz-ask="What if profit margins drop by 5% next quarter?">📉 OPM Drop 5%</button>
+                                    <button type="button" class="fz-chip-btn" data-fz-ask="What happens if Return on Equity (ROE) improves by 3%?">🚀 ROE Spike +3%</button>
+                                    <button type="button" class="fz-chip-btn" data-fz-ask="Is the debt leverage creating downside risk?">🛡️ Debt Risk</button>
+                                    <button type="button" class="fz-chip-btn" data-fz-ask="What threshold is needed for a Strong Buy rating?">🎯 Trigger Strong Buy</button>
+                                    <button type="button" class="fz-chip-btn" data-fz-ask="What if RSI breaks above 70 into overbought territory?">📈 RSI > 70</button>
+                                    <button type="button" class="fz-chip-btn" data-fz-ask="What fundamental failure would downgrade this stock to Strong Sell?">⚠️ Strong Sell Trigger</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Ask Input with Mic -->
+                             <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; max-width: 100%;">
+                                 <input type="text" id="fuzzy-ai-ask-input" placeholder="Ask what-if scenario or select template..." style="flex: 1; min-width: 120px; max-width: 100%; padding: 6px 10px; font-size: 10.5px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.3); color: var(--text-primary); outline: none; box-sizing: border-box;">
+                                 <div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
+                                     <button id="fuzzy-ai-ask-mic-btn" type="button" class="input-mic-btn" title="Voice Input (Speech-to-Text)" style="padding: 6px 10px; font-size: 11px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(59, 130, 246, 0.15); color: #3b82f6; cursor: pointer; display: flex; align-items: center; justify-content: center; height: 28px; width: 32px; flex-shrink: 0;">🎙️</button>
+                                     <button id="fuzzy-ai-ask-btn" type="button" style="padding: 6px 12px; font-size: 10.5px; font-weight: 700; border-radius: 6px; border: none; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; cursor: pointer; white-space: nowrap; height: 28px; flex-shrink: 0;">Ask 🪄</button>
+                                 </div>
+                             </div>
+                            
+                            <!-- AI Answer Output Container -->
+                            <div id="fuzzy-ai-ask-response" style="display: none; margin-top: 8px; padding: 10px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.2); border-radius: 6px; font-size: 10.5px; line-height: 1.5; color: var(--text-primary); position: relative;">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -1779,6 +2143,35 @@
                                         </div>
                                         <div id="desktop-watchlist-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; padding-right: 4px;">
                                             <div class="recent-research-empty" style="font-size: 11px;">Select a watchlist to display quotes.</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Fuzzy Radar Quick-View Card -->
+                                <div class="desktop-cmd-card" style="margin-top: 24px; margin-bottom: 0; border: 1px solid rgba(59, 130, 246, 0.25); background: linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(255,255,255,0) 100%);">
+                                    <div class="desktop-cmd-card-header" style="margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(59, 130, 246, 0.15);">
+                                        <div class="header-left">
+                                            <span class="header-icon" style="color: #3b82f6;">🧠</span>
+                                            <span class="header-title" style="font-size: 14px; font-weight: 700; font-family: var(--font-heading); color: #3b82f6;">Fuzzy Radar Quick-View</span>
+                                        </div>
+                                        <div class="header-right">
+                                            <button id="desktop-fuzzy-radar-go-btn" class="no-print" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.25); padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600; transition: all 0.2s;">Open Console</button>
+                                        </div>
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                        <!-- Active Buy Radar -->
+                                        <div>
+                                            <h4 style="margin: 0 0 8px 0; font-size: 11px; color: #10b981; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">🟢 Accumulation Radar</h4>
+                                            <div id="desktop-fuzzy-buy-radar" style="display: flex; flex-direction: column; gap: 6px;">
+                                                <div class="recent-research-empty" style="font-size: 10px; padding: 10px;">Hydrating radar...</div>
+                                            </div>
+                                        </div>
+                                        <!-- Active Sell warnings -->
+                                        <div>
+                                            <h4 style="margin: 0 0 8px 0; font-size: 11px; color: #ef4444; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">🔴 Avoid / Trap Alerts</h4>
+                                            <div id="desktop-fuzzy-sell-radar" style="display: flex; flex-direction: column; gap: 6px;">
+                                                <div class="recent-research-empty" style="font-size: 10px; padding: 10px;">Hydrating radar...</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -8682,7 +9075,7 @@
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
     <script src="export_manager.js?v=1.1.7"></script>
-    <script src="app.js?v=1.9.7"></script>
+    <script src="app.js?v=2.0.6"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
@@ -8716,7 +9109,7 @@
     </div>
 
     <!-- Modernization Custom Layer -->
-    <script src="modernizer.js?v=8.27"></script>
+    <script src="modernizer.js?v=8.31"></script>
 
     <!-- Mobile Frosted Glass Slide-up Details Bottom Sheet -->
     <div id="mobile-details-bottom-sheet" class="mobile-bottom-sheet no-print" style="display: none;">

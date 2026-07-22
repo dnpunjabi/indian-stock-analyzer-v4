@@ -1338,6 +1338,7 @@ let ruleScanFilterMaxDE = 500;
 // DOM Elements
 const tabs = {
     screener: document.getElementById('tab-screener'),
+    fuzzy: document.getElementById('tab-fuzzy'),
     universe: document.getElementById('tab-universe'),
     analyzer: document.getElementById('tab-analyzer'),
     compare: document.getElementById('tab-compare'),
@@ -1358,6 +1359,7 @@ const tabs = {
 
 const tabBtns = {
     screener: document.getElementById('tab-screener-btn'),
+    fuzzy: document.getElementById('tab-fuzzy-btn'),
     universe: document.getElementById('tab-universe-btn'),
     analyzer: document.getElementById('tab-analyzer-btn'),
     compare: document.getElementById('tab-compare-btn'),
@@ -2183,6 +2185,10 @@ function switchTab(tabKey) {
     // Expose switchTab globally
     window.switchTab = switchTab;
 
+    if (tabKey === 'fuzzy') {
+        if (typeof window.loadFuzzyIntelligence === 'function') window.loadFuzzyIntelligence();
+    }
+
     if (tabKey === 'sector-radar') {
         if (window.loadScreenerSectorRegime) window.loadScreenerSectorRegime();
     }
@@ -2502,6 +2508,8 @@ function setupScreenerControls() {
             runAIScreener();
         });
     }
+
+    setupScreenerSubtabs();
 
 
 
@@ -25295,6 +25303,7 @@ const RULE_SCANNER_COND_LABELS = {
 function setupRuleScanner() {
     // Sub-tab toggling
     setupRuleScannerSubtabs();
+    setupScreenerSubtabs();
 
     // Strategy guide cheatsheet
     const conditionSelect = document.getElementById('rule-scanner-condition');
@@ -26873,6 +26882,104 @@ function setupRuleScannerSubtabs() {
                 if (telemetryRow) telemetryRow.style.display = 'none';
                 const chartCard = document.getElementById('rule-scanner-historical-chart-card');
                 if (chartCard) chartCard.style.display = 'none';
+            });
+        }
+    });
+}
+
+function setupGlobalFuzzyTooltip() {
+    if (window._globalFuzzyTooltipInitialized) return;
+    window._globalFuzzyTooltipInitialized = true;
+
+    let tooltipEl = document.getElementById('fz-global-tooltip');
+    if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.id = 'fz-global-tooltip';
+        tooltipEl.className = 'fz-global-tooltip-card';
+        document.body.appendChild(tooltipEl);
+    }
+
+    document.addEventListener('mouseover', (e) => {
+        const target = e.target.closest('[data-fz-tooltip]');
+        if (!target) return;
+
+        const text = target.getAttribute('data-fz-tooltip');
+        if (!text) return;
+
+        const parts = text.split('|');
+        if (parts.length > 1) {
+            tooltipEl.innerHTML = `<strong>${parts[0]}</strong><br>${parts[1]}`;
+        } else {
+            tooltipEl.innerHTML = text;
+        }
+
+        tooltipEl.style.display = 'block';
+        const rect = target.getBoundingClientRect();
+        const tooltipRect = tooltipEl.getBoundingClientRect();
+
+        let top = rect.top - tooltipRect.height - 8;
+        let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+
+        if (top < 10) {
+            top = rect.bottom + 8;
+        }
+        if (left < 10) left = 10;
+        if (left + tooltipRect.width > window.innerWidth - 10) {
+            left = window.innerWidth - tooltipRect.width - 10;
+        }
+
+        tooltipEl.style.top = `${top + window.scrollY}px`;
+        tooltipEl.style.left = `${left + window.scrollX}px`;
+        tooltipEl.style.opacity = '1';
+        tooltipEl.style.visibility = 'visible';
+    });
+
+    document.addEventListener('mouseout', (e) => {
+        const target = e.target.closest('[data-fz-tooltip]');
+        if (target) {
+            tooltipEl.style.opacity = '0';
+            tooltipEl.style.visibility = 'hidden';
+        }
+    });
+}
+
+function setupScreenerSubtabs() {
+    setupGlobalFuzzyTooltip();
+    const quantBtn = document.getElementById('screener-tab-quant-btn');
+    const fuzzyBtn = document.getElementById('screener-tab-fuzzy-btn');
+
+    const quantPanel = document.getElementById('screener-panel-quant');
+    const fuzzyPanel = document.getElementById('screener-panel-fuzzy');
+
+    const btns = [quantBtn, fuzzyBtn];
+    const panels = [quantPanel, fuzzyPanel];
+
+    btns.forEach((btn, idx) => {
+        if (btn) {
+            btn.addEventListener('click', () => {
+                btns.forEach(b => {
+                    if (b) {
+                        b.classList.remove('active');
+                        b.style.border = '1px solid transparent';
+                        b.style.background = 'transparent';
+                        b.style.color = 'var(--text-muted)';
+                    }
+                });
+                panels.forEach(p => {
+                    if (p) p.style.display = 'none';
+                });
+
+                btn.classList.add('active');
+                btn.style.border = '1px solid var(--border-glass)';
+                btn.style.background = 'rgba(255,255,255,0.03)';
+                btn.style.color = 'var(--text-primary)';
+                if (panels[idx]) panels[idx].style.display = 'block';
+
+                if (btn === fuzzyBtn) {
+                    if (typeof window.loadFuzzyIntelligence === 'function') {
+                        window.loadFuzzyIntelligence();
+                    }
+                }
             });
         }
     });
@@ -48910,4 +49017,588 @@ function calculateAnomalyFlags() {
         }
     }
 }
+
+// ─── APEX Fuzzy-Multi-Agent Decision Engine (FMADE) ───
+
+window.loadFuzzyIntelligence = async function() {
+    const buysList = document.getElementById('fuzzy-buys-list');
+    const sellsList = document.getElementById('fuzzy-sells-list');
+    if (!buysList || !sellsList) return;
+
+    buysList.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Loading accumulation signals...</div>`;
+    sellsList.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">Loading avoid signals...</div>`;
+
+    try {
+        const response = await fetch('/api/fuzzy/universe-standings?limit=8');
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+
+        // Hydrate Buys
+        if (data.top_buys && data.top_buys.length > 0) {
+            buysList.innerHTML = data.top_buys.map((item, idx) => `
+                <div class="watchlist-strip-row fuzzy-standings-row" data-symbol="${item.symbol}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(16, 185, 129, 0.03); border: 1px solid rgba(16, 185, 129, 0.1); border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 2px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-weight: 800; font-family: monospace; font-size: 12px; color: #10b981;">${item.symbol}</span>
+                        <span style="font-size: 10px; color: var(--text-secondary); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.company_name}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 11px; font-weight: 800; color: #10b981; padding: 2px 6px; background: rgba(16, 185, 129, 0.1); border-radius: 4px;">+${item.fuzzy_score.toFixed(1)}%</span>
+                        <div style="font-size: 8px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-top: 2px;">${item.market_regime}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add click handlers
+            buysList.querySelectorAll('.fuzzy-standings-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const symbol = row.getAttribute('data-symbol');
+                    window.evaluateFuzzyStock(symbol);
+                });
+            });
+        } else {
+            buysList.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No accumulation setups active.</div>`;
+        }
+
+        // Hydrate Sells
+        if (data.top_sells && data.top_sells.length > 0) {
+            sellsList.innerHTML = data.top_sells.map((item, idx) => `
+                <div class="watchlist-strip-row fuzzy-standings-row" data-symbol="${item.symbol}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.1); border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 2px;">
+                    <div style="display: flex; flex-direction: column;">
+                        <span style="font-weight: 800; font-family: monospace; font-size: 12px; color: #ef4444;">${item.symbol}</span>
+                        <span style="font-size: 10px; color: var(--text-secondary); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.company_name}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 11px; font-weight: 800; color: #ef4444; padding: 2px 6px; background: rgba(239, 68, 68, 0.1); border-radius: 4px;">${item.fuzzy_score.toFixed(1)}%</span>
+                        <div style="font-size: 8px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-top: 2px;">${item.market_regime}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Add click handlers
+            sellsList.querySelectorAll('.fuzzy-standings-row').forEach(row => {
+                row.addEventListener('click', () => {
+                    const symbol = row.getAttribute('data-symbol');
+                    window.evaluateFuzzyStock(symbol);
+                });
+            });
+        } else {
+            sellsList.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No avoid signals active.</div>`;
+        }
+
+        // Pre-fetch complete 500-stock universe for search autocompletion
+        if (!window.fullStockUniverse) {
+            fetch('/api/universe')
+                .then(res => res.json())
+                .then(stocks => {
+                    if (Array.isArray(stocks)) window.fullStockUniverse = stocks;
+                })
+                .catch(err => console.error("Failed to load universe list:", err));
+        }
+
+        // Store pre-scanned standings
+        window.fuzzyStockUniverse = [...(data.top_buys || []), ...(data.top_sells || [])];
+
+        // Wire search input & autocomplete inside Diagnostic Console
+        const searchInput = document.getElementById('fuzzy-stock-search-input');
+        const searchBtn = document.getElementById('fuzzy-stock-search-btn');
+        const autoBox = document.getElementById('fuzzy-search-autocomplete');
+
+        const doFuzzySearch = (symbolOverride) => {
+            if (autoBox) autoBox.style.display = 'none';
+            let query = symbolOverride || (searchInput ? searchInput.value.trim().toUpperCase() : '');
+            if (!query) return;
+            if (!query.endsWith('.NS') && !query.endsWith('.BO') && !query.includes('.')) {
+                query = query + '.NS';
+            }
+            if (searchInput) searchInput.value = query;
+            window.evaluateFuzzyStock(query);
+        };
+
+        if (searchBtn) {
+            searchBtn.onclick = (e) => {
+                e.preventDefault();
+                doFuzzySearch();
+            };
+        }
+
+        if (searchInput) {
+            searchInput.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    doFuzzySearch();
+                }
+            };
+
+            // Live autocomplete typing listener across full 500-stock universe
+            searchInput.oninput = (e) => {
+                const term = e.target.value.trim().toUpperCase();
+                if (!term || term.length < 1 || !autoBox) {
+                    if (autoBox) autoBox.style.display = 'none';
+                    return;
+                }
+
+                // Pool combining full stock database and pre-scanned standings
+                const pool = (window.fullStockUniverse && window.fullStockUniverse.length > 0) 
+                    ? window.fullStockUniverse 
+                    : (window.fuzzyStockUniverse || []);
+
+                const scannedMap = new Map();
+                (window.fuzzyStockUniverse || []).forEach(item => {
+                    scannedMap.set(item.symbol, item);
+                });
+
+                const matches = pool.filter(item => 
+                    (item.symbol && item.symbol.toUpperCase().includes(term)) || 
+                    (item.base_symbol && item.base_symbol.toUpperCase().includes(term)) ||
+                    (item.company_name && item.company_name.toUpperCase().includes(term))
+                ).slice(0, 12);
+
+                if (matches.length === 0) {
+                    autoBox.innerHTML = `
+                        <div style="padding: 8px 12px; font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+                            <span>No stock found for "${term}"</span>
+                            <button type="button" class="btn-analyze-any" style="font-size: 10px; padding: 3px 8px; background: rgba(59,130,246,0.25); border: 1px solid rgba(59,130,246,0.5); color: #3b82f6; border-radius: 4px; cursor: pointer; font-weight: 700;">Analyze ${term}.NS 🔍</button>
+                        </div>`;
+                    const btnAny = autoBox.querySelector('.btn-analyze-any');
+                    if (btnAny) {
+                        btnAny.onclick = (ev) => {
+                            ev.stopPropagation();
+                            doFuzzySearch(term);
+                        };
+                    }
+                } else {
+                    autoBox.innerHTML = matches.map(m => {
+                        const scanned = scannedMap.get(m.symbol);
+                        let scoreBadge = `<span style="font-size: 9.5px; padding: 2px 6px; background: rgba(59,130,246,0.12); color: #3b82f6; border-radius: 4px; font-weight: 600;">Evaluate 🔍</span>`;
+                        if (scanned && scanned.fuzzy_score !== undefined) {
+                            const score = scanned.fuzzy_score;
+                            scoreBadge = `<span style="font-size: 10px; font-weight: 700; color: ${score > 0 ? '#10b981' : '#ef4444'};">${score > 0 ? '+' : ''}${score.toFixed(1)}%</span>`;
+                        }
+                        return `
+                            <div class="fuzzy-auto-item" data-symbol="${m.symbol}" style="padding: 6px 12px; font-size: 11px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s;">
+                                <div>
+                                    <span style="font-weight: 800; font-family: monospace; color: #3b82f6;">${m.symbol}</span>
+                                    <div style="font-size: 9.5px; color: var(--text-secondary); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${m.company_name || m.symbol}</div>
+                                </div>
+                                ${scoreBadge}
+                            </div>
+                        `;
+                    }).join('');
+
+                    autoBox.querySelectorAll('.fuzzy-auto-item').forEach(itemEl => {
+                        itemEl.onmouseenter = () => itemEl.style.background = 'rgba(59, 130, 246, 0.15)';
+                        itemEl.onmouseleave = () => itemEl.style.background = 'transparent';
+                        itemEl.onclick = (ev) => {
+                            ev.stopPropagation();
+                            const sym = itemEl.getAttribute('data-symbol');
+                            doFuzzySearch(sym);
+                        };
+                    });
+                }
+                autoBox.style.display = 'block';
+            };
+        }
+
+        // Close dropdown on outside click
+        document.addEventListener('click', (e) => {
+            if (autoBox && !autoBox.contains(e.target) && e.target !== searchInput) {
+                autoBox.style.display = 'none';
+            }
+        });
+
+        // Auto-select first buy as active
+        if (data.top_buys && data.top_buys.length > 0) {
+            window.evaluateFuzzyStock(data.top_buys[0].symbol);
+        } else if (data.top_sells && data.top_sells.length > 0) {
+            window.evaluateFuzzyStock(data.top_sells[0].symbol);
+        }
+
+    } catch (err) {
+        console.error("Fuzzy standings hydration error:", err);
+        buysList.innerHTML = `<div class="recent-research-empty" style="color: #ef4444; font-size: 11px;">Failed to load data.</div>`;
+        sellsList.innerHTML = `<div class="recent-research-empty" style="color: #ef4444; font-size: 11px;">Failed to load data.</div>`;
+    }
+};
+
+window.evaluateFuzzyStock = async function(symbol) {
+    const activeLabel = document.getElementById('fuzzy-active-stock');
+    if (activeLabel) activeLabel.innerText = symbol;
+
+    try {
+        const response = await fetch(`/api/fuzzy/evaluate?symbol=${symbol}`);
+        if (!response.ok) throw new Error(await response.text());
+        const result = await response.json();
+
+        // 1. Centroid gauge
+        const score = result.fuzzy_score;
+        const isLight = document.documentElement.getAttribute('data-mode') === 'light' || document.documentElement.getAttribute('data-theme') === 'light';
+        const buyColor = isLight ? '#047857' : '#10b981';
+        const sellColor = isLight ? '#dc2626' : '#ef4444';
+        const neutralColor = isLight ? '#b45309' : '#f59e0b';
+        const activeColor = score > 15 ? buyColor : score < -15 ? sellColor : neutralColor;
+
+        const valEl = document.getElementById('fuzzy-gauge-val');
+        if (valEl) {
+            valEl.innerText = `${score > 0 ? '+' : ''}${score.toFixed(1)}%`;
+            valEl.style.color = activeColor;
+        }
+
+        const ratingEl = document.getElementById('fuzzy-rating-label');
+        if (ratingEl) {
+            ratingEl.innerText = result.rating;
+            ratingEl.style.color = activeColor;
+        }
+
+        const pointer = document.getElementById('fuzzy-scale-pointer');
+        if (pointer) {
+            // Map score range [-100, 100] to left percentage [0, 100]
+            const percentage = ((score + 100) / 200) * 100;
+            pointer.style.left = `${percentage}%`;
+            pointer.style.background = activeColor;
+        }
+
+        // 2. Fuzzified inputs values
+        const inputs = result.inputs;
+        const setVal = (id, val, suffix='') => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = val !== undefined && val !== null ? `${val.toFixed(2)}${suffix}` : '--';
+        };
+        setVal('f-val-opm', inputs.opm_delta, '%');
+        setVal('f-val-roe', inputs.roe_delta, '%');
+        setVal('f-val-debt', inputs.debt_delta);
+        setVal('f-val-rsi', inputs.rsi);
+        setVal('f-val-dma', inputs.dma_prox, '%');
+        setVal('f-val-adx', inputs.adx);
+
+        // 3. Fired rules trail
+        const trailContainer = document.getElementById('fuzzy-rules-trail');
+        if (trailContainer) {
+            if (result.rule_trail && result.rule_trail.length > 0) {
+                trailContainer.innerHTML = result.rule_trail.map(rule => {
+                    let badgeBg = 'rgba(255,255,255,0.06)';
+                    let badgeColor = 'var(--text-secondary)';
+                    if (rule.rating && rule.rating.includes('Buy')) { badgeBg = isLight ? 'rgba(4, 120, 87, 0.12)' : 'rgba(16, 185, 129, 0.1)'; badgeColor = buyColor; }
+                    else if (rule.rating && rule.rating.includes('Sell')) { badgeBg = isLight ? 'rgba(220, 38, 38, 0.12)' : 'rgba(239, 68, 68, 0.1)'; badgeColor = sellColor; }
+                    else if (rule.rating && (rule.rating.includes('Cap') || rule.rating.includes('Floor') || rule.rating.includes('Penalty'))) { badgeBg = isLight ? 'rgba(180, 83, 9, 0.12)' : 'rgba(245, 158, 11, 0.1)'; badgeColor = neutralColor; }
+
+                    return `
+                        <div style="display: flex; flex-direction: column; gap: 4px; padding: 8px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-glass); border-radius: 6px; font-size: 11px; text-align: left; margin-bottom: 4px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span class="fuzzy-label-light" data-fz-tooltip="Mamdani Fuzzy Rule #${rule.rule_id}|Multi-agent fuzzy rule evaluated against fundamental trajectories and technical regime inputs." style="font-weight: 700; cursor: help;">
+                                    <span>[Rule ${rule.rule_id}] ${rule.rule_name}</span>
+                                    <span class="fz-info-icon">?</span>
+                                </span>
+                                <span data-fz-tooltip="Fuzzy Membership Grade (&mu;)|Degree of truth &mu; &in; [0.00, 1.00] indicating how strongly this stock satisfies the rule's IF antecedent." style="cursor: help;">
+                                    <span style="font-size: 9.5px; font-weight: 800; padding: 2px 6px; background: ${badgeBg}; color: ${badgeColor}; border-radius: 4px; text-transform: uppercase;">&mu; = ${rule.membership_grade.toFixed(2)}</span>
+                                </span>
+                            </div>
+                            <div data-fz-tooltip="Rule Consequence|Defuzzification weight and decision consequence contributed by this rule toward final Centroid score." style="width: 100%; margin-top: 2px; cursor: help;">
+                                <p style="margin: 0; font-size: 10px; color: var(--text-secondary); line-height: 1.4; width: 100%;">${rule.implication}</p>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                trailContainer.innerHTML = `<div class="recent-research-empty" style="font-size: 11px;">No fuzzy rules activated for this candidate.</div>`;
+            }
+        }
+
+        // 4. Reset AI Institutional Commentary to On-Demand State & Store Context
+        window.lastFuzzyContext = {
+            symbol: symbol,
+            centroid_score: result.fuzzy_score,
+            rating: result.rating,
+            inputs: result.inputs,
+            rule_trail: result.rule_trail
+        };
+
+        const responseBox = document.getElementById('fuzzy-ai-ask-response');
+        if (responseBox) responseBox.style.display = 'none';
+
+        const commentaryBody = document.getElementById('fuzzy-ai-commentary-body');
+        if (commentaryBody) {
+            commentaryBody.innerHTML = `
+                <div style="color: var(--text-muted); font-style: italic;">
+                    Click <strong>"Generate AI Analysis"</strong> to synthesize an institutional thesis for <strong>${symbol}</strong>.
+                </div>
+            `;
+        }
+
+    } catch (err) {
+        console.error("Fuzzy evaluation error:", err);
+    }
+};
+
+window.loadFuzzyAICommentary = async function(symbol, score, rating, inputs, activeRules) {
+    const bodyEl = document.getElementById('fuzzy-ai-commentary-body');
+    if (!bodyEl) return;
+
+    bodyEl.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 10.5px;">
+            <span style="width: 12px; height: 12px; border: 2px solid #3b82f6; border-top-color: transparent; border-radius: 50%; display: inline-block; animation: spin 0.8s linear infinite;"></span>
+            <span>Synthesizing AI Institutional Analyst Thesis...</span>
+        </div>
+    `;
+
+    try {
+        const response = await fetch('/api/fuzzy/commentary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbol: symbol,
+                centroid_score: score,
+                rating: rating,
+                inputs: inputs || {},
+                active_rules: (activeRules || []).map(r => ({ name: r.rule_name || r.name || '' }))
+            })
+        });
+
+        if (!response.ok) throw new Error('Commentary fetch failed');
+        const data = await response.json();
+        const s = data.layman_summary;
+
+        bodyEl.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div><strong style="color: #3b82f6;">📌 Overview:</strong> ${s.thesis || ''}</div>
+                <div><strong style="color: #10b981;">🚀 Main Growth Driver:</strong> ${s.key_driver || ''}</div>
+                <div><strong style="color: #f59e0b;">⚠️ Watchout / Risk:</strong> ${s.main_risk || ''}</div>
+            </div>
+        `;
+    } catch (err) {
+        bodyEl.innerHTML = `
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <div><strong style="color: #3b82f6;">📌 Overview:</strong> ${symbol} receives a <strong>${rating}</strong> rating based on fundamental profit growth and trend strength metrics.</div>
+                <div><strong style="color: #10b981;">🚀 Main Growth Driver:</strong> Profit margin expansion (OPM) and 200-DMA trend positioning.</div>
+                <div><strong style="color: #f59e0b;">⚠️ Watchout / Risk:</strong> Monitor debt expansion and momentum regime ADX stability.</div>
+            </div>
+        `;
+    }
+};
+
+window.askFuzzyAIAssistant = async function(question) {
+    const ctx = window.lastFuzzyContext || {};
+    const symbol = ctx.symbol || 'STOCK';
+    const responseBox = document.getElementById('fuzzy-ai-ask-response');
+    if (!responseBox) return;
+
+    responseBox.style.display = 'block';
+    responseBox.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 6px; color: var(--text-secondary);">
+            <span style="display: inline-block; animation: spin 0.8s linear infinite;">🪄</span>
+            <span>Analyzing scenario for ${symbol}...</span>
+        </div>
+    `;
+
+    try {
+        const response = await fetch('/api/fuzzy/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                symbol: symbol,
+                question: question,
+                fuzzy_context: ctx
+            })
+        });
+
+        if (!response.ok) throw new Error('AI Ask failed');
+        const data = await response.json();
+        
+        let formattedAnswer = (data.answer || '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+        responseBox.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; border-bottom: 1px dashed rgba(59, 130, 246, 0.2); padding-bottom: 4px;">
+                <div style="font-weight: 700; color: #3b82f6;">Q: "${question}"</div>
+                <button class="section-speak-btn" data-target="fuzzy-ai-ask-response-text" data-title="What-If AI Explanation" title="Listen to AI Explanation" style="background: none; border: none; cursor: pointer; font-size: 12px; color: #3b82f6; outline: none; padding: 0;">🔊</button>
+            </div>
+            <div id="fuzzy-ai-ask-response-text" style="line-height: 1.5; white-space: pre-wrap; color: var(--text-primary);">${formattedAnswer}</div>
+        `;
+    } catch (err) {
+        responseBox.innerHTML = `
+            <div style="font-weight: 700; color: #3b82f6; margin-bottom: 4px;">Q: "${question}"</div>
+            <div id="fuzzy-ai-ask-response-text">Analyzing ${symbol}: The fuzzy decision engine combines balance sheet deltas and momentum regimes. Changes in profit growth or RSI directly shift the defuzzified centroid score.</div>
+        `;
+    }
+};
+
+// Global event delegation for Fuzzy AI Assistant templates, chips, on-demand commentary, and mic
+document.addEventListener('click', function(e) {
+    // 1. Quick Chips Click
+    const chip = e.target.closest('.fz-chip-btn');
+    if (chip) {
+        const q = chip.getAttribute('data-fz-ask');
+        const input = document.getElementById('fuzzy-ai-ask-input');
+        if (input) input.value = q;
+        if (q) window.askFuzzyAIAssistant(q);
+        return;
+    }
+
+    // 2. Ask Button Click
+    if (e.target.id === 'fuzzy-ai-ask-btn' || e.target.closest('#fuzzy-ai-ask-btn')) {
+        const input = document.getElementById('fuzzy-ai-ask-input');
+        if (input && input.value.trim()) {
+            window.askFuzzyAIAssistant(input.value.trim());
+        }
+        return;
+    }
+
+    // 3. On-Demand AI Commentary Generation Button Click
+    const commentaryBtn = e.target.closest('#fuzzy-ai-commentary-generate-btn');
+    if (commentaryBtn) {
+        const ctx = window.lastFuzzyContext || {};
+        const symbol = ctx.symbol || 'STOCK';
+        window.loadFuzzyAICommentary(symbol, ctx.centroid_score || 0, ctx.rating || 'Hold', ctx.inputs || {}, ctx.rule_trail || []);
+        return;
+    }
+
+    // 4. Speech-to-Text Mic Button Click
+    const micBtn = e.target.closest('#fuzzy-ai-ask-mic-btn');
+    if (micBtn) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const isAndroidSpeech = window.AndroidSpeech && typeof window.AndroidSpeech.startListening === 'function';
+        
+        if (isAndroidSpeech) {
+            window.activeSpeechRecognizerTarget = 'fuzzy_ask';
+            window.AndroidSpeech.startListening();
+            return;
+        }
+        
+        if (!SpeechRecognition) {
+            alert("Speech recognition is not supported in this browser. Please type your scenario question.");
+            return;
+        }
+        
+        let rec = new SpeechRecognition();
+        rec.continuous = false;
+        rec.interimResults = false;
+        rec.lang = 'en-US';
+        
+        rec.onstart = () => {
+            micBtn.innerHTML = '🔴';
+            micBtn.style.background = 'rgba(239, 68, 68, 0.25)';
+            micBtn.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+        };
+        
+        rec.onresult = (evt) => {
+            const transcript = evt.results[0][0].transcript;
+            const input = document.getElementById('fuzzy-ai-ask-input');
+            if (input && transcript) {
+                input.value = transcript;
+                window.askFuzzyAIAssistant(transcript);
+            }
+        };
+        
+        rec.onerror = (err) => {
+            console.warn("Fuzzy What-If speech recognition error:", err);
+        };
+        
+        rec.onend = () => {
+            micBtn.innerHTML = '🎙️';
+            micBtn.style.background = 'rgba(59, 130, 246, 0.15)';
+            micBtn.style.borderColor = 'var(--border-glass)';
+        };
+        
+        rec.start();
+        return;
+    }
+});
+
+// Dropdown template select handler
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'fuzzy-ai-template-select') {
+        const val = e.target.value;
+        if (val) {
+            const input = document.getElementById('fuzzy-ai-ask-input');
+            if (input) input.value = val;
+            window.askFuzzyAIAssistant(val);
+        }
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.target.id === 'fuzzy-ai-ask-input' && e.key === 'Enter') {
+        if (e.target.value.trim()) {
+            window.askFuzzyAIAssistant(e.target.value.trim());
+        }
+    }
+});
+
+window.hydrateFuzzyRadarHomepage = async function() {
+    const desktopBuyRadar = document.getElementById('desktop-fuzzy-buy-radar');
+    const desktopSellRadar = document.getElementById('desktop-fuzzy-sell-radar');
+    const mobileBuyRadar = document.getElementById('mobile-fuzzy-buy-radar');
+    const mobileSellRadar = document.getElementById('mobile-fuzzy-sell-radar');
+
+    if (!desktopBuyRadar && !mobileBuyRadar) return;
+
+    try {
+        const response = await fetch('/api/fuzzy/universe-standings?limit=4');
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+
+        const renderRadarList = (items, isBuy) => {
+            if (!items || items.length === 0) {
+                return `<div class="recent-research-empty" style="font-size: 10px; padding: 10px;">No alerts.</div>`;
+            }
+            const colorClass = isBuy ? '#10b981' : '#ef4444';
+            const bgClass = isBuy ? 'rgba(16, 185, 129, 0.03)' : 'rgba(239, 68, 68, 0.03)';
+            const borderClass = isBuy ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+            const sign = isBuy ? '+' : '';
+
+            return items.map(item => `
+                <div class="watchlist-strip-row fuzzy-radar-row" data-symbol="${item.symbol}" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: ${bgClass}; border: 1px solid ${borderClass}; border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 2px;">
+                    <div style="display: flex; flex-direction: column; min-width: 0; flex: 1; text-align: left;">
+                        <span style="font-weight: 800; font-family: monospace; font-size: 11px; color: ${colorClass};">${item.symbol}</span>
+                    </div>
+                    <div style="text-align: right; flex-shrink: 0;">
+                        <span style="font-size: 10px; font-weight: 800; color: ${colorClass}; padding: 1px 5px; background: rgba(255,255,255,0.03); border-radius: 4px;">${sign}${item.fuzzy_score.toFixed(1)}%</span>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        const setupRadarClickEvents = (containerSelector) => {
+            const container = document.getElementById(containerSelector);
+            if (!container) return;
+            container.querySelectorAll('.fuzzy-radar-row').forEach(row => {
+                row.onclick = () => {
+                    const symbol = row.getAttribute('data-symbol');
+                    if (window.switchTab) {
+                        window.switchTab('fuzzy');
+                    }
+                    setTimeout(() => {
+                        if (typeof window.evaluateFuzzyStock === 'function') {
+                            window.evaluateFuzzyStock(symbol);
+                        }
+                    }, 50);
+                };
+            });
+        };
+
+        if (desktopBuyRadar) desktopBuyRadar.innerHTML = renderRadarList(data.top_buys, true);
+        if (desktopSellRadar) desktopSellRadar.innerHTML = renderRadarList(data.top_sells, false);
+        
+        if (mobileBuyRadar) mobileBuyRadar.innerHTML = renderRadarList(data.top_buys, true);
+        if (mobileSellRadar) mobileSellRadar.innerHTML = renderRadarList(data.top_sells, false);
+
+        setupRadarClickEvents('desktop-fuzzy-buy-radar');
+        setupRadarClickEvents('desktop-fuzzy-sell-radar');
+        setupRadarClickEvents('mobile-fuzzy-buy-radar');
+        setupRadarClickEvents('mobile-fuzzy-sell-radar');
+
+    } catch (err) {
+        console.error("Fuzzy homepage radar hydration error:", err);
+    }
+};
+
+// Wire up the desktop go button
+const desktopGoBtn = document.getElementById('desktop-fuzzy-radar-go-btn');
+if (desktopGoBtn) {
+    desktopGoBtn.onclick = () => {
+        if (window.switchTab) window.switchTab('fuzzy');
+    };
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(window.hydrateFuzzyRadarHomepage, 800);
+});
 

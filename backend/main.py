@@ -45,6 +45,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import List, Optional
+from backend.fuzzy_engine import evaluate_fuzzy_logic
 
 # Database path: relative to project with env override
 DATABASE_DIR = os.environ.get(
@@ -2410,6 +2411,458 @@ async def discover_stocks(
         return results
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Screener engine failed: {str(e)}")
+
+@app.get("/api/fuzzy/evaluate")
+async def get_fuzzy_evaluation(symbol: str):
+    symbol_upper = symbol.upper()
+    try:
+        with get_db() as conn:
+            # 1. Fetch profile from cached_profiles
+            row = conn.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (symbol_upper,)).fetchone()
+            if not row:
+                # If not found, try without suffix (.NS) or with wildcard
+                row = conn.execute("SELECT profile_json FROM cached_profiles WHERE symbol LIKE ?", (f"{symbol_upper}%",)).fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail=f"Stock profile for {symbol} not found in database. Please run analysis first.")
+            
+            profile = json.loads(row["profile_json"])
+            fundamentals = profile.get("fundamentals", {})
+            technicals = profile.get("technicals", {})
+            quality = profile.get("earnings_quality", {})
+            sector = profile.get("sector", "Unknown")
+
+            # 2. Extract present metrics
+            rsi = float(technicals.get("rsi", 50.0))
+            current_price = float(technicals.get("current_price", 0.0))
+            sma_200 = float(technicals.get("sma_200", 0.0))
+            dma_prox = 0.0
+            if sma_200 > 0:
+                dma_prox = ((current_price - sma_200) / sma_200) * 100.0
+            
+            # Simple Wyckoff classifier based on technical signals
+            trend_str = technicals.get("trend_50_vs_200", "Neutral")
+            
+            # ADX extraction from technicals profile
+            adx = float(technicals.get("adx", 22.0))
+            
+            stage = 1 # Default Stage 1 Accumulation
+            if trend_str == "Bullish" and current_price >= sma_200:
+                stage = 2 # Stage 2 Markup
+            elif trend_str == "Bearish" and current_price < sma_200:
+                stage = 4 # Stage 4 Markdown
+            elif rsi > 65 and trend_str != "Bullish":
+                stage = 3 # Stage 3 Distribution
+
+            altman_z = float(quality.get("altman_z_score", 3.0))
+            piotroski = int(quality.get("piotroski_score", 6))
+            promoter_holding = float(fundamentals.get("promoter_holding_pct", 50.0))
+            
+            # Promoter pledge change over 1Y (delta)
+            pledge_now = float(fundamentals.get("promoter_pledge_pct", 0.0))
+            promoter_pledge_delta = pledge_now  # Use current pledge as proxy delta for rules trigger
+
+            volume = float(fundamentals.get("volume", 1.0))
+            average_volume = float(fundamentals.get("average_volume", 1.0))
+            relative_volume = volume / average_volume if average_volume > 0 else 1.0
+
+            # Sector Markdown check
+            sector_markdown = False
+            sec_row = conn.execute("SELECT return_1m FROM sector_regime_stats WHERE sector = ?", (sector,)).fetchone()
+            if sec_row and sec_row["return_1m"] is not None and float(sec_row["return_1m"]) < -5.0:
+                sector_markdown = True
+
+            # 3. Compute Trajectories from Statement History
+            opm_delta = 0.0
+            roe_delta = 0.0
+            debt_delta = 0.0
+            
+            # Load statements
+            stmt_row = conn.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = 'consolidated'", (symbol_upper,)).fetchone()
+            if not stmt_row:
+                stmt_row = conn.execute("SELECT data_json FROM cached_financial_statements WHERE symbol = ? AND view = 'standalone'", (symbol_upper,)).fetchone()
+            
+            has_history = False
+            if stmt_row:
+                try:
+                    stmt_data = json.loads(stmt_row["data_json"])
+                    quarters = stmt_data.get("quarters", {})
+                    q_rows = quarters.get("rows", [])
+                    
+                    # Compute Operating Margin Trajectory slope
+                    opm_row = next((r for r in q_rows if r.get("label") == "OPM %"), None)
+                    if opm_row and "values" in opm_row:
+                        # Clean values to float
+                        opm_vals = []
+                        for v in opm_row["values"]:
+                            try:
+                                if isinstance(v, str):
+                                    v = v.replace("%", "").strip()
+                                opm_vals.append(float(v))
+                            except ValueError:
+                                pass
+                        # Take last 8 quarters to calculate slope
+                        if len(opm_vals) >= 2:
+                            y_vals = opm_vals[-8:]
+                            n = len(y_vals)
+                            x_vals = list(range(n))
+                            mean_x = sum(x_vals) / n
+                            mean_y = sum(y_vals) / n
+                            num = sum((x_vals[i] - mean_x) * (y_vals[i] - mean_y) for i in range(n))
+                            den = sum((x_vals[i] - mean_x) ** 2 for i in range(n))
+                            opm_delta = num / den if den > 0 else 0.0
+                            has_history = True
+
+                    # Compute ROE and Debt trajectory from annual sheet
+                    balance_sheet = stmt_data.get("balance_sheet", {})
+                    profit_loss = stmt_data.get("profit_loss", {})
+                    
+                    bs_rows = balance_sheet.get("rows", [])
+                    pl_rows = profit_loss.get("rows", [])
+                    
+                    capital_row = next((r for r in bs_rows if r.get("label") == "Equity Capital"), None)
+                    reserves_row = next((r for r in bs_rows if r.get("label") == "Reserves"), None)
+                    borrowing_row = next((r for r in bs_rows if r.get("label") == "Borrowings"), None)
+                    net_profit_row = next((r for r in pl_rows if r.get("label") == "Net Profit"), None)
+                    
+                    if capital_row and reserves_row and net_profit_row and borrowing_row:
+                        cap_vals = [float(v) for v in capital_row.get("values", []) if str(v).replace(".", "").isdigit()]
+                        res_vals = [float(v) for v in reserves_row.get("values", []) if str(v).replace(".", "").isdigit()]
+                        borrow_vals = [float(v) for v in borrowing_row.get("values", []) if str(v).replace(".", "").isdigit()]
+                        profit_vals = [float(v) for v in net_profit_row.get("values", []) if str(v).replace(".", "").replace("-", "").isdigit()]
+                        
+                        min_len = min(len(cap_vals), len(res_vals), len(borrow_vals), len(profit_vals))
+                        if min_len >= 2:
+                            # Align historical arrays
+                            roe_history = []
+                            debt_history = []
+                            for idx in range(-min_len, 0):
+                                equity = cap_vals[idx] + res_vals[idx]
+                                net_prof = profit_vals[idx]
+                                borrow = borrow_vals[idx]
+                                
+                                roe = (net_prof / equity * 100.0) if equity > 0 else 0.0
+                                debt_eq = (borrow / equity) if equity > 0 else 0.0
+                                
+                                roe_history.append(roe)
+                                debt_history.append(debt_eq)
+                            
+                            # ROE slope over last 4 years
+                            y_vals = roe_history[-4:]
+                            n = len(y_vals)
+                            x_vals = list(range(n))
+                            mean_x = sum(x_vals) / n
+                            mean_y = sum(y_vals) / n
+                            num = sum((x_vals[i] - mean_x) * (y_vals[i] - mean_y) for i in range(n))
+                            den = sum((x_vals[i] - mean_x) ** 2 for i in range(n))
+                            roe_delta = num / den if den > 0 else 0.0
+                            
+                            # Debt-to-Equity delta: present - 3y ago
+                            debt_delta = debt_history[-1] - debt_history[max(-len(debt_history), -4)]
+                except Exception as parse_err:
+                    print(f"Error parsing financial statement trajectories: {parse_err}")
+            
+            # If statement history was missing or empty, apply proxy estimation
+            if not has_history:
+                sales_growth_3y_pct = float(fundamentals.get("sales_growth_3y_pct", 0.0))
+                profit_growth_3y_pct = float(fundamentals.get("profit_growth_3y_pct", 0.0))
+                roe_pct = float(fundamentals.get("roe_pct", 12.0))
+                debt_to_equity = float(fundamentals.get("debt_to_equity", 0.0))
+                
+                # proxy opm trajectory
+                opm_delta = (profit_growth_3y_pct - sales_growth_3y_pct) / 10.0
+                # proxy roe trajectory
+                roe_delta = 1.0 if roe_pct > 15.0 else -1.0 if roe_pct < 8.0 else 0.0
+                # proxy debt trajectory
+                debt_delta = 0.0
+
+            # 4. Evaluate Mamdani fuzzy logic model
+            evaluation = evaluate_fuzzy_logic(
+                opm_delta=opm_delta,
+                roe_delta=roe_delta,
+                debt_delta=debt_delta,
+                rsi=rsi,
+                dma_prox=dma_prox,
+                adx=adx,
+                stage=stage,
+                altman_z=altman_z,
+                piotroski=piotroski,
+                promoter_holding=promoter_holding,
+                promoter_pledge_delta=promoter_pledge_delta,
+                relative_volume=relative_volume,
+                sector_markdown=sector_markdown
+            )
+            
+            # Include input diagnostics for visual transparency in the UI Console
+            evaluation["inputs"] = {
+                "symbol": symbol_upper,
+                "company_name": profile.get("company_name", symbol_upper),
+                "sector": sector,
+                "opm_delta": round(opm_delta, 2),
+                "roe_delta": round(roe_delta, 2),
+                "debt_delta": round(debt_delta, 2),
+                "rsi": round(rsi, 1),
+                "dma_prox": round(dma_prox, 1),
+                "adx": round(adx, 1),
+                "stage": stage,
+                "altman_z": round(altman_z, 2),
+                "piotroski": piotroski,
+                "promoter_holding": round(promoter_holding, 1),
+                "promoter_pledge_delta": round(promoter_pledge_delta, 2),
+                "relative_volume": round(relative_volume, 2),
+                "sector_markdown": sector_markdown
+            }
+            return evaluation
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fuzzy evaluation error: {str(e)}")
+
+@app.get("/api/fuzzy/universe-standings")
+async def get_fuzzy_universe_standings(limit: int = 5):
+    try:
+        with get_db() as conn:
+            # Query all symbols from cached_profiles
+            cursor = conn.execute("SELECT symbol FROM cached_profiles")
+            symbols = [row["symbol"] for row in cursor.fetchall() if not row["symbol"].startswith("BTEST")]
+            
+            evaluations = []
+            for symbol in symbols:
+                try:
+                    # Run the internal evaluation logic synchronously
+                    row = conn.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (symbol,)).fetchone()
+                    if not row:
+                        continue
+                    profile = json.loads(row["profile_json"])
+                    fundamentals = profile.get("fundamentals", {})
+                    technicals = profile.get("technicals", {})
+                    quality = profile.get("earnings_quality", {})
+                    sector = profile.get("sector", "Unknown")
+
+                    rsi = float(technicals.get("rsi", 50.0))
+                    current_price = float(technicals.get("current_price", 0.0))
+                    sma_200 = float(technicals.get("sma_200", 0.0))
+                    dma_prox = 0.0
+                    if sma_200 > 0:
+                        dma_prox = ((current_price - sma_200) / sma_200) * 100.0
+                    
+                    trend_str = technicals.get("trend_50_vs_200", "Neutral")
+                    adx = float(technicals.get("adx", 22.0))
+                    
+                    stage = 1
+                    if trend_str == "Bullish" and current_price >= sma_200:
+                        stage = 2
+                    elif trend_str == "Bearish" and current_price < sma_200:
+                        stage = 4
+                    elif rsi > 65 and trend_str != "Bullish":
+                        stage = 3
+
+                    altman_z = float(quality.get("altman_z_score", 3.0))
+                    piotroski = int(quality.get("piotroski_score", 6))
+                    promoter_holding = float(fundamentals.get("promoter_holding_pct", 50.0))
+                    
+                    # Fast proxy calculations for batch query to keep execution under 100ms
+                    sales_growth_3y_pct = float(fundamentals.get("sales_growth_3y_pct", 0.0))
+                    profit_growth_3y_pct = float(fundamentals.get("profit_growth_3y_pct", 0.0))
+                    roe_pct = float(fundamentals.get("roe_pct", 12.0))
+                    debt_to_equity = float(fundamentals.get("debt_to_equity", 0.0))
+                    
+                    opm_delta = (profit_growth_3y_pct - sales_growth_3y_pct) / 10.0
+                    roe_delta = 1.0 if roe_pct > 15.0 else -1.0 if roe_pct < 8.0 else 0.0
+                    debt_delta = 0.0
+                    
+                    volume = float(fundamentals.get("volume", 1.0))
+                    average_volume = float(fundamentals.get("average_volume", 1.0))
+                    relative_volume = volume / average_volume if average_volume > 0 else 1.0
+
+                    sector_markdown = False
+                    sec_row = conn.execute("SELECT return_1m FROM sector_regime_stats WHERE sector = ?", (sector,)).fetchone()
+                    if sec_row and sec_row["return_1m"] is not None and float(sec_row["return_1m"]) < -5.0:
+                        sector_markdown = True
+
+                    evaluation = evaluate_fuzzy_logic(
+                        opm_delta=opm_delta,
+                        roe_delta=roe_delta,
+                        debt_delta=debt_delta,
+                        rsi=rsi,
+                        dma_prox=dma_prox,
+                        adx=adx,
+                        stage=stage,
+                        altman_z=altman_z,
+                        piotroski=piotroski,
+                        promoter_holding=promoter_holding,
+                        promoter_pledge_delta=0.0,
+                        relative_volume=relative_volume,
+                        sector_markdown=sector_markdown
+                    )
+                    
+                    evaluations.append({
+                        "symbol": symbol,
+                        "company_name": profile.get("company_name", symbol),
+                        "sector": sector,
+                        "fuzzy_score": evaluation["fuzzy_score"],
+                        "rating": evaluation["rating"],
+                        "market_regime": evaluation["market_regime"]
+                    })
+                except Exception as eval_err:
+                    print(f"Skipping batch evaluate for {symbol}: {eval_err}")
+            
+            # Sort evaluations by score descending
+            buys = [ev for ev in evaluations if ev["fuzzy_score"] > 0]
+            sells = [ev for ev in evaluations if ev["fuzzy_score"] < 0]
+            
+            buys.sort(key=lambda x: x["fuzzy_score"], reverse=True)
+            sells.sort(key=lambda x: x["fuzzy_score"]) # most negative first
+            
+            return {
+                "top_buys": buys[:limit],
+                "top_sells": sells[:limit]
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch universe standings: {str(e)}")
+
+class FuzzyCommentaryRequest(BaseModel):
+    symbol: str
+    centroid_score: float
+    rating: str
+    inputs: dict = {}
+    active_rules: list = []
+
+class FuzzyAskRequest(BaseModel):
+    symbol: str
+    question: str
+    fuzzy_context: dict = {}
+
+def generate_fallback_fuzzy_commentary(symbol: str, centroid_score: float, rating: str, inputs: dict) -> dict:
+    opm_d = float(inputs.get("opm_delta", 0.0) or 0.0)
+    roe_d = float(inputs.get("roe_delta", 0.0) or 0.0)
+    debt_d = float(inputs.get("debt_delta", 0.0) or 0.0)
+    adx = float(inputs.get("adx", 20.0) or 20.0)
+    rsi = float(inputs.get("rsi", 50.0) or 50.0)
+
+    if rating in ["Strong Buy", "Buy"]:
+        thesis = f"{symbol} shows strong financial health and positive momentum. Profit margins and capital returns are expanding while financial leverage remains well managed."
+        driver = f"Solid profit expansion (OPM delta: {opm_d:+.1f}%) and healthy trend strength (ADX: {adx:.1f})."
+        risk = "Watch out for short-term technical pullbacks if broader sector momentum slows down."
+    elif rating in ["Sell", "Strong Sell"]:
+        thesis = f"{symbol} faces underlying financial margin compression or high debt pressures, dragging down quantitative conviction."
+        driver = f"Deteriorating profit margins or weak Return on Equity trajectory (ROE delta: {roe_d:+.1f}%)."
+        risk = "Debt expansion or broken technical support levels pose downside risk."
+    else:
+        thesis = f"{symbol} is currently in a balanced phase. Fundamentals and technical trends are rangebound."
+        driver = f"Moderate profit growth and stable momentum (RSI: {rsi:.1f})."
+        risk = "A clear breakout in profit margin trajectory or trend strength is required before upgrading to Buy."
+
+    return {
+        "status": "success",
+        "symbol": symbol,
+        "layman_summary": {
+            "thesis": thesis,
+            "key_driver": driver,
+            "main_risk": risk
+        },
+        "is_fallback": True
+    }
+
+@app.post("/api/fuzzy/commentary")
+async def get_fuzzy_ai_commentary(req: FuzzyCommentaryRequest):
+    try:
+        from backend.llm_config import call_llm, TASK_FAST
+        
+        rules_text = ", ".join([r.get("name", str(r)) for r in req.active_rules[:5]]) if req.active_rules else "Standard evaluation rules fired"
+        system_prompt = (
+            "You are an expert institutional quantitative analyst. Explain a mathematical fuzzy logic stock rating to a retail investor in VERY SIMPLE, LAYMAN TERMS (no complex academic jargon).\n"
+            "Format your response as a valid JSON object with EXACTLY three keys:\n"
+            '{\n  "thesis": "1-2 sentence simple overview of why the stock got this rating",\n'
+            '  "key_driver": "1 short sentence highlighting the biggest positive or negative growth driver",\n'
+            '  "main_risk": "1 short sentence noting the main potential risk or metric to monitor"\n}'
+        )
+        user_prompt = (
+            f"Stock: {req.symbol}\n"
+            f"Fuzzy Rating: {req.rating} (Centroid Conviction Score: {req.centroid_score:+.1f}%)\n"
+            f"Fuzzified Inputs: OPM Delta={req.inputs.get('opm_delta', 0)}%, ROE Delta={req.inputs.get('roe_delta', 0)}%, Debt Delta={req.inputs.get('debt_delta', 0)}%, RSI={req.inputs.get('rsi', 50)}, ADX={req.inputs.get('adx', 20)}\n"
+            f"Top Active Fired Rules: {rules_text}"
+        )
+        
+        response_text = call_llm(TASK_FAST, system_prompt, user_prompt, max_tokens=350)
+        if response_text and not response_text.startswith("ERROR:"):
+            try:
+                clean_txt = response_text.strip()
+                if "```json" in clean_txt:
+                    clean_txt = clean_txt.split("```json")[1].split("```")[0].strip()
+                elif "```" in clean_txt:
+                    clean_txt = clean_txt.split("```")[1].split("```")[0].strip()
+                parsed = json.loads(clean_txt)
+                return {
+                    "status": "success",
+                    "symbol": req.symbol,
+                    "layman_summary": parsed,
+                    "is_fallback": False
+                }
+            except Exception:
+                pass
+
+        return generate_fallback_fuzzy_commentary(req.symbol, req.centroid_score, req.rating, req.inputs)
+    except Exception as e:
+        return generate_fallback_fuzzy_commentary(req.symbol, req.centroid_score, req.rating, req.inputs)
+
+@app.post("/api/fuzzy/ask")
+async def ask_fuzzy_ai_assistant(req: FuzzyAskRequest):
+    try:
+        from backend.llm_config import call_llm, TASK_FAST
+
+        ctx = req.fuzzy_context or {}
+        inputs = ctx.get('inputs', {})
+        active_rules = [r.get('rule_name', '') for r in ctx.get('rule_trail', []) if r.get('rule_name')]
+
+        system_prompt = (
+            "You are an expert AI quantitative analyst explaining a Mamdani Fuzzy Logic Stock Decision Engine. "
+            "Answer the user's question or 'what-if' counterfactual scenario clearly, completely, and in layman terms. "
+            "When responding to IF/ELSE scenarios (e.g. 'What if profit margins drop by 5%?', 'Why did this stock receive its rating?'):\n"
+            "1. Explain IF the scenario occurs, how it alters the specific input indicator (e.g. OPM delta, ROE delta, Debt, RSI, ADX).\n"
+            "2. Explain WHICH Mamdani fuzzy rules would trigger or weaken as a result.\n"
+            "3. State clearly how the defuzzified Center-of-Gravity (Centroid Score) and overall conviction rating would shift (e.g., from Buy to Neutral/Sell).\n"
+            "Keep your explanation direct, complete, and easy for a retail investor to understand. Do NOT truncate or cut off mid-sentence."
+        )
+        user_prompt = (
+            f"Stock Symbol: {req.symbol}\n"
+            f"Current Conviction Rating: {ctx.get('rating', 'Hold')} (Defuzzified Score: {ctx.get('centroid_score', 0):+.1f}%)\n"
+            f"Current Fuzzified Indicators: Margin Delta (OPM)={inputs.get('opm_delta', 0)}%, ROE Delta={inputs.get('roe_delta', 0)}%, Debt Delta={inputs.get('debt_delta', 0)}, RSI={inputs.get('rsi', 50)}, 200-DMA Prox={inputs.get('dma_prox', 0)}%, ADX={inputs.get('adx', 20)}\n"
+            f"Currently Active Rules: {', '.join(active_rules) if active_rules else 'Standard rules'}\n"
+            f"User Question / Scenario: {req.question}"
+        )
+
+        answer_text = call_llm(TASK_FAST, system_prompt, user_prompt, max_tokens=2500)
+        if answer_text and not answer_text.startswith("ERROR:"):
+            return {
+                "status": "success",
+                "answer": answer_text.strip(),
+                "is_fallback": False
+            }
+        
+        # Smart dynamic fallback response for IF/ELSE queries if LLM is offline
+        rating = ctx.get('rating', 'Hold')
+        score = float(ctx.get('centroid_score', 0) or 0.0)
+        q_lower = req.question.lower()
+        if "profit" in q_lower or "opm" in q_lower or "drop" in q_lower or "margin" in q_lower:
+            fb = f"IF {req.symbol}'s profit margins drop, the OPM delta antecedent will weaken. This weakens Buy rules and activates Margin Contraction penalty rules, pulling down the current score of {score:+.1f}% toward the Sell zone (-15% to -100%)."
+        elif "debt" in q_lower or "risk" in q_lower or "leverage" in q_lower:
+            fb = f"IF debt leverage increases for {req.symbol}, the Debt Expansion rule triggers a score penalty, reducing overall conviction and increasing downside risk."
+        elif "buy" in q_lower or "strong buy" in q_lower:
+            fb = f"To trigger a Strong Buy rating (> +50% Centroid Score), {req.symbol} requires expanding profit margins (OPM delta > +2%), strong capital returns (ROE delta > +3%), and healthy trend momentum (RSI between 45-65 and ADX > 25)."
+        else:
+            fb = f"For {req.symbol} (current rating: {rating}), the fuzzy decision engine balances fundamental deltas and technical momentum. Any negative shift in profit trajectory or technical breakdown will reduce the centroid score."
+
+        return {
+            "status": "success",
+            "answer": fb,
+            "is_fallback": True
+        }
+    except Exception as e:
+        return {
+            "status": "success",
+            "answer": f"Analyzing {req.symbol}: The fuzzy decision engine combines balance sheet deltas and momentum regimes. Changes in profit growth or RSI directly shift the defuzzified centroid score.",
+            "is_fallback": True
+        }
 
 @app.get("/api/technical-scans")
 async def get_technical_scans():
