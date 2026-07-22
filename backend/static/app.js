@@ -49525,15 +49525,17 @@ document.addEventListener('keydown', function(e) {
 window.hydrateFuzzyRadarHomepage = async function() {
     const desktopBuyRadar = document.getElementById('desktop-fuzzy-buy-radar');
     const desktopSellRadar = document.getElementById('desktop-fuzzy-sell-radar');
+    const mobileRadarContainer = document.getElementById('mobile-home-fuzzy-radar-container');
     const mobileBuyRadar = document.getElementById('mobile-fuzzy-buy-radar');
     const mobileSellRadar = document.getElementById('mobile-fuzzy-sell-radar');
 
-    if (!desktopBuyRadar && !mobileBuyRadar) return;
+    if (!desktopBuyRadar && !mobileRadarContainer && !mobileBuyRadar) return;
 
     try {
         const response = await fetch('/api/fuzzy/universe-standings?limit=4');
         if (!response.ok) throw new Error(await response.text());
         const data = await response.json();
+        window.fuzzyHomepageData = data;
 
         const renderRadarList = (items, isBuy) => {
             if (!items || items.length === 0) {
@@ -49544,16 +49546,19 @@ window.hydrateFuzzyRadarHomepage = async function() {
             const borderClass = isBuy ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)';
             const sign = isBuy ? '+' : '';
 
-            return items.map(item => `
-                <div class="watchlist-strip-row fuzzy-radar-row" data-symbol="${item.symbol}" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: ${bgClass}; border: 1px solid ${borderClass}; border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 2px;">
+            return items.map(item => {
+                const cleanSym = item.symbol.replace('.NS', '').replace('.BO', '');
+                return `
+                <div class="watchlist-strip-row fuzzy-radar-row" data-symbol="${item.symbol}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: ${bgClass}; border: 1px solid ${borderClass}; border-radius: 6px; cursor: pointer; transition: all 0.2s; margin-bottom: 2px;">
                     <div style="display: flex; flex-direction: column; min-width: 0; flex: 1; text-align: left;">
-                        <span style="font-weight: 800; font-family: monospace; font-size: 11px; color: ${colorClass};">${item.symbol}</span>
+                        <span style="font-weight: 800; font-family: monospace; font-size: 11.5px; color: ${colorClass};">${cleanSym}</span>
                     </div>
                     <div style="text-align: right; flex-shrink: 0;">
-                        <span style="font-size: 10px; font-weight: 800; color: ${colorClass}; padding: 1px 5px; background: rgba(255,255,255,0.03); border-radius: 4px;">${sign}${item.fuzzy_score.toFixed(1)}%</span>
+                        <span style="font-size: 10.5px; font-weight: 800; color: ${colorClass}; padding: 2px 6px; background: rgba(255,255,255,0.03); border-radius: 4px;">${sign}${item.fuzzy_score.toFixed(1)}%</span>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         };
 
         const setupRadarClickEvents = (containerSelector) => {
@@ -49582,8 +49587,20 @@ window.hydrateFuzzyRadarHomepage = async function() {
 
         setupRadarClickEvents('desktop-fuzzy-buy-radar');
         setupRadarClickEvents('desktop-fuzzy-sell-radar');
-        setupRadarClickEvents('mobile-fuzzy-buy-radar');
-        setupRadarClickEvents('mobile-fuzzy-sell-radar');
+        if (mobileBuyRadar) setupRadarClickEvents('mobile-fuzzy-buy-radar');
+        if (mobileSellRadar) setupRadarClickEvents('mobile-fuzzy-sell-radar');
+
+        // Mobile segmented tab renderer
+        window.renderMobileFuzzyRadar = (mode) => {
+            if (!mobileRadarContainer) return;
+            const isBuy = mode !== 'sells';
+            const items = isBuy ? (window.fuzzyHomepageData ? window.fuzzyHomepageData.top_buys : []) : (window.fuzzyHomepageData ? window.fuzzyHomepageData.top_sells : []);
+            mobileRadarContainer.innerHTML = renderRadarList(items, isBuy);
+            setupRadarClickEvents('mobile-home-fuzzy-radar-container');
+        };
+
+        const currentActiveTab = document.getElementById('mobile-fuzzy-tab-sells')?.classList.contains('active') ? 'sells' : 'buys';
+        window.renderMobileFuzzyRadar(currentActiveTab);
 
     } catch (err) {
         console.error("Fuzzy homepage radar hydration error:", err);

@@ -3693,19 +3693,12 @@
                     <button class="section-view-all-btn" onclick="window.switchTab && window.switchTab('fuzzy')" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.25); padding: 3px 10px; font-size: 10.5px; border-radius: 4px; cursor: pointer; font-family: 'Outfit', sans-serif; font-weight: 600;">Console →</button>
                 </div>
                 <div class="mobile-glass-card" style="padding: 12px; margin-bottom: 20px; border: 1px solid rgba(59, 130, 246, 0.15);">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div>
-                            <div style="font-size: 10px; font-weight: 700; color: #10b981; margin-bottom: 8px; text-transform: uppercase;">🟢 Accumulation</div>
-                            <div id="mobile-fuzzy-buy-radar" style="display: flex; flex-direction: column; gap: 6px;">
-                                <div class="recent-research-empty" style="font-size: 10px; padding: 10px;">Hydrating radar...</div>
-                            </div>
-                        </div>
-                        <div>
-                            <div style="font-size: 10px; font-weight: 700; color: #ef4444; margin-bottom: 8px; text-transform: uppercase;">🔴 Avoid / Traps</div>
-                            <div id="mobile-fuzzy-sell-radar" style="display: flex; flex-direction: column; gap: 6px;">
-                                <div class="recent-research-empty" style="font-size: 10px; padding: 10px;">Hydrating radar...</div>
-                            </div>
-                        </div>
+                    <div class="movers-segmented-control" style="margin-bottom: 12px; display: flex; gap: 4px;">
+                        <button class="tech-segmented-tab active" id="mobile-fuzzy-tab-buys" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">🟢 Accumulation</button>
+                        <button class="tech-segmented-tab" id="mobile-fuzzy-tab-sells" style="flex: 1; text-align: center; font-size: 10.5px; padding: 6px 0;">🔴 Avoid / Traps</button>
+                    </div>
+                    <div id="mobile-home-fuzzy-radar-container" style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="recent-research-empty" style="font-size: 11px;">Hydrating radar...</div>
                     </div>
                 </div>
 
@@ -3817,6 +3810,24 @@
                     window.activeMoversTab = 'losers';
                     losersDiv.style.display = 'block';
                     gainersDiv.style.display = 'none';
+                };
+            }
+
+            // Wire mobile Fuzzy Radar tab clicks
+            const fTabBuys = document.getElementById('mobile-fuzzy-tab-buys');
+            const fTabSells = document.getElementById('mobile-fuzzy-tab-sells');
+            if (fTabBuys) {
+                fTabBuys.onclick = () => {
+                    if (fTabSells) fTabSells.classList.remove('active');
+                    fTabBuys.classList.add('active');
+                    if (window.renderMobileFuzzyRadar) window.renderMobileFuzzyRadar('buys');
+                };
+            }
+            if (fTabSells) {
+                fTabSells.onclick = () => {
+                    if (fTabBuys) fTabBuys.classList.remove('active');
+                    fTabSells.classList.add('active');
+                    if (window.renderMobileFuzzyRadar) window.renderMobileFuzzyRadar('sells');
                 };
             }
 
@@ -5462,7 +5473,7 @@
         searchBtn.click();
     }
 ">
-                                                    <td style="padding: 5px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol}</td>
+                                                    <td style="padding: 5px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol.replace('.NS', '')}</td>
                                                     <td style="padding: 5px 4px; text-align: right; color: var(--text-primary); font-weight: 600; font-family: 'Inter', monospace;">₹${parseFloat(item.live_price || 0).toFixed(2)}</td>
                                                     <td style="padding: 5px 4px; text-align: right; font-weight: 700; font-family: 'Inter', monospace;" class="${changeClass}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>
                                                 </tr>
@@ -5492,7 +5503,7 @@
         searchBtn.click();
     }
 ">
-                                                    <td style="padding: 5px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol}</td>
+                                                    <td style="padding: 5px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol.replace('.NS', '')}</td>
                                                     <td style="padding: 5px 4px; text-align: right; color: var(--text-primary); font-weight: 600; font-family: 'Inter', monospace;">₹${parseFloat(item.live_price || 0).toFixed(2)}</td>
                                                     <td style="padding: 5px 4px; text-align: right; font-weight: 700; font-family: 'Inter', monospace;" class="${changeClass}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>
                                                 </tr>
@@ -5520,7 +5531,7 @@
         searchBtn.click();
     }
 ">
-                                                    <td style="padding: 5px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol}</td>
+                                                    <td style="padding: 5px 4px; font-weight: 700; color: var(--text-primary);">${item.symbol.replace('.NS', '')}</td>
                                                     <td style="padding: 5px 4px; text-align: right; color: var(--text-primary); font-weight: 600; font-family: 'Inter', monospace;">₹${parseFloat(item.live_price || 0).toFixed(2)}</td>
                                                     <td style="padding: 5px 4px; text-align: right; font-weight: 700; font-family: 'Inter', monospace;" class="${changeClass}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>
                                                 </tr>
