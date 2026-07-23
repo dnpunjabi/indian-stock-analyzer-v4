@@ -11341,12 +11341,16 @@ async function fetchDailyWrapupSettings() {
         const lastSentLbl = document.getElementById('wrapup-last-sent-lbl');
         const includeEventsChkbx = document.getElementById('wrapup-include-events');
         const includeDealsChkbx = document.getElementById('wrapup-include-deals');
+        const includeSentimentChkbx = document.getElementById('wrapup-include-sentiment');
+        const includeBreakoutsChkbx = document.getElementById('wrapup-include-breakouts');
 
         if (enabledChkbx) enabledChkbx.checked = data.enabled;
         if (timeInput) timeInput.value = data.time;
         if (personaSelect) personaSelect.value = data.persona;
         if (includeEventsChkbx) includeEventsChkbx.checked = data.include_events;
         if (includeDealsChkbx) includeDealsChkbx.checked = data.include_deals;
+        if (includeSentimentChkbx) includeSentimentChkbx.checked = data.include_sentiment !== false;
+        if (includeBreakoutsChkbx) includeBreakoutsChkbx.checked = data.include_breakouts !== false;
         if (lastSentLbl) {
             lastSentLbl.textContent = data.last_sent ? `Last dispatched: ${data.last_sent}` : "Last dispatched: Never";
         }
@@ -11364,9 +11368,11 @@ function setupDailyWrapupListeners() {
             const persona = document.getElementById('wrapup-persona')?.value;
             const include_events = document.getElementById('wrapup-include-events')?.checked;
             const include_deals = document.getElementById('wrapup-include-deals')?.checked;
+            const include_sentiment = document.getElementById('wrapup-include-sentiment')?.checked;
+            const include_breakouts = document.getElementById('wrapup-include-breakouts')?.checked;
 
             if (!time) {
-                showToast("Please enter a valid dispatch time.", "error");
+                showToast("Please select a valid dispatch time.", "error");
                 return;
             }
 
@@ -11374,7 +11380,7 @@ function setupDailyWrapupListeners() {
                 const response = await fetch('/api/alerts/daily-wrapup/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ enabled, time, persona, include_events, include_deals })
+                    body: JSON.stringify({ enabled, time, persona, include_events, include_deals, include_sentiment, include_breakouts })
                 });
 
                 if (response.ok) {

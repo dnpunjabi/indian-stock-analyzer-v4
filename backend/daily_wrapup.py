@@ -523,8 +523,9 @@ def fetch_recent_deals_summary(portfolio_symbols: list, watchlist_symbols: list,
 
 def fetch_market_sentiment_header() -> str:
     """
-    Computes market sentiment score (0 to 100) using India VIX and Market Breadth.
-    Returns a clean header line for the daily report.
+    Computes market sentiment index score (0 to 100 Fear & Greed scale) using India VIX 
+    and actual Advances/Declines stock counts across the scanned stock universe.
+    Returns a clean, transparent header line for the daily report.
     """
     vix_val = 14.50
     vix_chg = 0.0
@@ -543,19 +544,39 @@ def fetch_market_sentiment_header() -> str:
         
     import backend.main as bmain
     cache = bmain._MARKET_MOVERS_CACHE or {}
-    adv = cache.get("advances", 50)
-    dec = cache.get("declines", 50)
+    adv = cache.get("advances", 0)
+    dec = cache.get("declines", 0)
+    
+    # Fallback to database cached profiles if market movers cache is empty
+    if adv == 0 and dec == 0:
+        try:
+            with get_db() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT profile_json FROM cached_profiles")
+                rows = cursor.fetchall()
+                for r in rows:
+                    if r["profile_json"]:
+                        p_data = json.loads(r["profile_json"])
+                        chg = p_data.get("technicals", {}).get("price_change_pct", 0.0)
+                        if chg > 0:
+                            adv += 1
+                        elif chg < 0:
+                            dec += 1
+        except Exception as db_err:
+            print(f"Daily Wrap-up: DB breadth calculation fallback error: {db_err}")
+            
     tot = max(1, adv + dec)
     breadth_ratio = (adv / tot) * 100.0
     
-    # Low VIX + High Breadth = High Bullish Sentiment
+    # Low VIX + High Breadth = High Bullish Sentiment Index Score (0 to 100 scale)
     vix_score = max(0.0, min(100.0, 120.0 - (vix_val * 3.0)))
     sentiment_score = int(round((0.6 * breadth_ratio) + (0.4 * vix_score)))
     
     regime = "Bullish 🚀" if sentiment_score >= 65 else ("Bearish 🔴" if sentiment_score <= 40 else "Neutral 🟡")
     vix_sign = "+" if vix_chg >= 0 else ""
+    breadth_str = f"{adv} Adv / {dec} Dec" if (adv + dec) > 0 else "N/A"
     
-    return f"🎯 *Market Sentiment:* {regime} ({sentiment_score}/100) | India VIX: `{vix_val:.2f} ({vix_sign}{vix_chg:.2f}%)`\n"
+    return f"🎯 *Market Sentiment Index:* {regime} (`{sentiment_score}/100`) | Breadth: `{breadth_str}` | India VIX: `{vix_val:.2f} ({vix_sign}{vix_chg:.2f}%)`\n"
 
 def fetch_52w_breakouts(portfolio_symbols: list, watchlist_symbols: list) -> str:
     """
