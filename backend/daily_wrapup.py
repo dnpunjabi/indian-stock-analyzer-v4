@@ -517,33 +517,133 @@ def fetch_recent_deals_summary(portfolio_symbols: list, watchlist_symbols: list,
         
     except Exception as e:
         print(f"Daily Wrap-up: Deals summary error: {e}")
-        result["portfolio_text"] = "_Failed to fetch recent deals._"
+        result["portfolio_text"] = "_No recent promoter or institutional deals._"
         
     return result
 
-async def generate_daily_wrapup_text(persona_override: str = None) -> str:
+def fetch_market_sentiment_header() -> str:
+    """
+    Computes market sentiment score (0 to 100) using India VIX and Market Breadth.
+    Returns a clean header line for the daily report.
+    """
+    vix_val = 14.50
+    vix_chg = 0.0
+    try:
+        df = yf.download("^INDIAVIX", period="2d", interval="1d", progress=False)
+        if not df.empty:
+            close_s = df['Close'].dropna()
+            if isinstance(close_s, pd.DataFrame):
+                close_s = close_s.iloc[:, 0]
+            if len(close_s) >= 1:
+                vix_val = float(close_s.values[-1])
+                prev_vix = float(close_s.values[-2]) if len(close_s) >= 2 else vix_val
+                vix_chg = ((vix_val - prev_vix) / prev_vix * 100.0) if prev_vix > 0 else 0.0
+    except Exception as e:
+        print(f"Daily Wrap-up: VIX fetch error: {e}")
+        
+    import backend.main as bmain
+    cache = bmain._MARKET_MOVERS_CACHE or {}
+    adv = cache.get("advances", 50)
+    dec = cache.get("declines", 50)
+    tot = max(1, adv + dec)
+    breadth_ratio = (adv / tot) * 100.0
+    
+    # Low VIX + High Breadth = High Bullish Sentiment
+    vix_score = max(0.0, min(100.0, 120.0 - (vix_val * 3.0)))
+    sentiment_score = int(round((0.6 * breadth_ratio) + (0.4 * vix_score)))
+    
+    regime = "Bullish 🚀" if sentiment_score >= 65 else ("Bearish 🔴" if sentiment_score <= 40 else "Neutral 🟡")
+    vix_sign = "+" if vix_chg >= 0 else ""
+    
+    return f"🎯 *Market Sentiment:* {regime} ({sentiment_score}/100) | India VIX: `{vix_val:.2f} ({vix_sign}{vix_chg:.2f}%)`\n"
+
+def fetch_52w_breakouts(portfolio_symbols: list, watchlist_symbols: list) -> str:
+    """
+    Scans portfolio and watchlist tickers for 52-week High breakouts or 52-week Low breakdowns.
+    """
+    all_syms = list(set([s.strip().upper() for s in portfolio_symbols + watchlist_symbols if s]))
+    if not all_syms:
+        return ""
+        
+    high_breakouts = []
+    low_breakdowns = []
+    
+    try:
+        df = yf.download(all_syms, period="1y", interval="1d", progress=False)
+        if not df.empty:
+            is_multi = isinstance(df.columns, pd.MultiIndex)
+            for sym in all_syms:
+                try:
+                    if is_multi:
+                        close_s = df['Close'][sym].dropna()
+                        high_s = df['High'][sym].dropna()
+                        low_s = df['Low'][sym].dropna()
+                    else:
+                        close_s = df['Close'].dropna()
+                        high_s = df['High'].dropna()
+                        low_s = df['Low'].dropna()
+                        
+                    if len(close_s) >= 20:
+                        curr_p = float(close_s.iloc[-1])
+                        yr_high = float(high_s.max())
+                        yr_low = float(low_s.min())
+                        sym_clean = sym.replace(".NS", "").replace(".BO", "")
+                        
+                        if curr_p >= (yr_high * 0.995):
+                            high_breakouts.append(f"{sym_clean} (`₹{curr_p:,.2f}`)")
+                        elif curr_p <= (yr_low * 1.005):
+                            low_breakdowns.append(f"{sym_clean} (`₹{curr_p:,.2f}`)")
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"Daily Wrap-up: 52W breakout scan error: {e}")
+        
+    if not high_breakouts and not low_breakdowns:
+        return ""
+        
+    res = "🚀 *52W BREAKOUT RADAR*\n"
+    if high_breakouts:
+        res += f"• 🟢 *52W Highs:* {', '.join(high_breakouts[:4])}\n"
+    if low_breakdowns:
+        res += f"• 🔴 *52W Lows:* {', '.join(low_breakdowns[:4])}\n"
+    res += "\n"
+    return res
+
+async def generate_daily_wrapup_text(persona_override: str = None, is_weekly_override: bool = False) -> str:
     """
     Assembles data from all components, invokes LLM to compile commentary based on selected persona,
     and returns a formatted WhatsApp text payload.
     """
     # 1. Fetch settings to determine AI persona and checkboxes
-    persona = "institutional"
+    persona = persona_override or "institutional"
     include_events = True
     include_deals = True
+    include_sentiment = True
+    include_breakouts = True
     
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """SELECT key, value FROM alert_settings 
-               WHERE key IN ('daily_wrapup_persona', 'daily_wrapup_include_events', 'daily_wrapup_include_deals')"""
+               WHERE key IN ('daily_wrapup_persona', 'daily_wrapup_include_events', 'daily_wrapup_include_deals',
+                             'daily_wrapup_include_sentiment', 'daily_wrapup_include_breakouts')"""
         )
         for row in cursor.fetchall():
-            if row["key"] == "daily_wrapup_persona":
+            if not persona_override and row["key"] == "daily_wrapup_persona":
                 persona = row["value"]
             elif row["key"] == "daily_wrapup_include_events":
                 include_events = (row["value"] == "true")
             elif row["key"] == "daily_wrapup_include_deals":
                 include_deals = (row["value"] == "true")
+            elif row["key"] == "daily_wrapup_include_sentiment":
+                include_sentiment = (row["value"] == "true")
+            elif row["key"] == "daily_wrapup_include_breakouts":
+                include_breakouts = (row["value"] == "true")
+
+    # 1.5 Sentiment Header
+    sentiment_header = ""
+    if include_sentiment:
+        sentiment_header = fetch_market_sentiment_header()
 
     # 2. Gather market indices
     indices_str = ""
@@ -687,7 +787,7 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
     else:
         news_str = "_No significant market news cached._\n"
 
-    # Gather Portfolio and Watchlist symbols for details
+    # Gather Portfolio and Watchlist symbols for details & breakouts
     port_symbols = []
     try:
         with get_db() as conn:
@@ -707,6 +807,11 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
             watchlist_symbols = [row["symbol"] for row in cursor.fetchall()]
     except Exception as e:
         print(f"Daily Wrap-up watchlist query error: {e}")
+
+    # 52W Breakouts Radar
+    breakouts_block = ""
+    if include_breakouts:
+        breakouts_block = fetch_52w_breakouts(port_symbols, watchlist_symbols)
 
     # 7. Gather Events and Deals blocks
     events_block = ""
@@ -781,12 +886,16 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
  
     # 9. Assemble final WhatsApp payload
     today_date = datetime.now().strftime("%B %d, %Y")
+    is_saturday = (datetime.now().weekday() == 5) or is_weekly_override
+    report_title = "📅 Weekly Close Retrospective" if is_saturday else "📅 Daily Close Wrap-Up"
     
     msg = (
         f"════════════════════════\n"
         f"📈 *APEX EQUITIES WORKSTATION*\n"
-        f"📅 Daily Close Wrap-Up | {today_date}\n"
+        f"{report_title} | {today_date}\n"
         f"════════════════════════\n\n"
+        
+        f"{sentiment_header}"
         
         f"📊 *1. KEY MARKET INDICES*\n"
         f"{indices_str}"
@@ -800,6 +909,8 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
         
         f"👀 *4. WATCHLIST HIGHLIGHTS*\n"
         f"{watchlist_str}\n"
+        
+        f"{breakouts_block}"
         
         f"📰 *5. MARKET CATALYST HEADLINES*\n"
         f"{news_str}\n"

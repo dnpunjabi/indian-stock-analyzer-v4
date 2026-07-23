@@ -5920,12 +5920,15 @@ async def get_daily_wrapup_settings():
     last_sent = ""
     include_events = "true"
     include_deals = "true"
+    include_sentiment = "true"
+    include_breakouts = "true"
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
             """SELECT key, value FROM alert_settings 
                WHERE key IN ('daily_wrapup_enabled', 'daily_wrapup_time', 'daily_wrapup_persona', 
-                             'daily_wrapup_last_sent', 'daily_wrapup_include_events', 'daily_wrapup_include_deals')"""
+                             'daily_wrapup_last_sent', 'daily_wrapup_include_events', 'daily_wrapup_include_deals',
+                             'daily_wrapup_include_sentiment', 'daily_wrapup_include_breakouts')"""
         )
         for row in cursor.fetchall():
             if row["key"] == "daily_wrapup_enabled":
@@ -5940,6 +5943,10 @@ async def get_daily_wrapup_settings():
                 include_events = row["value"]
             elif row["key"] == "daily_wrapup_include_deals":
                 include_deals = row["value"]
+            elif row["key"] == "daily_wrapup_include_sentiment":
+                include_sentiment = row["value"]
+            elif row["key"] == "daily_wrapup_include_breakouts":
+                include_breakouts = row["value"]
     
     return {
         "enabled": enabled.lower() == "true",
@@ -5947,7 +5954,9 @@ async def get_daily_wrapup_settings():
         "persona": persona,
         "last_sent": last_sent,
         "include_events": include_events.lower() == "true",
-        "include_deals": include_deals.lower() == "true"
+        "include_deals": include_deals.lower() == "true",
+        "include_sentiment": include_sentiment.lower() == "true",
+        "include_breakouts": include_breakouts.lower() == "true"
     }
 
 @app.post("/api/alerts/daily-wrapup/settings")
@@ -5968,6 +5977,12 @@ async def save_daily_wrapup_settings(payload: dict):
         if "include_deals" in payload:
             val = "true" if payload["include_deals"] else "false"
             cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_include_deals', ?)", (val,))
+        if "include_sentiment" in payload:
+            val = "true" if payload["include_sentiment"] else "false"
+            cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_include_sentiment', ?)", (val,))
+        if "include_breakouts" in payload:
+            val = "true" if payload["include_breakouts"] else "false"
+            cursor.execute("INSERT OR REPLACE INTO alert_settings (key, value) VALUES ('daily_wrapup_include_breakouts', ?)", (val,))
         conn.commit()
     return {"status": "success"}
 
