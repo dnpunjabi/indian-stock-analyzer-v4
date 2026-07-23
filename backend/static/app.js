@@ -11431,6 +11431,14 @@ function setupDailyWrapupListeners() {
                     previewContainer.style.display = 'block';
                 }
 
+                if (data.audio_url) {
+                    const audioPlayer = document.getElementById('wrapup-audio-player');
+                    if (audioPlayer) {
+                        audioPlayer.src = `${data.audio_url}?t=${Date.now()}`;
+                        audioPlayer.load();
+                    }
+                }
+
                 if (data.dispatch_status === "success") {
                     showToast("Wrap-up dispatched successfully to WhatsApp!", "success");
                 } else {

@@ -6018,6 +6018,7 @@ async def trigger_daily_wrapup(payload: Optional[dict] = None):
             "message_body": msg,
             "dispatch_status": dispatch_status,
             "message_id": message_id,
+            "audio_url": "/static/audio_reports/daily_wrapup_briefing.mp3",
             "error": dispatch_error
         }
     except Exception as e:

@@ -630,10 +630,28 @@ def fetch_52w_breakouts(portfolio_symbols: list, watchlist_symbols: list) -> str
     res += "\n"
     return res
 
+def generate_ai_voice_audio(text: str) -> str:
+    """
+    Generates an MP3 audio file for the AI Copilot Briefing using gTTS and returns the web URL.
+    """
+    try:
+        from gtts import gTTS
+        audio_dir = os.path.join(os.path.dirname(__file__), "static", "audio_reports")
+        os.makedirs(audio_dir, exist_ok=True)
+        audio_path = os.path.join(audio_dir, "daily_wrapup_briefing.mp3")
+        
+        clean_text = text.replace("*", "").replace("_", "").replace("`", "").strip()
+        tts = gTTS(text=clean_text, lang='en', tld='co.in')
+        tts.save(audio_path)
+        return "/static/audio_reports/daily_wrapup_briefing.mp3"
+    except Exception as e:
+        print(f"Daily Wrap-up AI voice audio generation error: {e}")
+        return ""
+
 async def generate_daily_wrapup_text(persona_override: str = None, is_weekly_override: bool = False) -> str:
     """
     Assembles data from all components, invokes LLM to compile commentary based on selected persona,
-    and returns a formatted WhatsApp text payload.
+    generates an AI Voice Audio Briefing note, and returns a formatted WhatsApp text payload.
     """
     # 1. Fetch settings to determine AI persona and checkboxes
     persona = persona_override or "institutional"
@@ -904,6 +922,15 @@ async def generate_daily_wrapup_text(persona_override: str = None, is_weekly_ove
     except Exception as ai_err:
         print(f"Daily Wrap-up AI commentary failed: {ai_err}")
         ai_commentary = "Market closed with standard distributions. Rebalancing and sector rotation remained active within structural bands."
+
+    # Generate AI Voice Audio Briefing
+    audio_url = ""
+    if ai_commentary:
+        audio_url = await asyncio.to_thread(generate_ai_voice_audio, ai_commentary)
+
+    audio_link_block = ""
+    if audio_url:
+        audio_link_block = f"🔊 *AI VOICE BRIEFING AUDIO:*\nhttp://127.0.0.1:8000{audio_url}\n\n"
  
     # 9. Assemble final WhatsApp payload
     today_date = datetime.now().strftime("%B %d, %Y")
@@ -940,7 +967,8 @@ async def generate_daily_wrapup_text(persona_override: str = None, is_weekly_ove
         f"{deals_block}"
         
         f"🤖 *AI COPILOT BRIEFING* (_{persona.title()}_)\n"
-        f"_{ai_commentary}_\n"
+        f"_{ai_commentary}_\n\n"
+        f"{audio_link_block}"
         f"────────────────────────\n"
         f"_APEX AI Workstation Client Portal_"
     )
