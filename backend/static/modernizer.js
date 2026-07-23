@@ -1543,7 +1543,7 @@
             `;
             document.body.appendChild(bottomNav);
 
-            document.getElementById('nav-terminal').addEventListener('click', () => window.switchTab('market-news'));
+            document.getElementById('nav-terminal').addEventListener('click', () => window.switchTab('analyzer'));
             document.getElementById('nav-screener').addEventListener('click', () => window.switchTab('screener'));
             document.getElementById('nav-watchlist').addEventListener('click', () => window.switchTab('watchlist'));
             document.getElementById('nav-portfolio').addEventListener('click', () => window.switchTab('portfolio'));

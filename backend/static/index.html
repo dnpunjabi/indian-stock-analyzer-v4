@@ -1017,8 +1017,8 @@
                         </button>
                     </div>
                     
-                    <!-- Cap Universe Selector, Style Overlays & Fuzzy Conviction Filter -->
-                    <div class="screener-controls-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 16px;">
+                    <!-- Cap Universe Selector & Style Overlays -->
+                    <div class="screener-controls-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-bottom: 16px;">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <label for="screener-universe-select" style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Screener Universe Cap Segment</label>
                             <select id="screener-universe-select" style="padding: 10px 14px; border-radius: 8px; font-size: 11.5px; cursor: pointer; outline: none; transition: all 0.2s; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);">
@@ -1038,41 +1038,14 @@
                                 <option value="contra">Contra Style (Oversold Turnaround)</option>
                             </select>
                         </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <label for="screener-fuzzy-rating-select" style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Fuzzy Rating Class Filter</label>
-                            <select id="screener-fuzzy-rating-select" style="padding: 10px 14px; border-radius: 8px; font-size: 11.5px; cursor: pointer; outline: none; transition: all 0.2s; width: 100%; box-shadow: inset 0 1px 2px rgba(0,0,0,0.25);">
-                                <option value="ALL" selected>All Ratings (No Filter)</option>
-                                <option value="STRONG_BUY">🚀 Strong Buy (≥ +70%)</option>
-                                <option value="BUY">🟢 Buy (≥ +30%)</option>
-                                <option value="HOLD">🟡 Hold (-39% to +29%)</option>
-                                <option value="SELL">🔴 Sell (≤ -40%)</option>
-                                <option value="STRONG_SELL">⛔ Strong Sell (≤ -70%)</option>
-                            </select>
-                        </div>
-
-                        <div style="display: flex; flex-direction: column; gap: 6px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <label for="screener-fuzzy-score-slider" style="font-family: 'Outfit', sans-serif; font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Min Fuzzy Score Filter</label>
-                                <span id="screener-fuzzy-score-val" style="font-size: 11px; font-weight: 800; color: #10b981;">-100%</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="range" id="screener-fuzzy-score-slider" min="-100" max="100" value="-100" step="5" style="flex: 1; cursor: pointer;">
-                                <input type="number" id="screener-fuzzy-score-num" min="-100" max="100" value="-100" step="5" style="width: 54px; padding: 6px; font-size: 11px; border-radius: 6px; border: 1px solid var(--border-glass); background: rgba(0,0,0,0.4); color: var(--text-primary); text-align: center; font-weight: 700;">
-                            </div>
-                        </div>
                     </div>
                     
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button class="analyze-asset-btn" id="run-screener-btn" style="min-width: 200px; height: 42px; border-radius: 8px; font-weight: 700; transition: all 0.3s ease;">
+                        <button class="analyze-asset-btn" id="run-screener-btn" style="min-width: 220px; height: 42px; border-radius: 8px; font-weight: 700; transition: all 0.3s ease;">
                             <span class="analyze-btn-particles" id="screener-btn-particles"></span>
                             <span class="analyze-btn-icon" id="screener-btn-icon" style="font-size: 14px;">🔬</span>
                             <span class="analyze-btn-label" id="screener-btn-label" style="font-family: 'Outfit', sans-serif; font-size: 12.5px; letter-spacing: 0.02em;">Run AI Screener Scan</span>
                             <span class="analyze-btn-shimmer"></span>
-                        </button>
-                        <button class="analyze-asset-btn" id="run-fuzzy-screener-modal-btn" style="min-width: 200px; height: 42px; border-radius: 8px; font-weight: 700; background: linear-gradient(135deg, #3b82f6, #10b981); border: none; color: #fff; cursor: pointer; transition: all 0.3s ease; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);">
-                            <span style="font-size: 14px;">⚡</span>
-                            <span style="font-family: 'Outfit', sans-serif; font-size: 12.5px; letter-spacing: 0.02em;">Run Fuzzy Scan</span>
                         </button>
                     </div>
                 </div>

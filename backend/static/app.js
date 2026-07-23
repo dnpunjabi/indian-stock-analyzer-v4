@@ -2867,27 +2867,6 @@ async function runAIScreener() {
             item.rank = index + 1;
         });
 
-        // Apply Fuzzy Conviction & Rating Class Filters if configured
-        const fuzzyRatingFilter = document.getElementById('screener-fuzzy-rating-select')?.value || 'ALL';
-        const fuzzyMinScoreFilter = parseFloat(document.getElementById('screener-fuzzy-score-slider')?.value || -100);
-
-        if (fuzzyRatingFilter !== 'ALL' || fuzzyMinScoreFilter > -100) {
-            results = results.filter(item => {
-                const itemScore = item.fuzzy_score !== undefined ? item.fuzzy_score : (item.score || 0);
-                const itemRating = item.fuzzy_rating || (itemScore >= 70 ? 'STRONG_BUY' : itemScore >= 30 ? 'BUY' : itemScore <= -70 ? 'STRONG_SELL' : itemScore <= -40 ? 'SELL' : 'HOLD');
-                
-                if (itemScore < fuzzyMinScoreFilter) return false;
-                if (fuzzyRatingFilter !== 'ALL') {
-                    if (fuzzyRatingFilter === 'STRONG_BUY' && itemRating !== 'STRONG_BUY') return false;
-                    if (fuzzyRatingFilter === 'BUY' && itemRating !== 'BUY' && itemRating !== 'STRONG_BUY') return false;
-                    if (fuzzyRatingFilter === 'HOLD' && itemRating !== 'HOLD') return false;
-                    if (fuzzyRatingFilter === 'SELL' && itemRating !== 'SELL' && itemRating !== 'STRONG_SELL') return false;
-                    if (fuzzyRatingFilter === 'STRONG_SELL' && itemRating !== 'STRONG_SELL') return false;
-                }
-                return true;
-            });
-        }
-
         activeScreenerResults = results;
         activeScreenerPage = 1;
         screenerSortCol = 'score';
@@ -50056,25 +50035,14 @@ window.hydrateFuzzyRadarHomepage = async function() {
 window.initScreenerFuzzyControls = function() {
     const slider = document.getElementById('screener-fuzzy-score-slider');
     const numInput = document.getElementById('screener-fuzzy-score-num');
-    const scoreVal = document.getElementById('screener-fuzzy-score-val');
     const ratingSelect = document.getElementById('screener-fuzzy-rating-select');
-    const runFuzzyBtn = document.getElementById('run-fuzzy-screener-modal-btn');
 
     if (!slider || slider.dataset.fuzzyWired) return;
     slider.dataset.fuzzyWired = 'true';
 
-    const updateScoreDisplay = (val) => {
-        const num = parseFloat(val);
-        if (scoreVal) {
-            scoreVal.innerText = `${num >= 0 ? '+' : ''}${num.toFixed(0)}%`;
-            scoreVal.style.color = num > 15 ? '#10b981' : num < -15 ? '#ef4444' : '#f59e0b';
-        }
-    };
-
     slider.addEventListener('input', (e) => {
         const val = e.target.value;
         if (numInput) numInput.value = val;
-        updateScoreDisplay(val);
     });
 
     if (numInput) {
@@ -50083,7 +50051,6 @@ window.initScreenerFuzzyControls = function() {
             if (isNaN(val)) val = -100;
             val = Math.max(-100, Math.min(100, val));
             slider.value = val;
-            updateScoreDisplay(val);
         });
     }
 
@@ -50102,14 +50069,6 @@ window.initScreenerFuzzyControls = function() {
                 slider.value = "-70";
             }
             if (numInput) numInput.value = slider.value;
-            updateScoreDisplay(slider.value);
-        });
-    }
-
-    if (runFuzzyBtn) {
-        runFuzzyBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (window.runAIScreener) window.runAIScreener();
         });
     }
 };
