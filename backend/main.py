@@ -11195,30 +11195,27 @@ async def get_market_news(refresh: bool = False, run_llm: bool = False):
         """
         
         try:
-            import os
-            api_key = os.environ.get("GROQ_API_KEY")
-            if api_key:
-                from groq import Groq
-                client = Groq(api_key=api_key)
-                completion = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[
-                        {"role": "system", "content": "You are a professional financial editor returning structured JSON reports."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.15,
-                    max_tokens=800
-                )
-                raw_res = completion.choices[0].message.content
-                ai_data = json.loads(raw_res)
-                ai_report = {
-                    "synthesis_report": ai_data.get("synthesis_report", "Consensus shows moderate consolidation across index ranges."),
-                    "top_drivers": ai_data.get("top_drivers", ["Global Tech Volatility", "Institutional Flows", "IPO Pipeline"])
-                }
-                has_ai_report = True
-        except Exception as groq_err:
-            print(f"Error generating AI Market Briefing: {groq_err}")
+            from backend.llm_config import call_llm, TASK_FAST
+            raw_res = call_llm(TASK_FAST, "You are a professional financial editor returning structured JSON reports.", prompt)
+            
+            # Clean markdown codeblocks if LLM wraps in ```json
+            clean_res = raw_res.strip()
+            if clean_res.startswith("```"):
+                lines = clean_res.splitlines()
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].startswith("```"):
+                    lines = lines[:-1]
+                clean_res = "\n".join(lines).strip()
+                
+            ai_data = json.loads(clean_res)
+            ai_report = {
+                "synthesis_report": ai_data.get("synthesis_report", "Consensus shows moderate consolidation across index ranges."),
+                "top_drivers": ai_data.get("top_drivers", ["Global Tech Volatility", "Institutional Flows", "IPO Pipeline"])
+            }
+            has_ai_report = True
+        except Exception as llm_err:
+            print(f"Error generating AI Market Briefing via unified call_llm: {llm_err}")
             
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     payload = {
@@ -14287,7 +14284,7 @@ async def learning_scenario(req: LearningScenarioRequest):
             return JSONResponse(
                 status_code=200,
                 content={
-                    "scenario": "The Case Study Generator requires a valid Groq API key. Please configure your GROQ_API_KEY environment variable to enable AI-powered scenario generation.",
+                    "scenario": "The Case Study Generator requires a valid LLM API key. Please configure your API key environment variable or SQLite key settings to enable AI-powered scenario generation.",
                     "status": "api_key_error"
                 }
             )
@@ -14352,7 +14349,7 @@ async def learning_ask(req: LearningAskRequest):
             return JSONResponse(
                 status_code=200,
                 content={
-                    "answer": "The AI Coach requires a valid Groq API key. Please configure your GROQ_API_KEY environment variable to enable AI-powered explanations.",
+                    "answer": "The AI Coach requires a valid LLM API key. Please configure your API key environment variable or SQLite key settings to enable AI-powered explanations.",
                     "status": "api_key_error"
                 }
             )
