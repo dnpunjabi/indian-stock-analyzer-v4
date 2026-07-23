@@ -11354,12 +11354,6 @@ async function fetchDailyWrapupSettings() {
         if (lastSentLbl) {
             lastSentLbl.textContent = data.last_sent ? `Last dispatched: ${data.last_sent}` : "Last dispatched: Never";
         }
-
-        const audioPlayer = document.getElementById('wrapup-audio-player');
-        if (audioPlayer) {
-            audioPlayer.src = `/audio_reports/daily_wrapup_briefing.mp3?t=${Date.now()}`;
-            audioPlayer.load();
-        }
     } catch (err) {
         console.error("Failed to fetch daily wrap-up settings:", err);
     }
