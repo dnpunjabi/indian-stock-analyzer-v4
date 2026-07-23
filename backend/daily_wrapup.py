@@ -747,10 +747,13 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
             
         if triggered_rows:
             fs_alerts_block += "🚨 *8. FINANCIAL STATEMENT RED FLAGS*\n"
-            for row in triggered_rows:
+            max_fs = 6
+            for row in triggered_rows[:max_fs]:
                 sym_clean = row["symbol"].replace(".NS", "").replace(".BO", "")
                 sev_emoji = "🔴" if row["severity"] == "Critical" else "🟡"
                 fs_alerts_block += f"  {sev_emoji} *{sym_clean}* - {row['metric']} {row['condition']} {row['threshold']} (Current: {row['current_value']})\n"
+            if len(triggered_rows) > max_fs:
+                fs_alerts_block += f"  └─ ⚠️ _...and {len(triggered_rows) - max_fs} more red flags logged in Alert Center._\n"
             fs_alerts_block += "\n"
     except Exception as e:
         print(f"Daily Wrap-up triggered FS alerts query error: {e}")
@@ -845,6 +848,7 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
 async def send_whatsapp_wrapup(msg_body: str) -> dict:
     """
     Dispatches a generated message body using the configured Meta WhatsApp Cloud API credentials.
+    Splits messages into chunks of <= 3800 characters if body exceeds WhatsApp's 4096 limit.
     """
     wa_token = os.environ.get("WHATSAPP_TOKEN", "")
     wa_phone_id = os.environ.get("WHATSAPP_PHONE_ID", "")
@@ -858,23 +862,66 @@ async def send_whatsapp_wrapup(msg_body: str) -> dict:
         "Authorization": f"Bearer {wa_token}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": wa_recipient,
-        "type": "text",
-        "text": {
-            "preview_url": False,
-            "body": msg_body
-        }
-    }
+
+    # Split message into chunks if it exceeds 3800 chars to avoid Meta WhatsApp Cloud API 4096 char limit
+    MAX_LEN = 3800
+    chunks = []
     
-    try:
-        resp = await asyncio.to_thread(requests.post, url, headers=headers, json=payload, timeout=10)
-        resp_data = resp.json()
-        if resp.status_code == 200 and "messages" in resp_data:
-            return {"status": "success", "message_id": resp_data["messages"][0].get("id", "")}
-        else:
-            error_msg = resp_data.get("error", {}).get("message", "Unknown error")
-            return {"status": "error", "message": f"WhatsApp Cloud API error: {error_msg}"}
-    except Exception as e:
-        return {"status": "error", "message": f"Network error sending WhatsApp: {str(e)}"}
+    if len(msg_body) <= MAX_LEN:
+        chunks = [msg_body]
+    else:
+        # Split by paragraphs, keeping them together if possible
+        raw_paragraphs = msg_body.split("\n\n")
+        current_chunk = ""
+        for p in raw_paragraphs:
+            if len(current_chunk) + len(p) + 2 <= MAX_LEN:
+                current_chunk += (p + "\n\n")
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                # If a single paragraph is still too long, split by line
+                if len(p) > MAX_LEN:
+                    lines = p.split("\n")
+                    sub_chunk = ""
+                    for line in lines:
+                        if len(sub_chunk) + len(line) + 1 <= MAX_LEN:
+                            sub_chunk += (line + "\n")
+                        else:
+                            chunks.append(sub_chunk.strip())
+                            sub_chunk = line + "\n"
+                    current_chunk = sub_chunk
+                else:
+                    current_chunk = p + "\n\n"
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+
+    last_msg_id = ""
+    for idx, chunk in enumerate(chunks):
+        final_text = chunk
+        if len(chunks) > 1:
+            final_text = f"*[Part {idx+1}/{len(chunks)}]*\n" + chunk
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": wa_recipient,
+            "type": "text",
+            "text": {
+                "preview_url": False,
+                "body": final_text
+            }
+        }
+        
+        try:
+            resp = await asyncio.to_thread(requests.post, url, headers=headers, json=payload, timeout=10)
+            resp_data = resp.json()
+            if resp.status_code == 200 and "messages" in resp_data:
+                last_msg_id = resp_data["messages"][0].get("id", "")
+                if idx < len(chunks) - 1:
+                    await asyncio.sleep(0.5)
+            else:
+                error_msg = resp_data.get("error", {}).get("message", "Unknown error")
+                return {"status": "error", "message": f"WhatsApp Cloud API error (part {idx+1}/{len(chunks)}): {error_msg}"}
+        except Exception as e:
+            return {"status": "error", "message": f"Network error sending WhatsApp (part {idx+1}/{len(chunks)}): {str(e)}"}
+            
+    return {"status": "success", "message_id": last_msg_id}
