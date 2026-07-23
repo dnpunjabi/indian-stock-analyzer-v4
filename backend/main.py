@@ -46,6 +46,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import List, Optional
 from backend.fuzzy_engine import evaluate_fuzzy_logic
+from backend.llm_config import get_last_llm_meta
 
 # Database path: relative to project with env override
 DATABASE_DIR = os.environ.get(
@@ -637,7 +638,7 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
 # Import analytical and agent engines
 from backend.financial_utils import get_complete_financial_profile, resolve_company_ticker, calculate_portfolio_backtest, calculate_dcf_valuation
 from backend.agent import run_cio_parent_agent, run_ai_stock_screener, run_comparison_synthesizer, run_conversational_chat, run_portfolio_doctor, run_single_stock_audit, generate_backtest_synthesis, calculate_portfolio_taxes
-from backend.llm_config import call_llm, TASK_HEAVY, TASK_FAST, get_llm_config
+from backend.llm_config import call_llm, TASK_HEAVY, TASK_FAST, get_llm_config, get_last_llm_meta
 
 # Angel One SmartAPI — Real-time WebSocket streaming (optional)
 from backend.angel_connect import AngelOneConnector
@@ -2237,6 +2238,7 @@ async def analyze_stock(
                 conn.commit()
         except Exception as db_err:
             print(f"Error caching analyzed profile to persistent SQLite: {db_err}")
+        profile["llm_meta"] = get_last_llm_meta()
         return profile
     except Exception as e:
         import traceback
@@ -2383,6 +2385,7 @@ async def analyze_custom_dcf(data: DCFOverrideRequest):
             "terminal_growth": data.terminal_growth
         }
         profile = await run_cio_parent_agent(data.query, data.horizon, data.risk_profile, custom_dcf=custom_dcf, force_llm=data.force_llm)
+        profile["llm_meta"] = get_last_llm_meta()
         return profile
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Custom valuation modeling error: {str(e)}")
@@ -2765,7 +2768,8 @@ async def get_fuzzy_ai_commentary(req: FuzzyCommentaryRequest):
                     "status": "success",
                     "symbol": req.symbol,
                     "layman_summary": parsed,
-                    "is_fallback": False
+                    "is_fallback": False,
+                    "llm_meta": get_last_llm_meta()
                 }
             except Exception:
                 pass
@@ -2805,7 +2809,8 @@ async def ask_fuzzy_ai_assistant(req: FuzzyAskRequest):
             return {
                 "status": "success",
                 "answer": answer_text.strip(),
-                "is_fallback": False
+                "is_fallback": False,
+                "llm_meta": get_last_llm_meta()
             }
         
         # Smart dynamic fallback response for IF/ELSE queries if LLM is offline
@@ -3397,6 +3402,7 @@ async def analyze_sector_regime_ai(data: AISectorAnalysisRequest):
                 elif ret_val >= -5.0: score = 42
                 else: score = 20
                 result["sector_sentiments"][sec_name] = score
+        result["llm_meta"] = get_last_llm_meta()
         return result
         
     except Exception as err:
@@ -3478,11 +3484,11 @@ async def chat_sector_regime_ai(data: AISectorChatRequest):
         
         if "ERROR_401" in response_text or "ERROR:" in response_text:
             # Fallback reply
-            return "The AI Co-Pilot chat is currently running in local offline mode. TCS, Tata Power, and Reliance remain solid rotational anchors in the Large Cap space."
+            return {"reply": "The AI Co-Pilot chat is currently running in local offline mode. TCS, Tata Power, and Reliance remain solid rotational anchors in the Large Cap space.", "llm_meta": get_last_llm_meta()}
             
-        return response_text
+        return {"reply": response_text, "llm_meta": get_last_llm_meta()}
     except Exception as e:
-        return f"Co-Pilot Chat connection error: {str(e)}"
+        return {"reply": f"Co-Pilot Chat connection error: {str(e)}", "llm_meta": get_last_llm_meta()}
 
 @app.get("/api/stock-profile/{symbol}")
 async def get_stock_profile_endpoint(symbol: str, cache: bool = True):
@@ -4322,7 +4328,8 @@ async def get_indicator_synthesis(
         return {
             "symbol": ticker,
             "indicator": indicator,
-            "synthesis": synthesis
+            "synthesis": synthesis,
+            "llm_meta": get_last_llm_meta()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Indicator LLM synthesis failure: {str(e)}")
@@ -4574,7 +4581,7 @@ async def post_chart_chat_analyst(req: ChartChatRequest):
         if not analysis:
             raise HTTPException(status_code=500, detail="LLM failed to respond.")
             
-        return {"analysis": analysis}
+        return {"analysis": analysis, "llm_meta": get_last_llm_meta()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chart AI Chatbot execution failed: {str(e)}")
 
@@ -5540,7 +5547,7 @@ async def get_pitchbook(
 2.  **Catalyst 2**: Positive institutional backing with robust FII/DII shareholdings.
 3.  **Risk Flag**: High volatility system beta of **{profile.get('consensus', {}).get('beta', 1.0):.2f}**. (Mitigation: Use strict stop-loss boundaries at support floors).
 """
-        return {"symbol": ticker, "markdown": markdown_memo}
+        return {"symbol": ticker, "markdown": markdown_memo, "llm_meta": get_last_llm_meta()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate Pitchbook memo: {str(e)}")
 
@@ -5575,7 +5582,7 @@ async def advisory_chat(request: ChatRequest):
             except Exception as e:
                 print(f"Error parsing ACTIONS_PAYLOAD: {e}")
                 
-        return {"response": clean_response, "actions": actions}
+        return {"response": clean_response, "actions": actions, "llm_meta": get_last_llm_meta()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat session failed: {str(e)}")
 
@@ -5800,7 +5807,8 @@ async def parse_nl_alert(data: ParseNLAlertRequest):
             "status": "Active",
             "triggered": False,
             "trigger_date": "",
-            "ai_context": ""
+            "ai_context": "",
+            "llm_meta": get_last_llm_meta()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse and configure alert: {str(e)}")
@@ -6018,7 +6026,8 @@ async def trigger_daily_wrapup(payload: Optional[dict] = None):
             "message_body": msg,
             "dispatch_status": dispatch_status,
             "message_id": message_id,
-            "error": dispatch_error
+            "error": dispatch_error,
+            "llm_meta": get_last_llm_meta()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Daily Wrap-up Generation failed: {str(e)}")
@@ -6635,7 +6644,8 @@ async def parse_fs_nl_alert(data: FsAlertParseRequest):
             "metric": metric,
             "condition": condition,
             "threshold": threshold,
-            "active": True
+            "active": True,
+            "llm_meta": get_last_llm_meta()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse and configure FS alert: {str(e)}")
@@ -10097,7 +10107,7 @@ async def post_risk_synthesis(data: RiskSynthesisRequest):
         )
         
         synthesis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
-        return {"synthesis": synthesis}
+        return {"synthesis": synthesis, "llm_meta": get_last_llm_meta()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Risk Synthesis Error: {str(e)}")
 
@@ -10168,6 +10178,7 @@ async def post_portfolio_doctor(input_data: PortfolioDoctorInput):
     try:
         portfolio_items = [item.dict() for item in input_data.items]
         diagnosis = await asyncio.to_thread(run_portfolio_doctor, portfolio_items)
+        diagnosis["llm_meta"] = get_last_llm_meta()
         return diagnosis
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Portfolio Doctor Error: {str(e)}")
@@ -10213,7 +10224,7 @@ async def post_portfolio_backtest_synthesis(data: PortfolioBacktestSynthesisRequ
             metrics=data.metrics,
             tickers_weights=data.tickers_weights
         )
-        return {"synthesis": synthesis}
+        return {"synthesis": synthesis, "llm_meta": get_last_llm_meta()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backtest Synthesis Error: {str(e)}")
 
@@ -10547,7 +10558,7 @@ async def post_optimizer_synthesis(data: OptimizerSynthesisRequest):
         )
         
         synthesis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
-        return {"synthesis": synthesis}
+        return {"synthesis": synthesis, "llm_meta": get_last_llm_meta()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Optimizer Synthesis Error: {str(e)}")
 
@@ -11195,7 +11206,7 @@ async def get_market_news(refresh: bool = False, run_llm: bool = False):
         """
         
         try:
-            from backend.llm_config import call_llm, TASK_FAST
+            from backend.llm_config import call_llm, TASK_FAST, get_last_llm_meta
             raw_res = call_llm(TASK_FAST, "You are a professional financial editor returning structured JSON reports.", prompt)
             
             # Clean markdown codeblocks if LLM wraps in ```json
@@ -11211,7 +11222,8 @@ async def get_market_news(refresh: bool = False, run_llm: bool = False):
             ai_data = json.loads(clean_res)
             ai_report = {
                 "synthesis_report": ai_data.get("synthesis_report", "Consensus shows moderate consolidation across index ranges."),
-                "top_drivers": ai_data.get("top_drivers", ["Global Tech Volatility", "Institutional Flows", "IPO Pipeline"])
+                "top_drivers": ai_data.get("top_drivers", ["Global Tech Volatility", "Institutional Flows", "IPO Pipeline"]),
+                "llm_meta": get_last_llm_meta()
             }
             has_ai_report = True
         except Exception as llm_err:
@@ -11221,7 +11233,8 @@ async def get_market_news(refresh: bool = False, run_llm: bool = False):
     payload = {
         "news_items": cleaned_items,
         "ai_report": ai_report,
-        "has_ai_report": has_ai_report
+        "has_ai_report": has_ai_report,
+        "llm_meta": get_last_llm_meta()
     }
     
     try:
@@ -11239,7 +11252,8 @@ async def get_market_news(refresh: bool = False, run_llm: bool = False):
         "ai_report": ai_report,
         "has_ai_report": has_ai_report,
         "updated_at": now_str,
-        "cached": False
+        "cached": False,
+        "llm_meta": get_last_llm_meta()
     }
 
 
@@ -11933,7 +11947,7 @@ async def post_swing_synthesis(data: SwingSynthesisRequest):
             )
             synthesis = f"{p1}\n\n{p2}\n\n{p3}\n\n{p4}"
             
-        return {"synthesis": synthesis}
+        return {"synthesis": synthesis, "llm_meta": get_last_llm_meta()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Swing trade synthesis failed: {str(e)}")
 
@@ -12418,7 +12432,8 @@ async def parse_nl_scan(data: ParseNLScanRequest):
             "condition_type": parsed.get("condition_type", "RSI").upper(),
             "operator": parsed.get("operator", "<"),
             "value": str(parsed.get("value", "30")),
-            "universe": parsed.get("universe", "all").lower()
+            "universe": parsed.get("universe", "all").lower(),
+            "llm_meta": get_last_llm_meta()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse scan prompt: {str(e)}")
@@ -12456,7 +12471,7 @@ async def get_telemetry_synthesis(data: TelemetrySynthesisRequest):
             f"Generate a 1-2 sentence institutional risk/momentum summary for this proximity setup."
         )
         synthesis = await asyncio.to_thread(call_llm, TASK_FAST, system_prompt, user_prompt)
-        return {"synthesis": synthesis.strip()}
+        return {"synthesis": synthesis.strip(), "llm_meta": get_last_llm_meta()}
     except Exception as e:
         import traceback
         print("Exception in get_telemetry_synthesis:")
@@ -13599,7 +13614,7 @@ async def scan_synthesis(data: ScanSynthesisRequest):
         )
 
         summary = await asyncio.to_thread(call_llm, TASK_FAST, sys_prompt, user_prompt)
-        return {"status": "success", "synthesis": summary.strip()}
+        return {"status": "success", "synthesis": summary.strip(), "llm_meta": get_last_llm_meta()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Synthesis generation failed: {str(e)}")
 
@@ -13626,7 +13641,7 @@ async def explain_formula(data: ExplainFormulaRequest):
         user_prompt = f"Stock Scanner Formula:\n{data.formula}"
         
         explanation = await asyncio.to_thread(call_llm, TASK_FAST, sys_prompt, user_prompt)
-        return {"status": "success", "explanation": explanation.strip()}
+        return {"status": "success", "explanation": explanation.strip(), "llm_meta": get_last_llm_meta()}
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -14289,7 +14304,7 @@ async def learning_scenario(req: LearningScenarioRequest):
                 }
             )
 
-        return {"scenario": response, "status": "success"}
+        return {"scenario": response, "status": "success", "llm_meta": get_last_llm_meta()}
 
     except Exception as e:
         print(f"[Learning Academy] Scenario Generator error: {e}")
@@ -14354,7 +14369,7 @@ async def learning_ask(req: LearningAskRequest):
                 }
             )
 
-        return {"answer": response, "status": "success"}
+        return {"answer": response, "status": "success", "llm_meta": get_last_llm_meta()}
 
     except Exception as e:
         print(f"[Learning Academy] AI Coach error: {e}")

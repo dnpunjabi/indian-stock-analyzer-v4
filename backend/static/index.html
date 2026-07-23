@@ -16,8 +16,8 @@
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <!-- TradingView Advanced Widget -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-    <link rel="stylesheet" href="styles.css?v=1.10.0">
-    <link rel="stylesheet" href="modernizer.css?v=1.5">
+    <link rel="stylesheet" href="styles.css?v=1.11.0">
+    <link rel="stylesheet" href="modernizer.css?v=1.8">
     <style>
         /* Light mode strategy guides visibility override */
         [data-mode="light"] #rule-scanner-strategy-guide,
@@ -533,7 +533,7 @@
 
 
             <div class="sidebar-footer" id="llm-connection-status">
-                <span class="status-indicator"></span> Connected to <span id="llm-status-label">Groq Llama 3 70B</span>
+                <span class="status-indicator"></span> Connected to <span id="llm-status-label">Gemini 1.5 Flash</span>
             </div>
         </aside>
 
@@ -1884,6 +1884,7 @@
                             <!-- Drivers list items -->
                         </ul>
                     </div>
+                    <div id="market-news-ai-llm-meta-badge" class="ai-footer-meta-wrap"></div>
                 </div>
 
                 <!-- Placeholder AI trigger card -->
@@ -1892,7 +1893,7 @@
                         <span style="font-size: 24px;">🤖</span>
                         <div>
                             <strong style="display: block; font-size: 13px; color: var(--text-primary); font-family: 'Outfit', sans-serif;">Generate Real-Time AI Market Briefing</strong>
-                            <span style="display: block; font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.4;">Summarize the active feed, extract the top 3 core drivers, and synthesize market sentiment using <span class="llm-engine-label">Groq Llama 3</span> on-demand.</span>
+                            <span style="display: block; font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.4;">Summarize the active feed, extract the top 3 core drivers, and synthesize market sentiment on-demand.</span>
                         </div>
                     </div>
                     <button id="market-news-ai-btn" style="background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #ffffff; border: none; padding: 9px 18px; font-size: 11.5px; font-weight: 700; border-radius: 50px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.2s ease; box-shadow: 0 2px 10px rgba(124, 58, 237, 0.3); white-space: nowrap; font-family: 'Outfit', sans-serif;"
@@ -9225,7 +9226,7 @@
     <script src="academy_prompts.js"></script>
     <script src="layman_details.js"></script>
     <script src="export_manager.js?v=1.1.7"></script>
-    <script src="app.js?v=2.0.6"></script>
+    <script src="app.js?v=2.1.1"></script>
 
     <!-- Modernization CDNs -->
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>

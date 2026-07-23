@@ -1047,3 +1047,109 @@ body.light-theme .brand-part-quant {
         display: block !important;
     }
 }
+/* -------------------------------------------------- */
+/* Mobile-Responsive LLM Execution Badge Component    */
+/* -------------------------------------------------- */
+.ai-footer-meta-wrap {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    width: 100% !important;
+    margin-top: 6px !important;
+    padding-top: 4px !important;
+    border-top: 1px dashed rgba(255, 255, 255, 0.07) !important;
+    box-sizing: border-box !important;
+}
+
+[data-theme="light"] .ai-footer-meta-wrap,
+[data-mode="light"] .ai-footer-meta-wrap {
+    border-top-color: rgba(0, 0, 0, 0.10) !important;
+}
+
+/* ── Dark Theme (Default) LLM Execution Badge ── */
+.llm-execution-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 4px 10px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    line-height: 1.4 !important;
+    border-radius: 6px !important;
+    background: rgba(16, 185, 129, 0.16) !important;
+    border: 1px solid rgba(52, 211, 153, 0.45) !important;
+    color: #34d399 !important;
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    letter-spacing: 0.02em !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    transition: all 0.2s ease !important;
+    vertical-align: middle !important;
+    margin-top: 6px !important;
+    margin-bottom: 2px !important;
+}
+
+.llm-execution-badge.fallback {
+    background: rgba(245, 158, 11, 0.16) !important;
+    border: 1px solid rgba(251, 191, 36, 0.50) !important;
+    color: #fbbf24 !important;
+}
+
+.llm-execution-badge .badge-latency {
+    opacity: 0.85 !important;
+    font-weight: 500 !important;
+    font-size: 10px !important;
+}
+
+/* ── Light Theme LLM Execution Badge Overrides (Comprehensive Selectors & AAA Contrast) ── */
+[data-theme="light"] .llm-execution-badge,
+[data-mode="light"] .llm-execution-badge,
+body.light-mode .llm-execution-badge,
+body.light-theme .llm-execution-badge,
+.light-mode .llm-execution-badge,
+.light-theme .llm-execution-badge {
+    background: rgba(5, 150, 105, 0.12) !important;
+    border: 1px solid rgba(5, 150, 105, 0.55) !important;
+    color: #064e3b !important; /* Dark emerald green for maximum readability */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .llm-execution-badge.fallback,
+[data-mode="light"] .llm-execution-badge.fallback,
+body.light-mode .llm-execution-badge.fallback,
+body.light-theme .llm-execution-badge.fallback,
+.light-mode .llm-execution-badge.fallback,
+.light-theme .llm-execution-badge.fallback {
+    background: rgba(217, 119, 6, 0.14) !important;
+    border: 1px solid rgba(180, 83, 9, 0.60) !important;
+    color: #7c2d12 !important; /* Dark mahogany/amber for ultra-high contrast */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+[data-theme="light"] .llm-execution-badge .badge-latency,
+[data-mode="light"] .llm-execution-badge .badge-latency,
+body.light-mode .llm-execution-badge .badge-latency,
+body.light-theme .llm-execution-badge .badge-latency,
+.light-mode .llm-execution-badge .badge-latency,
+.light-theme .llm-execution-badge .badge-latency {
+    opacity: 0.90 !important;
+    color: inherit !important;
+}
+
+@media (max-width: 768px) {
+    .ai-footer-meta-wrap {
+        margin-top: 4px !important;
+        padding-top: 4px !important;
+        justify-content: flex-start !important;
+    }
+    .llm-execution-badge {
+        font-size: 9.5px !important;
+        padding: 3px 8px !important;
+        white-space: nowrap !important;
+    }
+    .llm-execution-badge .badge-latency {
+        font-size: 8.5px !important;
+    }
+}

@@ -27,6 +27,35 @@
         }
     };
 
+    // Global LLM Execution Badge Renderer
+    window.renderLLMExecutionBadgeHtml = function(meta) {
+        if (!meta || !meta.model_used) {
+            meta = { model_used: 'Gemini 1.5 Flash', provider: 'gemini', latency_ms: 0, is_fallback: false };
+        }
+        const isFallback = meta.is_fallback || (meta.provider && meta.provider !== 'gemini');
+        const icon = isFallback ? '🔥' : '⚡';
+        const badgeClass = isFallback ? 'llm-execution-badge fallback' : 'llm-execution-badge';
+        
+        const isLight = document.documentElement.getAttribute('data-mode') === 'light' || 
+                        document.documentElement.getAttribute('data-theme') === 'light' ||
+                        document.body?.classList?.contains('light-mode') ||
+                        document.body?.classList?.contains('light-theme');
+
+        let bgStyle;
+        if (isLight) {
+            bgStyle = isFallback
+                ? 'background:#fef3c7;border:1px solid #d97706;color:#7c2d12;'
+                : 'background:#e6f4ea;border:1px solid #059669;color:#046c4e;';
+        } else {
+            bgStyle = isFallback
+                ? 'background:rgba(245,158,11,0.20);border:1px solid rgba(251,191,36,0.60);color:#fbbf24;'
+                : 'background:rgba(16,185,129,0.18);border:1px solid rgba(52,211,153,0.50);color:#34d399;';
+        }
+
+        const latencyHtml = meta.latency_ms ? `<span class="badge-latency" style="opacity:0.90;font-weight:500;font-size:10px;"> · ${meta.latency_ms}ms</span>` : '';
+        return `<span class="${badgeClass}" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;font-size:11px;font-weight:600;line-height:1.4;border-radius:6px;font-family:'Outfit',-apple-system,sans-serif;letter-spacing:0.02em;white-space:nowrap;margin-top:6px;margin-bottom:2px;box-shadow:0 1px 3px rgba(0,0,0,0.15);${bgStyle}" title="Executed by ${meta.model_used} (${meta.provider || 'gemini'})">${icon} Model: ${meta.model_used}${latencyHtml}</span>`;
+    };
+
     // Android Speech callbacks
     window.onAndroidSpeechStart = function() {
         window.AndroidSpeechListening = true;
@@ -1781,7 +1810,7 @@ async function generatePitchbook(symbol) {
         
         const contentPane = document.getElementById('pitchbook-content-pane');
         if (contentPane) {
-            contentPane.innerHTML = formattedHtml;
+            contentPane.innerHTML = formattedHtml + '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
         }
         
         // Display Modal
@@ -11424,6 +11453,7 @@ function setupDailyWrapupListeners() {
                 const previewText = document.getElementById('wrapup-preview-text');
                 if (previewContainer && previewText) {
                     typewriteElement(previewText, data.message_body, () => {
+                        previewText.innerHTML += `<div class="ai-footer-meta-wrap">${window.renderLLMExecutionBadgeHtml(data.llm_meta)}</div>`;
                         if (window.AIExportManager) {
                             window.AIExportManager.decorate(previewText, 'report', { module: 'DAILY_WRAPUP' });
                         }
@@ -12351,6 +12381,7 @@ async function deploySentinelTelemetry(item) {
                     if (!synthRes.ok) throw new Error("Synthesis failed");
                     const synthData = await synthRes.json();
                     typewriteElement(aiSummaryBox, `🧠 <strong>AI Audit:</strong> ${synthData.synthesis}`, () => {
+                        aiSummaryBox.innerHTML += `<div class="ai-footer-meta-wrap">${window.renderLLMExecutionBadgeHtml(synthData.llm_meta)}</div>`;
                         if (window.AIExportManager) {
                             window.AIExportManager.decorate(aiSummaryBox, 'report', { module: 'TELEMETRY_AUDIT' });
                         }
@@ -13883,7 +13914,7 @@ async function sendUserChatMessage() {
 
         const chatReplyText = data.response || "No response received from Equities Advisor.";
         document.getElementById(typingId).remove();
-        appendChatMessage('assistant', chatReplyText, true);
+        appendChatMessage('assistant', chatReplyText, true, data.llm_meta);
         chatHistory.push({ role: 'assistant', content: chatReplyText });
 
         // Execute workspace actions parsed from the LLM
@@ -13963,7 +13994,7 @@ async function sendUserChatMessage() {
     }
 }
 
-function appendChatMessage(role, content, useTypewriter = false) {
+function appendChatMessage(role, content, useTypewriter = false, llmMeta = null) {
     const box = document.getElementById('chat-messages');
     const msg = document.createElement('div');
     const msgId = 'msg-' + Math.random().toString(36).substr(2, 9);
@@ -13976,6 +14007,8 @@ function appendChatMessage(role, content, useTypewriter = false) {
         if (typeof parseMarkdownTables === 'function') {
             formatted = parseMarkdownTables(formatted);
         }
+
+        const metaBadgeHtml = llmMeta ? `<div class="ai-footer-meta-wrap">${window.renderLLMExecutionBadgeHtml(llmMeta)}</div>` : '';
 
         if (useTypewriter) {
             msg.innerHTML = `
@@ -13991,11 +14024,15 @@ function appendChatMessage(role, content, useTypewriter = false) {
                 if (speechBtn) {
                     speechBtn.style.display = 'inline-flex';
                 }
+                if (metaBadgeHtml) {
+                    msg.innerHTML += metaBadgeHtml;
+                }
             }, box);
         } else {
             msg.innerHTML = `
                 <p>${formatted}</p>
                 <button class="chat-speech-btn" title="Speak Response" style="background: transparent; border: none; cursor: pointer; font-size: 11px; padding: 2px 4px; display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); opacity: 0.6; transition: all 0.2s; margin-top: 6px;">🔊 Read Aloud</button>
+                ${metaBadgeHtml}
             `;
             box.appendChild(msg);
         }
@@ -21220,7 +21257,7 @@ async function runPortfolioDoctorAnalysis() {
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
                 .replace(/\n/g, '<br>');
 
-            prescriptionContent.innerHTML = html;
+            prescriptionContent.innerHTML = html + '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
             if (window.AIExportManager) {
                 window.AIExportManager.decorate(prescriptionContent, 'report', { module: 'PORTFOLIO_DOCTOR' });
             }
@@ -21330,7 +21367,9 @@ Keep the response professional, mathematically grounded, and extremely concise. 
                     .replace(/\*(.*?)\*/g, '<em>$1</em>')
                     .replace(/\n/g, '<br>');
 
-                typewriteElement(summaryText, html);
+                typewriteElement(summaryText, html, () => {
+                    summaryText.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
+                });
                 summaryBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
             } catch (err) {
@@ -21469,7 +21508,9 @@ Keep the response professional, mathematically grounded, and extremely concise. 
                     .replace(/\*(.*?)\*/g, '<em>$1</em>')
                     .replace(/\n/g, '<br>');
 
-                typewriteElement(summaryText, html);
+                typewriteElement(summaryText, html, () => {
+                    summaryText.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(chatRes.llm_meta) + '</div>';
+                });
                 summaryBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
             } catch (err) {
@@ -23273,6 +23314,7 @@ async function runPortfolioBacktest() {
                     if (synthResponse.ok) {
                         const synthData = await synthResponse.json();
                         typewriteElement(summaryText, formatMarkdownToHTML(synthData.synthesis), () => {
+                            summaryText.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(synthData.llm_meta) + '</div>';
                             if (window.AIExportManager) {
                                 window.AIExportManager.decorate(summaryText, 'report', { module: 'BACKTEST_REVIEW' });
                             }
@@ -23776,6 +23818,7 @@ function setupRiskAnalytics() {
 
                 if (textEl) {
                     typewriteElement(textEl, formatMarkdownToHTML(data.synthesis), () => {
+                        textEl.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
                         if (window.AIExportManager) {
                             window.AIExportManager.decorate(textEl, 'report', { module: 'RISK_SYNTHESIS' });
                         }
@@ -25358,6 +25401,7 @@ async function generateSwingAiSummary() {
         summaryBox.innerHTML = `<div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.6;"></div>`;
         const innerDiv = summaryBox.querySelector('div');
         typewriteElement(innerDiv, formatMarkdownToHTML(data.synthesis), () => {
+            innerDiv.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
             if (window.AIExportManager) {
                 window.AIExportManager.decorate(summaryBox, 'report', { module: 'SWING_THESIS' });
             }
@@ -26950,6 +26994,7 @@ async function requestRuleScanSynthesis(results, conditionDesc) {
             const data = await res.json();
             if (data.status === 'success') {
                 typewriteElement(textEl, formatMarkdownToHTML(data.synthesis || 'No synthesis generated.'), () => {
+                    textEl.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
                     if (window.AIExportManager) {
                         window.AIExportManager.decorate(textEl, 'report', { module: 'SCREENER_SCAN' });
                     }
@@ -27690,6 +27735,7 @@ async function explainCurrentFormula() {
 
         if (data.status === 'success') {
             typewriteElement(textEl, formatMarkdownToHTML(data.explanation || 'No explanation generated.'), () => {
+                textEl.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
                 if (window.AIExportManager) {
                     window.AIExportManager.decorate(textEl, 'report', { module: 'SCREENER_EXPLAIN_FORMULA' });
                 }
@@ -28873,7 +28919,7 @@ async function triggerSolvencyChatQuery() {
         removeSolvencyChatLoading(botMsgId);
         
         const responseText = data.response || "No response received.";
-        appendSolvencyChatMessage('bot', responseText, true);
+        appendSolvencyChatMessage('bot', responseText, true, data.llm_meta);
         solvencyChatHistoryList.push({ role: 'user', content: promptText });
         solvencyChatHistoryList.push({ role: 'assistant', content: responseText });
 
@@ -28887,7 +28933,7 @@ async function triggerSolvencyChatQuery() {
     }
 }
 
-function appendSolvencyChatMessage(role, text, useTypewriter = false) {
+function appendSolvencyChatMessage(role, text, useTypewriter = false, llmMeta = null) {
     const history = document.getElementById('solvency-chat-history');
     if (!history) return;
 
@@ -28982,6 +29028,12 @@ function appendSolvencyChatMessage(role, text, useTypewriter = false) {
     }
 
     msg.appendChild(bubble);
+    if (role !== 'user' && llmMeta) {
+        const metaWrap = document.createElement('div');
+        metaWrap.className = 'ai-footer-meta-wrap';
+        metaWrap.innerHTML = window.renderLLMExecutionBadgeHtml(llmMeta);
+        msg.appendChild(metaWrap);
+    }
     history.appendChild(msg);
     history.scrollTop = history.scrollHeight;
 
@@ -31223,7 +31275,7 @@ async function triggerTvChatQuery() {
         const data = await res.json();
         
         removeTvChatLoading(botMsgId);
-        appendTvChatMessage('bot', data.analysis || "No response received.", true);
+        appendTvChatMessage('bot', data.analysis || "No response received.", true, data.llm_meta);
         tvChatHistoryList.push({ role: 'user', content: promptText });
         tvChatHistoryList.push({ role: 'assistant', content: data.analysis || "" });
         
@@ -31285,7 +31337,7 @@ function makePricesClickable(htmlText) {
     });
 }
 
-function appendTvChatMessage(role, content, useTypewriter = false) {
+function appendTvChatMessage(role, content, useTypewriter = false, llmMeta = null) {
     const history = document.getElementById('tv-chart-chat-history');
     if (!history) return;
     
@@ -31346,6 +31398,7 @@ function appendTvChatMessage(role, content, useTypewriter = false) {
             history.appendChild(div);
             typewriteElement(contentDiv, html, () => {
                 speechContainer.style.display = 'flex';
+                if (llmMeta) div.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(llmMeta) + '</div>';
             }, history);
         } else {
             contentDiv.innerHTML = html;
@@ -32011,6 +32064,7 @@ async function triggerTVIndicatorSynthesis() {
         const data = await res.json();
 
         typewriteElement(content, formatMarkdownToHTML(data.synthesis), () => {
+            content.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
             if (window.AIExportManager) {
                 window.AIExportManager.decorate(content, 'report', { module: 'TECHNICAL_INDICATORS' });
             }
@@ -32978,6 +33032,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                     `;
 
                     typewriteElement(aiContent, compiledHtml, () => {
+                        aiContent.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
                         // Bind chat ticker clicks
                         aiContent.querySelectorAll('.chat-ticker-btn').forEach(btn => {
                             btn.onclick = () => {
@@ -33068,14 +33123,16 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                         throw new Error(`Server returned ${response.status}`);
                     }
 
-                    const reply = await response.json();
+                    const data = await response.json();
+                    const replyText = typeof data === 'string' ? data : (data.reply || data);
+                    const sectorChatMeta = data.llm_meta || null;
                     
                     // Remove loading bubble
                     const loadEl = document.getElementById(loadId);
                     if (loadEl) loadEl.remove();
 
                     // Parse any markdown ticker formats like [TCS.NS] into clickable tags
-                    let formattedReply = reply.replace(/\[([A-Z0-9_\-\.]+)(?:\.NS)?\]/g, (match, ticker) => {
+                    let formattedReply = String(replyText).replace(/\[([A-Z0-9_\-\.]+)(?:\.NS)?\]/g, (match, ticker) => {
                         const cleanTicker = ticker.includes(".NS") ? ticker : `${ticker}.NS`;
                         return `<span class="chat-inline-ticker" data-ticker="${cleanTicker}" style="font-weight: 700; color: var(--color-primary); cursor: pointer; text-decoration: underline;">${ticker}</span>`;
                     });
@@ -33083,6 +33140,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                     const replyId = `rotation-msg-${Date.now()}`;
                     const replyWrapper = document.createElement('div');
                     replyWrapper.style.marginTop = '6px';
+                    // Badge will be added after typewrite
                     replyWrapper.innerHTML = `
                         <span style="color: var(--color-primary); font-weight: 700;">[Co-Pilot]</span>
                         <button class="section-speak-btn" data-target="${replyId}" data-title="Rotation Co-Pilot" style="margin-left: 2px; display: none;">🔊</button>
@@ -33104,12 +33162,19 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                                 if (window.loadStockAnalyzer) window.loadStockAnalyzer(ticker);
                             };
                         });
+                        // LLM Execution Badge
+                        if (sectorChatMeta) {
+                            const badgeDiv = document.createElement('div');
+                            badgeDiv.className = 'ai-footer-meta-wrap';
+                            badgeDiv.innerHTML = window.renderLLMExecutionBadgeHtml(sectorChatMeta);
+                            replyWrapper.appendChild(badgeDiv);
+                        }
                         if (window.AIExportManager) {
                             window.AIExportManager.decorate(chatStream, 'chat', { module: 'SECTOR_REGIME' });
                         }
                     }, chatStream);
 
-                    chatHistory.push({ role: "assistant", content: reply });
+                    chatHistory.push({ role: "assistant", content: String(replyText) });
 
                 } catch (err) {
                     console.error("Co-Pilot Chat response failed:", err);
@@ -34272,6 +34337,7 @@ window.renderTVAdvancedChart = renderTVAdvancedChart;
                         aiResult.innerHTML = `<div style="line-height: 1.7; font-family: 'Inter', sans-serif; color: var(--text-secondary);"></div>`;
                         const innerDiv = aiResult.querySelector('div');
                         typewriteElement(innerDiv, formatMarkdownToHTML(data.synthesis), () => {
+                            innerDiv.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(data.llm_meta) + '</div>';
                             if (window.AIExportManager) {
                                 window.AIExportManager.decorate(aiResult, 'report', { module: 'PORTFOLIO_OPTIMIZATION' });
                             }
@@ -34682,11 +34748,18 @@ async function loadGlobalMarketNews(forceRefresh = false, runLLM = false) {
                 aiTimeBadge.innerText = `Audited: ${timePart}`;
             }
 
+            const badgeContainer = document.getElementById('market-news-ai-llm-meta-badge');
+            if (badgeContainer) {
+                const meta = (data.ai_report && data.ai_report.llm_meta) || data.llm_meta;
+                badgeContainer.innerHTML = window.renderLLMExecutionBadgeHtml(meta);
+            }
+
             if (runLLM) {
                 if (aiDrivers) aiDrivers.innerHTML = '';
                 if (aiSynthesis) {
                     aiSynthesis.innerHTML = '';
                     typewriteElement(aiSynthesis, data.ai_report.synthesis_report, () => {
+                        // LLM meta badge handled by #market-news-ai-llm-meta-badge container
                         if (aiDrivers) {
                             aiDrivers.innerHTML = (data.ai_report.top_drivers || []).map(driver => `
                                 <li style="list-style-type: square; margin-left: 15px;">${driver}</li>
@@ -38921,6 +38994,7 @@ function setupAcademyAICoach() {
                     <span>
                         <button class="section-speak-btn" data-target="${answerId}" data-title="AI Coach Reply" style="background: none; border: none; cursor: pointer; padding: 2px; margin-right: 4px; display: inline-flex; align-items: center; justify-content: center; outline: none; vertical-align: middle;">🔊</button>
                         <span id="${answerId}">${answer.replace(/\n/g, '<br>')}</span>
+                        <div class="ai-footer-meta-wrap">${window.renderLLMExecutionBadgeHtml(data.llm_meta)}</div>
                     </span>
                 </div>
             `;
@@ -39520,7 +39594,7 @@ async function generateAcademyCaseStudy() {
         });
         const data = await res.json();
         if (data.scenario) {
-            body.innerHTML = formatMarkdown(data.scenario);
+            body.innerHTML = formatMarkdown(data.scenario) + `<div style="margin-top: 12px;">${window.renderLLMExecutionBadgeHtml(data.llm_meta)}</div>`;
         } else {
             body.innerHTML = '<p style="color: var(--color-danger);">⚠️ Failed to generate scenario. Please try again.</p>';
         }
@@ -43992,6 +44066,7 @@ function renderFinancialHealthDashboard() {
                     
                     // Initialize the typewriter stream
                     streamTypewrite(auditTextEl, "", auditContainer, () => {
+                        auditTextEl.innerHTML += '<div class="ai-footer-meta-wrap">' + window.renderLLMExecutionBadgeHtml(null) + '</div>';
                         const finalHtml = auditTextEl.innerHTML;
                         // Bind Speaker button for AI response when complete
                         const aiAudioBtn = document.getElementById('fs-layman-ai-audio-btn');
@@ -46953,6 +47028,12 @@ function appendFsChatMessage(sender, text, useTypewriter = false) {
     }
     
     messageDiv.appendChild(contentDiv);
+    if (sender !== 'user' && llmMeta) {
+        const metaWrap = document.createElement('div');
+        metaWrap.className = 'ai-footer-meta-wrap';
+        metaWrap.innerHTML = window.renderLLMExecutionBadgeHtml(llmMeta);
+        messageDiv.appendChild(metaWrap);
+    }
     
     // If bot sender, add speaker control icon next to message
     if (sender === 'bot') {
@@ -48004,7 +48085,7 @@ async function triggerAuditChatQuery() {
 
         removeAuditChatLoading(botMsgId);
         const botResponse = data.response || "No response received.";
-        appendAuditChatMessage('bot', botResponse, latencySec, true);
+        appendAuditChatMessage('bot', botResponse, latencySec, true, data.llm_meta);
 
         // Save to local history
         auditChatHistory.push({ role: 'assistant', content: botResponse });
@@ -48018,7 +48099,7 @@ async function triggerAuditChatQuery() {
     }
 }
 
-function appendAuditChatMessage(sender, text, latency, useTypewriter = false) {
+function appendAuditChatMessage(sender, text, latency, useTypewriter = false, llmMeta = null) {
     const history = document.getElementById('audit-chatbot-history');
     if (!history) return;
 
@@ -48073,6 +48154,12 @@ function appendAuditChatMessage(sender, text, latency, useTypewriter = false) {
     }
 
     messageDiv.appendChild(contentDiv);
+    if (sender !== 'user' && llmMeta) {
+        const metaWrap = document.createElement('div');
+        metaWrap.className = 'ai-footer-meta-wrap';
+        metaWrap.innerHTML = window.renderLLMExecutionBadgeHtml(llmMeta);
+        messageDiv.appendChild(metaWrap);
+    }
 
     if (sender === 'bot') {
         const actionsDiv = document.createElement('div');
@@ -48866,7 +48953,7 @@ async function triggerMarginChatQuery() {
         removeMarginChatLoading(botMsgId);
 
         const botResponse = data.response || "No response received from model.";
-        appendMarginChatMessage('bot', botResponse, latencySec, true);
+        appendMarginChatMessage('bot', botResponse, latencySec, true, data.llm_meta);
         marginChatHistory.push({ role: 'assistant', content: botResponse });
 
     } catch (err) {
@@ -48879,7 +48966,7 @@ async function triggerMarginChatQuery() {
     }
 }
 
-function appendMarginChatMessage(sender, text, latency, useTypewriter = false) {
+function appendMarginChatMessage(sender, text, latency, useTypewriter = false, llmMeta = null) {
     const history = document.getElementById('margin-chatbot-history');
     if (!history) return;
 
@@ -48932,6 +49019,12 @@ function appendMarginChatMessage(sender, text, latency, useTypewriter = false) {
     }
 
     messageDiv.appendChild(contentDiv);
+    if (sender !== 'user' && llmMeta) {
+        const metaWrap = document.createElement('div');
+        metaWrap.className = 'ai-footer-meta-wrap';
+        metaWrap.innerHTML = window.renderLLMExecutionBadgeHtml(llmMeta);
+        messageDiv.appendChild(metaWrap);
+    }
 
     if (sender === 'bot') {
         const actionsDiv = document.createElement('div');
@@ -49801,6 +49894,7 @@ window.loadFuzzyAICommentary = async function(symbol, score, rating, inputs, act
                 <div><strong style="color: #3b82f6;">📌 Overview:</strong> ${s.thesis || ''}</div>
                 <div><strong style="color: #10b981;">🚀 Main Growth Driver:</strong> ${s.key_driver || ''}</div>
                 <div><strong style="color: #f59e0b;">⚠️ Watchout / Risk:</strong> ${s.main_risk || ''}</div>
+                <div class="ai-footer-meta-wrap">${window.renderLLMExecutionBadgeHtml(data.llm_meta)}</div>
             </div>
         `;
     } catch (err) {
@@ -49850,6 +49944,7 @@ window.askFuzzyAIAssistant = async function(question) {
                 <button class="section-speak-btn" data-target="fuzzy-ai-ask-response-text" data-title="What-If AI Explanation" title="Listen to AI Explanation" style="background: none; border: none; cursor: pointer; font-size: 12px; color: #3b82f6; outline: none; padding: 0;">🔊</button>
             </div>
             <div id="fuzzy-ai-ask-response-text" style="line-height: 1.5; white-space: pre-wrap; color: var(--text-primary);">${formattedAnswer}</div>
+<div class="ai-footer-meta-wrap">${window.renderLLMExecutionBadgeHtml(data.llm_meta)}</div>
         `;
     } catch (err) {
         responseBox.innerHTML = `

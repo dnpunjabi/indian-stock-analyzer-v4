@@ -241,6 +241,7 @@ def _call_gemini_with_rotation(task_type: str,
     Rotates keys dynamically on 429 rate limit or 401/403 auth failures.
     Returns (response_text, success_boolean).
     """
+    start_time = time.time()
     keys = _get_gemini_keys_pool()
     if not keys:
         return "ERROR: No Gemini API keys configured.", False
@@ -301,17 +302,21 @@ def _call_gemini_with_rotation(task_type: str,
             res = requests.post(url, headers=headers, json=payload, timeout=20.0)
             
             if res.status_code == 200:
+                res_json = res.json()
+                if "candidates" in res_json and len(res_json["candidates"]) > 0:
                     candidate = res_json["candidates"][0]
                     parts = candidate.get("content", {}).get("parts", [])
                     text = "".join([p.get("text", "") for p in parts if "text" in p])
                     if text:
+                        label = config["heavy_label"] if task_type == TASK_HEAVY else config["fast_label"]
+                        _set_last_llm_meta(label, "gemini", start_time, is_fallback=False)
                         return text, True
                     print(f"[LLM Rotation] No text parts found in Gemini response candidate")
                     
             elif res.status_code == 429:
-                print(f"[LLM Rotation] Key {mask} rate-limited (429). Placing on 60s cooldown.")
+                print(f"[LLM Rotation] Key {mask} rate-limited (429). Placing on 5s cooldown.")
                 with _rotation_lock:
-                    GEMINI_KEYS_COOLDOWN[mask] = datetime.now() + timedelta(seconds=60)
+                    GEMINI_KEYS_COOLDOWN[mask] = datetime.now() + timedelta(seconds=5)
                 continue
                 
             elif res.status_code in [401, 403]:
@@ -432,9 +437,9 @@ def _stream_gemini_with_rotation(task_type: str,
                 return
                 
             elif res.status_code == 429:
-                print(f"[LLM Rotation] Key {mask} streaming rate-limited (429). Placing on 60s cooldown.")
+                print(f"[LLM Rotation] Key {mask} streaming rate-limited (429). Placing on 5s cooldown.")
                 with _rotation_lock:
-                    GEMINI_KEYS_COOLDOWN[mask] = datetime.now() + timedelta(seconds=60)
+                    GEMINI_KEYS_COOLDOWN[mask] = datetime.now() + timedelta(seconds=5)
                 continue
                 
             elif res.status_code in [401, 403]:
@@ -457,6 +462,38 @@ def _stream_gemini_with_rotation(task_type: str,
             
     yield "ERROR: Exceeded maximum key rotation retry attempts for streaming."
 
+import threading
+import time
+
+_llm_meta_local = threading.local()
+_last_global_llm_meta = None
+
+def get_last_llm_meta() -> dict:
+    """Retrieve execution metadata for the most recent LLM call on the current thread or globally."""
+    meta = getattr(_llm_meta_local, "meta", None)
+    if meta is not None:
+        return meta
+    if _last_global_llm_meta is not None:
+        return _last_global_llm_meta
+    return {
+        "model_used": "Gemini 1.5 Flash",
+        "provider": "gemini",
+        "latency_ms": 0,
+        "is_fallback": False
+    }
+
+def _set_last_llm_meta(model_used: str, provider: str, start_time: float, is_fallback: bool = False):
+    global _last_global_llm_meta
+    latency = int((time.time() - start_time) * 1000)
+    meta_dict = {
+        "model_used": model_used,
+        "provider": provider,
+        "latency_ms": latency,
+        "is_fallback": is_fallback
+    }
+    _llm_meta_local.meta = meta_dict
+    _last_global_llm_meta = meta_dict
+
 def call_llm(task_type: str,
              system_prompt: str,
              user_prompt: str = None,
@@ -465,6 +502,7 @@ def call_llm(task_type: str,
     """
     Provider-agnostic LLM call. Routes to the correct model based on task_type.
     """
+    start_time = time.time()
     config = _get_config()
     
     # Ensure system prompt suppresses thinking process/chain-of-thought metadata
@@ -535,6 +573,8 @@ def call_llm(task_type: str,
         )
         response_content = chat_completion.choices[0].message.content
         print(f"[LLM] Successfully received response from {label} ({len(response_content)} chars)")
+        is_fallback = (config["provider"] != "gemini")
+        _set_last_llm_meta(label, config["provider"], start_time, is_fallback=is_fallback)
         return _clean_reasoning_metadata(response_content)
     except Exception as e:
         print(f"[LLM] Error calling {label}: {e}")
@@ -552,6 +592,7 @@ def call_llm(task_type: str,
                     max_tokens=safe_max_tokens,
                     temperature=temperature
                 )
+                _set_last_llm_meta(f"Fallback {fallback_model}", config["provider"], start_time, is_fallback=True)
                 return _clean_reasoning_metadata(chat_completion.choices[0].message.content)
             except Exception as e2:
                 if "invalid_api_key" in str(e2) or "401" in str(e2):
@@ -559,6 +600,17 @@ def call_llm(task_type: str,
                 return f"ERROR: Failed to query LLM. Details: {str(e2)}"
         
         return f"ERROR: Failed to query LLM model {model}. Details: {err_msg}"
+
+def call_llm_with_meta(task_type: str,
+                       system_prompt: str,
+                       user_prompt: str = None,
+                       max_tokens: int = 2500,
+                       messages: list = None) -> tuple[str, dict]:
+    """
+    Executes call_llm and returns a tuple of (response_text, llm_meta_dict).
+    """
+    text = call_llm(task_type, system_prompt, user_prompt, max_tokens, messages)
+    return text, get_last_llm_meta()
 
 def _clean_reasoning_metadata(text: str) -> str:
     """Strip out any internal thinking process or chain-of-thought blocks from the text."""
@@ -733,11 +785,10 @@ def get_llm_config() -> dict:
             groq_label = os.environ.get("LLM_FAST_LABEL") or os.environ.get("LLM_HEAVY_LABEL") or "Groq Llama 3.3"
             if "Groq" not in groq_label and "llama" in groq_label.lower():
                 groq_label = "Groq " + groq_label
-            active_label = f"{groq_label} (Fallback)"
+            active_label = groq_label
         else:
             active_provider = "gemini"
-            num_keys = len(keys)
-            active_label = f"{config['fast_label']} ({num_keys} Key{'s' if num_keys > 1 else ''})"
+            active_label = config["fast_label"]
     else:
         active_provider = config["provider"]
         active_label = config["heavy_label"]
