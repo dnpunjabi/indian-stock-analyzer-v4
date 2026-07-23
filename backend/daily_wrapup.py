@@ -643,7 +643,7 @@ def generate_ai_voice_audio(text: str) -> str:
         clean_text = text.replace("*", "").replace("_", "").replace("`", "").strip()
         tts = gTTS(text=clean_text, lang='en', tld='co.in')
         tts.save(audio_path)
-        return "/static/audio_reports/daily_wrapup_briefing.mp3"
+        return "/audio_reports/daily_wrapup_briefing.mp3"
     except Exception as e:
         print(f"Daily Wrap-up AI voice audio generation error: {e}")
         return ""
