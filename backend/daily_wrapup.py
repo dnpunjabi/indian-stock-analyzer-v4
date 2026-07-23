@@ -729,35 +729,6 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
             deals_block += f"• _Watchlist summary: {deals_summary['watchlist_count']} recent promoter deals detected._\n"
         deals_block += "\n"
 
-    # 7.5 Gather Triggered FS Alerts
-    fs_alerts_block = ""
-    try:
-        from datetime import datetime
-        today_start = datetime.now().strftime("%Y-%m-%d 00:00:00")
-        with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """SELECT symbol, metric, condition, threshold, current_value, severity 
-                   FROM fs_alert_history 
-                   WHERE triggered_at >= ? AND severity IN ('Critical', 'Warning')
-                   ORDER BY triggered_at DESC""", 
-                (today_start,)
-            )
-            triggered_rows = cursor.fetchall()
-            
-        if triggered_rows:
-            fs_alerts_block += "🚨 *8. FINANCIAL STATEMENT RED FLAGS*\n"
-            max_fs = 6
-            for row in triggered_rows[:max_fs]:
-                sym_clean = row["symbol"].replace(".NS", "").replace(".BO", "")
-                sev_emoji = "🔴" if row["severity"] == "Critical" else "🟡"
-                fs_alerts_block += f"  {sev_emoji} *{sym_clean}* - {row['metric']} {row['condition']} {row['threshold']} (Current: {row['current_value']})\n"
-            if len(triggered_rows) > max_fs:
-                fs_alerts_block += f"  └─ ⚠️ _...and {len(triggered_rows) - max_fs} more red flags logged in Alert Center._\n"
-            fs_alerts_block += "\n"
-    except Exception as e:
-        print(f"Daily Wrap-up triggered FS alerts query error: {e}")
-
     # 8. Generate AI commentary
     system_prompts = {
         "institutional": (
@@ -835,7 +806,6 @@ async def generate_daily_wrapup_text(persona_override: str = None) -> str:
         
         f"{events_block}"
         f"{deals_block}"
-        f"{fs_alerts_block}"
         
         f"🤖 *AI COPILOT BRIEFING* (_{persona.title()}_)\n"
         f"_{ai_commentary}_\n"
