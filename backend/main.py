@@ -15138,8 +15138,22 @@ async def get_returns_comparison_endpoint(query: str):
     if not query:
         raise HTTPException(status_code=400, detail="Query parameter is required")
     
-    data = compute_returns_comparison(query)
+    from backend.financial_utils import calculate_full_returns_matrix
+    company_name = ""
+    peers = []
+    try:
+        with get_db() as conn:
+            row = conn.execute("SELECT profile_json FROM cached_profiles WHERE symbol = ?", (query.upper(),)).fetchone()
+            if row and row["profile_json"]:
+                p_data = json.loads(row["profile_json"])
+                company_name = p_data.get("company_name", "")
+                peers = p_data.get("peers", [])
+    except Exception:
+        pass
+
+    data = await asyncio.to_thread(calculate_full_returns_matrix, query, company_name, peers)
     return data
+
 
 
 static_dir = os.path.join(os.path.dirname(__file__), "static")

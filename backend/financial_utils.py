@@ -2621,7 +2621,8 @@ def calculate_full_returns_matrix(ticker: str, company_name: str = "", peers: li
     periods = ["1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y"]
     
     clean_sym = f"{ticker} {company_name}".upper()
-    is_polycab = any(k in clean_sym for k in ["POLYCAB", "POLY"])
+    is_polycab = "POLYCAB" in clean_sym
+
 
     # Trendlyne Industry Benchmark for Polycab / Wires & Cables Industry
     ind_benchmarks = {
@@ -2759,10 +2760,12 @@ def calculate_full_returns_matrix(ticker: str, company_name: str = "", peers: li
         print(f"Error computing returns comparison matrix for {ticker}: {main_err}")
         
     return {
+        "symbol": company_name or ticker.upper(),
         "periods": periods,
         "matrix": matrix,
         "summary": summary
     }
+
 
 def generate_swot_analysis(ticker: str, screener_data: dict, technicals: dict, dcf_data: dict, performance: dict) -> dict:
     strengths = []

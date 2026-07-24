@@ -29,5 +29,15 @@ class TestReturnsComparison(unittest.TestCase):
         print("Test passed! Sample 1Y return:", matrix['1Y'])
         print("Sample 1Y summary:", res['summary']['1Y'])
 
+    def test_bosch_dynamic_returns(self):
+        from backend.financial_utils import calculate_full_returns_matrix
+        res = calculate_full_returns_matrix('BOSCHLTD', 'Bosch Ltd.')
+        self.assertIn('Bosch', res['symbol'])
+        self.assertNotEqual(res['matrix']['1Y']['stock'], 29.38, "Bosch 1Y stock return should not be hardcoded Polycab return (29.38%)")
+        self.assertIn("Bosch", res['summary']['1Y'])
+        print("Bosch test passed! Bosch 1Y return:", res['matrix']['1Y'])
+
+
 if __name__ == '__main__':
     unittest.main()
+

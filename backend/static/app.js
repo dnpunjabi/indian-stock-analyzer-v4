@@ -6784,6 +6784,10 @@ function renderStockDashboard(p) {
     if (p.ticker || p.base_symbol) {
         fetchAndRenderStockPriceAnalysis(p.ticker || p.base_symbol);
     }
+    if (window.renderReturnsComparisonCard) {
+        window.renderReturnsComparisonCard(p);
+    }
+
 
     // Start 2-second price refresh cycle for equity research terminal
     if (!window.stockPriceRefreshInterval) {
@@ -51115,12 +51119,13 @@ window.renderReturnsComparisonCard = function(profile) {
     const card = document.getElementById('returns-comparison-card');
     if (!card) return;
 
+    const activeProf = profile || window.activeStockProfile;
     let ticker = 'POLYCAB';
     let compName = 'Polycab India Ltd.';
 
-    if (profile) {
-        ticker = profile.ticker || profile.symbol || (profile.company_name ? profile.company_name.split(' ')[0] : 'POLYCAB');
-        compName = profile.company_name || ticker;
+    if (activeProf) {
+        ticker = activeProf.ticker || activeProf.symbol || (activeProf.company_name ? activeProf.company_name.split(' ')[0] : 'POLYCAB');
+        compName = activeProf.company_name || ticker;
     } else {
         const titleEl = document.getElementById('returns-card-stock-title');
         if (titleEl && titleEl.innerText && titleEl.innerText !== 'STOCK') {
@@ -51129,17 +51134,25 @@ window.renderReturnsComparisonCard = function(profile) {
         }
     }
 
+    // Clean symbol for API query
+    const cleanQuery = ticker.replace(/\.NS$/i, '').replace(/\.BO$/i, '');
+
     const titleEl = document.getElementById('returns-card-stock-title');
     if (titleEl) titleEl.innerText = compName;
 
-    if (profile && profile.returns_comparison && profile.returns_comparison.matrix && Object.keys(profile.returns_comparison.matrix).length > 0) {
-        window.currentReturnsData = profile.returns_comparison;
+    // Reset current returns data when stock profile changes
+    window.currentReturnsData = null;
+
+    if (activeProf && activeProf.returns_comparison && activeProf.returns_comparison.matrix && Object.keys(activeProf.returns_comparison.matrix).length > 0) {
+        window.currentReturnsData = activeProf.returns_comparison;
+        if (!window.currentReturnsData.symbol) window.currentReturnsData.symbol = compName;
         window.renderReturnsView(window.activeReturnsPeriod);
     } else {
-        fetch(`/api/stock/returns-comparison?query=${encodeURIComponent(ticker)}`)
+        fetch(`/api/stock/returns-comparison?query=${encodeURIComponent(cleanQuery)}`)
             .then(res => res.json())
             .then(data => {
                 if (data && data.matrix) {
+                    data.symbol = compName || data.symbol || cleanQuery;
                     window.currentReturnsData = data;
                     window.renderReturnsView(window.activeReturnsPeriod);
                 }
@@ -51149,6 +51162,7 @@ window.renderReturnsComparisonCard = function(profile) {
             });
     }
 };
+
 
 window.renderReturnsView = function(period) {
     window.activeReturnsPeriod = period;
