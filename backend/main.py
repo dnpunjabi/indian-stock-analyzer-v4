@@ -11056,6 +11056,7 @@ async def get_market_news(refresh: bool = False, run_llm: bool = False):
     from datetime import datetime, timedelta
     import urllib.request
     import xml.etree.ElementTree as ET
+    from backend.llm_config import call_llm, TASK_FAST, get_last_llm_meta
     
     if not refresh:
         try:
@@ -11206,7 +11207,6 @@ async def get_market_news(refresh: bool = False, run_llm: bool = False):
         """
         
         try:
-            from backend.llm_config import call_llm, TASK_FAST, get_last_llm_meta
             raw_res = call_llm(TASK_FAST, "You are a professional financial editor returning structured JSON reports.", prompt)
             
             # Clean markdown codeblocks if LLM wraps in ```json
