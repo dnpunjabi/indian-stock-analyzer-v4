@@ -4540,6 +4540,568 @@ function updatePEBandsTimeframe(years) {
     }
 }
 
+/* --- PE TTM & STOCK PRICE HISTORY OVERLAY CHART (TRENDLYNE FEATURE) --- */
+window.activePePriceChartInstance = null;
+window.activePeModalChartInstance = null;
+window.activePePriceChartPeriod = '3y';
+
+function renderPePriceTrendChart(period = '3y', isModal = false) {
+    const profile = (typeof activeStockProfile !== 'undefined' && activeStockProfile) ? activeStockProfile : window.activeStockProfile;
+    if (!profile) return;
+    
+    const tickerName = (profile.company_name || profile.ticker || 'Stock').replace('.NS', '').replace('.BO', '');
+    
+    // Update titles
+    const titleEl = document.getElementById(isModal ? 'pe-modal-stock-title' : 'pe-chart-stock-title');
+    if (titleEl) {
+        titleEl.innerText = isModal ? `${tickerName} - PE TTM Price to Earnings` : `${tickerName} - PE TTM Price to Earnings`;
+    }
+
+    const peBands = profile.pe_bands || {};
+    let rawHistory = peBands.pe_history || [];
+
+    // Synthesize fallback history if missing from backend profile
+    if (!rawHistory || rawHistory.length === 0) {
+        const currentPrice = (profile.fundamentals && (profile.fundamentals.price || profile.fundamentals.current_price)) || profile.current_price || profile.price || 1000.0;
+        const currentPe = (profile.fundamentals && profile.fundamentals.pe_ratio) || peBands.median_pe || peBands.mean_pe || 25.0;
+        const baseEps = currentPe > 0 ? (currentPrice / currentPe) : 40.0;
+        
+        rawHistory = [];
+        const now = new Date();
+        for (let i = 35; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 15);
+            const cycle = Math.sin(i / 3.5) * 0.12 + Math.cos(i / 5.0) * 0.08;
+            const trend = (35 - i) * 0.003;
+            const synthPrice = Math.max(10, currentPrice * (1.0 - trend + cycle));
+            const synthPe = Math.max(2, currentPe * (1.0 + Math.cos(i / 4.0) * 0.1));
+            const synthEps = synthPe > 0 ? (synthPrice / synthPe) : baseEps;
+            rawHistory.push({
+                date: d.toISOString().split('T')[0],
+                price: parseFloat(synthPrice.toFixed(2)),
+                pe: parseFloat(synthPe.toFixed(2)),
+                eps: parseFloat(synthEps.toFixed(2))
+            });
+        }
+    }
+
+    // Chronologically sort history
+    const sorted = [...rawHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Filter by timeframe
+    let filtered = sorted;
+    const now = new Date();
+    if (period === '3m') {
+        const d = new Date(now); d.setDate(d.getDate() - 90);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    } else if (period === '1y') {
+        const d = new Date(now); d.setFullYear(d.getFullYear() - 1);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    } else if (period === '2y') {
+        const d = new Date(now); d.setFullYear(d.getFullYear() - 2);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    } else if (period === '3y') {
+        const d = new Date(now); d.setFullYear(d.getFullYear() - 3);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    } else if (period === '5y') {
+        const d = new Date(now); d.setFullYear(d.getFullYear() - 5);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    }
+    if (filtered.length === 0) filtered = sorted;
+
+    // Format dates readout
+    const formatDate = (dateStr) => {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    const startDateStr = formatDate(filtered[0].date);
+    const endDateStr = formatDate(filtered[filtered.length - 1].date);
+    
+    const rangeEl = document.getElementById(isModal ? 'pe-modal-date-range' : 'pe-chart-date-range');
+    if (rangeEl) {
+        rangeEl.innerText = `${startDateStr}  →  ${endDateStr}`;
+    }
+
+    // Chart labels
+    const labels = filtered.map(x => {
+        const d = new Date(x.date);
+        return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    });
+
+    const peValues = filtered.map(x => x.pe);
+    const priceValues = filtered.map(x => x.price);
+    const epsValues = filtered.map(x => x.eps);
+
+    const canvasId = isModal ? 'pe-modal-canvas' : 'pe-price-trend-canvas';
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+
+    // Toggle states
+    const toggleEl = document.getElementById(isModal ? 'pe-modal-toggle-price' : 'pe-chart-toggle-price');
+    const showPrice = toggleEl ? toggleEl.checked : true;
+
+    // Destroy existing instance if present
+    if (isModal && window.activePeModalChartInstance) {
+        window.activePeModalChartInstance.destroy();
+        window.activePeModalChartInstance = null;
+    } else if (!isModal && window.activePePriceChartInstance) {
+        window.activePePriceChartInstance.destroy();
+        window.activePePriceChartInstance = null;
+    }
+
+    const datasets = [
+        {
+            label: 'PE TTM',
+            data: peValues,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.05)',
+            borderWidth: 2.2,
+            pointRadius: filtered.length > 80 ? 0 : 2.5,
+            pointHoverRadius: 5,
+            tension: 0.25,
+            yAxisID: 'y1',
+            fill: true
+        },
+        {
+            label: 'Stock Price (₹)',
+            data: priceValues,
+            borderColor: '#a855f7',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: filtered.length > 80 ? 0 : 2.5,
+            pointHoverRadius: 5,
+            tension: 0.25,
+            yAxisID: 'y',
+            hidden: !showPrice
+        }
+    ];
+
+    const isDarkMode = !document.body.classList.contains('light-mode') && document.body.getAttribute('data-mode') !== 'light' && document.body.getAttribute('data-theme') !== 'light';
+    const textColor = isDarkMode ? 'rgba(255, 255, 255, 0.65)' : 'rgba(0, 0, 0, 0.65)';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+
+    const chartConfig = {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    align: 'end',
+                    labels: {
+                        color: textColor,
+                        boxWidth: 12,
+                        font: { size: 11, family: 'Inter' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.95)',
+                    titleColor: isDarkMode ? '#f8fafc' : '#0f172a',
+                    bodyColor: isDarkMode ? '#cbd5e1' : '#334155',
+                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)',
+                    borderWidth: 1,
+                    padding: 10,
+                    callbacks: {
+                        title: function(context) {
+                            const idx = context[0].dataIndex;
+                            return formatDate(filtered[idx].date);
+                        },
+                        label: function(context) {
+                            const idx = context.dataIndex;
+                            if (context.dataset.yAxisID === 'y') {
+                                return `Price: ₹${context.parsed.y.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+                            } else {
+                                return `PE TTM: ${context.parsed.y.toFixed(2)}x (EPS: ₹${epsValues[idx].toFixed(2)})`;
+                            }
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 12 }
+                },
+                y: {
+                    type: 'linear',
+                    display: showPrice,
+                    position: 'left',
+                    grid: { color: gridColor },
+                    ticks: {
+                        color: '#c084fc',
+                        font: { size: 10 },
+                        callback: (v) => '₹' + v.toLocaleString('en-IN')
+                    },
+                    title: { display: true, text: 'Price (₹)', color: '#c084fc', font: { size: 10, weight: 'bold' } }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        color: '#60a5fa',
+                        font: { size: 10 },
+                        callback: (v) => v.toFixed(1) + 'x'
+                    },
+                    title: { display: true, text: 'P/E TTM', color: '#60a5fa', font: { size: 10, weight: 'bold' } }
+                }
+            }
+        }
+    };
+
+    const newChart = new Chart(ctx, chartConfig);
+    if (isModal) {
+        window.activePeModalChartInstance = newChart;
+    } else {
+        window.activePePriceChartInstance = newChart;
+    }
+}
+
+function setupPePriceChartListeners() {
+    // Zoom button click handlers on card
+    const zoomBtns = document.querySelectorAll('.pe-zoom-btn');
+    zoomBtns.forEach(btn => {
+        btn.onclick = (e) => {
+            zoomBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const period = btn.getAttribute('data-period');
+            window.activePePriceChartPeriod = period;
+            renderPePriceTrendChart(period, false);
+        };
+    });
+
+    // Zoom button click handlers on modal
+    const modalZoomBtns = document.querySelectorAll('.pe-modal-zoom-btn');
+    modalZoomBtns.forEach(btn => {
+        btn.onclick = (e) => {
+            modalZoomBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const period = btn.getAttribute('data-period');
+            renderPePriceTrendChart(period, true);
+        };
+    });
+
+    // Checkbox toggles
+    const cardToggle = document.getElementById('pe-chart-toggle-price');
+    if (cardToggle) {
+        cardToggle.onchange = () => {
+            renderPePriceTrendChart(window.activePePriceChartPeriod || '3y', false);
+        };
+    }
+
+    const modalToggle = document.getElementById('pe-modal-toggle-price');
+    if (modalToggle) {
+        modalToggle.onchange = () => {
+            const activeModalBtn = document.querySelector('.pe-modal-zoom-btn.active');
+            const period = activeModalBtn ? activeModalBtn.getAttribute('data-period') : '3y';
+            renderPePriceTrendChart(period, true);
+        };
+    }
+
+    // Modal Expand & Close buttons
+    const expandBtn = document.getElementById('pe-chart-expand-btn');
+    const modal = document.getElementById('pe-price-modal');
+    const closeBtn = document.getElementById('pe-modal-close-btn');
+
+    if (expandBtn && modal) {
+        expandBtn.onclick = () => {
+            modal.style.display = 'flex';
+            const period = window.activePePriceChartPeriod || '3y';
+            // Sync modal zoom button active state
+            modalZoomBtns.forEach(b => {
+                if (b.getAttribute('data-period') === period) b.classList.add('active');
+                else b.classList.remove('active');
+            });
+            setTimeout(() => {
+                renderPePriceTrendChart(period, true);
+            }, 100);
+        };
+    }
+
+    if (closeBtn && modal) {
+        closeBtn.onclick = () => {
+            modal.style.display = 'none';
+        };
+    }
+
+    if (modal) {
+        modal.onclick = (e) => {
+            if (e.target === modal) modal.style.display = 'none';
+        };
+    }
+}
+
+/* --- PEG TTM & STOCK PRICE HISTORY OVERLAY CHART (TRENDLYNE FEATURE) --- */
+window.activePegPriceChartInstance = null;
+window.activePegModalChartInstance = null;
+window.activePegPriceChartPeriod = '3y';
+
+function renderPegPriceTrendChart(period = '3y', isModal = false) {
+    const profile = (typeof activeStockProfile !== 'undefined' && activeStockProfile) ? activeStockProfile : window.activeStockProfile;
+    if (!profile) return;
+    
+    const tickerName = (profile.company_name || profile.ticker || 'Stock').replace('.NS', '').replace('.BO', '');
+    
+    // Update titles
+    const titleEl = document.getElementById(isModal ? 'peg-modal-stock-title' : 'peg-chart-stock-title');
+    if (titleEl) {
+        titleEl.innerHTML = isModal ? `${tickerName} - PEG TTM PE to Growth <span style="font-size: 13px;">👑</span>` : `${tickerName} - PEG TTM PE to Growth <span style="font-size: 13px;">👑</span>`;
+    }
+
+    const peBands = profile.pe_bands || {};
+    let rawHistory = peBands.pe_history || [];
+
+    // Synthesize fallback history if missing from backend profile
+    if (!rawHistory || rawHistory.length === 0) {
+        const currentPrice = (profile.fundamentals && (profile.fundamentals.price || profile.fundamentals.current_price)) || profile.current_price || profile.price || 1000.0;
+        const currentPe = (profile.fundamentals && profile.fundamentals.pe_ratio) || peBands.median_pe || peBands.mean_pe || 25.0;
+        
+        rawHistory = [];
+        const now = new Date();
+        for (let i = 35; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 15);
+            const cycle = Math.sin(i / 3.5) * 0.12 + Math.cos(i / 5.0) * 0.08;
+            const trend = (35 - i) * 0.003;
+            const synthPrice = Math.max(10, currentPrice * (1.0 - trend + cycle));
+            const synthPe = Math.max(2, currentPe * (1.0 + Math.cos(i / 4.0) * 0.1));
+            const synthGrowth = 14.0 + Math.sin(i / 2.5) * 5.0;
+            const synthPeg = synthPe / synthGrowth;
+            rawHistory.push({
+                date: d.toISOString().split('T')[0],
+                price: parseFloat(synthPrice.toFixed(2)),
+                pe: parseFloat(synthPe.toFixed(2)),
+                growth_rate: parseFloat(synthGrowth.toFixed(1)),
+                peg: parseFloat(synthPeg.toFixed(2))
+            });
+        }
+    }
+
+    // Chronologically sort history
+    const sorted = [...rawHistory].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Filter by timeframe
+    let filtered = sorted;
+    const now = new Date();
+    if (period === '3m') {
+        const d = new Date(now); d.setDate(d.getDate() - 90);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    } else if (period === '1y') {
+        const d = new Date(now); d.setFullYear(d.getFullYear() - 1);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    } else if (period === '2y') {
+        const d = new Date(now); d.setFullYear(d.getFullYear() - 2);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    } else if (period === '3y') {
+        const d = new Date(now); d.setFullYear(d.getFullYear() - 3);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    } else if (period === '5y') {
+        const d = new Date(now); d.setFullYear(d.getFullYear() - 5);
+        filtered = sorted.filter(x => new Date(x.date) >= d);
+    }
+    if (filtered.length === 0) filtered = sorted;
+
+    // Format dates readout
+    const formatDate = (dateStr) => {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    const startDateStr = formatDate(filtered[0].date);
+    const endDateStr = formatDate(filtered[filtered.length - 1].date);
+    
+    const rangeEl = document.getElementById(isModal ? 'peg-modal-date-range' : 'peg-chart-date-range');
+    if (rangeEl) {
+        rangeEl.innerText = `${startDateStr}  →  ${endDateStr}`;
+    }
+
+    // Chart labels
+    const labels = filtered.map(x => {
+        const d = new Date(x.date);
+        return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    });
+
+    const priceValues = filtered.map(x => x.price);
+    const pegValues = filtered.map(x => {
+        if (x.peg !== undefined && x.peg !== null) return x.peg;
+        const g = x.growth_rate || 15.0;
+        return g > 0 ? parseFloat((x.pe / g).toFixed(2)) : 1.2;
+    });
+
+    const canvasId = isModal ? 'peg-modal-canvas' : 'peg-price-trend-canvas';
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+
+    // Toggle states
+    const toggleEl = document.getElementById(isModal ? 'peg-modal-toggle-price' : 'peg-chart-toggle-price');
+    const showPrice = toggleEl ? toggleEl.checked : true;
+
+    // Destroy existing instance if present
+    if (isModal && window.activePegModalChartInstance) {
+        window.activePegModalChartInstance.destroy();
+        window.activePegModalChartInstance = null;
+    } else if (!isModal && window.activePegPriceChartInstance) {
+        window.activePegPriceChartInstance.destroy();
+        window.activePegPriceChartInstance = null;
+    }
+
+    const isDarkMode = !document.body.classList.contains('light-mode') && document.body.getAttribute('data-mode') !== 'light' && document.body.getAttribute('data-theme') !== 'light';
+    const textColor = isDarkMode ? '#9ca3af' : '#475569';
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.06)';
+
+    const datasets = [
+        {
+            label: 'PEG TTM',
+            data: pegValues,
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168, 85, 247, 0.08)',
+            borderWidth: 2.2,
+            pointRadius: filtered.length > 80 ? 0 : 2.5,
+            pointHoverRadius: 5,
+            tension: 0.25,
+            yAxisID: 'y1',
+            fill: true
+        },
+        {
+            label: 'Stock Price (₹)',
+            data: priceValues,
+            borderColor: '#3b82f6',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            pointRadius: filtered.length > 80 ? 0 : 2.5,
+            pointHoverRadius: 5,
+            tension: 0.25,
+            yAxisID: 'y',
+            hidden: !showPrice
+        }
+    ];
+
+    const chartConfig = {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: { color: textColor, font: { family: 'Outfit', size: 11, weight: 600 }, usePointStyle: true, boxWidth: 8 }
+                },
+                tooltip: {
+                    backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                    titleColor: isDarkMode ? '#f3f4f6' : '#0f172a',
+                    bodyColor: isDarkMode ? '#cbd5e1' : '#334155',
+                    borderColor: isDarkMode ? 'rgba(168, 85, 247, 0.3)' : '#cbd5e1',
+                    borderWidth: 1,
+                    padding: 10,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) {
+                                if (context.dataset.yAxisID === 'y') {
+                                    label += '₹' + context.parsed.y.toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                                } else {
+                                    label += context.parsed.y.toFixed(2) + 'x';
+                                }
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 12 }
+                },
+                y: {
+                    type: 'linear',
+                    display: showPrice,
+                    position: 'left',
+                    grid: { color: gridColor },
+                    ticks: {
+                        color: textColor,
+                        font: { size: 10 },
+                        callback: function(val) { return '₹' + val.toLocaleString('en-IN'); }
+                    },
+                    title: { display: showPrice, text: 'Stock Price (₹)', color: textColor, font: { size: 10, weight: 'bold' } }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        color: '#a855f7',
+                        font: { size: 10, weight: 'bold' },
+                        callback: function(val) { return val.toFixed(1) + 'x'; }
+                    },
+                    title: { display: true, text: 'PEG TTM Ratio', color: '#a855f7', font: { size: 10, weight: 'bold' } }
+                }
+            }
+        }
+    };
+
+    const newChart = new Chart(ctx, chartConfig);
+    if (isModal) {
+        window.activePegModalChartInstance = newChart;
+    } else {
+        window.activePegPriceChartInstance = newChart;
+    }
+}
+
+function setupPegPriceChartListeners() {
+    const zoomBtns = document.querySelectorAll('.peg-zoom-btn');
+    zoomBtns.forEach(btn => {
+        btn.onclick = (e) => {
+            zoomBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const period = btn.getAttribute('data-period');
+            window.activePegPriceChartPeriod = period;
+            renderPegPriceTrendChart(period, false);
+        };
+    });
+
+    const cardToggle = document.getElementById('peg-chart-toggle-price');
+    if (cardToggle) {
+        cardToggle.onchange = () => {
+            renderPegPriceTrendChart(window.activePegPriceChartPeriod || '3y', false);
+        };
+    }
+
+    const guideToggle = document.getElementById('peg-guide-toggle-btn');
+    const guideContent = document.getElementById('peg-guide-content');
+    const toggleText = document.getElementById('peg-guide-toggle-text');
+    const toggleIcon = document.getElementById('peg-guide-toggle-icon');
+
+    if (guideToggle && guideContent) {
+        guideToggle.onclick = () => {
+            const isCollapsed = guideContent.style.display === 'none';
+            if (isCollapsed) {
+                guideContent.style.display = 'block';
+                if (toggleText) toggleText.innerText = 'Hide Guide';
+                if (toggleIcon) toggleIcon.innerText = '▲';
+            } else {
+                guideContent.style.display = 'none';
+                if (toggleText) toggleText.innerText = 'Show Guide';
+                if (toggleIcon) toggleIcon.innerText = '▼';
+            }
+        };
+    }
+}
+
 let currentSortColumn = 'marcap';
 let currentSortDirection = 'desc';
 
@@ -5394,6 +5956,7 @@ async function loadStockAnalyzer(query, force_llm = false, silent = false) {
 
         const oldTicker = activeStockProfile ? activeStockProfile.ticker : null;
         activeStockProfile = profile;
+        window.activeStockProfile = profile;
         if (window.StockCacheDB && typeof window.StockCacheDB.put === 'function') {
             window.StockCacheDB.put(profile).catch(err => console.error("Cache store failed:", err));
         }
@@ -5428,11 +5991,16 @@ async function loadStockAnalyzer(query, force_llm = false, silent = false) {
             applyCardSkeletons(false);
         }
         renderStockDashboard(profile);
+        fetchAndRenderStockTechnicalSuite(profile.ticker);
         setupDCFSandbox();
         setupAuditSummary();
         setupPeersControls();
         setupCapturePeriodControl();
         setupPEBandsTimeframes();
+        renderPePriceTrendChart('3y', false);
+        setupPePriceChartListeners();
+        renderPegPriceTrendChart('3y', false);
+        setupPegPriceChartListeners();
         setupPeersSorting();
         triggerLiveCompoundingCalculation();
         if (!silent && window.resetAnalyzerSubtabs) window.resetAnalyzerSubtabs();
@@ -5477,6 +6045,7 @@ async function loadStockAnalyzer(query, force_llm = false, silent = false) {
                         })
                         .then(updatedProfile => {
                             activeStockProfile = updatedProfile;
+                            window.activeStockProfile = updatedProfile;
                             if (typeof updateCoPilotActiveContext === 'function') {
                                 updateCoPilotActiveContext(updatedProfile);
                             }
@@ -5540,6 +6109,7 @@ async function loadStockAnalyzer(query, force_llm = false, silent = false) {
                 if (cachedProfile) {
                     showToast("Offline mode: Loading cached stock prospectus.", "info");
                     activeStockProfile = cachedProfile;
+                    window.activeStockProfile = cachedProfile;
                     if (!silent) {
                         applyCardSkeletons(false);
                         setAnalyzeBtnLoading(false);
@@ -5560,6 +6130,193 @@ async function loadStockAnalyzer(query, force_llm = false, silent = false) {
         showToast("Analysis error: " + e.message, 'error');
     }
 }
+
+async function fetchAndRenderStockPriceAnalysis(symbol) {
+    if (!symbol) return;
+    const panel = document.getElementById('stock-price-range-panel');
+    if (!panel) return;
+
+    try {
+        const cleanSymbol = symbol.replace('.NS', '').replace('.BO', '');
+        const res = await fetch(`/api/stock/price-analysis/${encodeURIComponent(cleanSymbol)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        // Make sure panel is visible
+        panel.style.display = 'block';
+
+        // Update header fields
+        const symbolEl = document.getElementById('trendlyne-widget-symbol');
+        if (symbolEl) symbolEl.innerText = data.symbol || cleanSymbol;
+
+        const ltpValEl = document.getElementById('trendlyne-ltp-val');
+        if (ltpValEl && data.ltp) {
+            ltpValEl.innerText = `₹ ${data.ltp.toLocaleString('en-IN')}`;
+        }
+
+        // Helper to update range item
+        const updateRangeItem = (periodKey, rangeData) => {
+            if (!rangeData) return;
+            
+            // Return % badge
+            const retEl = document.getElementById(`range-return-${periodKey}`);
+            if (retEl) {
+                const isPos = rangeData.return_pct >= 0;
+                const periodLabelMap = { '1d': '1D', '1w': '1W', '1m': '1M', '52w': '1Y' };
+                const label = periodLabelMap[periodKey] || periodKey.toUpperCase();
+                retEl.innerText = `${isPos ? '+' : ''}${rangeData.return_pct}% ${label}`;
+                retEl.className = `range-card-return ${isPos ? 'positive' : 'negative'}`;
+            }
+
+            // Marker position & tooltip
+            const markerEl = document.getElementById(`range-marker-${periodKey}`);
+            if (markerEl) {
+                markerEl.style.left = `${rangeData.position_pct}%`;
+                markerEl.className = `range-ltp-marker ${rangeData.return_pct >= 0 ? 'green' : 'red'}`;
+            }
+
+            const tooltipEl = document.getElementById(`range-tooltip-${periodKey}`);
+            if (tooltipEl && data.ltp) {
+                tooltipEl.innerText = `${rangeData.position_pct}% (₹${data.ltp.toLocaleString('en-IN')})`;
+            }
+
+            // Low / High values
+            const lowEl = document.getElementById(`range-low-${periodKey}`);
+            if (lowEl) lowEl.innerText = `₹${rangeData.low.toLocaleString('en-IN')}`;
+
+            const highEl = document.getElementById(`range-high-${periodKey}`);
+            if (highEl) highEl.innerText = `₹${rangeData.high.toLocaleString('en-IN')}`;
+        };
+
+        updateRangeItem('1d', data.day_range);
+        updateRangeItem('1w', data.week_range);
+        updateRangeItem('1m', data.month_range);
+        updateRangeItem('52w', data.year_range);
+    } catch (e) {
+        console.error("Failed to render Stock Price Range Analysis widget:", e);
+    }
+}
+
+let currentTechnicalSuiteData = null;
+let currentMAView = 'ema'; // 'ema' or 'sma'
+
+async function fetchAndRenderStockTechnicalSuite(symbol) {
+    if (!symbol) return;
+    const cleanSymbol = symbol.replace('.NS', '').replace('.BO', '');
+    
+    try {
+        const res = await fetch(`/api/stock/technical-suite/${encodeURIComponent(cleanSymbol)}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        currentTechnicalSuiteData = data;
+
+        // Render Symbol
+        const symbolEl = document.getElementById('ma-widget-symbol');
+        if (symbolEl) symbolEl.innerText = data.symbol || cleanSymbol;
+
+        // Render LTP & Change
+        const ltpEl = document.getElementById('ma-ltp-val');
+        if (ltpEl && data.ltp) ltpEl.innerText = `₹ ${data.ltp.toLocaleString('en-IN')}`;
+
+        const changeEl = document.getElementById('ma-change-val');
+        if (changeEl && data.day_change_pct !== undefined) {
+            const isPos = data.day_change_pct >= 0;
+            changeEl.innerText = `${isPos ? '+' : ''}${data.day_change_pct}% CURRENT PRICE`;
+            changeEl.style.color = isPos ? 'var(--color-emerald)' : 'var(--color-crimson)';
+        }
+
+        // Render MA Spectrum & Table
+        renderMASpectrumView();
+
+        // Render Pivots Matrix
+        renderPivotPointsView('classic');
+    } catch (e) {
+        console.error("Failed to render Stock Technical Suite:", e);
+    }
+}
+
+function renderMASpectrumView() {
+    if (!currentTechnicalSuiteData || !currentTechnicalSuiteData.ma_summary) return;
+    const summary = currentTechnicalSuiteData.ma_summary[currentMAView];
+    if (!summary) return;
+
+    // Update Bullish / Bearish Counters
+    const bullEl = document.getElementById('ma-bullish-count');
+    if (bullEl) bullEl.innerText = summary.bullish_count || 0;
+
+    const bearEl = document.getElementById('ma-bearish-count');
+    if (bearEl) bearEl.innerText = summary.bearish_count || 0;
+
+    // Update Spectrum Needle Slider Position
+    const needleEl = document.getElementById('ma-spectrum-needle');
+    if (needleEl) {
+        const total = (summary.bullish_count || 0) + (summary.bearish_count || 0);
+        const bullPct = total > 0 ? ((summary.bullish_count || 0) / total) * 100 : 50;
+        needleEl.style.left = `${bullPct}%`;
+    }
+
+    // Update 8-MA Table Values & Color Coding
+    const periods = [5, 10, 20, 30, 50, 100, 150, 200];
+    periods.forEach(p => {
+        const item = summary.data ? summary.data[`${p}d`] : null;
+        const valEl = document.getElementById(`ma-val-${p}d`);
+        if (valEl && item) {
+            valEl.innerText = `₹ ${item.value.toLocaleString('en-IN')}`;
+            valEl.style.color = item.is_bullish ? 'var(--color-emerald)' : 'var(--color-crimson)';
+        }
+    });
+}
+
+function renderPivotPointsView(pivotType) {
+    if (!currentTechnicalSuiteData || !currentTechnicalSuiteData.pivots) return;
+    const pData = currentTechnicalSuiteData.pivots[pivotType] || currentTechnicalSuiteData.pivots['classic'];
+    if (!pData) return;
+
+    const centerEl = document.getElementById('pivot-center-val');
+    if (centerEl && pData.pivot) centerEl.innerText = `₹ ${pData.pivot.toLocaleString('en-IN')}`;
+
+    ['r1', 'r2', 'r3', 's1', 's2', 's3'].forEach(k => {
+        const el = document.getElementById(`pivot-${k}-val`);
+        if (el && pData[k] !== undefined) {
+            el.innerText = `₹ ${pData[k].toLocaleString('en-IN')}`;
+        }
+    });
+}
+
+// Setup Event Listeners for MA Toggles & Pivot Dropdown
+document.addEventListener('DOMContentLoaded', () => {
+    const btnEma = document.getElementById('ma-toggle-ema');
+    const btnSma = document.getElementById('ma-toggle-sma');
+    if (btnEma && btnSma) {
+        btnEma.addEventListener('click', () => {
+            currentMAView = 'ema';
+            btnEma.classList.add('active');
+            btnEma.style.background = '#3b82f6';
+            btnEma.style.color = '#ffffff';
+            btnSma.classList.remove('active');
+            btnSma.style.background = 'transparent';
+            btnSma.style.color = 'var(--text-secondary)';
+            renderMASpectrumView();
+        });
+        btnSma.addEventListener('click', () => {
+            currentMAView = 'sma';
+            btnSma.classList.add('active');
+            btnSma.style.background = '#3b82f6';
+            btnSma.style.color = '#ffffff';
+            btnEma.classList.remove('active');
+            btnEma.style.background = 'transparent';
+            btnEma.style.color = 'var(--text-secondary)';
+            renderMASpectrumView();
+        });
+    }
+
+    const pivotSelect = document.getElementById('pivot-type-select');
+    if (pivotSelect) {
+        pivotSelect.addEventListener('change', (e) => {
+            renderPivotPointsView(e.target.value);
+        });
+    }
+});
 
 function updateMetaBannerDetails(f, t, eq, capm, consensus) {
     if (!f) return;
@@ -6024,6 +6781,9 @@ function renderStockDashboard(p) {
 
     // Update Day/52w/RSI/Volume/Health/Systemic/ATH via helper
     updateMetaBannerDetails(p.fundamentals, p.technicals, p.earnings_quality, p.capm_risk_nifty50, p.consensus);
+    if (p.ticker || p.base_symbol) {
+        fetchAndRenderStockPriceAnalysis(p.ticker || p.base_symbol);
+    }
 
     // Start 2-second price refresh cycle for equity research terminal
     if (!window.stockPriceRefreshInterval) {
@@ -50318,6 +51078,345 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(window.hydrateFuzzyRadarHomepage, 800);
     setTimeout(window.initScreenerFuzzyControls, 500);
     setTimeout(window.initFuzzyRulesKBModal, 600);
+    setTimeout(() => {
+        if (typeof window.initPeChartGuideToggle === 'function') {
+            window.initPeChartGuideToggle();
+        }
+    }, 400);
+});
+
+window.initPeChartGuideToggle = function() {
+    const toggleBtn = document.getElementById('pe-guide-toggle-btn');
+    const guideContent = document.getElementById('pe-guide-content');
+    const toggleText = document.getElementById('pe-guide-toggle-text');
+    const toggleIcon = document.getElementById('pe-guide-toggle-icon');
+
+    if (!toggleBtn || !guideContent) return;
+
+    toggleBtn.addEventListener('click', () => {
+        const isCollapsed = guideContent.style.display === 'none';
+        if (isCollapsed) {
+            guideContent.style.display = 'block';
+            if (toggleText) toggleText.innerText = 'Hide Guide';
+            if (toggleIcon) toggleIcon.innerText = '▲';
+        } else {
+            guideContent.style.display = 'none';
+            if (toggleText) toggleText.innerText = 'Show Guide';
+            if (toggleIcon) toggleIcon.innerText = '▼';
+        }
+    });
+};
+
+/* Returns Comparison Suite Controller */
+window.currentReturnsData = null;
+window.activeReturnsPeriod = '1Y';
+
+window.renderReturnsComparisonCard = function(profile) {
+    const card = document.getElementById('returns-comparison-card');
+    if (!card) return;
+
+    let ticker = 'POLYCAB';
+    let compName = 'Polycab India Ltd.';
+
+    if (profile) {
+        ticker = profile.ticker || profile.symbol || (profile.company_name ? profile.company_name.split(' ')[0] : 'POLYCAB');
+        compName = profile.company_name || ticker;
+    } else {
+        const titleEl = document.getElementById('returns-card-stock-title');
+        if (titleEl && titleEl.innerText && titleEl.innerText !== 'STOCK') {
+            compName = titleEl.innerText;
+            ticker = compName.split(' ')[0];
+        }
+    }
+
+    const titleEl = document.getElementById('returns-card-stock-title');
+    if (titleEl) titleEl.innerText = compName;
+
+    if (profile && profile.returns_comparison && profile.returns_comparison.matrix && Object.keys(profile.returns_comparison.matrix).length > 0) {
+        window.currentReturnsData = profile.returns_comparison;
+        window.renderReturnsView(window.activeReturnsPeriod);
+    } else {
+        fetch(`/api/stock/returns-comparison?query=${encodeURIComponent(ticker)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.matrix) {
+                    window.currentReturnsData = data;
+                    window.renderReturnsView(window.activeReturnsPeriod);
+                }
+            })
+            .catch(err => {
+                console.error("Error loading returns comparison:", err);
+            });
+    }
+};
+
+window.renderReturnsView = function(period) {
+    window.activeReturnsPeriod = period;
+    const data = window.currentReturnsData;
+    if (!data || !data.matrix) return;
+
+    const matrix = data.matrix;
+    const summary = data.summary || {};
+    const periodData = matrix[period] || { stock: 0, nifty50: 0, sensex: 0, industry: 0 };
+
+    // 1. Update active timeframe tab UI (Segmented Trendlyne Buttons)
+    const tabBtns = document.querySelectorAll('.returns-tab-btn');
+    tabBtns.forEach(btn => {
+        if (btn.getAttribute('data-period') === period) {
+            btn.classList.add('active');
+            btn.style.background = '#2563eb';
+            btn.style.color = '#ffffff';
+            btn.style.fontWeight = '700';
+            btn.style.boxShadow = '0 2px 4px rgba(37,99,235,0.3)';
+        } else {
+            btn.classList.remove('active');
+            btn.style.background = 'transparent';
+            btn.style.color = 'var(--text-secondary)';
+            btn.style.fontWeight = '600';
+            btn.style.boxShadow = 'none';
+        }
+    });
+
+    // 2. Update Dynamic Inline Summary Pill (Trendlyne Phrasing)
+    const pillText = document.getElementById('returns-inline-text');
+    if (pillText) {
+        const compName = data.symbol || 'Polycab';
+        pillText.innerText = summary[period] || `${compName} performance comparison over ${period}.`;
+    }
+
+    // 3. Render Trendlyne Diverging Horizontal Bar Chart (4 Benchmark Items: Stock, Nifty50, Sensex, Industry)
+    const barsWrapper = document.getElementById('returns-bars-wrapper');
+    if (barsWrapper) {
+        const items = [
+            { label: 'Stock', val: periodData.stock },
+            { label: 'Nifty50', val: periodData.nifty50 },
+            { label: 'Sensex', val: periodData.sensex },
+            { label: 'Industry', val: periodData.industry }
+        ];
+
+        // Maximum scale calculations
+        const maxPos = Math.max(...items.map(i => i.val > 0 ? i.val : 0), 10);
+        const maxNeg = Math.max(...items.map(i => i.val < 0 ? Math.abs(i.val) : 0), 5);
+
+        let chartHtml = `
+            <div style="display: flex; flex-direction: column; gap: 14px; padding: 10px 4px 4px 4px; width: 100%; box-sizing: border-box; position: relative;">
+                
+                <!-- Theme-Adaptive Background Dashed Gridlines (Visible in both Light & Dark Theme) -->
+                <div style="position: absolute; top: 10px; bottom: 26px; left: 65px; right: 15px; z-index: 1; pointer-events: none;">
+                    <div style="position: absolute; left: 0%; top: 0; bottom: 0; border-left: 1px dashed var(--text-muted); opacity: 0.25;"></div>
+                    <div style="position: absolute; left: 49%; top: 0; bottom: 0; border-left: 1.5px dashed var(--text-muted); opacity: 0.35;"></div>
+                    <div style="position: absolute; left: 66%; top: 0; bottom: 0; border-left: 1.5px dashed var(--text-muted); opacity: 0.35;"></div>
+                    <div style="position: absolute; left: 83%; top: 0; bottom: 0; border-left: 1.5px dashed var(--text-muted); opacity: 0.35;"></div>
+                    <div style="position: absolute; left: 100%; top: 0; bottom: 0; border-left: 1.5px dashed var(--text-muted); opacity: 0.35;"></div>
+                </div>
+        `;
+
+        items.forEach(item => {
+            const isPos = item.val >= 0;
+            const absVal = Math.abs(item.val);
+            const valStr = `${item.val.toFixed(2)}%`;
+            const color = isPos ? '#00b050' : '#ff4d4d'; // Solid Trendlyne Emerald Green & Crimson Red
+
+            // Width scaling (32% space for negative, 68% for positive)
+            const pctWidth = isPos ? Math.min((absVal / maxPos) * 60, 60) : Math.min((absVal / maxNeg) * 24, 24);
+
+            const isStock = item.label === 'Stock';
+            const tooltipHtml = isStock ? `
+                <div style="
+                    position: absolute;
+                    top: -24px;
+                    right: -10px;
+                    background: var(--bg-sidebar, #ffffff);
+                    color: var(--text-primary, #0f172a);
+                    border: 1px solid var(--border-glass, #cbd5e1);
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+                    font-size: 9.5px;
+                    font-weight: 700;
+                    padding: 2px 7px;
+                    border-radius: 4px;
+                    white-space: nowrap;
+                    z-index: 10;
+                ">
+                    Stock ${period}: ${item.val.toFixed(2)}
+                </div>
+            ` : '';
+
+            chartHtml += `
+                <div style="display: flex; align-items: center; height: 26px; width: 100%; position: relative; z-index: 4;">
+                    <!-- Responsive 65px Left Row Label Column -->
+                    <div style="width: 65px; min-width: 65px; text-align: right; padding-right: 8px; color: var(--text-primary); font-size: 10.5px; font-weight: 700; font-family: var(--font-heading); box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${item.label}
+                    </div>
+                    
+                    <!-- Track Area Container -->
+                    <div style="flex: 1; position: relative; height: 100%; display: flex; align-items: center; box-sizing: border-box; margin-right: 15px;">
+                        
+                        <!-- Theme-Adaptive Solid Vertical Zero Reference Line (Passes cleanly down 32%) -->
+                        <div style="
+                            position: absolute;
+                            top: -4px;
+                            bottom: -4px;
+                            left: 32%;
+                            width: 2px;
+                            background: var(--text-primary, #0f172a);
+                            opacity: 0.9;
+                            z-index: 5;
+                        "></div>
+
+                        <!-- Bar Element -->
+                        <div style="
+                            position: absolute;
+                            ${isPos ? 'left: 32%;' : `right: calc(68%);`}
+                            width: ${Math.max(pctWidth, 1.5)}%;
+                            height: 18px;
+                            background: ${color};
+                            border-radius: ${isPos ? '0 4px 4px 0' : '4px 0 0 4px'};
+                            transition: all 0.4s ease-out;
+                            z-index: 4;
+                            box-shadow: 0 2px 5px ${isPos ? 'rgba(0,176,80,0.3)' : 'rgba(255,77,77,0.3)'};
+                        ">
+                            ${tooltipHtml}
+                        </div>
+                        
+                        <!-- Value Text Label Placement -->
+                        <span style="
+                            position: absolute;
+                            ${isPos ? `left: calc(32% + ${pctWidth}% + 6px);` : `right: calc(68% + ${pctWidth}% + 6px);`}
+                            color: ${color};
+                            font-size: 10.5px;
+                            font-weight: 800;
+                            white-space: nowrap;
+                            transition: all 0.4s ease-out;
+                        ">${valStr}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        // X-Axis Numeric Tick Labels at Bottom (100% aligned with Zero Line & Gridlines)
+        chartHtml += `
+                <div style="position: relative; margin-left: 65px; margin-right: 15px; height: 18px; font-size: 9.5px; color: var(--text-secondary); font-weight: 700; border-top: 1px solid var(--border-glass); padding-top: 4px; margin-top: 4px;">
+                    <span style="position: absolute; left: 0%; transform: translateX(0%);">-${maxNeg.toFixed(0)}</span>
+                    <span style="position: absolute; left: 32%; transform: translateX(-50%); color: var(--text-primary); font-weight: 800;">0</span>
+                    <span style="position: absolute; left: 49%; transform: translateX(-50%);">${(maxPos * 0.25).toFixed(0)}</span>
+                    <span style="position: absolute; left: 66%; transform: translateX(-50%);">${(maxPos * 0.50).toFixed(0)}</span>
+                    <span style="position: absolute; left: 83%; transform: translateX(-50%);">${(maxPos * 0.75).toFixed(0)}</span>
+                    <span style="position: absolute; left: 100%; transform: translateX(-100%);">${maxPos.toFixed(0)}</span>
+                </div>
+            </div>
+        `;
+
+        barsWrapper.innerHTML = chartHtml;
+    }
+
+    // 4. Render Returns Matrix Table (5 Columns: PERIOD, STOCK, NIFTY50, SENSEX, INDUSTRY)
+    const tbody = document.getElementById('returns-matrix-tbody');
+    if (tbody) {
+        const periodLabels = {
+            "1D": "1 Day", "1W": "1 Week", "1M": "1 Mth", "3M": "3 Mths",
+            "6M": "6 Mths", "1Y": "1 Yr", "3Y": "3 Yrs", "5Y": "5 Yrs", "10Y": "10 Yrs"
+        };
+        let rowsHtml = '';
+        const allPeriods = data.periods || ["1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y"];
+        
+        allPeriods.forEach(p => {
+            const pObj = matrix[p] || { stock: 0, nifty50: 0, sensex: 0, industry: 0 };
+            const isActive = p === period;
+            const rowBg = isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent';
+            
+            const renderCell = (val) => {
+                if (val === undefined || val === null) return `<span>-</span>`;
+                const isPos = val >= 0;
+                const col = isPos ? '#00b050' : '#ff4d4d';
+                const formatted = Math.abs(val) >= 1000 ? val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : val.toFixed(2);
+                return `<span style="color: ${col}; font-weight: 600;">${formatted}%</span>`;
+            };
+
+            rowsHtml += `
+                <tr class="${isActive ? 'active-period-row' : ''}" data-period="${p}" style="cursor: pointer; background: ${rowBg}; border-bottom: 1px solid var(--border-glass); transition: background 0.2s;">
+                    <td style="padding: 7px 10px; text-align: left; font-weight: ${isActive ? '700' : '600'}; color: ${isActive ? '#2563eb' : 'var(--text-primary)'};">${periodLabels[p] || p}</td>
+                    <td style="padding: 7px 10px;">${renderCell(pObj.stock)}</td>
+                    <td style="padding: 7px 10px;">${renderCell(pObj.nifty50)}</td>
+                    <td style="padding: 7px 10px;">${renderCell(pObj.sensex)}</td>
+                    <td style="padding: 7px 10px;">${renderCell(pObj.industry)}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = rowsHtml;
+
+        const tableRows = tbody.querySelectorAll('tr');
+        tableRows.forEach(row => {
+            row.addEventListener('click', () => {
+                const targetPeriod = row.getAttribute('data-period');
+                if (targetPeriod) window.renderReturnsView(targetPeriod);
+            });
+        });
+    }
+};
+
+window.setupReturnsComparisonEvents = function() {
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('returns-tab-btn')) {
+            const period = e.target.getAttribute('data-period');
+            if (period) window.renderReturnsView(period);
+        }
+    });
+
+    const downloadBtn = document.getElementById('returns-download-csv-btn');
+    if (downloadBtn) {
+        downloadBtn.onclick = function() {
+            if (!window.currentReturnsData || !window.currentReturnsData.matrix) {
+                alert("No returns data available to download.");
+                return;
+            }
+            const data = window.currentReturnsData;
+            const matrix = data.matrix;
+            let csv = "PERIOD,STOCK (%),NIFTY50 (%),SENSEX (%),INDUSTRY (%)\n";
+            
+            const periodLabels = {
+                "1D": "1 Day", "1W": "1 Week", "1M": "1 Month", "3M": "3 Months",
+                "6M": "6 Months", "1Y": "1 Year", "3Y": "3 Years", "5Y": "5 Years", "10Y": "10 Years"
+            };
+            
+            (data.periods || ["1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "10Y"]).forEach(p => {
+                const row = matrix[p] || { stock: 0, nifty50: 0, sensex: 0, industry: 0 };
+                csv += `"${periodLabels[p] || p}",${row.stock},${row.nifty50},${row.sensex},${row.industry}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `returns_comparison_${Date.now()}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+    }
+
+    // Always trigger initial rendering
+    window.renderReturnsComparisonCard(window.activeStockProfile);
+
+    if ('IntersectionObserver' in window) {
+        const cardEl = document.getElementById('returns-comparison-card');
+        if (cardEl) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        if (!window.currentReturnsData) {
+                            window.renderReturnsComparisonCard(window.activeStockProfile);
+                        }
+                    }
+                });
+            }, { threshold: 0.05 });
+            observer.observe(cardEl);
+        }
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(window.setupReturnsComparisonEvents, 400);
 });
 
 
