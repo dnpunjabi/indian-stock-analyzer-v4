@@ -1461,7 +1461,140 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTradesHandlers();
     loadGlobalTrades();
     setupScreenerImportHandlers();
+
+    // Mobile Home & Dock Enhancements
+    setupMobileBottomDock();
+    setupAIPromptChips();
+    updateMarketMoodGauge();
 });
+
+// Mobile Bottom Navigation Dock Manager
+function setupMobileBottomDock() {
+    const dockBtns = document.querySelectorAll('.mobile-dock-btn');
+    if (!dockBtns.length) return;
+
+    dockBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTabId = btn.dataset.tab;
+            if (!targetTabId) return;
+
+            // Map target tab ID to sidebar navigation button
+            const navBtnMap = {
+                'tab-analyzer': document.getElementById('tab-analyzer-btn'),
+                'tab-screener': document.getElementById('tab-screener-btn'),
+                'tab-technical-scans': document.getElementById('tab-technical-scans-btn'),
+                'tab-fuzzy': document.getElementById('tab-fuzzy-btn'),
+                'tab-portfolio': document.getElementById('tab-portfolio-btn')
+            };
+
+            const targetNavBtn = navBtnMap[targetTabId];
+            if (targetNavBtn) {
+                targetNavBtn.click();
+            }
+
+            // Update dock button active state
+            dockBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+}
+
+// AI Search Prompt Chips Handler
+function setupAIPromptChips() {
+    const promptChips = document.querySelectorAll('.ai-prompt-chip');
+    const searchInput = document.getElementById('analyzer-search-input');
+    const searchBtn = document.getElementById('analyzer-search-btn');
+
+    if (!promptChips.length || !searchInput) return;
+
+    promptChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            const promptText = chip.dataset.prompt;
+            if (!promptText) return;
+
+            if (promptText === 'High ROE Midcaps' || promptText === 'RSI Oversold' || promptText === 'Near 52W High' || promptText === 'Strong Buy') {
+                // Navigate to Screener or Technical Scans tab for predefined quantitative prompts
+                if (promptText === 'Near 52W High' || promptText === 'RSI Oversold') {
+                    const techScansBtn = document.getElementById('tab-technical-scans-btn');
+                    if (techScansBtn) techScansBtn.click();
+                } else {
+                    const screenerBtn = document.getElementById('tab-screener-btn');
+                    if (screenerBtn) screenerBtn.click();
+                }
+            } else {
+                searchInput.value = promptText;
+                if (searchBtn) searchBtn.click();
+            }
+        });
+    });
+}
+
+// Interactive Market Mood Radial Gauge Updater
+function updateMarketMoodGauge(customScore) {
+    const needleGroup = document.getElementById('mood-needle-group');
+    const scoreNumEl = document.getElementById('mood-score-num');
+    const scoreLabelEl = document.getElementById('mood-score-label');
+    const regimeBadgeEl = document.getElementById('mood-regime-badge');
+
+    if (!needleGroup || !scoreNumEl) return;
+
+    // Calculate score (default 62 - Greed if not provided)
+    const score = customScore !== undefined ? Math.max(0, Math.min(100, customScore)) : 62;
+
+    // Map 0 - 100 score to -90deg to +90deg needle angle
+    const angleDeg = ((score / 100) * 180) - 90;
+    needleGroup.style.transform = `rotate(${angleDeg}deg)`;
+
+    scoreNumEl.innerText = Math.round(score);
+
+    // Label & Regime status
+    let label = 'NEUTRAL';
+    let regimeText = 'Balanced Market Regime';
+    let regimeColor = '#eab308';
+    let regimeBg = 'rgba(234, 179, 8, 0.12)';
+    let regimeBorder = 'rgba(234, 179, 8, 0.25)';
+
+    if (score <= 20) {
+        label = 'EXTREME FEAR';
+        regimeText = 'Deep Value / Max Safety Dip Buying Zone';
+        regimeColor = '#ef4444';
+        regimeBg = 'rgba(239, 68, 68, 0.12)';
+        regimeBorder = 'rgba(239, 68, 68, 0.25)';
+    } else if (score <= 40) {
+        label = 'FEAR';
+        regimeText = 'Strategic Accumulation Regime';
+        regimeColor = '#f59e0b';
+        regimeBg = 'rgba(245, 158, 11, 0.12)';
+        regimeBorder = 'rgba(245, 158, 11, 0.25)';
+    } else if (score <= 60) {
+        label = 'NEUTRAL';
+        regimeText = 'Balanced Market Consolidation';
+        regimeColor = '#eab308';
+        regimeBg = 'rgba(234, 179, 8, 0.12)';
+        regimeBorder = 'rgba(234, 179, 8, 0.25)';
+    } else if (score <= 80) {
+        label = 'GREED';
+        regimeText = 'Strong Momentum / Dip Buying Advantage';
+        regimeColor = '#10b981';
+        regimeBg = 'rgba(16, 185, 129, 0.12)';
+        regimeBorder = 'rgba(16, 185, 129, 0.25)';
+    } else {
+        label = 'EXTREME GREED';
+        regimeText = 'Overbought Regime / Profit Taking Caution';
+        regimeColor = '#059669';
+        regimeBg = 'rgba(5, 150, 105, 0.12)';
+        regimeBorder = 'rgba(5, 150, 105, 0.25)';
+    }
+
+    if (scoreLabelEl) scoreLabelEl.innerText = label;
+    if (regimeBadgeEl) {
+        regimeBadgeEl.innerText = regimeText;
+        regimeBadgeEl.style.color = regimeColor;
+        regimeBadgeEl.style.background = regimeBg;
+        regimeBadgeEl.style.borderColor = regimeBorder;
+    }
+}
+
 
 // Collapsible Sidebar Workstation Manager
 function setupSidebarToggle() {

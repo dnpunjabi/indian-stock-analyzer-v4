@@ -2064,6 +2064,14 @@
                         </button>
                     </div>
                     
+                    <!-- AI Search Prompt Chips -->
+                    <div class="ai-search-prompt-chips" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; width: 100%;">
+                        <button class="ai-prompt-chip" data-prompt="High ROE Midcaps" style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); color: var(--color-primary-light, #60a5fa); font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 12px; cursor: pointer; transition: all 0.2s;">🚀 High ROE Midcaps</button>
+                        <button class="ai-prompt-chip" data-prompt="Near 52W High" style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: #10b981; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 12px; cursor: pointer; transition: all 0.2s;">⚡ Near 52W High</button>
+                        <button class="ai-prompt-chip" data-prompt="RSI Oversold" style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); color: #f59e0b; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 12px; cursor: pointer; transition: all 0.2s;">📉 RSI Oversold (&lt;30)</button>
+                        <button class="ai-prompt-chip" data-prompt="Strong Buy" style="background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.25); color: #c084fc; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 12px; cursor: pointer; transition: all 0.2s;">🟢 Mamdani Strong Buy</button>
+                    </div>
+                    
                     <div class="workspace-action-group">
                         <!-- Add to Watchlist controls -->
                         <div id="add-to-watchlist-container">
@@ -2076,10 +2084,112 @@
                     </div>
                 </div>
 
-
-
                 <!-- Empty State -->
                 <div class="empty-state-card" id="analyzer-empty-state">
+                    <!-- NIFTY 50 & SENSEX Interactive Sparklines Hero Row -->
+                    <div id="home-hero-sparklines" class="hero-sparklines-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; width: 100%; box-sizing: border-box;">
+                        <!-- Nifty 50 Sparkline Card -->
+                        <div class="sparkline-hero-card" id="card-sparkline-nifty" style="background: var(--bg-card, rgba(15,23,42,0.6)); border: 1px solid var(--border-glass); border-radius: 10px; padding: 14px; box-sizing: border-box; position: relative; overflow: hidden; transition: all 0.3s ease;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                                <div>
+                                    <span style="font-size: 9px; font-weight: 700; background: rgba(59, 130, 246, 0.12); color: var(--color-primary-light, #60a5fa); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.25);">NSE CORE</span>
+                                    <h4 style="margin: 4px 0 0 0; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-primary);">NIFTY 50</h4>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span id="spark-nifty-val" style="font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: var(--text-primary); display: block;">22,850.50</span>
+                                    <span id="spark-nifty-chg" style="font-size: 10px; font-weight: 700; color: #10b981;">▲ +0.45%</span>
+                                </div>
+                            </div>
+                            <!-- Dynamic SVG Intraday Trendline -->
+                            <div id="sparkline-svg-nifty" style="height: 48px; width: 100%; position: relative;">
+                                <svg viewBox="0 0 200 48" preserveAspectRatio="none" style="width: 100%; height: 100%; display: block;">
+                                    <defs>
+                                        <linearGradient id="gradNifty" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+                                            <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M 0 38 Q 25 32, 50 20 T 100 28 T 150 12 T 200 8 L 200 48 L 0 48 Z" fill="url(#gradNifty)" />
+                                    <path d="M 0 38 Q 25 32, 50 20 T 100 28 T 150 12 T 200 8" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Sensex Sparkline Card -->
+                        <div class="sparkline-hero-card" id="card-sparkline-sensex" style="background: var(--bg-card, rgba(15,23,42,0.6)); border: 1px solid var(--border-glass); border-radius: 10px; padding: 14px; box-sizing: border-box; position: relative; overflow: hidden; transition: all 0.3s ease;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                                <div>
+                                    <span style="font-size: 9px; font-weight: 700; background: rgba(168, 85, 247, 0.12); color: #c084fc; padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(168, 85, 247, 0.25);">BSE CORE</span>
+                                    <h4 style="margin: 4px 0 0 0; font-family: 'Outfit', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-primary);">SENSEX</h4>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span id="spark-sensex-val" style="font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; color: var(--text-primary); display: block;">75,120.30</span>
+                                    <span id="spark-sensex-chg" style="font-size: 10px; font-weight: 700; color: #10b981;">▲ +0.51%</span>
+                                </div>
+                            </div>
+                            <!-- Dynamic SVG Intraday Trendline -->
+                            <div id="sparkline-svg-sensex" style="height: 48px; width: 100%; position: relative;">
+                                <svg viewBox="0 0 200 48" preserveAspectRatio="none" style="width: 100%; height: 100%; display: block;">
+                                    <defs>
+                                        <linearGradient id="gradSensex" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="#10b981" stop-opacity="0.35"/>
+                                            <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M 0 40 Q 25 28, 50 32 T 100 18 T 150 14 T 200 6 L 200 48 L 0 48 Z" fill="url(#gradSensex)" />
+                                    <path d="M 0 40 Q 25 28, 50 32 T 100 18 T 150 14 T 200 6" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Market Mood & Sentiment Radial Gauge (Fear & Greed Index) -->
+                    <div id="home-market-mood-card" class="desktop-cmd-card mood-gauge-card" style="margin-bottom: 20px; background: var(--bg-card, rgba(15,23,42,0.6)); border: 1px solid var(--border-glass); border-radius: 10px; padding: 16px; box-sizing: border-box;">
+                        <div class="desktop-cmd-card-header" style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border-glass); display: flex; justify-content: space-between; align-items: center;">
+                            <div class="header-left" style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 16px;">🌡️</span>
+                                <span class="header-title" style="font-family: 'Outfit', sans-serif; font-size: 13.5px; font-weight: 700; color: var(--text-primary);">Market Mood & Sentiment (Fear & Greed Index)</span>
+                            </div>
+                            <div class="header-right">
+                                <span id="mood-regime-badge" style="font-size: 10px; font-weight: 700; color: #10b981; background: rgba(16,185,129,0.12); padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(16,185,129,0.25);">Dip Buying Opportunity</span>
+                            </div>
+                        </div>
+                        <div class="mood-gauge-body" style="display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 10px 0;">
+                            <!-- SVG Semi-Circular Arc Radial Gauge -->
+                            <div class="radial-svg-wrapper" style="position: relative; width: 220px; height: 110px;">
+                                <svg viewBox="0 0 200 100" style="width: 100%; height: 100%;">
+                                    <defs>
+                                        <linearGradient id="moodArcGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stop-color="#ef4444" />
+                                            <stop offset="25%" stop-color="#f59e0b" />
+                                            <stop offset="50%" stop-color="#eab308" />
+                                            <stop offset="75%" stop-color="#10b981" />
+                                            <stop offset="100%" stop-color="#059669" />
+                                        </linearGradient>
+                                    </defs>
+                                    <!-- Arc Track -->
+                                    <path d="M 20 95 A 80 80 0 0 1 180 95" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="14" stroke-linecap="round" />
+                                    <!-- Active Gradient Arc -->
+                                    <path id="mood-arc-path" d="M 20 95 A 80 80 0 0 1 180 95" fill="none" stroke="url(#moodArcGrad)" stroke-width="14" stroke-linecap="round" stroke-dasharray="251.2" stroke-dashoffset="0" />
+                                    <!-- Rotating Needle -->
+                                    <g id="mood-needle-group" style="transform-origin: 100px 95px; transform: rotate(22deg); transition: transform 1s cubic-bezier(0.34, 1.56, 0.64, 1);">
+                                        <polygon points="97,95 103,95 100,20" fill="var(--text-primary, #ffffff)" />
+                                        <circle cx="100" cy="95" r="7" fill="var(--color-primary, #3b82f6)" />
+                                    </g>
+                                </svg>
+                                <div style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); text-align: center;">
+                                    <span id="mood-score-num" style="font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 800; color: var(--text-primary);">62</span>
+                                    <span id="mood-score-label" style="display: block; font-size: 9.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-top: -4px;">GREED</span>
+                                </div>
+                            </div>
+                            <div class="mood-scale-labels" style="display: flex; justify-content: space-between; width: 100%; font-size: 9px; font-weight: 700; color: var(--text-muted); margin-top: 8px;">
+                                <span>0 EXTREME FEAR</span>
+                                <span>50 NEUTRAL</span>
+                                <span>100 EXTREME GREED</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Desktop & Shared Institutional Hero Command Center -->
                     <div class="desktop-empty-state inst-hero-card">
                         <!-- Two-Column Dashboard Cockpit Grid -->
@@ -9901,6 +10011,31 @@
             </div>
         </div>
     </div>
+
+    <!-- Mobile Bottom Dock Navigation Bar -->
+    <nav id="mobile-bottom-dock" class="mobile-bottom-dock no-print">
+        <button class="mobile-dock-btn active" data-tab="tab-analyzer">
+            <span class="dock-icon">🏠</span>
+            <span class="dock-label">Home</span>
+        </button>
+        <button class="mobile-dock-btn" data-tab="tab-screener">
+            <span class="dock-icon">🔍</span>
+            <span class="dock-label">Screener</span>
+        </button>
+        <button class="mobile-dock-btn" data-tab="tab-technical-scans">
+            <span class="dock-icon">⚡</span>
+            <span class="dock-label">Scans</span>
+        </button>
+        <button class="mobile-dock-btn" data-tab="tab-fuzzy">
+            <span class="dock-icon">🧠</span>
+            <span class="dock-label">Fuzzy AI</span>
+        </button>
+        <button class="mobile-dock-btn" data-tab="tab-portfolio">
+            <span class="dock-icon">💼</span>
+            <span class="dock-label">Portfolio</span>
+        </button>
+    </nav>
 </body>
 </html>
+
 
